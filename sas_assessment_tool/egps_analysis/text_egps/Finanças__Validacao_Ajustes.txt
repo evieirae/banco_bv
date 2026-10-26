@@ -1,0 +1,404 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Validacao_Ajustes
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:34 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -120
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 273
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: SHIS = /riscosbv/ctrnegocios/mshiroma
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): PLANCTRL.TBGRUPOSCONCILIACAO [SAS/Local], SHIS.AJUSTE_TB040_MESA_CARTEIRA_BOOK [SAS/Local], SHIS.MODALIDADEPRODUTO [SAS/Local], _RLGLOBL.TBDIVISAOCOMERCIAL [SAS/Local], _RLGLOBL.TBGRUPOCOMERCIAL [SAS/Local], _RLGLOBL.TBGRUPOECONOMICO [SAS/Local], _RLGLOBL.TBSEGMENTOMERCADO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: SHIS
+EXPORTED_LIBNAMES: PLANCTRL
+IMPORTED FILES (Requires Ingestion): N:\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Validacao_Ajustes\AJUSTES.xlsx[SHEET='AJUSTES']
+TEMP/DISCARDED_FILE_INPUT: WORK.AJUSTES <- N:\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Validacao_Ajustes\AJUSTES.xlsx[SHEET='AJUSTES']
+TEMP/DISCARDED_TABLE_INPUT: WORK.AJUSTES, WORK.BASE, WORK.BASE_GERENCIAL, WORK.BASE_GER_PROD, WORK.BASE_GER_PROD_CONC, WORK.TBDIVISAOCOMERCIAL, WORK.TBGRUPOCOMERCIAL, WORK.TBGRUPOECONOMICO, WORK.TBSEGMENTOMERCADO
+TABLE_READ_PROVENANCE (Flow): PLANCTRL.TBGRUPOSCONCILIACAO [PROC SQL - JOIN], PLANCTRL.TEMP_CONV_TES [PROC SQL - FROM], SHIS.AJUSTE_TB040_MESA_CARTEIRA_BOOK [PROC SQL - JOIN], SHIS.MODALIDADEPRODUTO [PROC SQL - JOIN], WORK.AJUSTES [DATA Step - SET; PROC SQL - FROM], WORK.BASE [PROC SQL - FROM], WORK.BASE_GERENCIAL [PROC SQL - FROM], WORK.BASE_GER_PROD [PROC SQL - FROM], WORK.BASE_GER_PROD_CONC [PROC SQL - FROM], WORK.TBDIVISAOCOMERCIAL [PROC SQL - FROM], WORK.TBGRUPOCOMERCIAL [PROC SQL - FROM], WORK.TBGRUPOECONOMICO [PROC SQL - FROM], WORK.TBSEGMENTOMERCADO [PROC SQL - FROM], _RLGLOBL.TBDIVISAOCOMERCIAL [DATA Step - SET], _RLGLOBL.TBGRUPOCOMERCIAL [DATA Step - SET], _RLGLOBL.TBGRUPOECONOMICO [DATA Step - SET], _RLGLOBL.TBSEGMENTOMERCADO [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): PLANCTRL.TEMP_CONV_TES
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PLANCTRL.TEMP_CONV_TES
+APPEND_ONLY_OUTPUTS: PLANCTRL.TEMP_CONV_TES
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): PLANCTRL.TEMP_CONV_TES
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.AJUSTES, WORK.BASE, WORK.BASE_GERENCIAL, WORK.BASE_GER_PROD, WORK.BASE_GER_PROD_CONC, WORK.FINAL, WORK.MARGEM, WORK.TBDIVISAOCOMERCIAL, WORK.TBGRUPOCOMERCIAL, WORK.TBGRUPOECONOMICO, WORK.TBSEGMENTOMERCADO, WORK.VALIDACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|N:\DFRI\SPT. ALM. RI. P&C. Contas a Pagar\P&C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Validacao_Ajustes\AJUSTES.xlsx[SHEET='AJUSTES']||AJUSTES.XLSX|C|ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Validacoes */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Validacoes */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gTkBEiPPBzdv84JJ/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+
+delete from work.Ajustes
+where cdtipoajuste = .
+and cdtiporealocacao = .;
+
+Create Table WORK.validacao as
+SELECT CdTipoContabil as valor format= $20. length=20, 'Tipo contábil deve ser A ou P' as Descricao length=60
+from work.Ajustes
+where CdTipoContabil not in ('A', 'P');
+
+insert into WORK.validacao
+SELECT put(cdtipoajuste, 10.) as valor, 'Tipo de Ajuste deve ser preenchido' as Descricao
+from work.Ajustes
+where cdtipoajuste in (.) ;
+
+insert into WORK.validacao
+SELECT put(CdModalidadeProduto, 10.) as valor , 'Modalidade não pode ser negativa'
+from work.Ajustes
+where CdModalidadeProduto <= 0
+and CdModalidadeProduto not in (.);
+
+insert into WORK.validacao
+SELECT put(CdBook, 10.) as valor, 'Book deve ser prenchido'
+from work.Ajustes
+where CdBook <= 0
+or cdbook in (.);
+
+insert into WORK.validacao
+SELECT put(CdSegmentoMercado, 10.) as valor, 'Segmento deve ser preenchido'
+from work.Ajustes
+where CdSegmentoMercado <= 0
+or CdSegmentoMercado in (99);
+
+insert into WORK.validacao
+SELECT DsJustificativaRealocacao as valor format= $20. length=20 as valor, 'DsJustificativaRealocacao não por ter vírgula'
+from work.Ajustes
+where  DsJustificativaRealocacao like '%,%';
+
+insert into WORK.validacao
+SELECT CdChaveOperacao as valor format= $20. length=20 as valor, 'CdChaveOperacao não por ter vírgula'
+from work.Ajustes
+where  CdChaveOperacao like '%,%';
+
+
+
+quit;
+
+data work.TbSegmentoMercado;
+set _RLGLOBL.TbSegmentoMercado;
+run;
+
+proc sql;
+
+insert into WORK.validacao
+SELECT put(cdsegmentomercado, 10.) as Valor, 'cdsegmentomercado inativado'
+from work.TbSegmentoMercado
+where cdsegmentomercado in ( select CdSegmentoMercado from WORK.Ajustes)
+and flativo <> 'S';
+
+insert into WORK.validacao
+SELECT put(cdsegmentomercado, 10.) as valor, 'cdsegmentomercado nao encontrado'
+from WORK.Ajustes
+where cdsegmentomercado not in ( select CdSegmentoMercado from work.TbSegmentoMercado)
+and cdsegmentomercado <> .;
+
+insert into WORK.validacao
+SELECT put(cdsegmentomercado, 10.) as valor, 'Nome do segmento maior que 50 caracteres'
+from work.TbSegmentoMercado
+where cdsegmentomercado in ( select CdSegmentoMercado from WORK.Ajustes)
+and length(nmsegmentomercado) > 50;
+
+drop table TbSegmentoMercado;
+
+quit;
+
+
+
+data work.TbDivisaoComercial;
+set _RLGLOBL.TbDivisaoComercial;
+run;
+
+proc sql;
+
+
+insert into WORK.validacao
+SELECT put(CdDivisaoComercial, 10.)  as valor, 'CdDivisaoComercial nao encontrada'
+from WORK.Ajustes
+where CdDivisaoComercial not in ( select CdDivisaoComercial from work.TbDivisaoComercial)
+and CdDivisaoComercial <> .;
+
+insert into WORK.validacao
+SELECT put(CdDivisaoComercial, 10.) as valor, 'Nome do divisao comercial maior que 40 caracteres'
+from work.TbDivisaoComercial
+where CdDivisaoComercial in ( select CdDivisaoComercial from WORK.Ajustes)
+and length(nmdivisaocomercial) > 40;
+
+drop table work.TbDivisaoComercial;
+
+quit;
+
+data work.TbGrupoComercial;
+set _RLGLOBL.TbGrupoComercial;
+run;
+
+proc sql;
+insert into WORK.validacao
+SELECT put(CdGrupoComercial, 10.) as valor, 'CdGrupoComercial nao encontrado'
+from WORK.Ajustes
+where CdGrupoComercial not in ( select CdGrupoComercial from work.TbGrupoComercial)
+and CdGrupoComercial <> .;
+
+insert into WORK.validacao
+SELECT put(CdGrupoComercial, 10.)  as valor, 'Nome do grupo comercial maior que 30 caracteres'
+from work.TbGrupoComercial
+where CdGrupoComercial in ( select CdGrupoComercial from WORK.Ajustes)
+and length(NmGrupoComercial) > 30;
+
+drop table TbGrupoComercial;
+
+quit;
+
+data work.TbGrupoEconomico;
+set _RLGLOBL.TbGrupoEconomico;
+run;
+
+proc sql;
+insert into WORK.validacao
+SELECT put(CdGrupoEconomico, 10.)  as valor, 'CdGrupoEconomico nao encontrado'
+from WORK.Ajustes
+where CdGrupoEconomico not in ( select CdGrupoEconomico from work.TbGrupoEconomico)
+and CdGrupoEconomico <> .;
+
+insert into WORK.validacao
+SELECT put(CdGrupoEconomico, 10.)  as valor, 'Nome do grupo economico maior que 30 caracteres'
+from work.TbGrupoEconomico
+where CdGrupoEconomico in ( select CdGrupoEconomico from WORK.Ajustes)
+and length(NmGrupoEconomico) > 30;
+
+drop table work.TbGrupoEconomico;
+
+quit;
+
+proc sql;
+
+UPDATE WORK.Ajustes
+set VrResultadoTesourariaNotDif = 0
+where VrResultadoTesourariaNotDif = .;
+
+UPDATE WORK.Ajustes
+set VrResultadoComercial = 0
+where VrResultadoComercial = .;
+
+UPDATE WORK.Ajustes
+set VrResultadoAcionista = 0
+where VrResultadoAcionista = .;
+
+UPDATE WORK.Ajustes
+set VrResPrivate = 0
+where VrResPrivate = .;
+
+UPDATE WORK.Ajustes
+set VrCustoCaixa = 0
+where VrCustoCaixa = .;
+
+UPDATE WORK.Ajustes
+set vrMora = 0
+where vrMora = .;
+
+UPDATE WORK.Ajustes
+set vrMulta = 0
+where vrMulta = .;
+
+UPDATE WORK.Ajustes
+set VrRiscoAlocado = 0
+where VrRiscoAlocado = .;
+
+quit;
+Data WORK.MARGEM;
+
+Set WORK.Ajustes;
+
+attrib DtReferencia format=ddmmyy10. informat=ddmmyy10.;
+attrib VrResultadoTesourariaNotDif length=8. format=COMMA18.6 informat=COMMA18.6;
+attrib VrResultadoComercial length=8. format=COMMA18.6 informat=COMMA18.6;
+attrib VrResultadoAcionista length=8. format=COMMA18.6 informat=COMMA18.6;
+attrib VrResPrivate length=8. format=COMMA18.6 informat=COMMA18.6;
+attrib VrCustoCaixa length=8. format=COMMA18.6 informat=COMMA18.6;
+attrib vrMora length=8. format=COMMA18.6 informat=COMMA18.6;
+attrib vrMulta length=8. format=COMMA18.6 informat=COMMA18.6;
+attrib VrRiscoAlocado length=8. format=COMMA18.6 informat=COMMA18.6;
+
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Validacoes */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Conversao_complemento */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Conversao_complemento */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-B5KcmzobG4EoDkUK/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname SHIS '/riscosbv/ctrnegocios/mshiroma';
+
+Proc Sql;
+
+delete from work.Ajustes
+where cdtipoajuste = . ;
+
+	Create table Work.base as
+		Select 'Margem 2' as Origem , DtReferencia as DataRef,
+	case
+		when countc("||", CdChaveOperacao) eq 2 then reverse(substr(reverse(CdChaveOperacao),1,find(reverse(CdChaveOperacao),'||')-1))
+		else CdChaveOperacao
+		end
+	as CdObjetoNegociacao_Ajustado,
+	CdVeiculoLegal as CdVeiculo, CdBook, CdClienteContraParte as CdCliente, CdGrupoConciliacao, CdModalidadeProduto, CdTipoContabil as TipoContabil,
+	COALESCE(VrResultadoAcionista,0)+COALESCE(VrResultadoComercial,0)+COALESCE(VrResultadoTesourariaNotDif,0) as ResultadoDia,
+    VrResultadoAcionista as ResultadoAcionista,
+    VrResultadoComercial as ResultadoComercial, VrResultadoTesourariaNotDif as ResultadoTesouraria, VrCustoCaixa as VrMesaCaixa,
+	dsjustificativarealocacao as cliente
+from work.Ajustes;
+
+create table Work.base_gerencial as
+select cp.*, aj.NmBook as Book, aj.NmCarteiraGerencial as NmCarteiraGerencial1, aj.NmMesaOperacao as NmMesaOperacao1
+from work.base as cp
+left join SHIS.AJUSTE_TB040_MESA_CARTEIRA_BOOK as aj
+on aj.cdbook = cp.cdbook;
+
+create table Work.base_ger_prod as
+select bg.*, mp.DsModalidadecatalogoproduto as ModalidadeProduto
+from work.base_gerencial as bg
+left join SHIS.Modalidadeproduto as mp
+on mp.cdmodalidadecatalogoproduto = bg.CdModalidadeProduto;
+
+create table Work.base_ger_prod_conc as
+select bg.*, nmgrupoconciliacao
+from work.base_ger_prod as bg
+left join PLANCTRL.TBGRUPOSCONCILIACAO as c
+on c.cdgrupoconciliacao = bg.cdgrupoconciliacao;
+
+delete from PLANCTRL.TEMP_CONV_TES;
+
+delete from Work.base_ger_prod_conc where CdModalidadeProduto in (625,814);
+
+insert into PLANCTRL.TEMP_CONV_TES ( Origem, DataRef, CdObjetoNegociacao_Ajustado, TipoContabil, ResultadoDia, ResultadoAcionista,
+                                    ResultadoComercial, ResultadoTesouraria, VrMesaCaixa, Book, NmCarteiraGerencial1, NmMesaOperacao1, ModalidadeProduto,  grupoconciliacao, cliente)
+select Origem, DataRef, CdObjetoNegociacao_Ajustado, TipoContabil, ResultadoDia, ResultadoAcionista,
+       ResultadoComercial, ResultadoTesouraria, VrMesaCaixa, Book, NmCarteiraGerencial1, NmMesaOperacao1, ModalidadeProduto, nmgrupoconciliacao, cliente
+from Work.base_ger_prod_conc ;
+
+create table work.final as
+select * from PLANCTRL.TEMP_CONV_TES;
+
+Quit;
+
+proc sql;
+
+drop table work.base;
+drop table base_gerencial;
+drop table base_ger_prod;
+drop table base_ger_prod_conc;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Conversao_complemento */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+Libname SHIS '/riscosbv/ctrnegocios/mshiroma';
+
+Proc Sql;
+
+delete from work.Ajustes
+where cdtipoajuste = . ;
+
+	Create table Work.base as
+		Select 'Margem 2' as Origem , DtReferencia as DataRef,
+	case
+		when countc("||", CdChaveOperacao) eq 2 then reverse(substr(reverse(CdChaveOperacao),1,find(reverse(CdChaveOperacao),'||')-1))
+		else CdChaveOperacao
+		end
+	as CdObjetoNegociacao_Ajustado,
+	CdVeiculoLegal as CdVeiculo, CdBook, CdClienteContraParte as CdCliente, CdGrupoConciliacao, CdModalidadeProduto, CdTipoContabil as TipoContabil,
+	COALESCE(VrResultadoAcionista,0)+COALESCE(VrResultadoComercial,0)+COALESCE(VrResultadoTesourariaNotDif,0) as ResultadoDia,
+    VrResultadoAcionista as ResultadoAcionista,
+    VrResultadoComercial as ResultadoComercial, VrResultadoTesourariaNotDif as ResultadoTesouraria, VrCustoCaixa as VrMesaCaixa,
+	dsjustificativarealocacao as cliente
+from work.Ajustes;
+
+create table Work.base_gerencial as
+select cp.*, aj.NmBook as Book, aj.NmCarteiraGerencial as NmCarteiraGerencial1, aj.NmMesaOperacao as NmMesaOperacao1
+from work.base as cp
+left join SHIS.AJUSTE_TB040_MESA_CARTEIRA_BOOK as aj
+on aj.cdbook = cp.cdbook;
+
+create table Work.base_ger_prod as
+select bg.*, mp.DsModalidadecatalogoproduto as ModalidadeProduto
+from work.base_gerencial as bg
+left join SHIS.Modalidadeproduto as mp
+on mp.cdmodalidadecatalogoproduto = bg.CdModalidadeProduto;
+
+create table Work.base_ger_prod_conc as
+select bg.*, nmgrupoconciliacao
+from work.base_ger_prod as bg
+left join PLANCTRL.TBGRUPOSCONCILIACAO as c
+on c.cdgrupoconciliacao = bg.cdgrupoconciliacao;
+
+delete from PLANCTRL.TEMP_CONV_TES;
+
+delete from Work.base_ger_prod_conc where CdModalidadeProduto in (625,814);
+
+insert into PLANCTRL.TEMP_CONV_TES ( Origem, DataRef, CdObjetoNegociacao_Ajustado, TipoContabil, ResultadoDia, ResultadoAcionista,
+                                    ResultadoComercial, ResultadoTesouraria, VrMesaCaixa, Book, NmCarteiraGerencial1, NmMesaOperacao1, ModalidadeProduto,  grupoconciliacao, cliente)
+select Origem, DataRef, CdObjetoNegociacao_Ajustado, TipoContabil, ResultadoDia, ResultadoAcionista,
+       ResultadoComercial, ResultadoTesouraria, VrMesaCaixa, Book, NmCarteiraGerencial1, NmMesaOperacao1, ModalidadeProduto, nmgrupoconciliacao, cliente
+from Work.base_ger_prod_conc ;
+
+create table work.final as
+select * from PLANCTRL.TEMP_CONV_TES;
+
+Quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

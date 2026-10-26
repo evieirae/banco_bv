@@ -1,0 +1,407 @@
+START_METADATA
+PROJECT: Rodas__PainelBVCompensa
+FILE_SAS: 05 - TbBVCompensa.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 12)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 336
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/BA/PROCESSOS/TMP/TBBVCOMPENSA.CSV [SAS/Local], BASEGRC.TBMETANAOISONOMICA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /riscosbvf/BA/processos/tmp/TbBVCompensa.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBPRODUCAOPRICING_WITHPREV, WORK.TBPRODUCAOPRICING_WITHTRIAVG
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], BASES.TBBVCOMPENSA [PROC SQL - FROM], WORK.TBPRODUCAOPRICING_WITHPREV [PROC SQL - JOIN], WORK.TBPRODUCAOPRICING_WITHTRIAVG [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/tmp/TbBVCompensa.csv
+INTERNAL READS (Temp/Local): BASES.TBBVCOMPENSA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBBVCOMPENSA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBBVCOMPENSA1, TBBVCOMPENSA2, TBBVCOMPENSAAJUSTADA, TBBVCOMPENSAFINAL, TBBVCOMPENSAFINAL2, TBMETANAOISONOMICAFOCAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/tmp/TbBVCompensa.csv
+
+END_METADATA
+================================================================================
+/* Criação de tabela TbBVCompensa para dashboard */
+PROC SQL;
+   CREATE TABLE TbBvCompensa1 AS
+   SELECT DISTINCT t1.DtAtualizacao FORMAT=DDMMYYS10. AS DtAtualizacaoPRD,
+   		  t2.DtAtualizacaoBVCompensa,
+		  t2.CdCampanha,
+          t2.NmCampanha,
+          t2.CdParceiroCampanha,
+          t2.NmParceiroCampanha,
+		  t5.NuCnpjLoja,
+          t2.NmGrupoProdutoMeta,
+		  t5.CdParceiroComercial,
+   		  t5.NmParceiroComercial,
+		  t5.NmColaboradorC,
+          t5.NmFilialC,
+		  t5.NmSubEstruturaComercialC,
+          t5.NmAreaEstruturaComercialC,
+          t5.NmCanalEstruturaComercialC,
+          t5.DsLoginN1C,
+          t5.DsLoginN2C,
+          t5.DsLoginN3C,
+          t5.LstSubstituicaoC,
+          t2.DtInicioVigencia,
+          t2.DtFimVigencia,
+          t2.AnoMes,
+          t2.NuOrdemPrioridade,
+          t2.VrMetaValorProducao FORMAT=COMMAX18.2 as VrMetaValorProducao,
+          t2.VrMetaPenetracaoSeguros FORMAT=COMMAX18.2 as VrMetaPenetracaoSeguros,
+          t2.VrMetaCresMen FORMAT=COMMAX18.2 as VrMetaCresMen,
+          t2.VrMetaCresTri FORMAT=COMMAX18.2 as VrMetaCresTri,
+          t2.VrMetaQtContratos,
+		  /* Calculando QtContratos */
+          SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) AS QtContratos,
+		  /* Consolidando VrProducaoBVCompensa */
+          SUM(t1.VrProducaoBVCompensa) FORMAT=COMMAX18.2 AS VrProducaoBVCompensa,
+		  /* Consolidando VrSegurosTotal */
+		  SUM(t1.VrSeguros) FORMAT=COMMAX18.2 AS VrSegurosTotal,
+		  /* Calculando QtContratosSeguros */
+          SUM(CASE WHEN t1.VrSeguros > 0 THEN 1 ELSE 0 END) AS QtContratosSeguros,
+		  /* Calculando PcSeguros */
+          SUM(CASE WHEN t1.VrSeguros > 0 THEN 1 ELSE 0 END) / SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) * 100 FORMAT=COMMAX18.2 AS PcSeguros,
+          t2.VrRecompensa FORMAT=COMMAX18.2 as VrRecompensa,
+		  /* Calculando PcMetaValorProducao */
+          SUM(t1.VrProducaoBVCompensa) / t2.VrMetaValorProducao FORMAT=COMMAX18.2 AS PcMetaValorProducao,
+		  /* Calculando PcMetaQtContratos */
+		  SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) / t2.VrMetaQtContratos FORMAT=COMMAX18.2 AS PcMetaQtContratos,
+          /* Calculando PcMetaPenetracaoSeguros com condição */
+          CASE
+              WHEN t2.VrMetaPenetracaoSeguros > 0 THEN
+                  (SUM(CASE WHEN t1.VrSeguros > 0 THEN 1 ELSE 0 END) / SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) * 100 - t2.VrMetaPenetracaoSeguros)
+              ELSE
+                  .
+          END FORMAT=COMMAX18.2 AS PcMetaPenetracaoSeguros,
+		  /* Calculando PcCrescimentoMensal com condição */
+          CASE
+              WHEN t2.VrMetaCresMen > 0 THEN
+                  CASE WHEN t3.VrProducaoLiquidaPrev IS NOT NULL AND t3.VrProducaoLiquidaPrev > 0
+                       THEN (t3.VrProducaoLiquidaTotal - t3.VrProducaoLiquidaPrev) / t3.VrProducaoLiquidaPrev
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END FORMAT=COMMAX18.2 AS PcCrescimentoMensal,
+          /* Calculando PcCrescimentoTri com condição */
+          CASE
+              WHEN t2.VrMetaCresTri > 0 THEN
+                  CASE WHEN t4.VrProducaoLiquidaTriAvg IS NOT NULL AND t4.VrProducaoLiquidaTriAvg > 0
+                       THEN (t4.VrProducaoLiquidaTotal - t4.VrProducaoLiquidaTriAvg) / t4.VrProducaoLiquidaTriAvg
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END FORMAT=COMMAX18.2 AS PcCrescimentoTri,
+		  /* Calculando o Recebimento da Comissão */
+		  CASE
+			WHEN
+				CASE
+              WHEN (t2.VrMetaValorProducao IS NOT NULL AND SUM(t1.VrProducaoBVCompensa) / t2.VrMetaValorProducao >= 1) OR
+			  	   (t2.VrMetaValorProducao IS NOT NULL AND SUM(t1.VrProducaoBVCompensa) / t2.VrMetaValorProducao >= 1) AND
+                   (t2.VrMetaPenetracaoSeguros IS NOT NULL AND CASE
+              WHEN t2.VrMetaPenetracaoSeguros > 0 THEN
+                  CASE
+              WHEN (SUM(CASE WHEN t1.VrSeguros > 0 THEN 1 ELSE 0 END) / SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) * 100 - t2.VrMetaPenetracaoSeguros) >= 0 THEN
+                  (SUM(CASE WHEN t1.VrSeguros > 0 THEN 1 ELSE 0 END) / SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) * 100 - t2.VrMetaPenetracaoSeguros)
+              ELSE
+                  .
+          END
+              ELSE
+                  .
+          END >= 0) OR
+                   (t2.VrMetaQtContratos IS NOT NULL AND CASE
+              WHEN SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) / t2.VrMetaQtContratos >= 1 THEN
+                  SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) / t2.VrMetaQtContratos
+              ELSE
+                  .
+          END >= 0) OR
+                   (t2.VrMetaCresMen IS NOT NULL AND CASE
+              WHEN t2.VrMetaCresMen > 0 THEN
+                  CASE WHEN t3.VrProducaoLiquidaPrev IS NOT NULL AND (t3.VrProducaoLiquidaTotal - t3.VrProducaoLiquidaPrev) / t3.VrProducaoLiquidaPrev > t2.VrMetaCresMen
+                       THEN (t3.VrProducaoLiquidaTotal - t3.VrProducaoLiquidaPrev) / t3.VrProducaoLiquidaPrev
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END >= 0) OR
+                   (t2.VrMetaCresTri IS NOT NULL AND CASE
+              WHEN CASE
+              WHEN t2.VrMetaCresTri > 0 THEN
+                  CASE WHEN t4.VrProducaoLiquidaTriAvg IS NOT NULL AND (t4.VrProducaoLiquidaTotal - t4.VrProducaoLiquidaTriAvg) / t4.VrProducaoLiquidaTriAvg > t2.VrMetaCresTri
+                       THEN (t4.VrProducaoLiquidaTotal - t4.VrProducaoLiquidaTriAvg) / t4.VrProducaoLiquidaTriAvg
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END IS NOT NULL THEN
+                  CASE WHEN t4.VrProducaoLiquidaTriAvg IS NOT NULL AND t4.VrProducaoLiquidaTriAvg > t2.VrMetaCresTri
+                       THEN (t4.VrProducaoLiquidaTotal - t4.VrProducaoLiquidaTriAvg) / t4.VrProducaoLiquidaTriAvg
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END >= 0)
+              THEN 1
+              ELSE 0
+          END = 1
+			THEN SUM(t1.VrProducaoBVCompensa) * (t2.VrRecompensa/100)
+			ELSE .
+			END FORMAT=COMMAX18.2 AS AReceber,
+		  /* Calculando o Status da Meta com base nas condições adaptadas */
+          CASE
+              WHEN (t2.VrMetaValorProducao IS NOT NULL AND SUM(t1.VrProducaoBVCompensa) / t2.VrMetaValorProducao >= 1) OR
+			  	   (t2.VrMetaValorProducao IS NOT NULL AND SUM(t1.VrProducaoBVCompensa) / t2.VrMetaValorProducao >= 1) AND
+                   (t2.VrMetaPenetracaoSeguros IS NOT NULL AND CASE
+              WHEN t2.VrMetaPenetracaoSeguros > 0 THEN
+                  CASE
+              WHEN (SUM(CASE WHEN t1.VrSeguros > 0 THEN 1 ELSE 0 END) / SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) * 100 - t2.VrMetaPenetracaoSeguros) >= 0 THEN
+                  (SUM(CASE WHEN t1.VrSeguros > 0 THEN 1 ELSE 0 END) / SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) * 100 - t2.VrMetaPenetracaoSeguros)
+              ELSE
+                  .
+          END
+              ELSE
+                  .
+          END >= 0) OR
+                   (t2.VrMetaQtContratos IS NOT NULL AND CASE
+              WHEN SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) / t2.VrMetaQtContratos >= 1 THEN
+                  SUM(CASE WHEN t1.VrProducaoBVCompensa > 0 THEN 1 ELSE 0 END) / t2.VrMetaQtContratos
+              ELSE
+                  .
+          END >= 0) OR
+                   (t2.VrMetaCresMen IS NOT NULL AND CASE
+              WHEN t2.VrMetaCresMen > 0 THEN
+                  CASE WHEN t3.VrProducaoLiquidaPrev IS NOT NULL AND (t3.VrProducaoLiquidaTotal - t3.VrProducaoLiquidaPrev) / t3.VrProducaoLiquidaPrev > t2.VrMetaCresMen
+                       THEN (t3.VrProducaoLiquidaTotal - t3.VrProducaoLiquidaPrev) / t3.VrProducaoLiquidaPrev
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END >= 0) OR
+                   (t2.VrMetaCresTri IS NOT NULL AND CASE
+              WHEN CASE
+              WHEN t2.VrMetaCresTri > 0 THEN
+                  CASE WHEN t4.VrProducaoLiquidaTriAvg IS NOT NULL AND (t4.VrProducaoLiquidaTotal - t4.VrProducaoLiquidaTriAvg) / t4.VrProducaoLiquidaTriAvg > t2.VrMetaCresTri
+                       THEN (t4.VrProducaoLiquidaTotal - t4.VrProducaoLiquidaTriAvg) / t4.VrProducaoLiquidaTriAvg
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END IS NOT NULL THEN
+                  CASE WHEN t4.VrProducaoLiquidaTriAvg IS NOT NULL AND t4.VrProducaoLiquidaTriAvg > t2.VrMetaCresTri
+                       THEN (t4.VrProducaoLiquidaTotal - t4.VrProducaoLiquidaTriAvg) / t4.VrProducaoLiquidaTriAvg
+                       ELSE .
+                  END
+              ELSE
+                  .
+          END >= 0)
+              THEN 1
+              ELSE 0
+          END AS FlStatusDaMeta
+      FROM BVCompensa t2
+      LEFT JOIN TbProducao t1
+	  ON t2.CdParceiroCampanha = t1.CdParceiroComercial AND t1.AnoMes = t2.AnoMes AND t1.NmGrupoProdutoMeta = t2.NmGrupoProdutoMeta
+	  LEFT JOIN WORK.TbProducaoPricing_WithPrev t3
+	  ON t1.CdParceiroComercial = t3.CdParceiroComercial AND t1.AnoMes = t3.AnoMes
+	  LEFT JOIN WORK.TbProducaoPricing_WithTriAvg t4
+   	  ON t1.CdParceiroComercial = t4.CdParceiroComercial AND t1.AnoMes = t4.AnoMes
+	  LEFT JOIN TbParceiro t5
+	  ON t2.CdParceiroComercial = t5.CdParceiroComercial
+      GROUP BY t2.CdCampanha,
+          t2.NmCampanha,
+          t2.CdParceiroCampanha,
+          t2.NmParceiroCampanha,
+		  t5.NuCnpjLoja,
+          t1.NmGrupoProdutoMeta,
+		  t5.CdParceiroComercial,
+   		  t5.NmParceiroComercial,
+		  t5.NmColaboradorC,
+          t5.NmFilialC,
+		  t5.NmSubEstruturaComercialC,
+          t5.NmAreaEstruturaComercialC,
+          t5.NmCanalEstruturaComercialC,
+          t5.DsLoginN1C,
+          t5.DsLoginN2C,
+          t5.DsLoginN3C,
+          t5.LstSubstituicaoC,
+          t2.DtInicioVigencia,
+          t2.DtFimVigencia,
+          t2.AnoMes,
+          t2.NuOrdemPrioridade;
+QUIT;
+
+proc sql;
+create table TbBvCompensa2 as
+select
+*
+from TbBvCompensa1
+WHERE FlStatusDaMeta = 1
+order by
+DtAtualizacaoPRD
+,DtAtualizacaoBVCompensa
+,CdCampanha
+,AnoMes
+,NmCampanha
+,CdParceiroCampanha
+,NmParceiroCampanha
+,NmGrupoProdutoMeta
+,nuordemprioridade desc
+
+;
+run;
+
+PROC SORT DATA=TbBvCompensa2 NODUPKEY;
+BY DtAtualizacaoPRD
+DtAtualizacaoBVCompensa
+CdCampanha
+AnoMes
+NmCampanha
+CdParceiroCampanha
+NmParceiroCampanha
+NmGrupoProdutoMeta
+;run;
+
+proc sql;
+create table TbBvCompensaAjustada as
+select distinct
+
+BVprin.*,
+case when BVSec.FlStatusDaMeta =1
+then 'Comissão Atingida' else '' end as StatusDaMeta
+from TbBvCompensa1 BVprin
+left join TbBvCompensa2 BVSec on BVprin.CdParceiroCampanha=BVSec.CdParceiroCampanha
+and BVprin.NuOrdemPrioridade=BVSec.NuOrdemPrioridade
+and BVprin.CdCampanha=BVSec.CdCampanha
+and BVprin.AnoMes=BVSec.AnoMes
+/*where BVprin.AnoMes='202401' and BVprin.CdParceiroCampanha=402424*/
+;run;
+
+proc sql;
+create table TbBvCompensaFinal as
+select distinct
+
+BVajus.*
+from TbBvCompensaAjustada BVajus
+where case when BVajus.FlStatusDaMeta =1 and  BVajus.StatusDaMeta = ''
+then 'Excluir' else '' end = ''
+
+;run;
+
+proc sql;
+create table BASES.TBBVCOMPENSA as
+select
+*
+from TbBvCompensaFinal
+
+;run;
+
+PROC SQL;
+CREATE TABLE TbMetaNaoIsonomicaFocal AS
+SELECT
+
+	 put(NuAnoMes, 6.) as NuAnoMes
+	,Produto
+	,CdParceiroComercial
+	,LstColaboradorFocal
+
+FROM basegrc.TbMetaNaoIsonomica
+WHERE LstColaboradorFocal <> ''
+/*AND CdParceiroComercial = 1466*/
+/*AND CdParceiroComercial in (SELECT CdParceiroCampanha FROM TbBvCompensaFinal2)*/
+;run;
+
+PROC SQL;
+CREATE TABLE TbBvCompensaFinal2 AS
+SELECT DISTINCT
+
+	 TBBVCOMPENSA.DtAtualizacaoPRD
+	,TBBVCOMPENSA.DtAtualizacaoBVCompensa
+	,TBBVCOMPENSA.CdCampanha
+	,TBBVCOMPENSA.NmCampanha
+	,TBBVCOMPENSA.CdParceiroCampanha
+	,TBBVCOMPENSA.NmParceiroCampanha
+	,TBBVCOMPENSA.NuCnpjLoja
+	,TBBVCOMPENSA.NmGrupoProdutoMeta
+	,TBBVCOMPENSA.CdParceiroComercial
+	,TBBVCOMPENSA.NmParceiroComercial
+	,TBBVCOMPENSA.NmColaboradorC
+	,TBBVCOMPENSA.NmFilialC
+	,TBBVCOMPENSA.NmSubEstruturaComercialC
+	,TBBVCOMPENSA.NmAreaEstruturaComercialC
+	,TBBVCOMPENSA.NmCanalEstruturaComercialC
+	,TBBVCOMPENSA.DsLoginN1C
+	,TBBVCOMPENSA.DsLoginN2C
+	,TBBVCOMPENSA.DsLoginN3C
+	,TBBVCOMPENSA.LstSubstituicaoC
+	,TBBVCOMPENSA.DtInicioVigencia
+	,TBBVCOMPENSA.DtFimVigencia
+	,TBBVCOMPENSA.AnoMes
+	,TBBVCOMPENSA.NuOrdemPrioridade
+	,TBBVCOMPENSA.VrMetaValorProducao
+	,TBBVCOMPENSA.VrMetaPenetracaoSeguros
+	,TBBVCOMPENSA.VrMetaCresMen
+	,TBBVCOMPENSA.VrMetaCresTri
+	,TBBVCOMPENSA.VrMetaQtContratos
+	,TBBVCOMPENSA.QtContratos
+	,TBBVCOMPENSA.VrProducaoBVCompensa
+	,TBBVCOMPENSA.VrSegurosTotal
+	,TBBVCOMPENSA.QtContratosSeguros
+	,TBBVCOMPENSA.PcSeguros
+	,TBBVCOMPENSA.VrRecompensa
+	,TBBVCOMPENSA.PcMetaValorProducao
+	,TBBVCOMPENSA.PcMetaQtContratos
+	,TBBVCOMPENSA.PcMetaPenetracaoSeguros
+	,TBBVCOMPENSA.PcCrescimentoMensal
+	,TBBVCOMPENSA.PcCrescimentoTri
+	,TBBVCOMPENSA.AReceber
+	,TBBVCOMPENSA.FlStatusDaMeta
+	,TBBVCOMPENSA.StatusDaMeta
+	,TbMetaNaoIsonomicaFocal.LstColaboradorFocal
+
+FROM BASES.TBBVCOMPENSA TBBVCOMPENSA
+	LEFT JOIN TbMetaNaoIsonomicaFocal TbMetaNaoIsonomicaFocal
+		ON TBBVCOMPENSA.CdParceiroCampanha = TbMetaNaoIsonomicaFocal.CdParceiroComercial
+		AND TBBVCOMPENSA.AnoMes = TbMetaNaoIsonomicaFocal.NuAnoMes
+		AND TBBVCOMPENSA.NmGrupoProdutoMeta = TbMetaNaoIsonomicaFocal.Produto
+;run;
+
+filename exprt2 '/riscosbvf/BA/processos/tmp/TbBVCompensa.csv' encoding="utf-8";
+
+proc export
+data=TbBvCompensaFinal2
+outfile=exprt2 replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/TbBVCompensa.csv /riscosbvf/BA/processos/output/';

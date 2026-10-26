@@ -1,0 +1,340 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Privado
+FILE_SAS: 11 - Enriquece tbproducao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -107
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 265
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISV = /projetos/MISV/data/bases; TEMP = /projetos/MISV/data/bases/tmp; TEMPW = &swork; TRIBO = /riscosbv/consignado
+DETECTED_MACROS_DEFINED: TIMESTAMP, TIMESTAMPDATA, TIMESTAMPHORA, database, database_fim, database_fim_lead, database_ini, database_ini_lead, databse, dir_csv
+DETECTED_MACROS_USED: database, swork
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], CPC.TBCONTRATO [DBCON], DBA.TBPARCEIROCOMERCIAL [DBCON], DBA.TBPESSOA [DBCON], DBA.TBPESSOASOBANALISE [DBCON], DBA.TBPESSOASOBANALISETIPOTELEFONE [DBCON], DBA.TBPROPOSTA [DBCON], DBA.TBPROPOSTACOMPLEMENTO [DBCON], DBCOR.TBEMPRESACONVENIADA [DBCON], DBCOR.TBPARCEIROCOMERCIALCOLABORADOR [DBCON], DBCRED.TBPROPOSTACONSIGNADO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TEMPW
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): CPC.TBCONTRATO [Pass-Through Native (DBCON) - JOIN], DBA.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOA [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOASOBANALISETIPOTELEFONE [Pass-Through Native (DBCON) - FROM], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBA.TBPROPOSTACOMPLEMENTO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBEMPRESACONVENIADA [Pass-Through Native (DBCON) - FROM], DBCOR.TBPARCEIROCOMERCIALCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTACONSIGNADO [Pass-Through Native (DBCON) - JOIN], TEMPW.CANCELADOS_AUTOSERV [PROC SQL - JOIN], TEMPW.CONSIGNADO_PRIVADO [PROC SQL - FROM], TEMPW.MAX_N [PROC SQL - JOIN], TEMPW.MIN_N [PROC SQL - JOIN], TEMPW.TEMP [PROC SQL - FROM], TEMPW.TEMP1 [PROC SORT - DATA=], TEMPW.TEMP2 [DATA Step - SET], TEMPW.TEMP3 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): TEMPW.CANCELADOS_AUTOSERV, TEMPW.CONSIGNADO_PRIVADO, TEMPW.MAX_N, TEMPW.MIN_N, TEMPW.TEMP, TEMPW.TEMP1, TEMPW.TEMP2, TEMPW.TEMP3
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TEMPW.CANCELADOS_AUTOSERV, TEMPW.CONSIGNADO_PRIVADO, TEMPW.MAX_N, TEMPW.MIN_N, TEMPW.TEMP, TEMPW.TEMP1, TEMPW.TEMP2, TEMPW.TEMP3
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TEMPW.CANCELADOS_AUTOSERV, TEMPW.CONSIGNADO_PRIVADO, TEMPW.CTRS_CANCELADOS, TEMPW.MAX_ALL, TEMPW.MAX_N, TEMPW.MIN_ALL, TEMPW.MIN_N, TEMPW.NEGADOS_AUTOSERV, TEMPW.TEMP, TEMPW.TEMP1, TEMPW.TEMP2, TEMPW.TEMP3
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	11 - Enriquece tbproducao.sas														| */
+/* | Descricao: Programa enriquecer a tbproducao.					| */
+/* | Objetivo: 	Dash Consignado Privado					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+libname tribo "/riscosbv/consignado";
+libname misv "/projetos/MISV/data/bases";
+libname temp "/projetos/MISV/data/bases/tmp";
+libname tempw "&swork";
+
+%let database = '2021/01/01';
+%let database_ini = '2022/01/01';
+%let database_fim = '2023/06/30';
+%let database_ini_lead = '2023/05/30';
+%let database_fim_lead = '2023/06/01';
+%let databse = %sysfunc(date(),ddmmyy10.);
+OPTIONS COMPRESS=BINARY;
+%LET TIMESTAMP = %SYSFUNC(DATE(),ddmmyy10.);
+%LET TIMESTAMPDATA = %SYSFUNC(date(),YYMMDDN8.);
+%LET TIMESTAMPHORA = %sysfunc(TIME(),hour4.);
+
+/* ======================================================================================*/
+/* =====================Enriquece tbproducao=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+%CONECTADB(server=PTA);
+
+  CREATE TABLE tempw.CONSIGNADO_PRIVADO AS
+	SELECT *
+	FROM CONNECTION TO DBCON
+
+			(
+		SELECT
+			/*CONVERT(VARCHAR(4),DATEPART (year, proposta.Dtentradaproposta))+'/'+CONVERT(VARCHAR(4),DATEPART(month,proposta.Dtentradaproposta))+'/'+CONVERT(VARCHAR(4),DATEPART(day,proposta.Dtentradaproposta))
+		as Dt_entrada, */
+			CAST(proposta.Dtentradaproposta AS DATE) as Dt_entrada,
+		CASE
+			WHEN TbContrato.dtcontrato IS NULL then
+			CONVERT(VARCHAR(4),DATEPART (year, proposta.DtStatusProposta))+'/'+CONVERT(VARCHAR(4),DATEPART(month,proposta.DtStatusProposta))+'/'+CONVERT(VARCHAR(4),DATEPART(day,proposta.DtStatusProposta))
+			else CONVERT(VARCHAR(4),DATEPART (year, TbContrato.dtcontrato))+'/'+CONVERT(VARCHAR(4),DATEPART(month,TbContrato.dtcontrato))+'/'+CONVERT(VARCHAR(4),DATEPART(day,TbContrato.dtcontrato))
+		end
+	as diamesano,
+		CASE
+			WHEN TbContrato.dtcontrato IS NULL THEN
+			CONVERT(VARCHAR(4),
+			DATEPART (year, proposta.DtStatusProposta))+'/'+CONVERT(VARCHAR(4),
+			DATEPART(month,proposta.DtStatusProposta))
+			ELSE
+			CONVERT(VARCHAR(4),
+			DATEPART (year, TbContrato.dtcontrato))+'/'+CONVERT(VARCHAR(4),
+			DATEPART(month,TbContrato.dtcontrato))
+		END
+	AS anomes,
+		year(proposta.DtStatusProposta) as ano,
+		month(proposta.DtStatusProposta) as mes,
+		Pessoa.NuCpfCnpj,
+		Pessoasobanalise.NuCpfCnpj as NuCpfCnpj_SobAnalise,
+		Pessoasobanalise.NmPessoaSobAnalise AS Nome_Cliente,
+	(SELECT telefone.CdDdd + telefone.NuTelefone FROM DBA.TbPessoaSobAnaliseTipoTelefone telefone WHERE telefone.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise AND telefone.CdTipoTelefone = 1) AS Telefone_Residencial,
+	(SELECT telefone.CdDdd + telefone.NuTelefone FROM DBA.TbPessoaSobAnaliseTipoTelefone telefone WHERE telefone.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise AND telefone.CdTipoTelefone = 2) AS Telefone_Comercial,
+	(SELECT telefone.CdDdd + telefone.NuTelefone FROM DBA.TbPessoaSobAnaliseTipoTelefone telefone WHERE telefone.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise AND telefone.CdTipoTelefone = 3) AS Telefone_Celular,
+		proposta.nuproposta,
+		TbContrato.nucontrato AS contrato_tb,
+		tbsimu.FlPropostaSimulacao as simulacao,
+	CASE
+		WHEN TbContrato.dtcancelamento IS NOT NULL
+		THEN 1
+	ELSE 0
+	END
+AS contrato_cancelado_aprovado,
+	CASE
+		WHEN TbContrato.dtcancelamento IS NOT NULL
+		AND
+		YEAR(TbContrato.dtcancelamento)*100+MONTH(TbContrato.dtcancelamento) = YEAR(TbContrato.dtcontrato)*100+MONTH(TbContrato.dtcontrato)
+		THEN 1
+	ELSE 0
+	END
+AS contrato_cancelado_MIS,
+	proposta.nucontratogestao,
+	Proposta.StProposta,
+	PropostaComplemento.CdSistemaOrigem,
+	PessoaConvenio.NuCpfCnpj AS cnpjconvenio,
+	Case when conveniada.CdLoja is not null then 'S' else 'N' END as Averbadora,
+	Pessoa.NmPessoa,
+	Proposta.dslogin AS login_operador,
+	PropostaComplemento.CdTipoMeioVenda,
+	PropostaComplemento.cdtipoassinatura,
+	Proposta.CdSubProduto,
+CASE
+	WHEN Pessoa.NuCpfCnpj = '01149953000189' THEN 'GR'
+	ELSE 'COBAN'
+END
+AS origem_cadastro,
+Parceirocom.CdTipoParceiroComercial,
+Parceirocom.CdParceiroComercial,
+proposta.cdpessoa,
+CASE
+WHEN upper(Proposta.DsLogin) = 'Autosservico' THEN 'AUTO'
+WHEN upper(Proposta.DsLogin) NOT LIKE 'P%' THEN 'CCOM'
+ELSE 'PPAR'
+END
+AS SistemaOrigem,
+CASE
+WHEN PropostaComplemento.CdTipoMeioVenda = 2 THEN 'FONADO'
+WHEN PropostaComplemento.CdTipoAssinatura IS NULL THEN 'FISICA'
+WHEN PropostaComplemento.CdTipoAssinatura = 0 THEN 'FISICA'
+WHEN PropostaComplemento.CdTipoAssinatura = 1 THEN 'ELETRONICA'
+WHEN PropostaComplemento.CdTipoAssinatura = 2 THEN 'ACEITE DIGITAL'
+ELSE 'N/I'
+END
+AS TipoAssinatura,
+CASE
+WHEN PropostaComplemento.CdTipoMeioVenda = 1 THEN 'CONVENCIONAL'
+WHEN PropostaComplemento.CdTipoMeioVenda = 2 THEN 'REMOTA'
+END
+AS  Classificacao_Assinatura,
+CASE
+WHEN PropostaComplemento.CdSistemaOrigem = 17 THEN 'POPE'
+ELSE 'FORM'
+END
+AS SistemaFormalizacao,
+Proposta.FlRefinConsignado as Refin,
+Parceirocom.NmFantasia AS Convenio,
+Coban.NmFantasia AS Coban,
+datediff(second,proposta.dtentradaproposta,proposta.dtstatusproposta) AS leadtime_seconds,
+1 AS Quantidade,
+Proposta.VrFinanciamento AS SomaVrFinanciamento,
+Proposta.VrProposta AS SomaVrProposta,
+Proposta.vrtac,
+Proposta.vrprestacao,
+Proposta.qtparcelas,
+Proposta.qtdiascarencia,
+Proposta.PcmargemLiquida,
+Proposta.txpactuada
+FROM DBA.TbProposta Proposta
+LEFT JOIN DBA.TbPessoaSobAnalise Pessoasobanalise ON Proposta.NuProposta = Pessoasobanalise.NuProposta
+/*	LEFT JOIN DBCRED.TbPessoaTipoEnderecoEletronico email ON email.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise*/
+/*	LEFT JOIN DBA.TbPessoaSobAnaliseTipoTelefone telefone ON telefone.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise*/
+LEFT JOIN CPC.TbContrato TbContrato ON Proposta.nucontratogestao = TbContrato.nucontrato
+LEFT JOIN DBA.TbPropostaComplemento PropostaComplemento ON PropostaComplemento.NuProposta = Proposta.NuProposta
+LEFT JOIN DBA.TbParceiroComercial Parceiropessoa ON Parceiropessoa.CdParceiroComercial = Proposta.CdPessoa
+LEFT JOIN DBA.TbParceiroComercial Parceirocom ON Parceirocom.CdParceiroComercial = Proposta.cdloja
+LEFT JOIN DBA.TbParceiroComercial Coban on Coban.CdParceiroComercial = Proposta.CdPessoa
+LEFT JOIN DBA.TbPessoa Pessoa ON Pessoa.CdPessoa = Parceiropessoa.CdPessoa
+LEFT JOIN DBA.TbPessoa PessoaConvenio ON PessoaConvenio.CdPessoa = Parceirocom.CdPessoa
+LEFT JOIN DBCRED.TbPropostaConsignado Tbsimu ON Tbsimu.nuproposta = Proposta.nuproposta
+LEFT JOIN DBCOR.TbParceiroComercialColaborador ParceiroColab ON Parceirocom.CdParceiroComercial = ParceiroColab.CdParceiroComercial
+LEFT JOIN  (Select * from DBCOR.TbEmpresaConveniada Where FlAverbacaoAutomatica = 'N' and  FlPermiteAverbacaoSite = 'S') conveniada ON conveniada.CdLoja = Parceirocom.CdParceiroComercial
+/*LEFT JOIN CPC.TbContratoFinanceiro cttfin on cttfin.nucontrato =  Proposta.nucontratogestao*/
+WHERE
+	Proposta.CdSubProduto = 12
+	AND CAST(Proposta.Dtentradaproposta AS DATE) between &database. and  DATEADD(DAY,-1,getdate())
+	AND CAST(Proposta.DtStatusProposta AS DATE) <= DATEADD(DAY,-1,getdate())
+	/*AND Proposta.StProposta = 'AP'*/
+			);
+RUN;
+
+PROC SQL;
+	CREATE TABLE tempw.CANCELADOS_AUTOSERV AS
+
+	SELECT * FROM tempw.CONSIGNADO_PRIVADO
+		WHERE SISTEMAORIGEM = 'AUTO'
+			AND STPROPOSTA IN ('C','CA');
+RUN;
+
+PROC SQL;
+	CREATE TABLE tempw.NEGADOS_AUTOSERV AS
+
+	SELECT * FROM tempw.CONSIGNADO_PRIVADO
+		WHERE SISTEMAORIGEM = 'AUTO'
+			AND STPROPOSTA IN ('N');
+RUN;
+
+PROC SQL;
+	CREATE TABLE tempw.TEMP AS
+		select a.*,b.dt_entrada as dt_entrada_b,
+			case
+				when INTCK('day',input(put(A.dt_entrada,ddmmyy10.),ddmmyy10.),input(B.diamesano,yymmdd10.)) between 0 and 30 then 1
+				else 0
+			end
+		as proposta_valida,
+			A.dt_entrada as dt_a,
+			B.diamesano as dt_b,
+			B.dt_entrada AS dtent_b,
+			INTCK('day',input(B.diamesano,yymmdd10.),input(put(A.dt_entrada,ddmmyy10.),ddmmyy10.)) as dias
+		from
+			(
+		SELECT *
+			FROM tempw.CONSIGNADO_PRIVADO
+				/*WHERE SISTEMAORIGEM <> 'AUTO'*/
+			) a
+		inner join
+			tempw.cancelados_autoserv b
+			on a.nucpfcnpj_sobanalise = b.nucpfcnpj_SobAnalise and
+			a.dt_entrada >= b.dt_entrada
+			and a.nuproposta >= b.nuproposta
+		where a.nucpfcnpj_sobanalise is not null
+			and a.Refin = 'N'
+			AND a.STPROPOSTA NOT IN ('C','CA');
+RUN;
+
+proc sql;
+	create table tempw.temp1 as
+		select distinct * from tempw.TEMP;
+RUN;
+
+PROC SORT DATA=tempw.TEMP1
+	OUT=tempw.TEMP2;
+	BY DESCENDING nucpfcnpj_sobanalise DESCENDING dt_entrada DESCENDING nuproposta;
+RUN;
+
+data tempw.temp3;
+	set tempw.TEMP2;
+	BY DESCENDING nucpfcnpj_sobanalise DESCENDING dt_entrada DESCENDING nuproposta;
+
+	if first.nucpfcnpj_sobanalise then
+		n=1;
+	else n+1;
+run;
+
+proc sql;
+	create table tempw.min_n as
+		select nucpfcnpj_sobanalise,
+			/*SISTEMAORIGEM,*/
+	min(n) as min_n
+
+	from tempw.TEMP3
+		group by
+			nucpfcnpj_sobanalise
+			/*SISTEMAORIGEM*/
+	;
+RUN;
+
+proc sql;
+	create table tempw.max_n as
+		select nucpfcnpj_sobanalise,
+			/*SISTEMAORIGEM,*/
+	max(n) as max_n
+
+	from tempw.TEMP3
+		group by
+			nucpfcnpj_sobanalise
+			/*SISTEMAORIGEM*/
+	;
+RUN;
+
+proc sql;
+	create table tempw.min_all as
+		select a.*
+			from tempw.temp3 a
+				inner join
+					tempw.min_n b
+					on a.nucpfcnpj_sobanalise = b.nucpfcnpj_sobanalise and
+					a.n = b.min_n;
+	;
+RUN;
+
+proc sql;
+	create table tempw.max_all as
+		select a.*
+			from tempw.temp3 a
+				inner join
+					tempw.max_n b
+					on a.nucpfcnpj_sobanalise = b.nucpfcnpj_sobanalise and
+					a.n = b.max_n;
+	;
+RUN;
+
+Proc Sql;
+	Create Table tempw.Ctrs_Cancelados as
+		Select Distinct
+			nuproposta
+			,nucontratogestao
+			,contrato_cancelado_aprovado as Contrato_Cancelado
+		From tempw.CONSIGNADO_PRIVADO
+			WHERE contrato_cancelado_aprovado = 1
+	;
+RUN;

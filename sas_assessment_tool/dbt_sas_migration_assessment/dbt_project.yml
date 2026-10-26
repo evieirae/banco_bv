@@ -1,0 +1,94 @@
+
+# Name your project! Project names should contain only lowercase characters and underscores.
+name: 'indimesh_dbt_core_reference'
+version: '1.0.0'
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+profile: "{{ env_var('DBT_PROFILE_TARGET') }}"
+
+# These configurations specify where dbt should look for different types of files.
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+asset-paths: ["assets"]
+
+# directories to be removed by `dbt clean`
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+require-dbt-version: [">=1.7.0", "<2.0.0"]
+
+# Configuring models
+models:
+  +file_format: delta
+  +persist_docs:
+    relation: "{{ target.name in ('prod', 'ci') }}"
+    columns: "{{ target.name in ('prod', 'ci') }}"
+  indimesh_dbt_core_reference:
+    # Staging layer - ephemeral models for data cleaning and transformation
+    00_staging:
+      +materialized: table
+      +schema: staging
+    
+    # Trusted layer - validated and standardized data
+    01_trusted:
+      +schema: trusted
+      +materialized: table
+    
+    # Marts layer - business logic and aggregations
+    02_marts:
+      +materialized: table
+      +schema: marts
+    
+    # Serving layer - final presentation layer
+    03_serving:
+      +contract:
+        enforced: true
+      +schema: serving
+      +materialized: table
+
+# Configuring sources
+sources:
+  indimesh_dbt_core_reference:
+
+# Configuring tests
+tests:
+  indimesh_dbt_core_reference:
+
+# Configuring seeds
+seeds:
+  indimesh_dbt_core_reference:
+    +enabled: false
+    +persist_docs:
+      relation: "{{ target.name in ('prod', 'ci') }}"
+      columns: "{{ target.name in ('prod', 'ci') }}"
+    +schema: "{{ 'raw_manual_input' if target.name == 'prod' else target.schema }}"
+    +delimiter: "|"
+
+# Configuring snapshots
+snapshots:
+  +enabled: "{{ target.name in ('prod', 'ci') }}"
+  +persist_docs:
+    relation: "{{ target.name in ('prod', 'ci') }}"
+    columns: "{{ target.name in ('prod', 'ci') }}"
+  +target_schema: "{{ 'snapshots' if target.name == 'prod' else target.schema }}"
+
+
+# Variables at dbt project level
+vars:
+
+  partitions_to_replace: [
+    dateadd(day, -0, current_date)
+    , dateadd(day, -1, current_date)
+    , dateadd(day, -2, current_date)
+    , dateadd(day, -3, current_date)
+  ]
+
+  # Elementary dbt cost monitoring variables: (Necessary to calculate the cost per dbt run.)
+  min_dbu_hour: 2 # Minimal DBU cost per hour of the Cluster.
+  dbu_cost: 0.55 # Cost per DBU of the cluster.

@@ -1,0 +1,308 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_pesados
+FILE_SAS: 01 - FunilPesados.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 25)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 240
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: SafraDe
+DETECTED_MACROS_USED: Banco, Base, DtMaxProd, DtMaxSim, DtMaxSimD0, DtMaxSimD10, DtMaxSimD15, DtMaxSimD20, DtMaxSimD3, DtMaxSimD30, IQM4, NomeBanco, SafraDe, iqHoje, safraM4
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: BANCO, BASE, NOMEBANCO
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], PPR.PPR_ANALITICO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/precoxrisco/ppr_analitico.sas7bdat, /infogrc/solicitacaopontual/tmp/FUNIL_PRICING_Pesados.sas7bdat, /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], CONVSIMU.TBSIMULACOES [DATA Step - SET], PPR.PPR_ANALITICO [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/precoxrisco/ppr_analitico.sas7bdat, /infogrc/solicitacaopontual/tmp/FUNIL_PRICING_Pesados.sas7bdat, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.FUNIL_PRICING_PESADOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEPROPOSTASSIMUCONVERTIDAS, BASESIMULACAO, CONVERTIDAS_&BASE, DATAMAXCONFERENCIAAUX, PRODUCAO, SIMULACAO, SIMULACAO_TRATADA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (sas: 1, sas7bdat: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/convsimu/tbsimulacoes.sas7bdat
+[CODE REF] /infogrc/precoxrisco/ppr_analitico.sas7bdat
+[CODE REF] /infogrc/solicitacaopontual/tmp/FUNIL_PRICING_Pesados.sas7bdat
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+/*Define Variáveis*/
+%let SafraDe = &safraM4.;
+
+/*Define Semana e DU*/
+%CRIAVARDB;
+%Gerar_TbSemanas_InicioSegunda(&IQM4.,&iqHoje.);
+%MarcaDU(&IQM4.,&iqHoje.,0);
+%MarcaDU(&IQM4.,&iqHoje.,3);
+%MarcaDU(&IQM4.,&iqHoje.,10);
+%MarcaDU(&IQM4.,&iqHoje.,15);
+%MarcaDU(&IQM4.,&iqHoje.,20);
+%MarcaDU(&IQM4.,&iqHoje.,30);
+
+ %VerificaAtualizacao(/infogrc/convsimu/tbsimulacoes.sas7bdat,12,600);
+/*Corta Bases*/
+DATA SIMULACAO;
+SET CONVSIMU.TBSIMULACOES;
+IF Produto = 'Pesados' and NuAnoMes >= &SafraDe;
+RUN;
+
+%VerificaAtualizacao(/infogrc/precoxrisco/ppr_analitico.sas7bdat,12,600);
+DATA PRODUCAO;
+SET PPR.PPR_ANALITICO;
+IF Produto = 'Pesados' AND Safra >= &SafraDe;
+RUN;
+/*DataMáxima Simulações*/
+PROC SQL;SELECT MAX(DtInclusaoGravame) INTO :DtMaxSim FROM SIMULACAO;RUN;
+
+PROC SQL;SELECT MAX(DtContrato) INTO :DtMaxProd FROM BaseProducao;RUN;
+PROC SQL;SELECT MAX(DtTempo) INTO :DtMaxSimD0 FROM TbD0 WHERE D0 <= &DtMaxSim.;RUN;
+PROC SQL;SELECT MAX(DtTempo) INTO :DtMaxSimD3 FROM TbD3 WHERE D3 <= &DtMaxSim.;RUN;
+PROC SQL;SELECT MAX(DtTempo) INTO :DtMaxSimD10 FROM TbD10 WHERE D10 <= &DtMaxSim.;RUN;
+PROC SQL;SELECT MAX(DtTempo) INTO :DtMaxSimD15 FROM TbD15 WHERE D15 <= &DtMaxSim.;RUN;
+PROC SQL;SELECT MAX(DtTempo) INTO :DtMaxSimD20 FROM TbD20 WHERE D20 <= &DtMaxSim.;RUN;
+PROC SQL;SELECT MAX(DtTempo) INTO :DtMaxSimD30 FROM TbD30 WHERE D30 <= &DtMaxSim.;RUN;
+
+PROC SQL;CREATE TABLE DataMaxConferenciaAUX AS SELECT DISTINCT
+PUT(&DtMaxProd.,DATE9.) AS DtProducao,
+PUT(&DtMaxSim.,DATE9.) AS DtSimulacao,
+PUT(&DtMaxSimD0.,DATE9.) AS DtSimulacaoD0,
+PUT(&DtMaxSimD3.,DATE9.) AS DtSimulacaoD3,
+PUT(&DtMaxSimD10.,DATE9.) AS DtSimulacaoD10,
+PUT(&DtMaxSimD15.,DATE9.) AS DtSimulacaoD15,
+PUT(&DtMaxSimD20.,DATE9.) AS DtSimulacaoD20,
+PUT(&DtMaxSimD30.,DATE9.) AS DtSimulacaoD30
+FROM SIMULACAO AS A;RUN;
+
+/*Base Auxiliar p/ Agrupamento*/
+PROC SQL;
+CREATE TABLE SIMULACAO_TRATADA AS
+SELECT
+A.*,D0,D3,D10,D15,D20,D30,
+CASE
+	WHEN Mensageria in ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+						'0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico')
+	AND Mensageria2 NOT IN ('3. Recusado', '4. Recusado Reversível','6. Recusado','6. Plano Recusado')
+	THEN 'Mensageria Positiva'
+	WHEN A.Mensageria IN ('6. Recusado','3. Recusado','6. Plano Recusado')
+	OR A.Mensageria in ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+						'0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico')
+	AND Mensageria2 in ('3. Recusado', '4. Recusado Reversível','6. Recusado','6. Plano Recusado')
+	THEN 'Recusado'
+	ELSE 'Demais Msgs' END AS AgrupMensageria,
+CASE
+	WHEN A.PcEntradaMinima BETWEEN 0 AND 10 THEN 'Ate 10%'
+	WHEN A.PcEntradaMinima BETWEEN 10 AND 20 THEN 'MINIMA ATE 20%'
+	WHEN A.PcEntradaMinima BETWEEN 20 AND 30 THEN 'MINIMA ATE 30%'
+	WHEN A.PcEntradaMinima BETWEEN 30 AND 40 THEN 'MINIMA ATE 40%'
+	WHEN A.PcEntradaMinima BETWEEN 40 AND 50 THEN 'MINIMA ATE 50%'
+	WHEN A.PcEntradaMinima BETWEEN 50 AND 60 THEN 'MINIMA ATE 60%'
+	WHEN A.PcEntradaMinima BETWEEN 60 AND 70 THEN 'MINIMA ATE 70%'
+	WHEN A.PcEntradaMinima BETWEEN 70 AND 80 THEN 'MINIMA ATE 80%'
+	WHEN A.PcEntradaMinima BETWEEN 80 AND 90 THEN 'MINIMA ATE 90%'
+	WHEN A.PcEntradaMinima BETWEEN 90 AND 100 THEN 'MINIMA ATE 100%'
+	ELSE 'Desconhecido' END AS FaixaEntradaMinima,
+B.VrPropostaOriginada,
+B.VpScore,
+CASE WHEN B.VrTotalSeguro IS NOT NULL THEN 1 ELSE 0 END AS FlagSeguro,
+CASE
+	WHEN B.NuScoreFim < 5 THEN 'Ate 5'
+	WHEN B.NuScoreFim >= 5 AND B.NuScoreFim < 6 THEN '5 - 6'
+	WHEN B.NuScoreFim >= 6 AND B.NuScoreFim < 7 THEN '6 - 7'
+	WHEN B.NuScoreFim >= 7 AND B.NuScoreFim < 8 THEN '7 - 8'
+	WHEN B.NuScoreFim >= 8 AND B.NuScoreFim < 9 THEN '8 - 9'
+	WHEN B.NuScoreFim >= 9 AND B.NuScoreFim < 10 THEN '9 - 10'
+	ELSE 'Desconhecido' END AS FxScore,
+CASE
+	WHEN AH.NmSubEstruturaComercialC = "Canal Pesados" THEN "Canal Exclusivo"
+	ELSE "Canal Hibrido" END AS TipoCanal,
+CASE
+	WHEN A.Mensageria IN( '0. Aprovado 100%','0. Aprovado') THEN 'PAP'
+	WHEN A.DtSimulacaoInicial >= '09Apr2024'd AND SUBSTR(A.NuCPFCNPJ,6,2) BETWEEN '00' AND '04' THEN 'Politica Desafiante'
+	ELSE 'Politica Atual' END AS TpPoliticaCredito,
+	AH.NmTipoParceiroComercial AS TipoParceiro
+FROM SIMULACAO AS A
+LEFT JOIN PRODUCAO AS B ON A.NuProposta = B.NuProposta
+LEFT JOIN TBD0 AS C ON A.DtSimulacaoInicial=C.DtTempo
+LEFT JOIN TBD3 AS F ON A.DtSimulacaoInicial=F.DtTempo
+LEFT JOIN TBD10 AS M ON A.DtSimulacaoInicial=M.DtTempo
+LEFT JOIN TBD15 AS R ON A.DtSimulacaoInicial=R.DtTempo
+LEFT JOIN TBD20 AS W ON A.DtSimulacaoInicial=W.DtTempo
+LEFT JOIN TBD30 AS AG ON A.DtSimulacaoInicial=AG.DtTempo
+LEFT JOIN bases.TBPARCEIROCOMERCIAL AS AH ON A.CdParceiroComercial = AH.CdParceiroComercial
+;RUN;
+
+/*Funil - BV*/
+PROC SQL;
+CREATE TABLE BaseSimulacao AS
+SELECT
+"Simulacao" AS TpDados,
+A.NuAnoMes AS Safra,
+A.Produto,
+/*A.DtEntradaProposta*/ A.DtSimulacaoInicial AS DtContrato,
+B.NuSemana,
+A.FaixaEntradaMinima,
+A.FxIdade,
+A.FxScore,
+A.FaixaMatriz,
+CASE
+WHEN A.FlPropostaOriginada = 0 THEN ''
+WHEN (CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) BETWEEN 0 AND 100000 THEN '0 A 100 Mil'
+WHEN (CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) BETWEEN 100000 AND 200000 THEN '100 A 200 Mil'
+WHEN (CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) BETWEEN 200000 AND 300000 THEN '200 A 300 Mil'
+WHEN (CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) BETWEEN 300000 AND 400000 THEN '300 A 400 Mil'
+WHEN (CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) BETWEEN 400000 AND 500000 THEN '400 A 500 Mil'
+WHEN (CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) > 500000 THEN 'Maior 500 Mil'
+ELSE '' END AS FxTicket,
+A.AgrupMensageria,
+A.Regional,
+A.TipoCanal,
+A.Filial,
+A.SistemaInicial,
+A.SistemaFinal,
+A.CdTabelaFinanciamento AS CdTabela,
+A.Canal,
+A.TpPoliticaCredito,
+A.TipoParceiro,
+COUNT (DISTINCT (A.nucpfcnpj)) AS Qtd_PreAnalise,
+COUNT (DISTINCT (CASE WHEN A.flcard=1 THEN A.nucpfcnpj END)) AS Simulacao,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD0. AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD0,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD3. AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD3,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD15. AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD15,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD30. AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD30,
+COUNT (DISTINCT (CASE WHEN A.AgrupMensageria = 'Mensageria Positiva' AND flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoPositiva,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD0. AND A.AgrupMensageria = 'Mensageria Positiva' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD0P,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD3. AND A.AgrupMensageria = 'Mensageria Positiva' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD3P,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD15. AND A.AgrupMensageria = 'Mensageria Positiva' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD15P,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD30. AND A.AgrupMensageria = 'Mensageria Positiva' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD30P,
+COUNT (DISTINCT (CASE WHEN A.AgrupMensageria = 'Recusado' AND flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoRecusada,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD0. AND A.AgrupMensageria = 'Recusado' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD0R,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD3. AND A.AgrupMensageria = 'Recusado' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD3R,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD15. AND A.AgrupMensageria = 'Recusado' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD15R,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD30. AND A.AgrupMensageria = 'Recusado' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD30R,
+COUNT (DISTINCT (CASE WHEN A.AgrupMensageria = 'Demais Msgs' AND flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoDemais,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD0. AND A.AgrupMensageria = 'Demais Msgs' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD0D,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD3. AND A.AgrupMensageria = 'Demais Msgs' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD3D,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD15. AND A.AgrupMensageria = 'Demais Msgs' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD15D,
+	COUNT (DISTINCT (CASE WHEN A.DtSimulacaoInicial <= &DtMaxSimD30. AND A.AgrupMensageria = 'Demais Msgs' AND A.flcard=1 THEN A.nucpfcnpj END)) AS SimulacaoD30D,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' THEN A.NuCpfCnpj END)) AS SimulacaoNeg,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta negada' AND A.DtEntradaProposta <= &DtMaxSimD0. THEN A.NuCpfCnpj END)) AS SimulacaoNegD0,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta negada' AND A.DtEntradaProposta <= &DtMaxSimD3. THEN A.NuCpfCnpj END)) AS SimulacaoNegD3,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta negada' AND A.DtEntradaProposta <= &DtMaxSimD15. THEN A.NuCpfCnpj END)) AS SimulacaoNegD15,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta negada' AND A.DtEntradaProposta <= &DtMaxSimD30. THEN A.NuCpfCnpj END)) AS SimulacaoNegD30,
+COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta APNP' THEN A.NuCpfCnpj END)) AS SimulacaoAPNP,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta APNP' AND A.DtEntradaProposta <= &DtMaxSimD0. THEN A.NuCpfCnpj END)) AS SimulacaoAPNPD0,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta APNP' AND A.DtEntradaProposta <= &DtMaxSimD3. THEN A.NuCpfCnpj END)) AS SimulacaoAPNPD3,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta APNP' AND A.DtEntradaProposta <= &DtMaxSimD15. THEN A.NuCpfCnpj END)) AS SimulacaoAPNPD15,
+	COUNT(DISTINCT (CASE WHEN A.StatusSimulacao = 'Proposta APNP' AND A.DtEntradaProposta <= &DtMaxSimD30. THEN A.NuCpfCnpj END)) AS SimulacaoAPNPD30,
+SUM(A.FlPropostaOriginada) AS PropostaOriginada,
+	SUM(CASE WHEN A.AgrupMensageria = 'Mensageria Positiva' THEN A.FlPropostaOriginada ELSE 0 END) AS PropostaOriginadaP,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD0. THEN A.FlPropostaOriginada ELSE 0 END) as PropostaOriginadaD0,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD3. THEN A.FlPropostaOriginada ELSE 0 END) as PropostaOriginadaD3,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD15. THEN A.FlPropostaOriginada ELSE 0 END) as PropostaOriginadaD15,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD30. THEN A.FlPropostaOriginada ELSE 0 END) as PropostaOriginadaD30,
+SUM(A.FlPropostaAprovada) AS PropostaAprovada,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD0. THEN A.FlPropostaAprovada ELSE 0 END) AS PropostaAprovadaD0,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD3. THEN A.FlPropostaAprovada ELSE 0 END) AS PropostaAprovadaD3,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD10. THEN A.FlPropostaAprovada ELSE 0 END) AS PropostaAprovadaD10,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD15. THEN A.FlPropostaAprovada ELSE 0 END) AS PropostaAprovadaD15,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD20. THEN A.FlPropostaAprovada ELSE 0 END) AS PropostaAprovadaD20,
+	SUM(CASE WHEN A.DtEntradaProposta <= &DtMaxSimD30. THEN A.FlPropostaAprovada ELSE 0 END) AS PropostaAprovadaD30,
+SUM(A.FlPropostaEfetivada) AS PropostaEfetivada,
+	SUM(CASE WHEN A.DtContrato <= A.D0 AND A.DtContrato >= A.DtEntradaProposta AND A.DtEntradaProposta <= &DtMaxSimD0. THEN A.FlPropostaEfetivada ELSE 0 END) AS PropostaEfetivadasD0,
+	SUM(CASE WHEN A.DtContrato <= A.D3 AND A.DtContrato >= A.DtEntradaProposta AND A.DtEntradaProposta <= &DtMaxSimD3. THEN A.FlPropostaEfetivada ELSE 0 END) AS PropostaEfetivadasD3,
+	SUM(CASE WHEN A.DtContrato <= A.D10 AND A.DtContrato >= A.DtEntradaProposta AND A.DtEntradaProposta <= &DtMaxSimD10. THEN A.FlPropostaEfetivada ELSE 0 END) AS PropostaEfetivadasD10,
+	SUM(CASE WHEN A.DtContrato <= A.D15 AND A.DtContrato >= A.DtEntradaProposta AND A.DtEntradaProposta <= &DtMaxSimD15. THEN A.FlPropostaEfetivada ELSE 0 END) AS PropostaEfetivadasD15,
+	SUM(CASE WHEN A.DtContrato <= A.D20 AND A.DtContrato >= A.DtEntradaProposta AND A.DtEntradaProposta <= &DtMaxSimD20. THEN A.FlPropostaEfetivada ELSE 0 END) AS PropostaEfetivadasD20,
+	SUM(CASE WHEN A.DtContrato <= A.D30 AND A.DtContrato >= A.DtEntradaProposta AND A.DtEntradaProposta <= &DtMaxSimD30. THEN A.FlPropostaEfetivada ELSE 0 END) AS PropostaEfetivadasD30,
+SUM(A.VrProposta) as VrSimulacao,
+SUM(CASE WHEN A.AgrupMensageria = 'Mensageria Positiva' THEN A.VrProposta ELSE 0 END) as VrSimulacaoPositiva,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) AS VrPropostaOriginada1,
+SUM(A.VrPropostaOriginada) AS VrPropostaOriginada2,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN A.VpScore ELSE 0 END) AS VpScorePropostasOriginadas,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN COALESCE(A.VrEntradaOri,A.VrEntrada) ELSE 0 END) AS VpEntradaPropostasOriginadas,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN A.TxInicioFinanciamento*A.VrProposta  ELSE 0 END) AS VpTaxaPropostasOriginadas,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN A.TxTirContabil*A.VrProposta  ELSE 0 END) AS VpTIRPropostasOriginadas,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN A.IdadeBem*A.VrProposta  ELSE 0 END) AS VpIdadePropostasOriginadas,
+SUM(CASE WHEN A.FlPropostaAprovada > 0 THEN A.VpScore ELSE 0 END) AS VpScorePropostasAprovadas,
+SUM(CASE WHEN A.FlPropostaAprovada > 0 THEN COALESCE(A.VrEntradaOri,A.VrEntrada) ELSE 0 END) AS VpEntradaPropostasAprovadas,
+SUM(CASE WHEN A.FlPropostaAprovada > 0 THEN A.TxInicioFinanciamento*A.VrProposta  ELSE 0 END) AS VpTaxaPropostasAprovadas,
+SUM(CASE WHEN A.FlPropostaAprovada > 0 THEN A.TxTirContabil*A.VrProposta  ELSE 0 END) AS VpTIRPropostasAprovadas,
+SUM(CASE WHEN A.FlPropostaAprovada > 0 THEN A.IdadeBem*A.VrProposta  ELSE 0 END) AS VpIdadePropostasAprovadas,
+SUM(CASE WHEN A.FlPropostaEfetivada > 0 THEN A.VpScore ELSE 0 END) AS VpScorePropostasEfetivadas,
+SUM(CASE WHEN A.FlPropostaEfetivada > 0 THEN COALESCE(A.VrEntradaOri,A.VrEntrada) ELSE 0 END) AS VpEntradaPropostasEfetivadas,
+SUM(CASE WHEN A.FlPropostaEfetivada > 0 THEN A.TxInicioFinanciamento*A.VrProposta  ELSE 0 END) AS VpTaxaPropostasEfetivadas,
+SUM(CASE WHEN A.FlPropostaEfetivada > 0 THEN A.TxTirContabil*A.VrProposta  ELSE 0 END) AS VpTIRPropostasEfetivadas,
+SUM(CASE WHEN A.FlPropostaEfetivada > 0 THEN A.IdadeBem*A.VrProposta  ELSE 0 END) AS VpIdadePropostasEfetivadas
+
+FROM SIMULACAO_TRATADA AS A
+LEFT JOIN TBSEMANAS AS B ON A.DtSimulacaoInicial = B.DtTempo
+WHERE A.DtSimulacaoInicial <= &DtMaxSim. AND A.FlSimuValidaDiaEfet = 1
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;RUN;
+
+/*Convertidas*/
+%Macro ConversaoBancos (Base, NomeBanco , Banco);
+PROC SQL;
+CREATE TABLE CONVERTIDAS_&Base AS SELECT
+&NomeBanco AS Banco length=30,
+'Conversao' as TpDados,
+A.NuAnoMes AS Safra,
+A.Regional,
+A.TipoCanal,
+A.Filial,
+A.AgrupMensageria,
+A.StatusSimulacao,
+COUNT(DISTINCT (CASE WHEN A.Banco &Banco AND A.DtInclusaoGravame >= A.DtEntradaProposta AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END))AS Qtd_Convertidas,
+COUNT(DISTINCT (CASE WHEN A.Banco &Banco AND A.DtInclusaoGravame <= A.D3 AND A.DtInclusaoGravame >= A.DtEntradaProposta AND A.FlConcorrente = 1 AND A.DtEntradaProposta <= &DtMaxSimD3. then A.NuCpfCnpj END)) AS Qtd_Conv_D3,
+COUNT(DISTINCT (CASE WHEN A.Banco &Banco AND A.DtInclusaoGravame <= A.D15 AND A.DtInclusaoGravame >= A.DtEntradaProposta AND A.FlConcorrente = 1 AND A.DtEntradaProposta <= &DtMaxSimD15. then A.NuCpfCnpj END)) AS Qtd_Conv_D15
+FROM SIMULACAO_TRATADA AS A
+WHERE A.DtSimulacaoInicial <= &DtMaxSim. AND A.FlSimuValidaDiaEfet = 1
+GROUP BY 1,2,3,4,5,6,7;RUN;
+%Mend ConversaoBancos;
+
+%ConversaoBancos (0,"Total", IS NOT NULL);
+%ConversaoBancos (1,"ITAU", IN('Itau'));
+%ConversaoBancos (2,"SANTANDER", IN ('Santander'));
+%ConversaoBancos (3,"BRADESCO", IN ('Bradesco'));
+%ConversaoBancos (4,"PAN", IN ('PANAMERICANO','Pan'));
+%ConversaoBancos (5,"C6", IN ('C6'));
+%ConversaoBancos (6,"DAYCOVAL", IN ('Daycoval'));
+%ConversaoBancos (7,"COOPERATIVA", IN ('Cooperativa'));
+%ConversaoBancos (8,"OMNI", IN ('Omni'));
+%ConversaoBancos (9,"Demais", NOT IN ('Itau','Santander','Bradesco','PANAMERICANO','Pan','C6','Daycoval','Cooperativa','Omni'));
+
+DATA BasePropostasSimuConvertidas;
+SET CONVERTIDAS_0 CONVERTIDAS_1 CONVERTIDAS_2 CONVERTIDAS_3 CONVERTIDAS_4 CONVERTIDAS_5 CONVERTIDAS_6 CONVERTIDAS_7 CONVERTIDAS_8 CONVERTIDAS_9;RUN;
+
+X 'rm /infogrc/solicitacaopontual/tmp/FUNIL_PRICING_Pesados.sas7bdat';
+
+/*junta para fazer funil*/
+DATA SOLITMP.FUNIL_PRICING_Pesados;
+SET BaseSimulacao BasePropostasSimuConvertidas;RUN;

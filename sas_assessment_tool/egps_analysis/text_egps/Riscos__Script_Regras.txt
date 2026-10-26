@@ -1,0 +1,228 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Script_Regras
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:37 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 170
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: EMER = /riscosbvf/fraude/PESSOAL/EMERSON
+DETECTED_MACROS_DEFINED: domingo, domingo_n
+DETECTED_MACROS_USED: domingo, domingo_n
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): EMER.BASE_PERDAS [SAS/Local], EMER.CT_PROP_ANALITICO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: EMER
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): EMER.BASE_PERDAS [PROC SQL - FROM], EMER.CT_PROP_ANALITICO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DTEC\Desenvolvimento\Tableau\PrevencaoFraudes\Cartoes\ONBOARDING\BASE_DASH_REGRAS.csv
+TEMP/DISCARDED OUTPUTS: BASE_DASH, BASE_DASH_REGRAS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-iaGQyiuazYYhPC9F/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname emer '/riscosbvf/fraude/PESSOAL/EMERSON';
+
+
+%let domingo = %sysfunc(intnx(week, %sysfunc(today()), 0));
+%let domingo_n = %sysfunc(putn(&domingo. ,ddmmyy10.));
+%put >>>>> &domingo_n.;
+
+
+
+proc sql;
+	create table base_dash as
+	select
+		a.PROPOSTA
+		,a.MES_ANO
+		,a.DT_ENTRADA_PROPOSTA
+		,a.LIMITE_CONCEDIDO
+		,case
+			when a.REGRA like ('%APA HP%') or a.REGRA like ('%Aprova%') or a.REGRA = 'Whitelist'
+			then 'Aprova'
+				when a.REGRA like ('%óbito%') or a.REGRA like ('%menor de%') or a.REGRA like ('%Score%') or a.REGRA = 'Blacklist'
+				then 'Reprova'
+					else 'Deriva'
+		end as TipoRegra
+		,case
+			when a.REGRA = 'Grupo Controle - Fila geral' then 'FILA GERAL'
+			when a.REGRA = 'Aprovacao Automática' then 'Aprovação Automática'
+			when a.REGRA = 'Blacklist' then 'Badlist'
+			when a.REGRA = 'Whitelist' then 'Goodlist'
+			when a.REGRA in ('Cliente VIP 4', 'Cliente VIP 5') then 'Outros'
+			else a.REGRA
+		end as Regra_Funil
+		,case when a.sts_retorno_clearsale in ('APA','RPA') then 0 else 1 end as flg_deriv_mesa
+		,case
+			when a.sts_retorno_clearsale = 'AMA' and status_proposta in ('A','AE') then 'APM'
+			when  a.sts_retorno_clearsale = 'AMA' and status_proposta = 'N' then 'RPM'
+			else a.sts_retorno_clearsale
+		end as status_clearsale
+		,case when a.proposta = b.proposta then 1 else 0 end as FlgFrdEfetiva
+		,b.ValorPerda
+	from emer.ct_prop_analitico as a
+	left join (
+		select distinct
+			proposta
+			,sum(valor_final) format commax20.2 as ValorPerda
+		from emer.base_perdas
+		where proposta not is missing
+		group by 1) as b on a.proposta = b.proposta
+	where a.DT_ENTRADA_PROPOSTA >= today()-365 and a.DT_ENTRADA_PROPOSTA <= &domingo.
+	and a.id_clearsale not is missing
+	order by a.DT_ENTRADA_PROPOSTA
+	;
+quit;
+
+proc sql;
+	create table base_dash_regras as
+	select
+		count(proposta) format commax10. as Qtde
+		,cat(substr(MES_ANO,1,4), '-', substr(mes_ano,5,2)) as SafraProposta
+		,DT_ENTRADA_PROPOSTA
+		,sum(LIMITE_CONCEDIDO) format commax20.2 as ValorLimite
+		,TipoRegra
+		,Regra_Funil
+		,flg_deriv_mesa
+		,status_clearsale
+		,FlgFrdEfetiva
+		,sum(ValorPerda) format commax20.2 as ValorPerdas
+	from base_dash
+	group by 2,3,5,6,7,8,9
+	order by DT_ENTRADA_PROPOSTA
+	;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+	create table base_dash as
+	select
+		a.PROPOSTA
+		,a.MES_ANO
+		,a.DT_ENTRADA_PROPOSTA
+		,a.LIMITE_CONCEDIDO
+		,case
+			when a.REGRA like ('%APA HP%') or a.REGRA like ('%Aprova%') or a.REGRA = 'Whitelist'
+			then 'Aprova'
+				when a.REGRA like ('%óbito%') or a.REGRA like ('%menor de%') or a.REGRA like ('%Score%') or a.REGRA = 'Blacklist'
+				then 'Reprova'
+					else 'Deriva'
+		end as TipoRegra
+		,case
+			when a.REGRA = 'Grupo Controle - Fila geral' then 'FILA GERAL'
+			when a.REGRA = 'Aprovacao Automática' then 'Aprovação Automática'
+			when a.REGRA = 'Blacklist' then 'Badlist'
+			when a.REGRA = 'Whitelist' then 'Goodlist'
+			when a.REGRA in ('Cliente VIP 4', 'Cliente VIP 5') then 'Outros'
+			else a.REGRA
+		end as Regra_Funil
+		,case when a.sts_retorno_clearsale in ('APA','RPA') then 0 else 1 end as flg_deriv_mesa
+		,case
+			when a.sts_retorno_clearsale = 'AMA' and status_proposta in ('A','AE') then 'APM'
+			when  a.sts_retorno_clearsale = 'AMA' and status_proposta = 'N' then 'RPM'
+			else a.sts_retorno_clearsale
+		end as status_clearsale
+		,case when a.proposta = b.proposta then 1 else 0 end as FlgFrdEfetiva
+		,b.ValorPerda
+	from emer.ct_prop_analitico as a
+	left join (
+		select distinct
+			proposta
+			,sum(valor_final) format commax20.2 as ValorPerda
+		from emer.base_perdas
+		where proposta not is missing
+		group by 1) as b on a.proposta = b.proposta
+	where a.DT_ENTRADA_PROPOSTA >= today()-365 and a.DT_ENTRADA_PROPOSTA <= &domingo.
+	and a.id_clearsale not is missing
+	order by a.DT_ENTRADA_PROPOSTA
+	;
+quit;
+
+proc sql;
+	create table base_dash_regras as
+	select
+		count(proposta) format commax10. as Qtde
+		,cat(substr(MES_ANO,1,4), '-', substr(mes_ano,5,2)) as SafraProposta
+		,DT_ENTRADA_PROPOSTA
+		,sum(LIMITE_CONCEDIDO) format commax20.2 as ValorLimite
+		,TipoRegra
+		,Regra_Funil
+		,flg_deriv_mesa
+		,status_clearsale
+		,FlgFrdEfetiva
+		,sum(ValorPerda) format commax20.2 as ValorPerdas
+	from base_dash
+	group by 2,3,5,6,7,8,9
+	order by DT_ENTRADA_PROPOSTA
+	;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.BASE_DASH_REGRAS
+    OUTFILE='N:\DTEC\Desenvolvimento\Tableau\PrevencaoFraudes\Cartoes\ONBOARDING\BASE_DASH_REGRAS.csv'
+    DBMS=csv REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

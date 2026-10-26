@@ -1,0 +1,188 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_motos
+FILE_SAS: 03 - Efeito Propostas Canceladas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 114
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: iqM6, safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBFILTROCVG [SAS/Local], DBA.TBLOGSTATUSPROPOSTA [DBCON], PROJETOS.TBORIGINACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBFILTROCVG [PROC SQL - JOIN], DBA.TBLOGSTATUSPROPOSTA [Pass-Through Native (DBCON) - FROM], PROJETOS.TBORIGINACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LOGSTATUSPROPOSTA, LOGSTATUSPROPOSTA_01, LOGSTATUSPROPOSTA_01_AUX, LOGSTATUSPROPOSTA_02, PROPOSTAS, PROPOSTASNEGADASAPROVADAS, PROPOSTASORIGINADAS, QTPROPOSTAS, STATUSATUAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+options nosource nosource2;
+
+/* Gerar tabela de log de status */
+
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE LogStatusProposta_01 AS SELECT * FROM connection to dbcon (
+  SELECT
+    NuProposta,
+    DATE(DtStatusProposta) AS DtStatusProposta,
+    CASE WHEN StProposta IN ('A','CA','PA') THEN 'A' ELSE StProposta END AS StProposta,
+    1 AS Prioridade
+
+  FROM DBA.TbLogStatusProposta
+
+  WHERE DtStatusProposta >= &iqM6.
+    AND StProposta IN ('A','AP','C','CA','CE','PA','N')
+
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE LogStatusProposta_01_Aux AS
+  SELECT
+    NuProposta,
+    StProposta,
+    MIN(DtStatusProposta) AS UltDtStatus FORMAT=DATE9.
+  FROM LogStatusProposta_01
+
+  GROUP BY 1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE PropostasNegadasAprovadas AS
+  SELECT
+    NuProposta,
+    MAX(CASE WHEN StProposta = 'A' THEN 1 ELSE 0 END) AS FlA,
+    MAX(CASE WHEN StProposta = 'N' THEN 1 ELSE 0 END) AS FlN
+
+  FROM LogStatusProposta_01
+
+  GROUP BY 1
+  HAVING calculated FlA + calculated FlN = 2;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE StatusAtual AS
+  SELECT NuProposta, StProposta FROM projetos.TbOriginacao
+  WHERE NuProposta IN (SELECT DISTINCT NuProposta FROM PropostasNegadasAprovadas);
+RUN;
+
+PROC SQL;
+CREATE TABLE LogStatusProposta_02 AS
+  SELECT
+    A.NuProposta,
+    A.DtStatusProposta,
+    A.StProposta,
+    A.Prioridade
+
+  FROM LogStatusProposta_01 A
+  INNER JOIN LogStatusProposta_01_Aux B ON A.NuProposta = B.NuProposta AND A.StProposta = B.StProposta
+  AND A.DtStatusProposta = B.UltDtStatus
+  LEFT JOIN PropostasNegadasAprovadas C ON A.NuProposta = C.NuProposta
+  LEFT JOIN StatusAtual D ON A.NuProposta = D.NuProposta
+  WHERE  CASE WHEN A.StProposta <> 'N' THEN 1
+              WHEN A.StProposta = 'N' AND C.NuProposta <> . AND D.StProposta = 'N' THEN 1
+              ELSE 0 END = 1;
+RUN;
+
+PROC SQL;
+CREATE TABLE PropostasOriginadas AS
+  SELECT
+    NuProposta,
+    DtEntradaProposta AS DtStatusProposta,
+    'O' AS StProposta,
+    0 AS Prioridade
+
+  FROM projetos.TbOriginacao WHERE NuAnoMes >= &safraM6.;
+RUN;
+
+DATA LogStatusProposta;
+SET LogStatusProposta_02 PropostasOriginadas;
+RUN;
+
+PROC SORT DATA=LogStatusProposta;
+BY NuProposta DtStatusProposta Prioridade;
+RUN;
+
+PROC SORT DATA=LogStatusProposta NODUPKEY;
+BY NuProposta DtStatusProposta Prioridade StProposta;
+RUN;
+/* Buscar tabela principal de propostas */
+
+PROC SQL;
+PROC SQL;
+CREATE TABLE Propostas AS
+  SELECT
+    ORI.NuAnoMes,
+    ORI.NuProposta,
+    ORI.NmGrupoProdutoMeta AS Produto,
+    ORI.DsTipoCanalProducao AS Canal,
+	ORI.DtEntradaProposta,
+    COALESCE(CVG.FiltroCVG,'OUTROS PRODUTOS') as FiltroCVG,
+    ORI.FxIdade,
+    ORI.FxEntrada,
+    ORI.FxParcela
+
+  FROM projetos.TbOriginacao as ORI
+    LEFT JOIN BASEGRC.TbFiltroCVG CVG
+	ON CVG.nuproposta = ORI.nuproposta
+  WHERE NuAnoMes >= &safraM6.;
+RUN;
+
+PROC SQL;
+CREATE TABLE QtPropostas AS
+  SELECT
+    A.NuProposta,
+    A.NuAnoMes,
+    INPUT(STRIP(PUT(A.NuAnoMes,6.) || '01'),yymmdd8.) AS DtMin FORMAT=DATE9.,
+    MIN(INTNX('DAY', calculated DtMin, 90, 'END'),TODAY()-1) AS DtMax FORMAT=DATE9.,
+    a.DtEntradaProposta,
+	b.DtStatusProposta,
+    A.Produto,
+    SUM(CASE WHEN B.StProposta = 'O' THEN 1 ELSE 0 END) AS QtOriginadas,
+    SUM(CASE WHEN B.StProposta = 'A' THEN 1 ELSE 0 END) AS QtAprovadas,
+    SUM(CASE WHEN B.StProposta = 'AP' THEN 1 ELSE 0 END) AS QtEfetivadas,
+    SUM(CASE WHEN B.StProposta = 'C' THEN 1 ELSE 0 END) AS QtCanceladas,
+    SUM(CASE WHEN B.StProposta = 'CE' THEN 1 ELSE 0 END) AS QtCanceladasAE,
+    SUM(CASE WHEN B.StProposta = 'N' THEN 1 ELSE 0 END) AS QtNegadas
+  FROM Propostas A
+  LEFT JOIN LogStatusProposta B ON A.NuProposta = B.NuProposta
+  where A.Produto IN ('Motos')
+  GROUP BY
+    1,2,3,4,5,6,7;
+
+RUN;

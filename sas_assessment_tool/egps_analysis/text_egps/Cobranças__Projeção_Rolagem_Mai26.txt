@@ -1,0 +1,912 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Projeção_Rolagem_Mai26
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:47 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 8
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC DATASETS (1x | +20), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 686
+CODE_TASKS_COUNT: 9
+DETECTED_PROCS: DATASETS, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: PRETER = /riscosbv/cobranca/preter
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DATA, DT_PROCES_ATU
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: DATA, DT_PROCES_ATU
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [BIGQUERY], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCOR.TBMODALIDADEPRODUTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCRED.TBGRUPOSUBPRODUTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCRED.TBSUBPRODUTOGRUPO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [BIGQUERY], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.PROVISAO_VAREJO, WORK.VALIDACAO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.CARTEIRA_20260111, WORK.PROVISAO_VAREJO, WORK.ROLAGEM_TOTAL2, WORK.VALIDACAO
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DBCOR.TBMODALIDADEPRODUTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_DBCRED.TBGRUPOSUBPRODUTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_DBCRED.TBSUBPRODUTOGRUPO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], WORK.CARTEIRA_20260111 [PROC SQL - FROM], WORK.PROVISAO_VAREJO [PROC SQL - FROM], WORK.ROLAGEM_TOTAL2 [PROC SQL - FROM], WORK.VALIDACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_AGRUPA_&DATA, BASE_GCON_&DATA, CARTEIRA_&DATA, CUBO, ERRO_GCON, PROVISAO_VAREJO, ROLAGEM_TOTAL, RPDD_EXPORT, VALIDACAO, WORK.FILTER_FOR_ROLAGEM_TOTAL2, WORK.QUERY_FOR_CARTEIRA_2026, WORK.QUERY_FOR_PROVISAO_VAREJO, WORK.QUERY_FOR_ROLAGEM_TOTAL2, WORK.QUERY_FOR_VALIDACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Projeção_GCP */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Projeção_GCP */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-bqq4gSkIKWIG5GMI/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME preter '/riscosbv/cobranca/preter';
+options reuse=yes compress=binary;
+
+proc datasets library=work kill nolist;
+quit;
+
+
+
+
+
+
+%MACRO acumular_atraso(DT_PROCES_ATU,DATA);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=20);
+
+CREATE TABLE BASE_GCON_&DATA. AS
+SELECT
+	A.*
+
+FROM CONNECTION TO PERM (
+
+		SELECT
+			A.DTPROCESSAMENTO AS DATA_BASE,
+			A.NUCONTRATO
+			,C.cd_cpf_cnpj,
+			C.dt_contrato,
+			A.SQCONTRATOFINANCEIRO,
+
+			CASE
+				WHEN A.CdSItuacaoContabil = '1' THEN 'ATIVA'
+				WHEN A.CdSItuacaoContabil = '2' THEN 'WO'
+				ELSE ""
+			END AS STATUS,
+
+			'GCON' AS BASE,
+			C.cd_produto,
+			D.cdsubproduto,
+			C.cd_modalidade_produto,
+			I.nmmodalidadeproduto,
+			H.NMGRUPOSUBPRODUTO,
+			J.FlRestruturacaoContrato,
+
+		CASE
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto IS NULL                           THEN 'CP_BV'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto IN ( '21', '22', '29', '44' )                               THEN 'CP_BV'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 18                              THEN 'CP_BV_MAR_ABERTO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 22                              THEN 'CP_BV'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 56                              THEN 'CP_PRE_APROVADO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 67                              THEN 'CP_GUIA_BOLSO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 71                              THEN 'CP_BOM_PRA_CREDITO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 72                              THEN 'CP_SERASA_ECRED'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 73                              THEN 'CP_FINANZERO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 77                              THEN 'CP_MINHA_BV'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 82                              THEN 'CP_EASYCREDITO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto IN (85,86)                        THEN 'CP_NEON'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 87                              THEN 'CP_JUST'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 97                              THEN 'CP_BANCO_DIGITAL'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 101                             THEN 'CP_BANCO_DIGITAL'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 89                              THEN 'CP_JUROS_BAIXO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 93                              THEN 'CP_QUERO_FINANCIAR'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 68                              THEN 'CP_GUIA_BOLSO'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 96                              THEN 'CP_ABASTECE_AI'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '19' AND D.cdsubproduto = 100                             THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+			WHEN C.cd_produto = '10' AND C.cd_modalidade_produto = '77'	AND (D.cdsubproduto = 100 OR D.cdsubproduto IS NULL) THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+			WHEN C.cd_produto = '11' AND C.cd_modalidade_produto = '16'                                                      THEN 'INSS'
+			WHEN C.cd_produto = '11' AND C.cd_modalidade_produto IN ('17', '75')                                             THEN 'PRIVADO'
+			WHEN C.cd_produto = '11' AND C.cd_modalidade_produto IN ('18', '32', '37', '39')                                 THEN 'PUBLICO'
+			WHEN C.cd_produto = '14' 									AND H.CDGRUPOSUBPRODUTO IN (4, 7)                    THEN 'LEVES'
+			WHEN C.cd_produto = '14' 									AND H.CDGRUPOSUBPRODUTO IS NULL                      THEN 'LEVES'
+			WHEN C.cd_produto = '14' 									AND H.CDGRUPOSUBPRODUTO = 6                          THEN 'PESADOS'
+			WHEN C.cd_produto = '13' 									AND D.cdsubproduto IN (15, 21, 75)                   THEN 'CDC_ECOMMERCE'
+			WHEN C.cd_produto = '13' AND C.cd_modalidade_produto = '12' AND D.cdsubproduto IS NULL                           THEN 'CDC_ECOMMERCE'
+			WHEN C.cd_produto = '13' 									AND D.cdsubproduto = 76                              THEN 'CDC_TURISMO'
+			WHEN C.cd_produto = '13' 									AND D.cdsubproduto = 74                              THEN 'CDC_SAUDE'
+			WHEN C.cd_produto = '13' AND C.cd_modalidade_produto = '51'	AND D.cdsubproduto IS NULL 		                 	 THEN 'CDC_SAUDE'
+			WHEN C.cd_produto = '13' 									AND D.cdsubproduto IN ( 46, 47 )                     THEN 'CDC_MOVEIS'
+			WHEN C.cd_produto = '13' 									AND D.cdsubproduto = 70                              THEN 'CDC_SOLAR'
+			WHEN C.cd_produto = '13' 									AND D.cdsubproduto = 53                              THEN 'CDC_ODONTOLOGICO'
+			WHEN C.cd_produto = '13' AND C.cd_modalidade_produto = '55' AND D.cdsubproduto IS NULL                           THEN 'CDC_SOLAR'
+			WHEN C.cd_produto = '13' AND C.cd_modalidade_produto = '10' AND D.cdsubproduto IS NULL                           THEN 'CDC_DESCONTO_CHEQUE'
+			WHEN C.cd_produto = '13' AND C.cd_modalidade_produto = '11' AND D.cdsubproduto IS NULL                           THEN 'CDC_INFORMATICA'
+		 	WHEN C.cd_produto = '13' AND C.cd_modalidade_produto = '62' AND D.cdsubproduto IS NULL                           THEN 'CDC_ESTUDANTIL'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '3'  AND D.cdsubproduto IS NULL                           THEN 'CVG_LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '6'  AND D.cdsubproduto IS NULL                           THEN 'CVG_LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '6'  AND D.cdsubproduto = 8                               THEN 'CVG_LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '6'  AND D.cdsubproduto = 13                              THEN 'CVG_PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '27' AND D.cdsubproduto IS NULL                           THEN 'CVG_LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '27' AND D.cdsubproduto IN (19,60)                        THEN 'CVG_LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '28' AND D.cdsubproduto IN (20,63)                        THEN 'CVG_PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '78' AND D.cdsubproduto IN (13,20)                        THEN 'CVG_PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '79' AND D.cdsubproduto IN (8,19,60)                      THEN 'CVG_LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '79' AND D.cdsubproduto IN (13,20)                        THEN 'CVG_PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '2'  AND D.cdsubproduto = 9                               THEN 'LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '3'  AND D.cdsubproduto = 16                              THEN 'LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '3'  AND D.cdsubproduto = 30                              THEN 'PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '5'                                                       THEN 'MOTOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '7'  AND D.cdsubproduto IS NULL                           THEN 'LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '7'  AND D.cdsubproduto = 4                               THEN 'LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '7'  AND D.cdsubproduto = 3                               THEN 'PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '8'  AND D.cdsubproduto IS NULL                           THEN 'LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '8'  AND D.cdsubproduto IN (1,58)                         THEN 'LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '9' 	AND D.cdsubproduto IS NULL                           THEN 'PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '9' 	AND D.cdsubproduto IN ( 2,3,61)                      THEN 'PESADOS'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '38' AND D.cdsubproduto = 29                              THEN 'LEVES'
+			WHEN C.cd_produto = '12' AND C.cd_modalidade_produto = '38' AND D.cdsubproduto = 31                              THEN 'PESADOS'
+			WHEN C.cd_produto = '16' AND C.cd_modalidade_produto = '60'                                                      THEN 'COBAN'
+		END AS PRODUTO,
+			MAX(A.NuDiasAtraso) AS QTATRASO,
+
+		CASE
+			WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+			ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+		END AS SALDO
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato C
+		ON A.NUCONTRATO = C.cd_contrato
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+		ON A.NUCONTRATO = D.NUCONTRATOGESTAO AND D.STPROPOSTA='AP'
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbsubprodutogrupo AS G
+		ON D.CDSUBPRODUTO = G.CDSUBPRODUTO
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbgruposubproduto AS H
+		ON G.CDGRUPOSUBPRODUTO =H.CDGRUPOSUBPRODUTO
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbmodalidadeproduto AS I
+		ON A.cdmodalidadeproduto=I.CDMODALIDADEPRODUTO
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE
+		DATE(A.DTPROCESSAMENTO) = &DT_PROCES_ATU.
+		AND A.CDCARTEIRA IN (1,3,4,5,12)
+
+
+		GROUP BY
+		DATA_BASE,
+		A.NUCONTRATO,
+		C.cd_cpf_cnpj,
+		C.dt_contrato,
+		A.SQCONTRATOFINANCEIRO,
+		STATUS,
+		BASE,
+		C.cd_produto,
+		D.cdsubproduto,
+		C.cd_modalidade_produto,
+		I.nmmodalidadeproduto,
+		H.nmgruposubproduto,
+		PRODUTO,
+		J.FlRestruturacaoContrato
+
+) AS A;
+QUIT;
+
+%mend;
+
+
+
+
+
+
+
+%MACRO agrupa(DATA);
+
+	data BASE_AGRUPA_&DATA.;
+	SET	BASE_GCON_&DATA.;
+	run;
+
+	PROC SQL;
+	CREATE TABLE CARTEIRA_&DATA. AS
+	SELECT
+		DATA_BASE,
+		&DATA. as DATA,
+		NUCONTRATO,
+		cd_cpf_cnpj,
+		dt_contrato,
+		SQCONTRATOFINANCEIRO,
+		STATUS,
+		BASE,
+		cd_produto,
+		cdsubproduto,
+		cd_modalidade_produto,
+		UPCASE(nmmodalidadeproduto) AS NMMODALIDADEPRODUTO,
+		UPCASE(nmgruposubproduto) AS NMGRUPOSUBPRODUTO,
+		UPCASE(PRODUTO) AS PRODUTO,
+		QTATRASO,
+	CASE
+		WHEN QTATRASO <= 0    THEN 'EM DIA'
+		WHEN QTATRASO <= 30   THEN '0001 A 0030'
+		WHEN QTATRASO <= 60   THEN '0031 A 0060'
+		WHEN QTATRASO <= 90   THEN '0061 A 0090'
+		WHEN QTATRASO <= 120  THEN '0091 A 0120'
+		WHEN QTATRASO <= 150  THEN '0121 A 0150'
+		WHEN QTATRASO <= 180  THEN '0151 A 0180'
+		WHEN QTATRASO <= 211  THEN '0181 A 0211'
+		WHEN QTATRASO <= 240  THEN '0211 A 0240'
+		WHEN QTATRASO <= 270  THEN '0241 A 0270'
+		WHEN QTATRASO <= 300  THEN '0271 A 0300'
+		WHEN QTATRASO <= 330  THEN '0301 A 0330'
+		WHEN QTATRASO <= 360  THEN '0331 A 0360'
+		WHEN QTATRASO <= 390  THEN '0361 A 0390'
+		WHEN QTATRASO <= 420  THEN '0391 A 0420'
+		WHEN QTATRASO <= 450  THEN '0421 A 0450'
+		WHEN QTATRASO <= 480  THEN '0451 A 0480'
+		WHEN QTATRASO <= 510  THEN '0481 A 0510'
+		WHEN QTATRASO <= 540  THEN '0511 A 0540'
+		WHEN QTATRASO <= 570  THEN '0541 A 0570'
+		WHEN QTATRASO <= 600  THEN '0571 A 0600'
+		WHEN QTATRASO <= 630  THEN '0601 A 0630'
+		WHEN QTATRASO <= 660  THEN '0631 A 0660'
+		WHEN QTATRASO <= 690  THEN '0661 A 0690'
+		WHEN QTATRASO <= 720  THEN '0691 A 0720'
+		WHEN QTATRASO <= 900  THEN '0721 A 0900'
+		WHEN QTATRASO <= 1180 THEN '0901 A 1180'
+		WHEN QTATRASO <= 1260 THEN '1181 A 1260'
+		WHEN QTATRASO <= 1440 THEN '1261 A 1440'
+		WHEN QTATRASO <= 1620 THEN '1441 A 1620'
+		WHEN QTATRASO <= 1800 THEN '1621 A 1800'
+		WHEN QTATRASO <= 1980 THEN '1801 A 1980'
+		WHEN QTATRASO <= 2160 THEN '1981 A 2160'
+		WHEN QTATRASO <= 2340 THEN '2161 A 2340'
+		WHEN QTATRASO <= 2520 THEN '2341 A 2520'
+		WHEN QTATRASO <= 2700 THEN '2521 A 2700'
+		WHEN QTATRASO <= 2880 THEN '2701 A 2880'
+		WHEN QTATRASO <= 3600 THEN '2881 A 3600'
+		WHEN QTATRASO  > 3600 THEN 'ACIMA 3600'
+	ELSE 'EM DIA' END AS FAIXA_ATRASO,
+	CASE
+		WHEN QTATRASO <= 0    THEN '01 - EM DIA'
+		WHEN QTATRASO <= 30   THEN '03 - 0001 A 0030'
+		WHEN QTATRASO <= 60   THEN '04 - 0031 A 0060'
+		WHEN QTATRASO <= 90   THEN '05 - 0061 A 0090'
+		WHEN QTATRASO <= 120  THEN '06 - 0091 A 0120'
+		WHEN QTATRASO <= 150  THEN '07 - 0121 A 0150'
+		WHEN QTATRASO <= 180  THEN '08 - 0151 A 0180'
+		WHEN QTATRASO <= 210  THEN '09 - 0181 A 0210'
+		WHEN QTATRASO <= 240  THEN '10 - 0211 A 0240'
+		WHEN QTATRASO <= 270  THEN '11 - 0241 A 0270'
+		WHEN QTATRASO <= 300  THEN '12 - 0271 A 0300'
+		WHEN QTATRASO <= 330  THEN '13 - 0301 A 0330'
+		WHEN QTATRASO <= 360  THEN '14 - 0331 A 0360'
+		WHEN QTATRASO <= 390  THEN '15 - 0361 A 0390'
+		WHEN QTATRASO <= 420  THEN '16 - 0391 A 0420'
+		WHEN QTATRASO <= 450  THEN '17 - 0421 A 0450'
+		WHEN QTATRASO <= 480  THEN '18 - 0451 A 0480'
+		WHEN QTATRASO <= 510  THEN '19 - 0481 A 0510'
+		WHEN QTATRASO <= 540  THEN '20 - 0511 A 0540'
+		WHEN QTATRASO <= 570  THEN '21 - 0541 A 0570'
+		WHEN QTATRASO <= 600  THEN '22 - 0571 A 0600'
+		WHEN QTATRASO <= 630  THEN '23 - 0601 A 0630'
+		WHEN QTATRASO <= 660  THEN '24 - 0631 A 0660'
+		WHEN QTATRASO <= 690  THEN '25 - 0661 A 0690'
+		WHEN QTATRASO <= 720  THEN '26 - 0691 A 0720'
+		WHEN QTATRASO <= 540  THEN '27 - 0361 A 0540'
+		WHEN QTATRASO <= 720  THEN '28 - 0541 A 0720'
+		WHEN QTATRASO <= 900  THEN '29 - 0721 A 0900'
+		WHEN QTATRASO <= 1180 THEN '30 - 0901 A 1180'
+		WHEN QTATRASO <= 1260 THEN '31 - 1181 A 1260'
+		WHEN QTATRASO <= 1440 THEN '32 - 1261 A 1440'
+		WHEN QTATRASO <= 1620 THEN '33 - 1441 A 1620'
+		WHEN QTATRASO <= 1800 THEN '34 - 1621 A 1800'
+		WHEN QTATRASO <= 1980 THEN '35 - 1801 A 1980'
+		WHEN QTATRASO <= 2160 THEN '36 - 1981 A 2160'
+		WHEN QTATRASO <= 2340 THEN '36 - 2161 A 2340'
+		WHEN QTATRASO <= 2520 THEN '37 - 2341 A 2520'
+		WHEN QTATRASO <= 2700 THEN '38 - 2521 A 2700'
+		WHEN QTATRASO <= 2880 THEN '39 - 2701 A 2880'
+		WHEN QTATRASO <= 3600 THEN '40 - 2881 A 3600'
+		WHEN QTATRASO  > 3600 THEN '41 - ACIMA 3600'
+	ELSE 'EM DIA' END AS FX_ATRASO,
+		CASE
+		WHEN SALDO < 50000   THEN '01 - Até 49.999'
+		WHEN SALDO >= 50000   THEN '02 - 50.000+'
+	ELSE 'SEM SALDO' END AS FX_SALDO,
+
+		SALDO
+	FROM
+		BASE_AGRUPA_&DATA.;
+	QUIT;
+
+	%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%acumular_atraso('2026-05-07',20260507);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%agrupa(20260507);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DATA Rolagem_Total;
+SET CARTEIRA_:;
+
+WHERE PRODUTO NOT IN ('CDC_ECOMMERCE', 'CP_SAQUE_ANIVERSARIO_FGTS', 'INSS', 'PUBLICO');
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO AS
+SELECT
+	t1.STATUS,
+	t1.PRODUTO,
+	t1.DATA,
+	t1.QTATRASO,
+	t1.FX_ATRASO,
+	t1.FX_SALDO,
+	t1.BASE,
+	(SUM(t1.SALDO)) FORMAT=31.4 AS SUM_of_SALDO,
+	(COUNT(t1.DATA_BASE)) AS COUNT_of_DATA_BASE
+
+FROM Rolagem_Total AS t1
+
+WHERE
+	t1.STATUS = 'ATIVA' AND
+	t1.PRODUTO in ('CVG_LEVES', 'CVG_PESADOS', 'LEVES', 'MOTOS', 'PESADOS')
+GROUP BY
+	t1.STATUS,
+	t1.PRODUTO,
+	t1.DATA,
+	t1.QTATRASO,
+	t1.FX_ATRASO,
+	t1.FX_SALDO,
+	t1.BASE
+;QUIT;
+
+PROC SORT DATA= CUBO out=CUBO nodupkey;
+BY _all_;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Projeção_GCP */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: RPDD */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: RPDD */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dSdp4WkzxULkkN41/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE PROVISAO_VAREJO AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'CARTOES BANKLY'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = '2025-12-31');
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RPDD_EXPORT AS
+SELECT
+	 dt_referencia
+	,PRODUTO
+	,cd_estagio_final
+	,fl_ativo_problematico
+
+	,CASE
+		WHEN QT_DIAS_ATRASO <= 0    THEN '01 - EM DIA'
+		WHEN QT_DIAS_ATRASO <= 30   THEN '03 - 0001 A 0030'
+		WHEN QT_DIAS_ATRASO <= 60   THEN '04 - 0031 A 0060'
+		WHEN QT_DIAS_ATRASO <= 90   THEN '05 - 0061 A 0090'
+		WHEN QT_DIAS_ATRASO <= 120  THEN '06 - 0091 A 0120'
+		WHEN QT_DIAS_ATRASO <= 150  THEN '07 - 0121 A 0150'
+		WHEN QT_DIAS_ATRASO <= 180  THEN '08 - 0151 A 0180'
+		WHEN QT_DIAS_ATRASO <= 210  THEN '09 - 0181 A 0210'
+		WHEN QT_DIAS_ATRASO <= 240  THEN '10 - 0211 A 0240'
+		WHEN QT_DIAS_ATRASO <= 270  THEN '11 - 0241 A 0270'
+		WHEN QT_DIAS_ATRASO <= 300  THEN '12 - 0271 A 0300'
+		WHEN QT_DIAS_ATRASO <= 330  THEN '13 - 0301 A 0330'
+		WHEN QT_DIAS_ATRASO <= 360  THEN '14 - 0331 A 0360'
+		WHEN QT_DIAS_ATRASO <= 390  THEN '15 - 0361 A 0390'
+		WHEN QT_DIAS_ATRASO <= 420  THEN '16 - 0391 A 0420'
+		WHEN QT_DIAS_ATRASO <= 450  THEN '17 - 0421 A 0450'
+		WHEN QT_DIAS_ATRASO <= 480  THEN '18 - 0451 A 0480'
+		WHEN QT_DIAS_ATRASO <= 510  THEN '19 - 0481 A 0510'
+		WHEN QT_DIAS_ATRASO <= 540  THEN '20 - 0511 A 0540'
+		WHEN QT_DIAS_ATRASO <= 570  THEN '21 - 0541 A 0570'
+		WHEN QT_DIAS_ATRASO <= 600  THEN '22 - 0571 A 0600'
+		WHEN QT_DIAS_ATRASO <= 630  THEN '23 - 0601 A 0630'
+		WHEN QT_DIAS_ATRASO <= 660  THEN '24 - 0631 A 0660'
+		WHEN QT_DIAS_ATRASO <= 690  THEN '25 - 0661 A 0690'
+		WHEN QT_DIAS_ATRASO <= 720  THEN '26 - 0691 A 0720'
+		WHEN QT_DIAS_ATRASO <= 900  THEN '29 - 0721 A 0900'
+		WHEN QT_DIAS_ATRASO <= 1180 THEN '30 - 0901 A 1180'
+		WHEN QT_DIAS_ATRASO <= 1260 THEN '31 - 1181 A 1260'
+		WHEN QT_DIAS_ATRASO <= 1440 THEN '32 - 1261 A 1440'
+		WHEN QT_DIAS_ATRASO <= 1620 THEN '33 - 1441 A 1620'
+		WHEN QT_DIAS_ATRASO <= 1800 THEN '34 - 1621 A 1800'
+		WHEN QT_DIAS_ATRASO <= 1980 THEN '35 - 1801 A 1980'
+		WHEN QT_DIAS_ATRASO <= 2160 THEN '36 - 1981 A 2160'
+		WHEN QT_DIAS_ATRASO <= 2340 THEN '36 - 2161 A 2340'
+		WHEN QT_DIAS_ATRASO <= 2520 THEN '37 - 2341 A 2520'
+		WHEN QT_DIAS_ATRASO <= 2700 THEN '38 - 2521 A 2700'
+		WHEN QT_DIAS_ATRASO <= 2880 THEN '39 - 2701 A 2880'
+		WHEN QT_DIAS_ATRASO <= 3600 THEN '40 - 2881 A 3600'
+		WHEN QT_DIAS_ATRASO  > 3600 THEN '41 - ACIMA 3600'
+	ELSE 'EM DIA' END AS FX_ATRASO
+
+	,SUM(vr_saldo_carteira) as CARTEIRA
+	,SUM(vr_provisao_total) AS PERDA_ESPERADA
+	,COUNT(cd_contrato) AS QNT
+
+FROM PROVISAO_VAREJO
+GROUP BY 1,2,3,4,5;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: RPDD */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-PpsOWjixz75wrqR9/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=20);
+CREATE TABLE VALIDACAO AS
+SELECT
+	A.*,
+	B.SALDO AS SALDO_20251116,
+	B.QTATRASO AS QTATRASO_20251116,
+	B.FX_ATRASO AS FX_ATRASO_20251116,
+	B.STATUS as STATUS_20251116,
+	CASE WHEN A.SALDO = B.SALDO THEN "IGUAL"
+	ELSE "DIF"
+	END AS ERRO_SALDO,
+	CASE WHEN A.STATUS = B.STATUS THEN "IGUAL"
+	ELSE "DIF"
+	END AS ERRO_STATUS,
+
+
+
+
+	B.QTATRASO - A.QTATRASO AS DIF_ATRASO_1516
+
+
+
+FROM CARTEIRA_20251115 AS A
+
+LEFT JOIN CARTEIRA_20251116 AS B
+on a.nucontrato = b.nucontrato
+
+
+
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=20);
+CREATE TABLE ERRO_GCON AS
+SELECT
+	*
+FROM CONNECTION TO PERM (
+	SELECT
+		A.DTPROCESSAMENTO,
+		A.NUCONTRATO,
+		A.SQCONTRATOFINANCEIRO,
+		A.Nudiasatraso,
+		A.CdSItuacaoContabil,
+		SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)) AS vrpermanenciaapropriado,
+		SUM(CAST(A.VrTaxaContratoRestruturacao AS FLOAT64)) AS VrTaxaContratoRestruturacao,
+		SUM(CAST(A.VrTaxaContrato AS FLOAT64)) AS VrTaxaContrato,
+
+		CASE
+			WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+			ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+		END AS SALDO
+
+      FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		      WHERE a.nucontrato in (
+'12014000268427',
+'12014000263554',
+'12014000258740',
+'12014000259100',
+'12014000260392',
+'12014000261648',
+'12014000262109',
+'12014000322341',
+'12014000322467',
+'12014000322477',
+'12014000323612',
+'12014000323709',
+'12014000345054',
+'12015000277922',
+'12029000286391',
+'12033000344103',
+'12014000343432',
+'12014000344940') AND DATE(A.DTPROCESSAMENTO) IN ('2025-11-14', '2025-11-15', '2025-11-16', '2025-11-17')
+
+		GROUP BY
+		A.DTPROCESSAMENTO,
+		A.NUCONTRATO,
+		A.SQCONTRATOFINANCEIRO,
+		A.Nudiasatraso,
+		A.CdSItuacaoContabil,
+		J.FlRestruturacaoContrato
+
+)
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTEIRA_2026);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTEIRA_2026 AS
+   SELECT t1.STATUS,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO,
+          
+            (SUM(t1.SALDO)) AS SUM_of_SALDO
+      FROM WORK.CARTEIRA_20260111 t1
+      WHERE t1.QTATRASO BETWEEN 520 AND 720 AND t1.PRODUTO = 'LEVES'
+      GROUP BY t1.STATUS;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_VALIDACAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_VALIDACAO AS
+   SELECT t1.FX_ATRASO,
+          t1.PRODUTO,
+          
+            (SUM(t1.SALDO)) AS SUM_of_SALDO,
+          
+            (SUM(t1.SALDO_20251116)) AS SUM_of_SALDO_20251116
+      FROM WORK.VALIDACAO t1
+      GROUP BY t1.FX_ATRASO,
+               t1.PRODUTO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_PROVISAO_VAREJO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PROVISAO_VAREJO AS
+   SELECT t1.cd_subproduto,
+          t1.cd_modalidade,
+          t1.cd_produto_risco,
+          t1.cd_sistema_origem
+      FROM WORK.PROVISAO_VAREJO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=20);
+CREATE TABLE ERRO_GCON AS
+SELECT
+	*
+FROM CONNECTION TO PERM (
+	SELECT
+		A.DTPROCESSAMENTO,
+		A.NUCONTRATO,
+		A.SQCONTRATOFINANCEIRO,
+		A.Nudiasatraso,
+		A.CdSItuacaoContabil,
+		SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)) AS vrpermanenciaapropriado,
+		SUM(CAST(A.VrTaxaContratoRestruturacao AS FLOAT64)) AS VrTaxaContratoRestruturacao,
+		SUM(CAST(A.VrTaxaContrato AS FLOAT64)) AS VrTaxaContrato,
+
+		CASE
+			WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+			ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+		END AS SALDO
+
+      FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		      WHERE a.nucontrato in (
+'12014000268427',
+'12014000263554',
+'12014000258740',
+'12014000259100',
+'12014000260392',
+'12014000261648',
+'12014000262109',
+'12014000322341',
+'12014000322467',
+'12014000322477',
+'12014000323612',
+'12014000323709',
+'12014000345054',
+'12015000277922',
+'12029000286391',
+'12033000344103',
+'12014000343432',
+'12014000344940') AND DATE(A.DTPROCESSAMENTO) IN ('2025-11-14', '2025-11-15', '2025-11-16', '2025-11-17')
+
+		GROUP BY
+		A.DTPROCESSAMENTO,
+		A.NUCONTRATO,
+		A.SQCONTRATOFINANCEIRO,
+		A.Nudiasatraso,
+		A.CdSItuacaoContabil,
+		J.FlRestruturacaoContrato
+
+)
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ROLAGEM_TOTAL2);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ROLAGEM_TOTAL2 AS
+   SELECT t1.DATA,
+          t1.STATUS,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO
+      FROM WORK.ROLAGEM_TOTAL2 t1
+      WHERE t1.QTATRASO BETWEEN 520 AND 720
+      GROUP BY t1.DATA,
+               t1.STATUS;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_ROLAGEM_TOTAL2);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_ROLAGEM_TOTAL2 AS
+   SELECT t1.DATA_BASE,
+          t1.DATA,
+          t1.NUCONTRATO,
+          t1.cd_cpf_cnpj,
+          t1.dt_contrato,
+          t1.SQCONTRATOFINANCEIRO,
+          t1.STATUS,
+          t1.BASE,
+          t1.cd_produto,
+          t1.cdsubproduto,
+          t1.cd_modalidade_produto,
+          t1.NMMODALIDADEPRODUTO,
+          t1.NMGRUPOSUBPRODUTO,
+          t1.PRODUTO,
+          t1.QTATRASO,
+          t1.FAIXA_ATRASO,
+          t1.FX_ATRASO,
+          t1.FX_SALDO,
+          t1.SALDO
+      FROM WORK.ROLAGEM_TOTAL2 t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */

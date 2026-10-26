@@ -1,0 +1,117 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__1100-BaseAcoesContrarias
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:27 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 60
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: COMPTO = /riscosbv/juridico/comp_total
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: ANOMESDIA
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBV/JURIDICO/YRIBEIRO/RISCO_BCO_DBBVF_LOG.SAS [SAS/Local], DBEP.VWTBLCAUSACONS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: COMPTO
+IMPORTED FILES (Requires Ingestion): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBLACOESCONTRARIAS
+TABLE_READ_PROVENANCE (Flow): DBEP.VWTBLCAUSACONS [PROC SQL - FROM], WORK.TBLACOESCONTRARIAS [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): COMPTO.TBLACOESCONTRARIA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.TBLACOESCONTRARIAS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas|/RISCOSBV/JURIDICO/YRIBEIRO|RISCO_BCO_DBBVF_LOG.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: TblbaseCONS */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 1 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: TblbaseCONS */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-QEIzmkuPHORelbYo/code.sas */
+/* =========================INÍCIO TASK========================= */
+%include '/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas';
+
+libname CompTo	'/riscosbv/juridico/comp_total';
+%GLOBAL AnoMesDia;
+DATA _NULL_;
+AnoMesDia=YEAR(TODAY())*10000+MONTH(TODAY())*100+DAY(TODAY());
+CALL SYMPUT('AnoMesDia',STRIP(AnoMesDia));
+;run;
+
+PROC SQL;
+CREATE TABLE WORK.tblacoescontrarias AS
+SELECT
+ B.CdCausa
+,B.CdPasta
+,B.CPFCNPJ
+,B.NomeParte
+,B.DtCadastramento
+,B.DtEncerramento
+,B.NmMotivo
+,B.NmSubMotivo
+,B.NmMotivoEncerramento
+,B.NmMotivoRRO
+,B.NmTipoEncerramento
+,B.NmStatusProcesso
+,B.NmAcaoJudicial
+,B.TipoAcaoGrupo
+,B.NuContrato1DeN
+,B.VrIndenizacao
+,B.VrEmolumentos
+
+FROM dbep.VWTBLCAUSACONS B
+where 1=1
+AND B.cdSistema = 'p'
+AND B.CdUnidadeExyon='VAC'
+;RUN;
+
+data CompTo.tblacoescontraria (compress=yes);set WORK.tblacoescontrarias;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: TblbaseCONS */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 1 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1000 - Fixar Log */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gJA8mqQhX1flJwCf/code.sas */
+/* =========================INÍCIO TASK========================= */
+%log_errors;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

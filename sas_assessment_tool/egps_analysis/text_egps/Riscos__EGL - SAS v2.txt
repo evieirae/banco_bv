@@ -1,0 +1,426 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__EGL - SAS v2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:03 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 35
+ODS_OUTPUTS_DETECTED: xlsx
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 268
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: DV10AUTO = /projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10; DV10_ONE = /projetos/riscosmercado/rmsas/rmone/dv10/; NII = /riscosbv/mercado/comp_total; POS_ONE = /projetos/riscosmercado/dados/rmone/posicao/; RM_TBPOS = /projetos/riscosmercado/dados/rm/relatorios; TDV = /projetos/riscosmercado/rmsas/rmone/dv10; TPOS = /projetos/riscosmercado/dados/rmone/posicao
+DETECTED_MACROS_DEFINED: DtRef_D0, DtRef_d0, dtref, versao
+DETECTED_MACROS_USED: DtRef_D0, DtRef_d0, dtref, versao
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DTREF._V01 [SAS/Local], DV10AUTO.FLUXODV10PTA_20250930 [SAS/Local], NII.NII_FULL_CONSOLIDADO_20250930 [SAS/Local], POS_ONE.TBPOSICAOMOR_20250930 [SAS/Local], TPOS.TBPOSICAOMOR_20250930 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DV10AUTO, NII, POS_ONE, TPOS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_CODIGO_BACEN, WORK.BOND_BANVOR, WORK.TBTOTAL
+TABLE_READ_PROVENANCE (Flow): DTREF._V01 [Resolved dynamic lib.member&macro (%LET)], DV10AUTO.FLUXODV10PTA_20250930 [PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)], NII.NII_FULL_CONSOLIDADO_20250930 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], POS_ONE.TBPOSICAOMOR_20250930 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], TPOS.TBPOSICAOMOR_20250930 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], WORK.BASE_CODIGO_BACEN [PROC EXPORT - DATA=], WORK.BOND_BANVOR [PROC EXPORT - DATA=], WORK.TBTOTAL [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbv/mercado/NII/EGL/BOND_BANVOR_&DtRef_D0..xlsx, /riscosbv/mercado/NII/EGL/EGL_&dtref._v&versao..xlsx, /riscosbv/mercado/NII/EGL/TB_POSICAO_FLUXO_&DtRef_d0.&..xlsx, /riscosbv/mercado/NII/EGL/TB_POSICAO_FLUXO_TOTAL_&DtRef_d0.&..xlsx
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_NII_CONSOLIDADA, WORK.BASE_CODIGO_BACEN, WORK.BOND_BANVOR, WORK.TBTOTAL
+DYNAMIC REFS (Ambiguous): {DTREF_D0}.XLSX, {VERSAO}.XLSX
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET dtref=20250930;
+%LET versao=01;
+%LET DtRef_D0=20250930;
+%LET DtRef_d0=20250930;
+
+[[ FILE_REFS_MACRO ]]
+OUT|/riscosbv/mercado/NII/EGL/BOND_BANVOR_&DtRef_D0..xlsx|/RISCOSBV/MERCADO/NII/EGL|BOND_BANVOR_20250930.XLSX|DTREF_D0|ok
+OUT|/riscosbv/mercado/NII/EGL/EGL_&dtref._v&versao..xlsx|/RISCOSBV/MERCADO/NII/EGL|EGL_20250930_V01.XLSX|DTREF,VERSAO|ok
+OUT|/riscosbv/mercado/NII/EGL/TB_POSICAO_FLUXO_&DtRef_d0.&..xlsx|/RISCOSBV/MERCADO/NII/EGL|TB_POSICAO_FLUXO_20250930&..XLSX|DTREF_D0|ok
+OUT|/riscosbv/mercado/NII/EGL/TB_POSICAO_FLUXO_TOTAL_&DtRef_d0.&..xlsx|/RISCOSBV/MERCADO/NII/EGL|TB_POSICAO_FLUXO_TOTAL_20250930&..XLSX|DTREF_D0|ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Auxiliar_Batimento_EGL */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Auxiliar_Batimento_EGL */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-wdNSll6mK6QO4OKB/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname nii '/riscosbv/mercado/comp_total';
+options compress= yes;
+%let dtref= 20250930;
+%let versao= 01;
+
+proc sql;
+	create table base_nii_consolidada as
+	select 	DtReferencia,
+			Cenario,
+			SplitNumber,
+			Portfolio,
+			PosID,
+			TipoContabil,
+			Grupo_DBS,
+			Mesa_Operacao,
+			Carteira,
+			Modalidade,
+			Book,
+			Indexador,
+			TpPNL,
+			Tipo_Taxa,
+			Tipo_Categoria_Contabil,
+			Tipo_Negociacao,
+			Tp_Ligadas,
+			Tp_Liquidez,
+			'Soma 1 ano' as TimestepAgrup,
+			sum(PositionUnits) as PositionUnits,
+			sum(ifn(timestep = dtreferencia, THEO_Value, 0)) as THEO_Value, 
+			sum(THEO_Accounting_Earnings) as THEO_Accounting_Earnings,
+			sum(ifn(timestep = dtreferencia, THEO_Accounting_Accrued_Interest, 0)) as THEO_Accounting_Accrued_Interest, 
+			sum(THEO_BV_Benchmark_Earnings) as THEO_BV_Benchmark_Earnings,
+			sum(ifn(timestep = dtreferencia, THEO_Outstanding_Balance_EX, 0)) as THEO_Outstanding_Balance_EX, 
+			0 as SE_Cash_1, 
+			sum(SE_Cash_Earnings_1) as SE_Cash_Earnings_1,
+			0 as THEO_Yield,
+			sum(THEO_Macaulay_Duration) as THEO_Macaulay_Duration,
+			sum(THEO_Transfer_Charges) as THEO_Transfer_Charges,
+			THEO_Transfer_Current_Rates,
+			sum(THEO_PV01) as THEO_PV01,
+			0 as THEO_BV_RNR, 
+			sum(THEO_Current_Rate) as THEO_Current_Rate,
+			sum(THEO_Accounting_Earnings_Delta) as THEO_Accounting_Earnings_Delta,
+			0 as THEO_Value_EX_Delta, 
+			sum(THEO_Cash_Earnings_Delta) as THEO_Cash_Earnings_Delta
+	from nii.nii_full_consolidado_&dtref. (where= (timestep <= intnx('month',dtreferencia,12,'end')))
+		Where
+			Cenario = "BaseScenario"
+			and TipoContabil <> "undefined"
+			and Tipo_Taxa = "Cliente"
+			and Tipo_Negociacao = "BANKING"
+			and Tipo_Categoria_Contabil <> "R"
+			and SplitNumber <= 900
+			and portfolio not contains "Interareas"
+	group by
+			1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, THEO_Transfer_Current_Rates, 2;
+quit;
+
+proc export
+  data=base_nii_consolidada
+  dbms=xlsx
+  outfile="/riscosbv/mercado/NII/EGL/EGL_&dtref._v&versao..xlsx"
+  replace;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Auxiliar_Batimento_EGL */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BASE_BANVOR */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BASE_BANVOR */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-T8lGj6Gx5Gk6ysKO/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname POS_ONE "/projetos/riscosmercado/dados/rmone/posicao/";
+Libname DV10_ONE "/projetos/riscosmercado/rmsas/rmone/dv10/";
+libname RM_TBPOS '/projetos/riscosmercado/dados/rm/relatorios';
+libname DV10AUTO '/projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10';
+
+%let DtRef_D0 = 20250930;
+
+%_eg_conditional_dropds(WORK.TBPOS_DV10_OLD_ONE);
+
+PROC SQL;
+CREATE TABLE WORK.BOND_BANVOR AS
+SELECT t2.DtReferencia,
+t2.PosId,
+t2.Fator_de_Risco,
+t2.Modalidade,
+t2.TipoDeNegociacao,
+t2.MesaOperacao,
+t2.CarteiraGerencial,
+t2.BookGerencial,
+t2.ProdutoGerencial,
+t2.TpPNL,
+t2.TipoContabil,
+t2.Veiculo,
+t2.Vencimento,
+t2.Valor_Presente,
+t2.PresenteBase,
+t2.FuturoBase,
+t2.vrDV10,
+t1.PositionUnits,
+t1.AgrupamentoPosicao,
+t1.TipoTesouraria,
+t1.IndexadorBV,
+t1.MtMLegado,
+t1.ValorPresenteGerencial,
+t1.GrupoDeConciliacao,
+t1.DataCarencia,
+t1.GrupoContabilBacen,
+t1.DataVencimentoOperacao,
+t1.IdPessoa,
+t1.ChaveNegociacao,
+t1.IssueDate,
+t1.MaturityDate,
+t1.Currency,
+t1.Nome,
+t1.ContractSize,
+t1.PcamSettlementLag,
+t1.Notional,
+t1.Underlying,
+t1.PaymentProcedure,
+t1.UnderlyingCurveIndex,
+t1.Factor,
+t1.SpreadValue,
+t1.SpreadUnit,
+t1.SpotPrice,
+t1.Volatility,
+t1.Template,
+t1.CouponRateValue,
+t1.CouponRateUnit,
+t1.Type,
+t1.CallOption,
+t1.Barrier,
+t1.BarrierDirection,
+t1.BarrierStartDate,
+t1.BarrierEndDate,
+t1.BarrierHit,
+t1.BarrierHitDate,
+t1.Knockout,
+t1.StrikePrice,
+t1.Rebate,
+t1.PayOffAtBreach,
+t1.CouponListValue,
+t1.CouponListUnit,
+t1.Limitador,
+t1.LimitadorLegAtiva,
+t1.LimitadorSuperior,
+t1.DataInicioMedia,
+t1.DataFimMedia,
+t1.InitialIndexLevel,
+t1.BMF,
+t1.Bacen,
+t1.Offshore,
+t1.ReferenceEntity,
+"ALGO_OLD" as ALGO
+FROM POS_ONE.tbposicaomor_&DtRef_D0. t1
+INNER JOIN DV10AUTO.FLUXODV10PTA_&DtRef_D0. t2 ON (t1.PosID = t2.PosId)
+WHERE t2.Modalidade in ('486 - Eurobond - Subordinated','487 - Eurobond - Senior')
+ANd t2.Fator_de_Risco not contains 'Gerencial'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;
+QUIT;
+
+proc export
+  data=WORK.BOND_BANVOR
+  dbms=xlsx
+  outfile="/riscosbv/mercado/NII/EGL/BOND_BANVOR_&DtRef_D0..xlsx"
+  replace;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BASE_BANVOR */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: EXPORT_COD_BC */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: EXPORT_COD_BC */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dbFFkielp9LxQpJ3/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname TPOS '/projetos/riscosmercado/dados/rmone/posicao';
+libname TDV '/projetos/riscosmercado/rmsas/rmone/dv10';
+libname DV10AUTO '/projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10';
+
+%let DtRef_d0 = 20250930;
+
+PROC SQL;
+   CREATE TABLE WORK.BASE_CODIGO_BACEN AS
+	SELECT
+		t2.DtReferencia,
+		t2.Veiculo,
+		t2.TipoDeNegociacao,
+		t2.MesaOperacao,
+		t2.Modalidade,
+		t2.BookGerencial,
+		t2.TpPNL,
+		t2.TipoContabil,
+		t1.GrupoContabilBacen,
+		t2.Fator_de_Risco,
+		sum(t2.Valor_Presente)as Valor_Presente ,
+		sum(t2.PresenteBase)as PresenteBase,
+		sum(t2.FuturoBase)as FuturoBase,
+		sum(t2.vrDV10)as vrDV10,
+		sum(t1.MtMLegado)as MtMLegado,
+		sum(t1.ValorPresenteGerencial)as ValorPresenteGerencial,
+		sum(t1.Notional)as Notional
+      FROM TPOS.TBPOSICAOMOR_&DtRef_D0. t1
+           Full join DV10AUTO.FLUXODV10PTA_&DtRef_d0. t2 ON (t1.PosID = t2.PosId)
+		Where t2.Fator_de_Risco not contains 'Gerencial'
+		GROUP BY  1, 2, 3, 4,5 ,6,7 ,8,9,10
+
+;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.TBTOTAL AS
+	SELECT
+		t1.DtReferencia as DtReferencia_FLUXO,
+		t1.Veiculo as Veiculo_FLUXO,
+		t1.TipoDeNegociacao as TipoDeNegociacao_FLUXO,
+		t1.MesaOperacao as MesaOperacao_FLUXO,
+		t1.Modalidade as Modalidade_FLUXO,
+		t1.BookGerencial as BookGerencial_FLUXO,
+		t1.TpPNL as TpPNL_FLUXO,
+		t1.TipoContabil as TipoContabil_FLUXO,
+		t2.DtReferencia,
+		t2.Veiculo,
+		t2.TipoDeNegociacao,
+		t2.MesaOperacao,
+		t2.Modalidade,
+		t2.BookGerencial,
+		t2.TpPNL,
+		t2.TipoContabil,
+		t1.GrupoContabilBacen,
+		t2.Fator_de_Risco,
+		sum(t2.Valor_Presente)as Valor_Presente ,
+		sum(t2.PresenteBase)as PresenteBase,
+		sum(t2.FuturoBase)as FuturoBase,
+		sum(t2.vrDV10)as vrDV10,
+		sum(t1.MtMLegado)as MtMLegado,
+		sum(t1.ValorPresenteGerencial)as ValorPresenteGerencial,
+		sum(t1.Notional)as Notional
+      FROM TPOS.TBPOSICAOMOR_&DtRef_D0. t1
+           Full join DV10AUTO.FLUXODV10PTA_&DtRef_d0. t2 ON (t1.PosID = t2.PosId)
+			Where t2.Fator_de_Risco not contains 'Gerencial'
+			GROUP BY  1, 2, 3, 4,5 ,6,7 ,8,9,10,11,12,13,14,15,16,17,18
+
+;
+QUIT;
+
+proc export
+  data=WORK.BASE_CODIGO_BACEN
+  dbms=xlsx
+  outfile="/riscosbv/mercado/NII/EGL/TB_POSICAO_FLUXO_&DtRef_d0.&..xlsx"
+  replace;
+run;
+
+proc export
+  data=WORK.TBTOTAL
+  dbms=xlsx
+  outfile="/riscosbv/mercado/NII/EGL/TB_POSICAO_FLUXO_TOTAL_&DtRef_d0.&..xlsx"
+  replace;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: EXPORT_COD_BC */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

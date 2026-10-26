@@ -1,0 +1,285 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__resultados_solar
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 202
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CONVSIMU = /infogrc/convsimu
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): MIS.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): MIS.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_CANALSOLAR, TBPRODUCAO_SOLAR, WORK.QUERY_FOR_TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Resultado - Solar (antigo) */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Resultado - Solar (antigo) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-d6qjeRntaqx8YPrs/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MIS'/projetos/MISV/data/bases';
+
+LIBNAME CONVSIMU '/infogrc/convsimu';
+
+PROC SQL;
+
+   CREATE TABLE TBPRODUCAO_SOLAR AS
+          SELECT
+          NuAnoMes,
+          NuContrato,
+          DsTipoCanalProducaoMeta,
+		  VrProducao,
+          VrCap,
+          VrBVMais,
+          FlCap,
+          FlBVMais,
+          DsFilial,
+          NmParceiroComercial,
+		  FlParceiroSinergia,
+		  FLPropostaSinergia,
+		  NmParceiroComercialCoban,
+		  NmGrupoProdutoMeta
+
+      FROM MIS.TBPRODUCAO
+
+      WHERE NuAnoMes IN (202301, 202302, 202303, 202304, 202305, 202306, 202307, 202308,
+      202309, 202310, 202311, 202312, 202401, 202402, 202403)
+      AND NmGrupoProdutoMeta = 'Solar'
+      AND TpPessoa = 'F';
+
+      QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Resultado - Solar (antigo) */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Resultado - Por Canal */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Resultado - Por Canal */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-oX7tqntXjxTuTxGW/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MIS'/projetos/MISV/data/bases';
+
+LIBNAME CONVSIMU '/infogrc/convsimu';
+
+PROC SQL;
+
+   CREATE TABLE BASE_CANALSOLAR AS
+          SELECT
+          NuAnoMes,
+          NuContrato,
+		  NmAreaEstruturaComercial,
+		  NmSubEstruturaComercialA,
+		  NmCanalEstruturaComercial,
+		  NmGrupoProdutoMeta,
+		  CdParceiroComercial,
+		  NmParceiroComercial,
+          CdParceiroComercialCoban,
+		  NmParceiroComercialCoban,
+          CdColaborador,
+          NmColaborador,
+			DsFilial,
+          DsTipoCanalProducaoMeta,
+          VrProducao,
+          VrCap,
+          VrPlacaSolar,
+          FlCap,
+          FlBVMais,
+		  FlPlacaSolar,
+		  FlParceiroSinergia,
+		  FlPropostaSinergia,
+
+      CASE
+      WHEN FlParceiroSinergia = 1 and FlPropostaSinergia =1 then "SINERGIA"
+      WHEN NmParceiroComercial = "MEU FINANCIAMENTO SOLAR LTDA" then "MFS"
+      when NmParceiroComercialCoban = "MEU FINANCIAMENTO SOLAR LTDA" and NmGrupoProdutoMeta = "Solar" then "MFS"
+      when NmGrupoProdutoMeta = "Solar" then "Canal Solar"
+      end as Canal_Solar
+
+      FROM MIS.TBPRODUCAO
+      WHERE NuAnoMes IN (
+202412, 202501, 202502, 202503, 202504, 202505, 202506, 202507, 202508, 202509, 202510, 202511)
+      AND NmGrupoProdutoMeta = 'Solar'
+      AND TpPessoa = 'F';
+
+      QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Resultado - Por Canal */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MIS'/projetos/MISV/data/bases';
+
+LIBNAME CONVSIMU '/infogrc/convsimu';
+
+PROC SQL;
+
+   CREATE TABLE TBPRODUCAO_SOLAR AS
+          SELECT
+          NuAnoMes,
+          NuContrato,
+          DsTipoCanalProducaoMeta,
+		  VrProducao,
+          VrCap,
+          VrBVMais,
+          FlCap,
+          FlBVMais,
+          DsFilial,
+          NmParceiroComercial,
+		  FlParceiroSinergia,
+		  FLPropostaSinergia,
+		  NmParceiroComercialCoban,
+		  NmGrupoProdutoMeta
+
+      FROM MIS.TBPRODUCAO
+
+      WHERE NuAnoMes IN (202301, 202302, 202303, 202304, 202305, 202306, 202307, 202308,
+      202309, 202310, 202311, 202312, 202401, 202402)
+      AND NmGrupoProdutoMeta = 'Solar'
+      AND TpPessoa = 'F';
+
+      QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPRODUCAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBPRODUCAO AS
+   SELECT DISTINCT t1.TpPessoa
+      FROM MIS.TBPRODUCAO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MIS'/projetos/MISV/data/bases';
+
+LIBNAME CONVSIMU '/infogrc/convsimu';
+
+PROC SQL;
+
+   CREATE TABLE BASE_CANALSOLAR AS
+          SELECT
+          NuAnoMes,
+          NuContrato,
+		  NmAreaEstruturaComercial,
+		  NmSubEstruturaComercialA,
+		  NmCanalEstruturaComercial,
+		  NmGrupoProdutoMeta,
+		  CdParceiroComercial,
+		  NmParceiroComercial,
+          CdParceiroComercialCoban,
+		  NmParceiroComercialCoban,
+          CdColaborador,
+          NmColaborador,
+			DsFilial,
+          DsTipoCanalProducaoMeta,
+          VrProducao,
+          VrCap,
+          VrPlacaSolar,
+          FlCap,
+          FlBVMais,
+		  FlPlacaSolar,
+		  FlParceiroSinergia,
+		  FlPropostaSinergia,
+
+      CASE
+      WHEN FlParceiroSinergia = 1 and FlPropostaSinergia =1 then "SINERGIA"
+      WHEN NmParceiroComercial = "MEU FINANCIAMENTO SOLAR LTDA" then "MFS"
+      when NmParceiroComercialCoban = "MEU FINANCIAMENTO SOLAR LTDA" and NmGrupoProdutoMeta = "Solar" then "MFS"
+      when NmGrupoProdutoMeta = "Solar" then "Canal Solar"
+      end as Canal_Solar
+
+      FROM MIS.TBPRODUCAO
+
+      
+
+      WHERE NuAnoMes IN (
+202412, 202501, 202502, 202503, 202504, 202505, 202506, 202507, 202508, 202509, 202510, 202511)
+      AND NmGrupoProdutoMeta = 'Solar'
+      AND TpPessoa = 'F';
+
+      QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

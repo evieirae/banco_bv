@@ -1,0 +1,436 @@
+START_METADATA
+PROJECT: Rodas__tbconversaoc6
+FILE_SAS: tbconversaoc6_Tbsimulacao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 344
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ABANDONO = /riscosbvf/coaching/tribo_veiculos/SAS/Funil_Leads/bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAt, DtAtCetip2, SafraM13, a0, a1, safraM13
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], ABANDONO.ABANDONO [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPESSOA [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], TMP.TBORIGINACAO&A0 [SAS/Local], TMP.TBORIGINACAO&A1 [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: ABANDONO
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): ABANDONO.ABANDONO [PROC SQL - JOIN], BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], BASES.TBPESSOA [PROC SQL - JOIN], CONVSIMU.TBSIMULACOES [DATA Step - SET; PROC SQL - FROM], TMP.TBORIGINACAO&A0 [DATA Step - SET], TMP.TBORIGINACAO&A1 [DATA Step - SET], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): ABANDONO.ABANDONO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.TBCONVERSAOC6
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEFRAUDE, CONVERSAOC6_DADOSCLIENTE, CONVERSAOC6_DADOSCLIENTE1, CONVERSAOC6_DADOSCLIENTETMP, CONVSIMU, CONVSIMU002, ORIGINACAO, TBCOLABORADOR, TBCOLABORADORPDV, TBSIMULACOES
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{A0}, TMP.TBORIGINACAO{A1}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Atualizacao:	28/10/2025														| */
+/* |	Responsavel: 	Gustavo Domingues -  MIS IGE									| */
+/* |	Alt. Realizada:	- Retirada regra de não mostrar banco dos ultimos 7 dias		| */
+/* ====================================================================================== */
+/* |	Atualizacao:	09/12/2025														| */
+/* |	Responsavel: 	Gustavo Domingues -  MIS IGE									| */
+/* |	Alt. Realizada:	- Inseirdo FlFraude												| */
+/* ====================================================================================== */
+
+%include '/infogrc/utils/all-includes.sas';
+libname ABANDONO '/riscosbvf/coaching/tribo_veiculos/SAS/Funil_Leads/bases';
+options compress=yes;
+
+/*
+%VerificaAtualizacao(/infogrc/convsimu/tbsimulacoes.sas7bndx,24,300);
+*/
+
+data tbsimulacoes (Keep=NuAnoMes FlSimuValidaPDV FlConversao DtInclusaoGravame FlConcorrente Banco CdParceiroComercial NmParceiroComercial Canal Produto Regional
+								 Filial CdSimulacaoInicial StatusSimulacao Mensageria NuCpfCnpj NuProposta DtInclusaoGravame FxIdade StPagoLoja DtSimulacaoInicial FxEntrada);
+    set Convsimu.tbsimulacoes (where=(NuAnoMes >= &SafraM13.))
+;run;
+
+PROC SQL;
+CREATE TABLE Convsimu AS
+  SELECT * FROM tbsimulacoes
+ WHERE
+	(
+    Canal IN ('CONCESSIONARIAS','MULTIMARCAS')
+    /*AND FlSimuValidaEfet = 1
+    AND TpPessoa = 'PF'*/
+	AND FlSimuValidaPDV = 1
+    /*AND SistemaInicial IN ('ACOM','APAR','PPAR')*/
+    AND FlConversao = 1
+    AND FlConcorrente = 1
+    AND Produto in ('Leves','Leves-BVO','Motos','Pesados','CVG Leves','CVG Pesados')
+	)
+	or
+	(
+	Canal IN ('BV FINANCEIRA - OPERACAO ESPECIAL','CANAL DIGITAL','CANAL DIRETO','LOJA CANAL NEGOCIOS','NEGOCIOS CENTRALIZADOS','TELEMARKETING')
+    /*AND FlSimuValidaEfet = 1*/
+    /*AND TpPessoa = 'PF'*/
+	AND FlSimuValidaPDV = 1
+    AND FlConversao = 1
+    AND FlConcorrente = 1
+    AND Produto in ('Leves','Leves-BVO','Motos','Pesados','CVG Leves','CVG Pesados')
+	)
+;RUN;
+
+/* Busca dados de GF e GR */
+PROC SQL;
+CREATE TABLE TbColaboradorPDV AS
+  SELECT DISTINCT
+    CdColaboradorC AS CdColaborador,
+    NmColaboradorC,
+    CdParceiroComercial,
+    NmParceiroComercial,
+    LstSubstituicaoC
+  FROM BASES.TbParceiroComercial
+  WHERE
+    CdParceiroComercial <> .
+    AND CdColaboradorC <> .;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbColaborador AS
+  SELECT
+    A.DsLoginN1 AS CdGR,
+    A.DsLoginN2A AS CdGF,
+	A.DsLoginN3A AS CdGREG,
+    B.LstSubstituicaoC AS LstFocais,
+    B.CdParceiroComercial
+  FROM
+    BASES.TbEstruturaComercial A
+  INNER JOIN
+    TbColaboradorPDV B
+    ON A.CdColaboradorAtivo = B.CdColaborador
+  WHERE
+    TODAY() BETWEEN A.DtInicioVigencia AND A.DtFimVigencia
+    AND A.DsLoginN1 IS NOT NULL
+    AND A.DsLoginN2A IS NOT NULL;
+RUN;
+
+PROC SQL;
+  SELECT MAX(DtAtualizacaoCetip) format date9. INTO :DtAtCetip2 FROM TMP.TBPOTENCIALRODAS;
+RUN;
+
+PROC SQL;
+CREATE TABLE Convsimu002 AS
+  SELECT
+    A.NuAnoMes,
+/*    CASE WHEN TODAY() - A.DtInclusaoGravame < 8 AND FlConcorrente = 1 THEN 'Converteu' ELSE A.Banco END AS Banco,*/
+    A.Banco,
+	A.CdParceiroComercial,
+    A.NmParceiroComercial,
+    A.Produto,
+    A.Regional,
+    A.Filial,
+    B.CdGF,
+    B.CdGR,
+	B.CdGREG,
+    B.LstFocais,
+    A.CdSimulacaoInicial,
+    0 AS NuTelefone,
+    A.StatusSimulacao,
+    A.Mensageria,
+    A.NuCpfCnpj,
+    A.NuProposta,
+    A.DtInclusaoGravame,
+    A.FxIdade,
+    A.StPagoLoja,
+	Case when A.DtSimulacaoInicial < "&DtAtCetip2."d then 'Sim' else 'Não' End as DataCetip,
+	A.FxEntrada
+  FROM
+    Convsimu A
+  LEFT JOIN
+    TbColaborador B
+    ON A.CdParceiroComercial = B.CdParceiroComercial;
+RUN;
+
+DATA Originacao (KEEP=NuProposta FlTxAlterada NuRating);
+SET TMP.TbOriginacao&a1. - TMP.TbOriginacao&a0.;
+  WHERE NuAnoMes >= &safraM13.
+    /*AND NmGrupoProdutoMeta in ('Leves','Leves-BVO','Motos')
+    AND DsTipoCanalProducao IN ('CONCESSIONARIAS','MULTIMARCAS','NEGOCIOS CENTRALIZADOS')*/
+;RUN;
+
+PROC SQL;
+SELECT MAX(DtSimulacaoInicial) INTO :DtAt FROM convsimu.tbsimulacoes;
+RUN;
+
+PROC SQL;
+/*CREATE TABLE ConversaoC6_DadosCliente AS*/
+CREATE TABLE ConversaoC6_DadosClienteTMP AS
+  SELECT
+    A.NuAnoMes,
+    A.Banco,
+    A.CdParceiroComercial,
+    A.NmParceiroComercial,
+    A.Produto,
+    A.Regional,
+    A.Filial,
+    A.CdGF,
+    A.CdGR,
+	A.CdGREG,
+    ColaboradorFocal.LstColaboradorFocal as LstFocais,
+    A.CdSimulacaoInicial,
+    A.StatusSimulacao,
+    A.Mensageria,
+    A.NuCpfCnpj,
+    COALESCE(B.NmPessoa, 'DESCONHECIDO') AS NmPessoa,
+    B.NuTelefone1,
+    B.NuTelefone2,
+    B.NuTelefone3,
+    B.DsEmail,
+    A.NuProposta,
+	C.NuRating,
+    C.FlTxAlterada AS FlPA,
+    A.DtInclusaoGravame,
+    A.StPagoLoja,
+    A.FxIdade,
+    PUT(&DtAt.,DATE9.) AS DtAtualizacao,
+	DataCetip,
+	A.FxEntrada
+  FROM
+    Convsimu002 A
+  LEFT JOIN
+    bases.TbPessoa B
+    ON A.NuCpfCnpj = B.NuCpfCnpj
+  LEFT JOIN
+    Originacao C
+    ON A.NuProposta = C.NuProposta
+  LEFT JOIN basegrc.TbColaboradorFocal ColaboradorFocal
+		on  A.Filial = ColaboradorFocal.NmAreaEstruturaComercial
+		and ColaboradorFocal.NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and ColaboradorFocal.NmGrupoProdutoMeta=A.Produto
+;RUN;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd'
+READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100
+);
+create table BaseFraude as
+select
+*
+from connection to perm(
+
+WITH
+    propostas AS (
+        SELECT DISTINCT
+            event_id as IdEvento,
+            event_external_id as NuProposta,
+            branch_id as CdParceiroComercial,
+            product_type AS NmProduto
+
+        FROM bv-pdbd-prd.trusted_corp_fraudes.tb_am_event_account_opening
+
+        WHERE DATE(TIMESTAMP_MILLIS(event_received_at)) >= DATE_ADD(CURRENT_DATE(), INTERVAL -12 MONTH)
+          AND outcome_decision = 'review'
+		  AND product_type IN ('CDC COM GARANTIA', 'CDC SEM GARANTIA')
+/*          AND event_external_id = '405405195'*/
+    ),
+
+      status_inicial as (
+        SELECT
+        event_id as IdEvento,
+        timestamp_millis(timestamp) AS DtEntradaEvento
+
+        FROM bv-pdbd-prd.trusted_corp_fraudes.tb_am_event_status es
+
+        WHERE DATE(TIMESTAMP_MILLIS(timestamp)) >= DATE_ADD(CURRENT_DATE(), INTERVAL -12 MONTH)
+        AND new_status_id = 'ready'
+/*        and event_id in ('73ed009d-873a-4ea4-a452-2beedcdf7bef', '06c59403-e679-41b2-8edc-48fc58981616')*/
+    ),
+
+    status_final AS (
+        SELECT DISTINCT
+            es.event_id as IdEvento,
+            TIMESTAMP_MILLIS(es.`TIMESTAMP`) AS DtFinalEvento,
+			new_status_id as DsStatusEvento,
+            REPLACE(pulse_user.name, '@bv.com.br', '') AS NmAnalista
+
+        FROM bv-pdbd-prd.trusted_corp_fraudes.tb_am_event_status AS es
+        INNER JOIN bv-pdbd-prd.trusted_corp_fraudes.tb_pulse_user AS pulse_user ON pulse_user.`id` = es.`USER_ID`
+
+        WHERE pulse_user.`name` <> 'system'
+        AND DATE(TIMESTAMP_MILLIS(es.timestamp)) >= DATE_ADD(CURRENT_DATE(), INTERVAL -12 MONTH)
+/*        and event_id in ('73ed009d-873a-4ea4-a452-2beedcdf7bef', '06c59403-e679-41b2-8edc-48fc58981616')*/
+    ),
+
+    parceiro AS (
+        SELECT
+            parceiro.CdParceiroComercial,
+            filial.dsfilial as DsFilial
+
+        FROM bv-pdbd-prd.trusted_dba.tbparceirocomercial AS parceiro
+        LEFT JOIN bv-pdbd-prd.trusted_dba.tbloja AS loja ON parceiro.CdParceiroComercial = loja.Cdloja
+        LEFT JOIN bv-pdbd-prd.trusted_dba.tbregiao AS regiao ON loja.CdRegiao = regiao.CdRegiao
+        LEFT JOIN bv-pdbd-prd.trusted_dba.tbfilial AS filial ON regiao.CdFilial = filial.CdFilial
+    ),
+
+    pending_hist AS (
+        SELECT
+            event_id as IdEvento,
+            MIN(timestamp_millis(timestamp)) as DtPendenciamento
+
+        FROM bv-pdbd-prd.trusted_corp_fraudes.tb_am_event_status
+
+        WHERE DATE(TIMESTAMP_MILLIS(timestamp)) >= DATE_ADD(CURRENT_DATE(), INTERVAL -12 MONTH)
+            AND new_status_id = 'pending'
+
+        GROUP BY event_id
+    ),
+
+    tb_final AS (
+        SELECT *
+        FROM (
+            SELECT
+                propostas.NuProposta,
+                propostas.IdEvento,
+                inicial.DtEntradaEvento,
+				pending_hist.DtPendenciamento,
+                final.DtFinalEvento,
+				propostas.NmProduto,
+                final.NmAnalista,
+                parceiro.DsFilial,
+				CASE WHEN (final.DsStatusEvento = 'pending' OR final.DtFinalEvento IS NULL) THEN 'S' ELSE 'N' END AS FlEventoPendente,
+                CASE WHEN pending_hist.IdEvento IS NOT NULL THEN 'S' ELSE 'N' END AS FlEventoPendenciado,
+                ROW_NUMBER() OVER (PARTITION BY propostas.NuProposta, propostas.IdEvento ORDER BY final.DtFinalEvento DESC ) AS row_num
+                FROM propostas
+                LEFT JOIN status_inicial AS inicial ON propostas.IdEvento = inicial.IdEvento
+                LEFT JOIN status_final AS final ON propostas.IdEvento = final.IdEvento
+                LEFT JOIN parceiro ON CAST(propostas.CdParceirocomercial AS INT64) = CAST(parceiro.CdParceiroComercial AS INT64)
+                LEFT JOIN pending_hist ON propostas.IdEvento = pending_hist.IdEvento
+        )
+      WHERE row_num = 1
+    )
+
+    SELECT
+        cast (NuProposta as int64) as NuProposta,
+        IdEvento,
+        DtEntradaEvento,
+		DtPendenciamento,
+        DtFinalEvento,
+		NmProduto,
+        NmAnalista,
+        DsFilial,
+		FlEventoPendente,
+        FlEventoPendenciado
+    FROM tb_final
+
+);
+disconnect from perm;
+quit;
+
+proc sql;
+create table ConversaoC6_DadosCliente1 as
+	select
+		TMP.*
+		,ABANDONO.DS_CLASSIFICACAO as Preenchimento
+		,ABANDONO.FL_ABANDONADA as FlAbandono
+		,ABANDONO.DS_CONCORRENCIA as BancoRetornoAbandono
+		,Case when BaseFraude.NuProposta = TMP.Nuproposta then 'Sim' else 'Nao' end as FlFraude
+	from
+		ConversaoC6_DadosClienteTMP as TMP
+
+		left join ABANDONO.ABANDONO as APROSIMU
+			on TMP.CdSimulacaoInicial = APROSIMU.CD_SIMULACAO_PROPOSTA
+
+		Left join BaseFraude as BaseFraude
+			on BaseFraude.NuProposta = TMP.Nuproposta
+
+;run;
+
+PROC SQL;
+CREATE TABLE ConversaoC6_DadosCliente AS
+SELECT DISTINCT
+	NuAnoMes
+	,Banco
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,Produto
+	,Regional
+	,Filial
+	,CdGF
+	,CdGR
+	,CdGREG
+	,LstFocais
+	,CdSimulacaoInicial
+	,StatusSimulacao
+	,Mensageria
+	,NuCpfCnpj
+	,NmPessoa
+	,NuTelefone1
+	,NuTelefone2
+	,NuTelefone3
+	,DsEmail
+	,NuProposta
+	,NuRating
+	,FlPA
+	,DtInclusaoGravame
+	,StPagoLoja
+	,FxIdade
+	,DtAtualizacao
+	,DataCetip
+	,FxEntrada
+,CASE
+  WHEN FlAbandono = 'S'
+    AND LOWER(Mensageria) NOT LIKE '%0. aprovado%'
+    AND LOWER(Mensageria) NOT LIKE '%0. aprovado 100%'
+    AND LOWER(Mensageria) NOT LIKE '%1. alta chance%'
+    AND LOWER(Mensageria) NOT LIKE '%1. aprovado com rastreador%'
+    AND LOWER(Mensageria) NOT LIKE '%1. muita chance >85%'
+    AND LOWER(Mensageria) NOT LIKE '%2. grande chance >70%'
+    AND LOWER(Mensageria) NOT LIKE '%2. tem chance%'
+    AND LOWER(Mensageria) NOT LIKE '%3. boa chance >50%'
+  THEN ''
+  ELSE Preenchimento
+END AS Preenchimento
+
+	,FlAbandono
+
+	,CASE
+  WHEN FlAbandono = 'S'
+    AND LOWER(Mensageria) NOT LIKE '%0. aprovado%'
+    AND LOWER(Mensageria) NOT LIKE '%0. aprovado 100%'
+    AND LOWER(Mensageria) NOT LIKE '%1. alta chance%'
+    AND LOWER(Mensageria) NOT LIKE '%1. aprovado com rastreador%'
+    AND LOWER(Mensageria) NOT LIKE '%1. muita chance >85%'
+    AND LOWER(Mensageria) NOT LIKE '%2. grande chance >70%'
+    AND LOWER(Mensageria) NOT LIKE '%2. tem chance%'
+    AND LOWER(Mensageria) NOT LIKE '%3. boa chance >50%'
+  THEN ''
+  ELSE BancoRetornoAbandono
+END AS BancoRetornoAbandono
+,FlFraude
+
+FROM ConversaoC6_DadosCliente1
+
+;run;
+
+%ExportaCSV(ConversaoC6_DadosCliente,ConversaoC6_DadosCliente);
+
+DATA SOLITMP.TbConversaoC6;
+SET ConversaoC6_DadosCliente;
+RUN;

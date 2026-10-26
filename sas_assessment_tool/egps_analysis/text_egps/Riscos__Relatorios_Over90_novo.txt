@@ -1,0 +1,970 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Relatorios_Over90_novo
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:41 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC TRANSPOSE (9x | +90), %MACRO (5x | +25)
+----------------------------------------
+LINES_OF_CODE: 693
+CODE_TASKS_COUNT: 6
+DETECTED_PROCS: SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (16x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISCRED = /riscosbv/credito/MISCREDITO
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: ANOMES, anomes, lista_agro
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): MISCRED.BASE_UNICA_ATACADO_&ANOMES [SAS/Local], MISCRED.DE_PARA_MACRO_SETOR [SAS/Local], MISCRED.DE_PARA_MACRO_SETOR_2023 [SAS/Local], MISCRED.DE_PARA_MACRO_SETOR_OLD [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: MISCRED
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): MISCRED.BASE_UNICA_ATACADO_&ANOMES [DATA Step - SET], MISCRED.DE_PARA_MACRO_SETOR [DATA Step - SET], MISCRED.DE_PARA_MACRO_SETOR_2023 [DATA Step - SET], MISCRED.DE_PARA_MACRO_SETOR_OLD [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE0, BASE1, BASE_UNICA_AJUSTADA, LISTA_SETORES, OVERS_GRUPOS_HISTORICO, OVERS_GRUPO_HIST, OVERS_HISTORICO, OVER_&ANOMES, OVER_GRUPOS_&ANOMES, RESUMO_COMP, RESUMO_COMP_&ANOMES, RESUMO_COMP_FINAL_&ANOMES, RESUMO_ICRED, RESUMO_ICRED_FINAL_&ANOMES, RESUMO_INAD, RESUMO_INAD_FINAL_&ANOMES
+DYNAMIC REFS (Ambiguous): MISCRED.BASE_UNICA_ATACADO_{ANOMES}
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Crédito */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 31 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Crédito */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-XovwJiswLhlXzsbk/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname miscred BASE "/riscosbv/credito/MISCREDITO";
+
+%macro calcular_over (anomes);
+
+data base_unica_ajustada;
+set  miscred.base_unica_atacado_&anomes.;
+
+
+IF CdModalidadeProduto in (561) and DsTipoCarteira NE 'COMISSAO_FIANÇA' then DsTipoCarteira = 'REGULAR';
+IF CdModalidadeProduto in (560) then DsTipoCarteira = 'OFFSHORE';
+run;
+
+proc sql;
+create table base1 as
+select AnoMes_Referencia
+		%if &anomes. >202402 %then %do;
+		,case when tipo_carteira = 'SMES' or tipo_carteira_gerencial = 'SMES' then 'PM/UM'
+			else 'CORE' end as Segmento
+		,case when tipo_carteira = 'SMES' or tipo_carteira_gerencial = 'SMES' then 'PM/UM'
+			  when tipo_carteira in ('GPR/AE') then tipo_carteira_gerencial
+			  when tipo_carteira in ('PROJECT FINANCE') then tipo_carteira_financas
+			  when tipo_carteira in ('CORRETORA') then 'CORPORATE'
+			  else tipo_carteira end as SegmentoCliente
+		%end;
+		%else %do;
+		,case when tipo_carteira = 'SMES' then 'PM/UM'
+			else 'CORE' end as Segmento
+		,case when tipo_carteira = 'SMES' then 'PM/UM'
+			  when tipo_carteira in ('PROJECT FINANCE') then tipo_carteira_financas
+			  when tipo_carteira in ('CORRETORA') then 'CORPORATE'
+			  else tipo_carteira end as SegmentoCliente
+		%end;		,DsGrupoEconomicoRisco
+		,NuObjetoNegociacao
+		,sum(VrSaldo) as Saldo
+		,max(NumDiasVencidos) as Atraso
+		,case when calculated Atraso > 90 then 'Over90'
+			  when calculated Atraso > 60 then 'Over60'
+			  when calculated Atraso > 30 then 'Over30'
+			  when calculated Atraso > 15 then 'Over15'
+			  else 'Em dia' end as Fx_Atraso
+
+from base_unica_ajustada
+%if &anomes. >202505 %then %do;
+	where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and tipo_carteira NE 'CORRETORA' and DsGrupoEconomicoRisco NE 'CREDZ' and
+	      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário" "TVM") and DsProduto ne ("Stand-by")
+%end;
+%else %do;
+	where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and DsGrupoEconomicoRisco NE 'CREDZ' and
+	      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário" "TVM") and DsProduto ne ("Stand-by")
+%end;
+group by 1,2,3,4,5;
+
+create table OVER_&ANOMES. as
+select
+		AnoMes_Referencia
+		,Segmento
+		
+		,sum(Saldo) as Saldo 									format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,calculated over15 / calculated saldo as percent_over15 format percent10.2
+		,calculated over30 / calculated saldo as percent_over30 format percent10.2
+		,calculated over60 / calculated saldo as percent_over60 format percent10.2
+		,calculated over90 / calculated saldo as percent_over90 format percent10.2
+from base1
+group by 1,2;
+
+create table OVER_GRUPOS_&ANOMES. as
+select
+		AnoMes_Referencia
+		,Segmento
+		,DsGrupoEconomicoRisco
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+
+from base1
+group by 1,2,3;
+quit;
+
+
+
+
+proc sql;
+    create table resumo_icred as
+    select
+		anomes_referencia,
+        segmento,
+        sum(case when atraso > 15 then 1 else 0 end)/1000 as atraso_15,
+        sum(case when atraso > 30 then 1 else 0 end)/1000 as atraso_30,
+        sum(case when atraso > 60 then 1 else 0 end)/1000 as atraso_60,
+        sum(case when atraso > 90 then 1 else 0 end)/1000 as atraso_90,
+        count(*)/1000 as total_operacoes
+    from
+        base1
+    group by
+        anomes_referencia, segmento;
+quit;
+
+proc transpose data=resumo_icred out=resumo_icred_final_&anomes. name=indicador;
+    by anomes_referencia;
+    var atraso_15 atraso_30 atraso_60 atraso_90 total_operacoes;
+    id segmento;
+run;
+
+
+
+
+proc sql;
+    create table resumo_inad as
+    select
+		anomes_referencia,
+        segmentocliente,
+        sum(case when atraso > 15 then Saldo else 0 end)/1000000 as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end)/1000000 as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end)/1000000 as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end)/1000000 as Saldo_Over_90,
+        sum(Saldo)/1000000  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, segmentocliente;
+quit;
+
+proc transpose data=resumo_inad out=resumo_inad_final_&anomes. name=indicador;
+    by segmentocliente anomes_referencia;
+    var Saldo_Over_15 Saldo_Over_30 Saldo_Over_60 Saldo_Over_90 Carteira;
+
+run;
+
+
+
+
+proc sql;
+    create table resumo_comp as
+    select
+		anomes_referencia,
+        segmentocliente,
+		DsGrupoEconomicoRisco,
+        sum(case when atraso > 15 then Saldo else 0 end) as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end) as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end) as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end) as Saldo_Over_90,
+        sum(Saldo)  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, segmentocliente, DsGrupoEconomicoRisco;
+quit;
+
+proc transpose data=resumo_comp out=resumo_comp_final_&anomes. name=indicador;
+where Saldo_Over_15 > 0 or Saldo_Over_30 > 0 or Saldo_Over_60 > 0 or Saldo_Over_90 > 0 or Carteira > 0;
+    by segmentocliente anomes_referencia DsGrupoEconomicoRisco;
+    var Saldo_Over_15 Saldo_Over_30 Saldo_Over_60 Saldo_Over_90 Carteira;
+
+
+run;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+%calcular_over(202507);
+%calcular_over(202508);
+%calcular_over(202509);
+
+data overs_historico;
+set over_20:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Crédito */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Expandida */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 31 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Expandida */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vHwyzFWAFLNDebFh/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname miscred BASE "/riscosbv/credito/MISCREDITO";
+
+%macro calcular_over (anomes);
+
+data base_unica_ajustada;
+set  miscred.base_unica_atacado_&anomes.;
+
+
+IF CdModalidadeProduto in (561) and DsTipoCarteira NE 'COMISSAO_FIANÇA' then DsTipoCarteira = 'REGULAR';
+IF CdModalidadeProduto in (560) then DsTipoCarteira = 'OFFSHORE';
+run;
+
+proc sql;
+create table base1 as
+select AnoMes_Referencia
+		,case when tipo_carteira = 'SMES' or tipo_carteira_gerencial = 'SMES' then 'PM/UM'
+			else 'CORE' end as Segmento
+		,case when tipo_carteira = 'SMES' or tipo_carteira_gerencial = 'SMES' then 'PM/UM'
+			  when tipo_carteira in ('GPR/AE') then tipo_carteira_gerencial
+			  when tipo_carteira in ('PROJECT FINANCE') then tipo_carteira_financas
+			  when tipo_carteira in ('CORRETORA') then 'CORPORATE'
+			  else tipo_carteira end as SegmentoCliente
+		,DsGrupoEconomicoRisco
+		,NuObjetoNegociacao
+		,sum(VrSaldo) as Saldo
+		,max(NumDiasVencidos) as Atraso
+		,case when calculated Atraso > 90 then 'Over90'
+			  when calculated Atraso > 60 then 'Over60'
+			  when calculated Atraso > 30 then 'Over30'
+			  when calculated Atraso > 15 then 'Over15'
+			  else 'Em dia' end as Fx_Atraso
+
+from base_unica_ajustada
+%if &anomes. >202505 %then %do;
+	where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and tipo_carteira NOT IN ('SECURITIES', 'CORRETORA') and DsGrupoEconomicoRisco NE 'CREDZ' and
+	      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário") and DsProduto ne ("Stand-by")
+	  		and tipo_carteira_gerencial not in ('FIDC', 'FIDC PME') and CdModalidadeProduto ne 211 and NOT FIND(DsGrupoEconomicoRisco, 'DEB SEC') and NOT FIND(DsGrupoEconomicoRisco, 'FIDC')
+%end;
+%else %do;
+where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and tipo_carteira NOT IN ('SECURITIES') and DsGrupoEconomicoRisco NE 'CREDZ' and
+      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário") and DsProduto ne ("Stand-by")
+	  		and tipo_carteira_gerencial not in ('FIDC', 'FIDC PME') and CdModalidadeProduto ne 211 and NOT FIND(DsGrupoEconomicoRisco, 'DEB SEC') and NOT FIND(DsGrupoEconomicoRisco, 'FIDC')
+%end;
+group by 1,2,3,4,5;
+
+create table OVER_&ANOMES. as
+select
+		AnoMes_Referencia
+		,Segmento
+		
+		,sum(Saldo) as Saldo 									format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,calculated over15 / calculated saldo as percent_over15 format percent10.2
+		,calculated over30 / calculated saldo as percent_over30 format percent10.2
+		,calculated over60 / calculated saldo as percent_over60 format percent10.2
+		,calculated over90 / calculated saldo as percent_over90 format percent10.2
+from base1
+group by 1,2;
+
+create table OVER_GRUPOS_&ANOMES. as
+select
+		AnoMes_Referencia
+		,Segmento
+		,DsGrupoEconomicoRisco
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+
+from base1
+group by 1,2,3;
+quit;
+
+
+
+
+proc sql;
+    create table resumo_icred as
+    select
+		anomes_referencia,
+        segmento,
+        sum(case when atraso > 15 then 1 else 0 end)/1000 as atraso_15,
+        sum(case when atraso > 30 then 1 else 0 end)/1000 as atraso_30,
+        sum(case when atraso > 60 then 1 else 0 end)/1000 as atraso_60,
+        sum(case when atraso > 90 then 1 else 0 end)/1000 as atraso_90,
+        count(*)/1000 as total_operacoes
+    from
+        base1
+    group by
+        anomes_referencia, segmento;
+quit;
+
+proc transpose data=resumo_icred out=resumo_icred_final_&anomes. name=indicador;
+    by anomes_referencia;
+    var atraso_15 atraso_30 atraso_60 atraso_90 total_operacoes;
+    id segmento;
+run;
+
+
+
+
+proc sql;
+    create table resumo_inad as
+    select
+		anomes_referencia,
+        segmentocliente,
+        sum(case when atraso > 15 then Saldo else 0 end)/1000000 as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end)/1000000 as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end)/1000000 as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end)/1000000 as Saldo_Over_90,
+        sum(Saldo)/1000000  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, segmentocliente;
+quit;
+
+proc transpose data=resumo_inad out=resumo_inad_final_&anomes. name=indicador;
+    by segmentocliente anomes_referencia;
+    var Saldo_Over_15 Saldo_Over_30 Saldo_Over_60 Saldo_Over_90 Carteira;
+
+run;
+
+
+
+
+proc sql;
+    create table resumo_comp as
+    select
+		anomes_referencia,
+        segmentocliente,
+		DsGrupoEconomicoRisco,
+        sum(case when atraso > 15 then Saldo else 0 end) as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end) as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end) as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end) as Saldo_Over_90,
+        sum(Saldo)  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, segmentocliente, DsGrupoEconomicoRisco;
+quit;
+
+proc transpose data=resumo_comp out=resumo_comp_final_&anomes. name=indicador;
+where Saldo_Over_15 > 0 or Saldo_Over_30 > 0 or Saldo_Over_60 > 0 or Saldo_Over_90 > 0 or Carteira > 0;
+    by segmentocliente anomes_referencia DsGrupoEconomicoRisco;
+    var Saldo_Over_15 Saldo_Over_30 Saldo_Over_60 Saldo_Over_90 Carteira;
+
+
+run;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+%calcular_over(202505);
+%calcular_over(202506);
+%calcular_over(202507);
+%calcular_over(202508);
+
+data overs_historico;
+set over_20:;
+run;
+
+data overs_grupos_historico;
+set OVER_GRUPOS_:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Expandida */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Expandida + FIDCs */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 31 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Expandida + FIDCs */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ctYyvkXdllrj9xS2/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname miscred BASE "/riscosbv/credito/MISCREDITO";
+
+%macro calcular_over (anomes);
+
+data base_unica_ajustada;
+set  miscred.base_unica_atacado_&anomes.;
+
+
+IF CdModalidadeProduto in (561) and DsTipoCarteira NE 'COMISSAO_FIANÇA' then DsTipoCarteira = 'REGULAR';
+IF CdModalidadeProduto in (560) then DsTipoCarteira = 'OFFSHORE';
+run;
+
+proc sql;
+create table base1 as
+select AnoMes_Referencia
+		%if &anomes. >202402 %then %do;
+		,case when tipo_carteira = 'SMES' or tipo_carteira_gerencial = 'SMES' then 'PM/UM'
+			else 'CORE' end as Segmento
+		,case when tipo_carteira = 'SMES' or tipo_carteira_gerencial = 'SMES' then 'PM/UM'
+			  when tipo_carteira in ('GPR/AE') then tipo_carteira_gerencial
+			  when tipo_carteira in ('PROJECT FINANCE') then tipo_carteira_financas
+			  when tipo_carteira in ('CORRETORA') then 'CORPORATE'
+			  else tipo_carteira end as SegmentoCliente
+		%end;
+		%else %do;
+		,case when tipo_carteira = 'SMES' then 'PM/UM'
+			else 'CORE' end as Segmento
+		,case when tipo_carteira = 'SMES' then 'PM/UM'
+			  when tipo_carteira in ('PROJECT FINANCE') then tipo_carteira_financas
+			  when tipo_carteira in ('CORRETORA') then 'CORPORATE'
+			  else tipo_carteira end as SegmentoCliente
+		%end;
+		,DsGrupoEconomicoRisco
+		,NuObjetoNegociacao
+		,sum(VrSaldo) as Saldo
+		,max(NumDiasVencidos) as Atraso
+		,case when calculated Atraso > 90 then 'Over90'
+			  when calculated Atraso > 60 then 'Over60'
+			  when calculated Atraso > 30 then 'Over30'
+			  when calculated Atraso > 15 then 'Over15'
+			  else 'Em dia' end as Fx_Atraso
+
+from base_unica_ajustada
+%if &anomes. >202505 %then %do;
+	where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and tipo_carteira NOT IN ('SECURITIES', 'CORRETORA') and DsGrupoEconomicoRisco NOT IN ('ROSANA FRANCESCHINI', 'CREDZ') and
+	      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário") and DsProduto ne ("Stand-by")
+	  		
+%end;
+%else %do;
+where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and tipo_carteira NOT IN ('SECURITIES') and DsGrupoEconomicoRisco NE 'CREDZ' and
+      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário") and DsProduto ne ("Stand-by")
+	  		
+%end;
+group by 1,2,3,4,5;
+
+create table OVER_&ANOMES. as
+select
+		AnoMes_Referencia
+		,Segmento
+		
+		,sum(Saldo) as Saldo 									format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,calculated over15 / calculated saldo as percent_over15 format percent10.2
+		,calculated over30 / calculated saldo as percent_over30 format percent10.2
+		,calculated over60 / calculated saldo as percent_over60 format percent10.2
+		,calculated over90 / calculated saldo as percent_over90 format percent10.2
+from base1
+group by 1,2;
+
+create table OVER_GRUPOS_&ANOMES. as
+select
+		AnoMes_Referencia
+		,Segmento
+		,DsGrupoEconomicoRisco
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+
+from base1
+group by 1,2,3;
+quit;
+
+
+
+
+proc sql;
+    create table resumo_icred as
+    select
+		anomes_referencia,
+        segmento,
+        sum(case when atraso > 15 then 1 else 0 end)/1000 as atraso_15,
+        sum(case when atraso > 30 then 1 else 0 end)/1000 as atraso_30,
+        sum(case when atraso > 60 then 1 else 0 end)/1000 as atraso_60,
+        sum(case when atraso > 90 then 1 else 0 end)/1000 as atraso_90,
+        count(*)/1000 as total_operacoes
+    from
+        base1
+    group by
+        anomes_referencia, segmento;
+quit;
+
+proc transpose data=resumo_icred out=resumo_icred_final_&anomes. name=indicador;
+    by anomes_referencia;
+    var atraso_15 atraso_30 atraso_60 atraso_90 total_operacoes;
+    id segmento;
+run;
+
+
+
+
+proc sql;
+    create table resumo_inad as
+    select
+		anomes_referencia,
+        segmentocliente,
+        sum(case when atraso > 15 then Saldo else 0 end)/1000000 as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end)/1000000 as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end)/1000000 as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end)/1000000 as Saldo_Over_90,
+        sum(Saldo)/1000000  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, segmentocliente;
+quit;
+
+proc transpose data=resumo_inad out=resumo_inad_final_&anomes. name=indicador;
+    by segmentocliente anomes_referencia;
+    var Saldo_Over_15 Saldo_Over_30 Saldo_Over_60 Saldo_Over_90 Carteira;
+
+run;
+
+
+
+
+proc sql;
+    create table resumo_comp as
+    select
+		anomes_referencia,
+        segmentocliente,
+		DsGrupoEconomicoRisco,
+        sum(case when atraso > 15 then Saldo else 0 end) as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end) as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end) as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end) as Saldo_Over_90,
+        sum(Saldo)  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, segmentocliente, DsGrupoEconomicoRisco;
+quit;
+
+proc transpose data=resumo_comp out=resumo_comp_final_&anomes. name=indicador;
+where Saldo_Over_15 > 0 or Saldo_Over_30 > 0 or Saldo_Over_60 > 0 or Saldo_Over_90 > 0 or Carteira > 0;
+    by segmentocliente anomes_referencia DsGrupoEconomicoRisco;
+    var Saldo_Over_15 Saldo_Over_30 Saldo_Over_60 Saldo_Over_90 Carteira;
+
+
+run;
+
+%mend;
+
+
+
+
+
+
+
+
+%calcular_over(202507);
+%calcular_over(202508);
+%calcular_over(202509);
+
+data overs_historico;
+set over_20:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Expandida + FIDCs */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Histórico - Div resultados */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 31 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Histórico - Div resultados */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-GyKk4sj2Wtl1EMNV/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname miscred BASE "/riscosbv/credito/MISCREDITO";
+
+%macro calcular_over (anomes);
+
+data base_unica_ajustada;
+set  miscred.base_unica_atacado_&anomes.;
+
+
+IF CdModalidadeProduto in (561) and DsTipoCarteira NE 'COMISSAO_FIANÇA' then DsTipoCarteira = 'REGULAR';
+IF CdModalidadeProduto in (560) then DsTipoCarteira = 'OFFSHORE';
+IF Anomes_Referencia = 14823 then Anomes_Referencia = 202012;
+run;
+
+proc sql;
+create table base1 as
+select AnoMes_Referencia
+		,DsGrupoEconomicoRisco
+		,DsStatus_Monitoramento format $5.
+		,DsProduto
+		,NuObjetoNegociacao
+		,sum(VrSaldo) as Saldo
+		,max(NumDiasVencidos) as Atraso
+		,case when calculated Atraso > 90 then 'Over90'
+			  when calculated Atraso > 60 then 'Over60'
+			  when calculated Atraso > 30 then 'Over30'
+			  when calculated Atraso > 15 then 'Over15'
+			  else 'Em dia' end as Fx_Atraso
+
+from base_unica_ajustada
+%if &anomes. > 201910 %then %do;
+where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and tipo_carteira NOT IN ('SECURITIES') and DsGrupoEconomicoRisco NE 'CREDZ' and
+%end;
+%else %do;
+where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and DsGrupoEconomicoRisco NE 'CREDZ' and
+%end;
+
+      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário") and DsProduto ne ("Stand-by")
+group by 1,2,3,4,5;
+
+create table OVER_&ANOMES. as
+select
+		AnoMes_Referencia
+		,sum(Saldo) as Saldo 									format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,calculated over15 / calculated saldo as percent_over15 format percent10.2
+		,calculated over30 / calculated saldo as percent_over30 format percent10.2
+		,calculated over60 / calculated saldo as percent_over60 format percent10.2
+		,calculated over90 / calculated saldo as percent_over90 format percent10.2
+from base1
+group by 1;
+
+create table OVER_GRUPOS_&ANOMES. as
+select
+		AnoMes_Referencia
+		,DsGrupoEconomicoRisco
+		,DsStatus_Monitoramento
+		,Atraso
+		,DsProduto
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+
+from base1
+group by 1,2,3;
+quit;
+
+
+
+
+proc sql;
+    create table resumo_comp as
+    select
+		anomes_referencia,
+		DsGrupoEconomicoRisco,
+        sum(case when atraso > 15 then Saldo else 0 end) as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end) as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end) as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end) as Saldo_Over_90,
+        sum(Saldo)  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, DsGrupoEconomicoRisco;
+quit;
+%mend;
+
+
+%calcular_over(202506);
+
+%calcular_over(202412);
+%calcular_over(202312);
+
+%calcular_over(202212);
+%calcular_over(202112);
+%calcular_over(202012);
+%calcular_over(201912);
+%calcular_over(201812);
+%calcular_over(201712);
+%calcular_over(201612);
+
+data overs_historico;
+set over_20:;
+run;
+
+data overs_grupo_hist;
+format DsStatus_Monitoramento $5.;
+set OVER_GRUPOS_:;
+where Over90>0;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Histórico - Div resultados */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Histórico Agro */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 31 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Histórico Agro */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-om88lfXr7TnCZbsp/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname miscred BASE "/riscosbv/credito/MISCREDITO";
+
+data lista_setores;
+set miscred.de_para_macro_setor miscred.de_para_macro_setor_2023 miscred.de_para_macro_setor_old;
+run;
+
+proc sql;
+select distinct cats("'",Setor_Credito,"'") as Setor into: lista_agro SEPARATED BY ", " from lista_setores where macro_setor = 'AGRONEGOCIO' ; quit;
+
+%macro calcular_over (anomes);
+
+data base_unica_ajustada;
+set  miscred.base_unica_atacado_&anomes.;
+
+
+IF CdModalidadeProduto in (561) and DsTipoCarteira NE 'COMISSAO_FIANÇA' then DsTipoCarteira = 'REGULAR';
+IF CdModalidadeProduto in (560) then DsTipoCarteira = 'OFFSHORE';
+IF Anomes_Referencia = 14823 then Anomes_Referencia = 202012;
+WHERE DsSetorClienteRisco_novo not in (&lista_agro.)
+		
+;run;
+
+proc sql;
+create table base0 as
+select AnoMes_Referencia
+		,DsGrupoEconomicoRisco
+		,DsStatus_Monitoramento format $5.
+		,NuObjetoNegociacao
+		,sum(VrSaldo) as Saldo
+		,max(NumDiasVencidos) as Atraso
+from base_unica_ajustada
+%if &anomes. > 201910 %then %do;
+where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and tipo_carteira NOT IN ('SECURITIES') and DsGrupoEconomicoRisco NE 'CREDZ' and
+%end;
+%else %do;
+where DsTipoCarteira in ('REGULAR', 'OFFSHORE') and DsGrupoEconomicoRisco NE 'CREDZ' and
+%end;
+
+      DsGrupoProduto not in ("Operações de Garantias" "Hedge" "Mercado Bancário") and DsProduto ne ("Stand-by")
+group by 1,2,3,4;
+quit;
+proc sql;
+create table base1 as
+select *
+		,case when Atraso > 90 then 'Over90'
+			  when Atraso > 60 then 'Over60'
+			  when Atraso > 30 then 'Over30'
+			  when Atraso > 15 then 'Over15'
+			  else 'Em dia' end as Fx_Atraso
+
+from base0
+where Atraso <= 360;
+
+create table OVER_&ANOMES. as
+select
+		AnoMes_Referencia
+		,sum(Saldo) as Saldo 									format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,calculated over15 / calculated saldo as percent_over15 format percent10.2
+		,calculated over30 / calculated saldo as percent_over30 format percent10.2
+		,calculated over60 / calculated saldo as percent_over60 format percent10.2
+		,calculated over90 / calculated saldo as percent_over90 format percent10.2
+
+from base1
+group by 1;
+
+create table OVER_GRUPOS_&ANOMES. as
+select
+		AnoMes_Referencia
+		,DsGrupoEconomicoRisco
+		,DsStatus_Monitoramento
+		,Atraso
+		,sum(case when Atraso>90 then Saldo end) as Over90 		format commax26.2
+		,sum(case when Atraso>60 then Saldo end) as Over60		format commax26.2
+		,sum(case when Atraso>30 then Saldo end) as Over30		format commax26.2
+		,sum(case when Atraso>15 then Saldo end) as Over15		format commax26.2
+
+from base1
+group by 1,2,3,4;
+quit;
+
+
+
+
+proc sql;
+    create table resumo_comp_&ANOMES. as
+    select
+		anomes_referencia,
+		DsGrupoEconomicoRisco,
+        sum(case when atraso > 15 then Saldo else 0 end) as Saldo_Over_15,
+        sum(case when atraso > 30 then Saldo else 0 end) as Saldo_Over_30,
+        sum(case when atraso > 60 then Saldo else 0 end) as Saldo_Over_60,
+        sum(case when atraso > 90 then Saldo else 0 end) as Saldo_Over_90,
+        sum(Saldo)  as Carteira
+    from
+        base1
+    group by
+        anomes_referencia, DsGrupoEconomicoRisco;
+quit;
+%mend;
+
+
+%calcular_over(202112);
+
+
+
+
+
+
+
+
+
+
+
+
+%calcular_over(202212);
+
+
+
+
+
+
+
+
+
+
+
+
+%calcular_over(202312);
+
+
+
+
+
+
+
+
+
+
+
+
+%calcular_over(202412);
+
+
+
+
+
+
+
+
+
+
+
+
+%calcular_over(202506);
+
+
+
+
+
+
+data overs_historico;
+set over_20:;
+run;
+
+data overs_grupo_hist;
+format DsStatus_Monitoramento $5.;
+set OVER_GRUPOS_:;
+where Over90>0;
+run;
+
+data resumo_comp;
+set resumo_comp_:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Histórico Agro */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data overs_grupo_hist;
+format DsStatus_Monitoramento $5.;
+set OVER_GRUPOS_:;
+where Over90>0;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */

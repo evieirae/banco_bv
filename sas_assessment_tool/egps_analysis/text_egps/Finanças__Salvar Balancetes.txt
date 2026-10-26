@@ -1,0 +1,257 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Salvar Balancetes
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:35 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 55
+ODS_OUTPUTS_DETECTED: xlsx
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 166
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_FINANCAS.SFINANCE_BALANCETE_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_FINANCAS.SFINANCE_BALANCETE_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/financas/PE_DATA_VIZ/175.xlsx, /riscosbvf/financas/PE_DATA_VIZ/183.xlsx, /riscosbvf/financas/PE_DATA_VIZ/213.xlsx, /riscosbvf/financas/PE_DATA_VIZ/51.xlsx, /riscosbvf/financas/PE_DATA_VIZ/640.xlsx, /riscosbvf/financas/PE_DATA_VIZ/6556_1015.xlsx, /riscosbvf/financas/PE_DATA_VIZ/6556_40088.xlsx, /riscosbvf/financas/PE_DATA_VIZ/6556_99999.xlsx
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BALANCETE_175, BALANCETE_183, BALANCETE_213, BALANCETE_51, BALANCETE_640, BALANCETE_6556_1015, BALANCETE_6556_40088, BALANCETE_6556_99999, BALANCETE_UNIAO, GCP_BALANCETE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+OUT|/riscosbvf/financas/PE_DATA_VIZ/175.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|175.XLSX||suspeito
+OUT|/riscosbvf/financas/PE_DATA_VIZ/183.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|183.XLSX||suspeito
+OUT|/riscosbvf/financas/PE_DATA_VIZ/213.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|213.XLSX||suspeito
+OUT|/riscosbvf/financas/PE_DATA_VIZ/51.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|51.XLSX||suspeito
+OUT|/riscosbvf/financas/PE_DATA_VIZ/640.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|640.XLSX||suspeito
+OUT|/riscosbvf/financas/PE_DATA_VIZ/6556_1015.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|6556_1015.XLSX||ok
+OUT|/riscosbvf/financas/PE_DATA_VIZ/6556_40088.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|6556_40088.XLSX||ok
+OUT|/riscosbvf/financas/PE_DATA_VIZ/6556_99999.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|6556_99999.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-mVezPrmmYpE7A8FY/code.sas */
+/* =========================INÍCIO TASK========================= */
+options compress=binary reuse=yes replace symbolgen;
+Proc sql;
+	Connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+	Create table GCP_BALANCETE AS
+	Select * FROM CONNECTION TO perm (
+		Select
+			*
+		From `bv-pdbd-prd.dvry_corp_financas.sfinance_balancete_fato`
+		Where
+			aa_anomes  = 202510     
+			and nu_instituicao in (51, 175, 183, 213, 640, 6556)
+)
+;disconnect from perm
+
+;Quit;
+proc sql;
+  create table BALANCETE_UNIAO as
+  select
+          nu_agencia as 'Agência'n,
+          ds_descricao_conta_contabil as 'Descrição'n,
+          strip(cd_conta_contabil_nu) as 'Conta contábil'n,
+          st_ativo_passivo as 'Identificador Ativo/passivo'n,
+          nu_grau as 'Identificador Grau'n,
+          vr_saldo_anterior as 'Saldo anterior'n,
+		  st_sinal_saldo_anterior as 'Sinal ant. contas alt.'n,
+          vr_debito as 'Débitos'n,
+          vr_credito as 'Créditos'n,
+          vr_saldo_atual as 'Saldo atual'n,
+		  st_saldo_atual as 'Sinal'n,
+		  nu_prefixo  as 'Prefixo da conta'n,
+		  nu_nint_cotabil as 'Nr. Int. c. contábil'n,
+		  strip(put(nu_instituicao, 10.)) as INST
+  from gcp_balancete
+  where ts_alteracao_dvry =
+    (select max(ts_alteracao_dvry) from gcp_balancete);
+
+quit;
+
+proc sql;
+  create table BALANCETE_51 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '51';
+
+quit;
+
+proc sql;
+  create table BALANCETE_175 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '175';
+
+quit;
+
+proc sql;
+  create table BALANCETE_183 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '183';
+
+quit;
+
+proc sql;
+  create table BALANCETE_213 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '213';
+
+quit;
+
+proc sql;
+  create table BALANCETE_640 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '640';
+
+quit;
+
+proc sql;
+  create table BALANCETE_6556_99999 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '6556'
+	And 'Agência'n = 99999
+;
+
+quit;
+
+proc sql;
+  create table BALANCETE_6556_40088 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '6556'
+	And 'Agência'n = 40088
+;
+
+quit;
+
+proc sql;
+  create table BALANCETE_6556_1015 as
+	select
+	*
+
+	From BALANCETE_UNIAO
+	where INST = '6556'
+	And 'Agência'n = 1015
+;
+
+quit;
+
+PROC EXPORT
+  DATA=BALANCETE_51
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/51.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_51;
+RUN;
+
+PROC EXPORT
+  DATA=BALANCETE_175
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/175.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_175;
+RUN;
+
+PROC EXPORT
+  DATA=BALANCETE_183
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/183.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_183;
+RUN;
+
+PROC EXPORT
+  DATA=BALANCETE_213
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/213.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_213;
+RUN;
+
+PROC EXPORT
+  DATA=BALANCETE_640
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/640.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_640;
+RUN;
+
+PROC EXPORT
+  DATA=BALANCETE_6556_99999
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/6556_99999.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_6556_99999;
+RUN;
+
+PROC EXPORT
+  DATA=BALANCETE_6556_40088
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/6556_40088.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_6556_40088;
+RUN;
+
+PROC EXPORT
+  DATA=BALANCETE_6556_1015
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/6556_1015.xlsx"
+  REPLACE;
+  SHEET= BALANCETE_6556_1015;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,288 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 05 - PDV_Simulando.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 215
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5, DataBase
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBFUNILSIMULACAO_SOLAR [SAS/Local], RITOSOL.BASE_COBANS_SOLAR_SAIDA [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBFUNILSIMULACAO_SOLAR [PROC SQL - FROM], RITOSOL.BASE_COBANS_SOLAR_SAIDA [PROC SQL - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_PDV_SIMULANDO_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PDVS_SIMULANDO, BASE_PDV_SIMU_CANAL_TOTAL, BASE_PDV_SIMU_FILIAL_TOTAL, BASE_PDV_SIMU_GRS_TOTAL, BASE_PDV_SIMU_PDVS_TOTAL, COBANS_SOLAR_ATIVOS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**Gerar a base de PDVs de Solar Ativos**/
+Proc Sql;
+Create Table Cobans_Solar_Ativos as
+Select Distinct
+Parc.NmAreaEstruturaComercialC
+,Parc.DsLoginN1C
+,Parc.DsLoginN2C
+,Parc.DsLoginN3C
+,Parc.NmColaboradorC
+,Parc.cdParceiroComercial
+,Parc.NmParceiroComercial
+,Parc.NuCnpjLoja
+,DatePart(Parc.DtCadastro) as DtCadastro Format DDMMYY10.
+,(YEAR(DatePart(Parc.DtCadastro)) * 100) + MONTH(DatePart(Parc.DtCadastro)) as NuAnomes_Cadastro
+,Parc.FlAtivo
+,Porte.Porte
+,Porte.TipoParceiro
+
+from tmp.tbparceirocomercial as Parc
+	Left join ritosol.Base_Cobans_Solar_Saida as Porte On Parc.CdParceiroComercial = Porte.CdParceiroComercial
+
+where 1=1
+and Parc.tpatividade = 7 and Parc.FlAtivo = 'S'
+and Parc.NmCanalEstruturaComercialC = 'Canal Solar' and
+		Parc.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+;
+run;
+
+/*Resumo dos PDVs Simulando*/
+Proc Sql;
+Create Table Base_PDVs_Simulando as
+Select Distinct
+Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,Funil.CdParceiroComercial as CdParceiroComercial
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and NmCanalEstruturaComercialC = 'Canal Solar'
+		Group by 1) as MSGPOS
+		  On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Simu_Canal_Total as
+Select Distinct
+'PDV_Simulando' as Base
+,PenSimul.NuAnoMes
+,PenSimul.DataBase as DataBase format DDMMYY10.
+,"Canal" as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,PenFunil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,"Canal Solar" as Dimensao2
+,"Canal Solar" as Dimensao3
+,'Mês Fechado' as Semana
+,PenFunil.Porte
+,PenFunil.TipoParceiro
+
+,0 as QtCorridosDiaUtilMes
+/*,Count (Distinct PenFunil.CdParceiroComercial) as Qtd_PDVs*/
+,Sum(Case When PenSimul.QtdSimulação > 0 Then 1 Else 0 End) as Qtd_PDVs_Simulando
+,Sum(Case When PenSimul.FlMSGPositiva> 0 Then 1 Else 0 End) as Qtd_PDVs_MSG_Positiva
+
+From Cobans_Solar_Ativos as PenFunil
+INNER Join Base_PDVs_Simulando as PenSimul On PenFunil.CdParceiroComercial = PenSimul.CdParceiroComercial
+
+Where PenSimul.NuANomes >= &Base_m5. and
+		PenFunil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Simu_Filial_Total as
+Select Distinct
+'PDV_Simulando' as Base
+,PenSimul.NuAnoMes
+,PenSimul.DataBase as DataBase format DDMMYY10.
+,"Filial" as Visao
+,"" as DsLoginN1C
+,PenFunil.DsLoginN2C
+,PenFunil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,PenFunil.NmAreaEstruturaComercialC as Dimensao2
+,PenFunil.NmAreaEstruturaComercialC as Dimensao3
+,'Mês Fechado' as Semana
+,PenFunil.Porte
+,PenFunil.TipoParceiro
+
+,0 as QtCorridosDiaUtilMes
+/*,Count (Distinct PenFunil.CdParceiroComercial) as Qtd_PDVs*/
+,Sum(Case When PenSimul.QtdSimulação > 0 Then 1 Else 0 End) as Qtd_PDVs_Simulando
+,Sum(Case When PenSimul.FlMSGPositiva> 0 Then 1 Else 0 End) as Qtd_PDVs_MSG_Positiva
+
+From Cobans_Solar_Ativos as PenFunil
+Inner Join Base_PDVs_Simulando as PenSimul On PenFunil.CdParceiroComercial = PenSimul.CdParceiroComercial
+
+Where PenSimul.NuANomes >= &Base_m5. and
+		PenFunil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Simu_GRs_Total as
+Select Distinct
+'PDV_Simulando' as Base
+,PenSimul.NuAnoMes
+,PenSimul.DataBase as DataBase format DDMMYY10.
+,"GRs" as Visao
+,PenFunil.DsLoginN1C
+,PenFunil.DsLoginN2C
+,PenFunil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,PenFunil.NmAreaEstruturaComercialC as Dimensao2
+,PenFunil.NmColaboradorC as Dimensao3
+,'Mês Fechado' as Semana
+,PenFunil.Porte
+,PenFunil.TipoParceiro
+,PenFunil.DtCadastro Format ddmmyy10.
+
+,0 as QtCorridosDiaUtilMes
+/*,Count (Distinct PenFunil.CdParceiroComercial) as Qtd_PDVs*/
+,Sum(Case When PenSimul.QtdSimulação > 0 Then 1 Else 0 End) as Qtd_PDVs_Simulando
+,Sum(Case When PenSimul.FlMSGPositiva> 0 Then 1 Else 0 End) as Qtd_PDVs_MSG_Positiva
+
+From Cobans_Solar_Ativos as PenFunil
+Inner Join Base_PDVs_Simulando as PenSimul On PenFunil.CdParceiroComercial = PenSimul.CdParceiroComercial
+
+Where PenSimul.NuANomes >= &Base_m5. and
+		PenFunil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Simu_PDVs_Total as
+Select Distinct
+'PDV_Simulando' as Base
+,PenSimul.NuAnoMes
+,PenSimul.DataBase as DataBase format DDMMYY10.
+,"Cobans" as Visao
+,PenFunil.DsLoginN1C
+,PenFunil.DsLoginN2C
+,PenFunil.DsLoginN3C
+,PenFunil.NmAreaEstruturaComercialC as Dimensao1
+,PenFunil.NmColaboradorC as Dimensao2
+,Put(PenFunil.CdParceiroComercial,8.) || '-' || PenFunil.NmParceiroComercial as Dimensao3
+,'Mês Fechado' as Semana
+,PenFunil.Porte
+,PenFunil.TipoParceiro
+,PenFunil.DtCadastro Format ddmmyy10.
+
+,0 as QtCorridosDiaUtilMes
+/*,Count (Distinct PenFunil.CdParceiroComercial) as Qtd_PDVs*/
+,Sum(Case When PenSimul.QtdSimulação > 0 Then 1 Else 0 End) as Qtd_PDVs_Simulando
+,Sum(Case When PenSimul.FlMSGPositiva> 0 Then 1 Else 0 End) as Qtd_PDVs_MSG_Positiva
+
+From Cobans_Solar_Ativos as PenFunil
+Inner Join Base_PDVs_Simulando as PenSimul On PenFunil.CdParceiroComercial = PenSimul.CdParceiroComercial
+
+Where PenSimul.NuANomes >= &Base_m5. and
+		PenFunil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Data ritosol.Base_PDV_Simulando_Solar;
+Set
+	Base_PDV_Simu_PDVs_Total
+	Base_PDV_Simu_Grs_Total
+	Base_PDV_Simu_Filial_Total
+	Base_PDV_Simu_Canal_Total
+;Run;

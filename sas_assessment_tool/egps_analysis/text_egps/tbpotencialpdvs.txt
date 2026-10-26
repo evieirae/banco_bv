@@ -1,0 +1,461 @@
+START_METADATA
+PROJECT: SAS_UC4__tbpotencialpdvs
+FILE_SAS: tbpotencialpdvs.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:51 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -5
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 351
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: AUTOMATI = /riscosbvf/CRM/SAS/AddIn/
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: NuAnoMesInicio
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], AUTOMATI.BASE_CLASSIFICACAO_PDVS_HIST [SAS/Local], BASEGRC.TBGRUPOPARCEIROLOCADORAS [SAS/Local], BASEGRC.TBMUNICIPIOCHAVE [SAS/Local], BASEGRC.TBMUNICIPIODISTRIBUICAO [SAS/Local], BASEGRC.TBPORTEPDV [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], DWBI_DTWH.TBMUNICIPIO [DBCON], TBCETIPSINTETICOFINAL [DBCON], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: AUTOMATI
+EXPORTED_LIBNAMES: TMP
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): AUTOMATI.BASE_CLASSIFICACAO_PDVS_HIST [PROC SQL - FROM], BASEGRC.TBGRUPOPARCEIROLOCADORAS [PROC SQL - JOIN], BASEGRC.TBMUNICIPIOCHAVE [PROC SQL - JOIN], BASEGRC.TBMUNICIPIODISTRIBUICAO [PROC SQL - JOIN], BASEGRC.TBPORTEPDV [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], DWBI_DTWH.TBMUNICIPIO [Pass-Through Native (DBCON) - FROM], TBCETIPSINTETICOFINAL [Pass-Through Native (DBCON) - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCidadeSemCodigo.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): AUTOMATI.BASE_CLASSIFICACAO_PDVS_HIST
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TMP.TBPOTENCIALPDVS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCidadeSemCodigo.csv
+TEMP/DISCARDED OUTPUTS: TBCETIPENDERECO, TBCETIPFILIAL, TBCIDADESEMCODIGO, TBCLASSIFICACAOPDV, TBEXTCETIPSINTETICO, TBMUNICIPIO, TBPARCEIROCOMERCIAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCidadeSemCodigo.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+LIBNAME AUTOMATI '/riscosbvf/CRM/SAS/AddIn/';
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = BI);
+create table TbExtCetipSintetico as
+select * from connection to dbcon
+(
+  WITH
+	 TbDataUltimoArquivo AS (
+		SELECT MAX(substr(NmArquivo,26,8)) AS DtUltimoArquivo
+		FROM DWBI_DTWH.TbSintetico
+	 )
+
+	,TbCetipSinteticoMesAtual AS (
+		SELECT
+			year(CAST(substr(Sintetico.NmArquivo,26,8) AS DATE))*100+month(CAST(substr(Sintetico.NmArquivo,26,8) AS DATE)) AS NuAnoMes
+			,Sintetico.NuCnpjLoja
+			,Sintetico.DsRazaoSocial
+			,Sintetico.NmFantasia
+			,Sintetico.DsCNAE
+			,Sintetico.DsEndereco
+			,Sintetico.DsComplemento
+			,Sintetico.NuLoja
+			,Sintetico.NmBairro
+			,Sintetico.SgUf
+			,Sintetico.NmCidade
+			,Sintetico.NuCep
+			,Sintetico.QtFinanciamentos
+			,Sintetico.QtVolumeFinanciamentos
+
+		FROM DWBI_DTWH.TbSintetico Sintetico
+			INNER JOIN TbDataUltimoArquivo DataUltimoArquivo
+				ON substr(Sintetico.NmArquivo,26,8) = DataUltimoArquivo.DtUltimoArquivo
+				AND substr(DataUltimoArquivo.DtUltimoArquivo,7,2) <> '01'
+
+		WHERE Sintetico.CdTipoRegistro = 'D'
+			AND Sintetico.NmCidade IS NOT NULL
+			AND Sintetico.SgUf IS NOT NULL
+
+		)
+
+		,TbCetipSinteticoMesFechado AS (
+			SELECT
+				year(CAST(substr(Sintetico.NmArquivo,26,8) AS DATE))*100+month(CAST(substr(Sintetico.NmArquivo,26,8) AS DATE)) AS NuAnoMes
+				,Sintetico.NuCnpjLoja
+				,Sintetico.DsRazaoSocial
+				,Sintetico.NmFantasia
+				,Sintetico.DsCNAE
+				,Sintetico.DsEndereco
+				,Sintetico.DsComplemento
+				,Sintetico.NuLoja
+				,Sintetico.NmBairro
+				,Sintetico.SgUf
+				,Sintetico.NmCidade
+				,Sintetico.NuCep
+				,Sintetico.QtFinanciamentos
+				,Sintetico.QtVolumeFinanciamentos
+			FROM DWBI_DTWH.TbSintetico Sintetico
+			WHERE substr(Sintetico.NmArquivo,32,2) = '01'
+			  AND Sintetico.CdTipoRegistro = 'D'
+			  AND Sintetico.NmCidade IS NOT NULL
+			  AND Sintetico.SgUf IS NOT NULL
+		)
+
+		,TbCetipSinteticoFinal AS (
+			SELECT * FROM TbCetipSinteticoMesAtual UNION ALL
+			SELECT * FROM TbCetipSinteticoMesFechado
+		)
+
+	SELECT
+		 NuAnoMes
+		,NuCnpjLoja
+		,DsRazaoSocial
+		,NmFantasia
+		,DsCNAE
+		,DsEndereco
+		,DsComplemento
+		,NuLoja
+		,NmBairro
+		,SgUf
+		,NmCidade
+		,NuCep
+		,SUM(QtFinanciamentos) AS QtFinanciamentos
+		,SUM(QtVolumeFinanciamentos) AS VrFinanciamentos
+
+	FROM TbCetipSinteticoFinal
+	GROUP BY
+		 NuAnoMes
+		,NuCnpjLoja
+		,DsRazaoSocial
+		,NmFantasia
+		,DsCNAE
+		,DsEndereco
+		,DsComplemento
+		,NuLoja
+		,NmBairro
+		,SgUf
+		,NmCidade
+		,NuCep
+	)
+;run;
+
+proc sql;
+create table TbCetipEndereco as
+select
+	 CetipSintetico.NuAnoMes
+	,put(CetipSintetico.NuCnpjLoja,z14.)  as NuCnpjLoja
+	,CetipSintetico.NmFantasia
+	,CetipSintetico.DsRazaoSocial
+	,upper(CetipSintetico.DsCNAE) as CnaePrimario
+	,CetipSintetico.DsEndereco as NmLogradouro
+	,put(CetipSintetico.NuLoja, 10.) AS NuEndereco
+	,CetipSintetico.DsComplemento AS DsComplementoEndereco
+	,CetipSintetico.NmBairro
+	,CetipSintetico.NuCep as CdCep
+	,CetipSintetico.NmCidade
+	,CetipSintetico.SgUf as CdUf
+	,MunicipioChave.CdMunicipio
+
+from TbExtCetipSintetico CetipSintetico
+
+	left join basegrc.TbMunicipioChave MunicipioChave
+		on  CetipSintetico.NmCidade = MunicipioChave.NmMunicipio
+		and CetipSintetico.SgUf = MunicipioChave.CdUf
+
+order by
+	 CetipSintetico.NuAnoMes desc
+;quit;
+
+proc sort data=TbCetipEndereco   nodupkey; by NuCnpjLoja;run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = BI);
+create table TbMunicipio as
+select * from connection to dbcon
+(
+	SELECT
+		*
+	FROM DWBI_DTWH.TbMunicipio Municipio
+)
+;run;
+
+/*proc sql;*/
+/*create table TbParceiroGrandesGrupos as */
+/*select distinct*/
+/*	 NuCnpjLoja*/
+/*	,NmGrupoConcessionaria*/
+/**/
+/*from basegrc.TbParceiroGrandesGrupos */
+/*order by 1*/
+/*;run;*/
+
+proc sql;
+create table TbCetipFilial as
+select
+	 CetipEndereco.NmFantasia
+	,CetipEndereco.DsRazaoSocial
+	,CetipEndereco.NuCnpjLoja
+	,PortePDV.FlPorteA
+	,PortePDV.FlPorteNovoMotos
+	,GrupoParceiroLocadoras.DsGrupoParceiroLocadoras
+/*	,ParceiroGrandesGrupos.NmGrupoConcessionaria*/
+	,CetipEndereco.NmLogradouro
+	,CetipEndereco.NuEndereco
+	,CetipEndereco.DsComplementoEndereco
+	,CetipEndereco.NmBairro
+	,CetipEndereco.CdCep
+	,CetipEndereco.NmCidade
+	,Municipio.CdMunicipio
+	,CetipEndereco.CdUf
+	,CetipEndereco.CnaePrimario
+	,CASE
+		WHEN CetipEndereco.CnaePrimario is null then 'SEM INFORMACAO'
+		WHEN substr(CetipEndereco.CnaePrimario,1,2) = '45' THEN 'VEICULOS'
+		WHEN substr(CetipEndereco.CnaePrimario,1,2) = '29' THEN 'MONTADORAS'
+		WHEN substr(CetipEndereco.CnaePrimario,1,2) = '64' THEN 'FINANCEIRAS'
+		WHEN substr(CetipEndereco.CnaePrimario,1,3) = '771' THEN 'LOCADORAS'
+	 ELSE 'OUTROS' END AS TpCnae
+	,Municipio.CdFilial
+	,EstruturaComercial.NmFilial
+	,EstruturaComercial.CdColaboradorAtivo AS CdColaborador
+	,EstruturaComercial.NmColaborador AS NmColaboradorA
+
+	,COALESCE(MunicipioDistribuicao.NmAreaEstruturaComercial, EstruturaComercial.NmAreaEstruturaComercial) AS NmAreaEstruturaComercial
+	,COALESCE(MunicipioDistribuicao.NmSubEstruturaComercialA, EstruturaComercial.NmSubEstruturaComercialA) AS NmSubEstruturaComercialA
+
+	,COALESCE(MunicipioDistribuicao.NmCanalEstruturaComercial, EstruturaComercial.NmCanalEstruturaComercial) AS NmCanalEstruturaComercial
+	,EstruturaComercial.DsLoginN1 AS DsLoginN1A
+	,EstruturaComercial.DsLoginN2A
+	,COALESCE(MunicipioDistribuicao.DsLoginN3A, EstruturaComercial.DsLoginN3A) AS DsLoginN3A
+	,EstruturaComercial.LstSubstituicao
+	,1 as FlPrioridade
+
+from TbCetipEndereco CetipEndereco
+
+	left join basegrc.TbGrupoParceiroLocadoras GrupoParceiroLocadoras
+		on substr(CetipEndereco.NuCnpjLoja,1,8) = GrupoParceiroLocadoras.CnpjBase
+
+/*	left join TbParceiroGrandesGrupos ParceiroGrandesGrupos*/
+/*		on CetipEndereco.NuCnpjLoja = ParceiroGrandesGrupos.NuCnpjLoja*/
+
+	left join basegrc.TbPortePDV PortePDV
+		on  CetipEndereco.NuCnpjLoja = PortePDV.NuCnpjLoja
+		and PortePDV.CdParceiroComercial is null
+		and year(today()) = PortePDV.NuAno
+
+	left join TbMunicipio Municipio
+		on  CetipEndereco.CdMunicipio = Municipio.CdMunicipio
+
+		left join bases.TbEstruturaComercial EstruturaComercial
+			on  coalesce(GrupoParceiroLocadoras.CdFilial,Municipio.CdFilial) = EstruturaComercial.CdFilial
+			and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+			and EstruturaComercial.NmNivel = 'N2'
+
+		left join basegrc.TbMunicipioDistribuicao MunicipioDistribuicao
+			on Municipio.CdMunicipio = MunicipioDistribuicao.CdMunicipio
+
+;quit;
+
+proc sql;
+create table TbCidadeSemCodigo as
+select
+	 NmCidade
+	,CdUf
+	,CdUf||NmCidade as chave
+	,count(*) as QtOcorrencias
+from TbCetipFilial
+where CdFilial is null
+  and NmCidade not in ('SAO PAULO','RIO DE JANEIRO','FORTALEZA')
+  and NmCidade is not null
+  and CdUf is not null
+group by 1,2,3
+order by 4 desc
+;run;
+
+proc export
+data=TbCidadeSemCodigo
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCidadeSemCodigo.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCidadeSemCodigo.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";
+
+proc sql;
+select
+	max(NuAnoMes) into: NuAnoMesInicio
+from automati.Base_Classificacao_PDVs_hist
+where InfoSemanaMes  = 'MF'
+;run;
+
+proc sql;
+create table TbClassificacaoPDV as
+select
+		*
+from automati.Base_Classificacao_PDVs_hist
+where NuAnoMes = &NuAnoMesInicio
+	and InfoSemanaMes = 'MF'
+;run;
+
+proc sql;
+create table TbParceiroComercial as
+select
+	 ParceiroComercial.NuCnpjLoja
+	,ParceiroComercial.CdParceiroComercial
+	,ParceiroComercial.NmParceiroComercial AS NmLoja
+	,ParceiroComercial.FlAtivo
+	,PortePDV.FlPorteA
+	,PortePDV.FlPorteNovoMotos
+	,ClassificacaoPDV.DsClassificacaoA
+	,ParceiroComercial.CdTipoParceiroComercial
+	,ParceiroComercial.NmTipoParceiroComercial
+	,ParceiroComercial.FlIntegracaoParceiroFeI
+	,ParceiroComercial.NmLogradouro
+	,ParceiroComercial.NuEndereco
+	,ParceiroComercial.DsComplementoEndereco
+	,ParceiroComercial.NmBairro
+	,ParceiroComercial.CdCep
+/*	,ParceiroComercial.NmAutoShopping*/
+/*	,ParceiroComercial.NmCorredor*/
+/*	,ParceiroComercial.NmGrupoConcessionaria*/
+/*	,ParceiroComercial.NmBandeiraGrupoConcessionaria*/
+	,ParceiroComercial.DsGrupoParceiroLocadoras
+	,ParceiroComercial.NmCidade
+	,ParceiroComercial.CdUf
+
+	,Municipio.CdMunicipio
+	,case when MunicipioDistribuicao.CdMunicipio is not null then .  else coalesce(ParceiroComercial.CdColaboradorC, EstruturaComercial.CdColaboradorAtivo) END AS CdColaboradorC
+	,case when MunicipioDistribuicao.CdMunicipio is not null then '' else coalesce(ParceiroComercial.NmColaboradorC, EstruturaComercial.NmColaborador) END AS NmColaboradorC
+	,case when MunicipioDistribuicao.CdMunicipio is not null then .  else coalesce(ParceiroComercial.CdFilialC, EstruturaComercial.CdFilial) END AS CdFilialC
+	,case when MunicipioDistribuicao.CdMunicipio is not null then '' else coalesce(ParceiroComercial.NmFilialC, EstruturaComercial.NmFilial) END AS NmFilialC
+
+	,coalesce(MunicipioDistribuicao.NmAreaEstruturaComercial,ParceiroComercial.NmAreaEstruturaComercialC, EstruturaComercial.NmAreaEstruturaComercial) AS NmAreaEstruturaComercialC
+	,coalesce(MunicipioDistribuicao.NmSubEstruturaComercialA, ParceiroComercial.NmSubEstruturaComercialC,EstruturaComercial.NmSubEstruturaComercialA) AS NmSubEstruturaComercialC
+	,coalesce(MunicipioDistribuicao.NmCanalEstruturaComercial,ParceiroComercial.NmCanalEstruturaComercialC, EstruturaComercial.NmCanalEstruturaComercial) AS NmCanalEstruturaComercialC
+	,case when MunicipioDistribuicao.CdMunicipio is not null then '' else coalesce(ParceiroComercial.DsLoginN1C, EstruturaComercial.DsLoginN1) END AS DsLoginN1C
+	,case when MunicipioDistribuicao.CdMunicipio is not null then '' else coalesce(ParceiroComercial.DsLoginN2C, EstruturaComercial.DsLoginN2A) END AS DsLoginN2C
+	,coalesce(MunicipioDistribuicao.DsLoginN3A,ParceiroComercial.DsLoginN3C, EstruturaComercial.DsLoginN3A) AS DsLoginN3C
+	,coalesce(EstruturaComercial.LstSubstituicao, ParceiroComercial.LstSubstituicaoC) AS LstSubstituicaoC
+
+	,ParceiroComercial.DtCadastro
+	,ParceiroComercial.DtUltimaAtualizacao
+	,CASE WHEN FlAtivo = 'N' AND GrupoParceiroLocadoras.CdFilial IS NOT NULL THEN 1 END AS FlAlteracaoGerencialLocadoras
+	,ParceiroComercial.FlPrioridade
+
+from tmp.TbParceiroComercial ParceiroComercial
+
+	left join basegrc.TbGrupoParceiroLocadoras GrupoParceiroLocadoras
+		on  substr(ParceiroComercial.NuCnpjLoja,1,8) = GrupoParceiroLocadoras.CnpjBase
+		and ParceiroComercial.FlAtivo = 'N'
+
+	left join basegrc.TbPortePDV PortePDV
+		on  ParceiroComercial.NuCnpjLoja = PortePDV.NuCnpjLoja
+		and PortePDV.CdParceiroComercial is not null
+		and year(today()) = PortePDV.NuAno
+
+	left join TbClassificacaoPDV ClassificacaoPDV
+		on  ParceiroComercial.CdParceiroComercial = ClassificacaoPDV.CdParceiroComercial
+
+	left join basegrc.TbMunicipioChave MunicipioChave
+		on  ParceiroComercial.NmCidade = MunicipioChave.NmMunicipio
+		and ParceiroComercial.CdUf = MunicipioChave.CdUf
+		and ParceiroComercial.FlAtivo = 'N'
+
+		left join TbMunicipio Municipio
+			on  MunicipioChave.CdMunicipio = Municipio.CdMunicipio
+
+			left join basegrc.TbMunicipioDistribuicao MunicipioDistribuicao
+				on Municipio.CdMunicipio = MunicipioDistribuicao.CdMunicipio
+
+			left join bases.TbEstruturaComercial EstruturaComercial
+				on coalesce(GrupoParceiroLocadoras.CdFilial,Municipio.CdFilial) = EstruturaComercial.CdFilial
+				and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+				and EstruturaComercial.NmNivel = 'N2'
+;run;
+
+proc sql;
+create table tmp.TbPotencialPDVs as
+select
+	coalesce(ParceiroComercial.NuCnpjLoja, CetipFilial.NuCnpjLoja) AS NuCnpjLoja
+	,ParceiroComercial.CdParceiroComercial
+	,coalesce(ParceiroComercial.NmLoja, CetipFilial.NmFantasia, CetipFilial.DsRazaoSocial) AS NmLoja
+	,ParceiroComercial.FlAtivo
+	,coalesce(ParceiroComercial.FlPorteA, CetipFilial.FlPorteA) AS FlPorteA
+	,coalesce(ParceiroComercial.FlPorteNovoMotos, CetipFilial.FlPorteNovoMotos) AS FlPorteMotos
+	,ParceiroComercial.DsClassificacaoA
+
+	,ParceiroComercial.CdTipoParceiroComercial
+	,ParceiroComercial.NmTipoParceiroComercial
+	,ParceiroComercial.FlIntegracaoParceiroFeI
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' AND CetipFilial.NmCidade IS NOT NULL THEN CetipFilial.NmLogradouro ELSE ParceiroComercial.NmLogradouro END AS NmLogradouro
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' AND CetipFilial.NmCidade IS NOT NULL THEN CetipFilial.NuEndereco   ELSE ParceiroComercial.NuEndereco END AS NuEndereco
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' AND CetipFilial.NmCidade IS NOT NULL THEN CetipFilial.DsComplementoEndereco ELSE ParceiroComercial.DsComplementoEndereco END AS DsComplementoEndereco
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' AND CetipFilial.NmCidade IS NOT NULL THEN CetipFilial.NmBairro ELSE ParceiroComercial.NmBairro END AS NmBairro
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' AND CetipFilial.NmCidade IS NOT NULL THEN CetipFilial.CdCep ELSE ParceiroComercial.CdCep END AS CdCep
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' AND CetipFilial.CdMunicipio IS NOT NULL THEN CetipFilial.CdMunicipio ELSE ParceiroComercial.CdMunicipio END AS CdMunicipio
+
+	,CetipFilial.NmCidade AS NmCidadeCetip
+	,ParceiroComercial.NmCidade AS NmCidadeParceiroComercial
+/*	,ParceiroComercial.NmAutoShopping*/
+/*	,ParceiroComercial.NmCorredor*/
+/*	,COALESCE(ParceiroComercial.NmGrupoConcessionaria, CetipFilial.NmGrupoConcessionaria) AS NmGrupoConcessionaria*/
+/*	,ParceiroComercial.NmBandeiraGrupoConcessionaria*/
+
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.NmCidade, ParceiroComercial.NmCidade) ELSE ParceiroComercial.NmCidade END AS NmCidade
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.CdUf, ParceiroComercial.CdUf) ELSE ParceiroComercial.CdUf END AS CdUf
+
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.CdColaborador, ParceiroComercial.CdColaboradorC) ELSE ParceiroComercial.CdColaboradorC END AS CdColaboradorC
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.NmColaboradorA, ParceiroComercial.NmColaboradorC) ELSE ParceiroComercial.NmColaboradorC END AS NmColaboradorC
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.CdFilial, ParceiroComercial.CdFilialC) ELSE ParceiroComercial.CdFilialC END AS CdFilialC
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.NmFilial, ParceiroComercial.NmFilialC) ELSE ParceiroComercial.NmFilialC END AS NmFilialC
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.NmAreaEstruturaComercial, ParceiroComercial.NmAreaEstruturaComercialC) ELSE ParceiroComercial.NmAreaEstruturaComercialC END AS NmAreaEstruturaComercialC
+
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.NmSubEstruturaComercialA, ParceiroComercial.NmSubEstruturaComercialC) ELSE ParceiroComercial.NmSubEstruturaComercialC END AS NmSubEstruturaComercialC
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.NmCanalEstruturaComercial, ParceiroComercial.NmCanalEstruturaComercialC) ELSE ParceiroComercial.NmCanalEstruturaComercialC END AS NmCanalEstruturaComercialC
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.DsLoginN1A, ParceiroComercial.DsLoginN1C) ELSE ParceiroComercial.DsLoginN1C END AS DsLoginN1C
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.DsLoginN2A, ParceiroComercial.DsLoginN2C) ELSE ParceiroComercial.DsLoginN2C END AS DsLoginN2C
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.DsLoginN3A, ParceiroComercial.DsLoginN3C) ELSE ParceiroComercial.DsLoginN3C END AS DsLoginN3C
+	,CASE WHEN ParceiroComercial.FlAtivo <> 'S' THEN  coalesce(CetipFilial.LstSubstituicao, ParceiroComercial.LstSubstituicaoC) ELSE ParceiroComercial.LstSubstituicaoC END AS LstSubstituicaoC
+
+	,ParceiroComercial.DtCadastro
+	,ParceiroComercial.DtUltimaAtualizacao
+	,coalesce(ParceiroComercial.DsGrupoParceiroLocadoras, CetipFilial.DsGrupoParceiroLocadoras) AS DsGrupoParceiroLocadoras
+	,ParceiroComercial.FlAlteracaoGerencialLocadoras
+
+	,coalesce(ParceiroComercial.FlPrioridade, CetipFilial.FlPrioridade) AS FlPrioridade
+	,CetipFilial.CnaePrimario
+	,CASE WHEN TbParceiroComercial.DsGrupoParceiroLocadoras IN
+     ('UNIDAS','MOVIDA','LOKAMIG','LOCALIZA','JR LOCADORA','BS RENT')
+      THEN 'LOCADORA' ELSE COALESCE(CetipFilial.TpCnae, 'SEM INFORMACAO') END AS TpCnae
+
+from TbParceiroComercial ParceiroComercial
+
+	full join TbCetipFilial CetipFilial
+		on ParceiroComercial.NuCnpjLoja = CetipFilial.NuCnpjLoja
+
+order by ParceiroComercial.NuCnpjLoja desc
+;run;
+
+proc sql;create index NuCnpjLoja on tmp.TbPotencialPDVs;run;
+proc sql;create index CdParceiroComercial on tmp.TbPotencialPDVs;run;
+proc sql;create index chave on tmp.TbPotencialPDVs (NuCnpjLoja,FlPrioridade);run;

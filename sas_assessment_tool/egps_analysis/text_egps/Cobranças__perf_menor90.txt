@@ -1,0 +1,1937 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__perf_menor90
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:03 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 75)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -69
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (15x | +75)
+----------------------------------------
+LINES_OF_CODE: 1464
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (32x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: MARCACAO = /riscosbv/cobranca/gtavares/Reneg/Marcacao; PRETER = /riscosbv/cobranca/preter; RENEG = /riscosbv/cobranca/gtavares/Reneg
+DETECTED_MACROS_DEFINED: SAFRA_M0, TABELA, anomes, base, fim_mes_m0, fim_mes_m1, inicio_mes_m1, libname, path, work
+DETECTED_MACROS_USED: TABELA, anomes, base, fim_mes_m0, fim_mes_m1, libname, path, tabela, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES, BASE, FIM_MES_M0, FIM_MES_M1, INICIO_MES, LIBNAME, TABELA
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY/GCP], MARCACAO.&TABELA [SAS/Local], RENEG.&TABELA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_ELEG
+IMPORTED_LIBNAMES: MARCACAO, RENEG
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ELEG
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [PROC SQL - JOIN], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM], MARCACAO.&TABELA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], RENEG.&TABELA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], WORK.BASE_ELEG [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, BASE_ELEG, CUBO_202507, CUBO_EXPORT, RENEG_MENOR90, RENEG_MENOR90_202507, RENEG_MENOR90_FINAL_202507, WORK.QUERY_FOR_BASE_ELEG, WORK.QUERY_FOR_BASE_ELEG1
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET libname=%sysfunc(lowcase(&libname.));
+%LET base=%sysfunc(lowcase(&base.));
+%LET fim_mes_m0='2025-06-30';
+%LET fim_mes_m1='2025-07-31';
+%LET inicio_mes_m1='2025-07-01';
+%LET SAFRA_M0=202506;
+%LET anomes=202507;
+%LET TABELA=marcacao_reneg_tescon_&anomes.;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: [off] perf_menor90 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 41 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: [off] perf_menor90 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-SqkQf2GgtIwcIloC/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro performance_reneg (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DtProcessamentoLiquidacao) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.);
+
+QUIT;
+
+
+DATA reneg_menor90_&anomes.;
+SET reneg_menor90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF DtProcessamentoLiquidacao NE .		 									THEN RESULTADO = "Quitacao"; ELSE
+IF nudiasatraso >= atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO = '0061-0090';
+ELSE FX_ATRASO = '0090+';
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO
+;QUIT;
+
+%mend;
+
+%macro performance_reneg_2 (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = B.NUCONTRATO
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DtProcessamentoLiquidacao) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+
+ON A.nucontrato = C.NUCONTRATO;
+QUIT;
+
+
+DATA reneg_menor90_&anomes.;
+SET reneg_menor90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF DtProcessamentoLiquidacao NE .		 									THEN RESULTADO = "Quitacao"; ELSE
+IF nudiasatraso >= atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO = '0061-0090';
+ELSE FX_ATRASO = '0090+';
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+%performance_reneg (202501, '2025-01-01', '2025-01-31', '2024-12-31');
+%performance_reneg (202502, '2025-02-01', '2025-02-28', '2025-01-31');
+%performance_reneg (202503, '2025-03-01', '2025-03-31', '2025-02-28');
+%performance_reneg (202504, '2025-04-01', '2025-04-30', '2025-03-31');
+%performance_reneg (202505, '2025-05-01', '2025-05-31', '2025-04-30');
+%performance_reneg (202506, '2025-06-01', '2025-06-30', '2025-05-31');
+%performance_reneg (202507, '2025-07-01', '2025-07-31', '2025-06-30');
+
+%performance_reneg_2 (202508, '2025-08-01', '2025-08-31', '2025-07-31');
+%performance_reneg_2 (202509, '2025-09-01', '2025-09-30', '2025-08-31');
+
+DATA CUBO_EXPORT;
+SET CUBO_2025:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: [off] perf_menor90 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: [off] perf_menor90_estoque */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 41 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: [off] perf_menor90_estoque */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5gNJEh4qEFTddAJB/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro performance_reneg (anomes, inicio_mes, fim_mes_m1, fim_mes_m0, tabela);
+
+
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DtProcessamentoLiquidacao) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.);
+
+QUIT;
+
+
+DATA reneg_menor90_&anomes.;
+SET reneg_menor90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF DtProcessamentoLiquidacao NE .		 									THEN RESULTADO = "Quitacao"; ELSE
+IF nudiasatraso >= atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	&anomes. as SAFRA,
+	FX_ATRASO,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	RESULTADO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	RESULTADO
+;QUIT;
+
+%mend;
+
+%macro performance_reneg_2 (anomes, inicio_mes, fim_mes_m1, fim_mes_m0, tabela);
+
+
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = B.NUCONTRATO
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DtProcessamentoLiquidacao) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+
+ON A.nucontrato = C.NUCONTRATO;
+QUIT;
+
+
+DATA reneg_menor90_&anomes.;
+SET reneg_menor90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF DtProcessamentoLiquidacao NE .		 									THEN RESULTADO = "Quitacao"; ELSE
+IF nudiasatraso >= atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	&anomes. as SAFRA,
+	FX_ATRASO,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	RESULTADO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	RESULTADO
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+%performance_reneg (202504, '2025-04-01', '2025-04-30', '2025-03-31', reneg_ate_90_20250401_tescon_a);
+
+
+
+
+
+
+
+
+DATA CUBO_EXPORT;
+SET CUBO_2025:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: [off] perf_menor90_estoque */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: perf_menor90_estoque_chuveirinho */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 41 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: perf_menor90_estoque_chuveirinho */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ZQZ6eEOEPWl3sCWI/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro performance_reneg (anomes, inicio_mes, fim_mes_m1, fim_mes_m0, tabela);
+
+
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO_2 = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO_2 = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO_2 = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO_2 = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO_2 = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO_2 = '0061-0090';
+ELSE FX_ATRASO_2 = '0090+';
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90_&anomes. AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0,
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN C.DtProcessamentoLiquidacao
+		WHEN D.dt_baixa IS NOT NULL 					THEN D.dt_baixa
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN F.dt_ultimo_recebimento
+	END FORMAT=DDMMYY10. AS DT_PAGAMENTO,
+
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN "Quitacao"
+		WHEN D.dt_baixa IS NOT NULL 					THEN "Reneg"
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN "Pgmt"
+		ELSE "Sem Acao"
+	END AS TP_PAGAMENTO
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DATE(DtProcessamentoLiquidacao)) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.)
+
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			NuContratoGestao,
+			MAX(SqContratoFinanceiro)      AS SqContratoFinanceiro,
+			NuContratoGestaoNovo,
+			MAX(sqcontratofinanceironovo)     AS sqcontratofinanceironovo,
+			MAX(DATE(dt_baixa))         AS dt_baixa,
+			MAX(dt_reneg)         AS dt_reneg,
+			MAX(SAFE_CAST(vr_presente AS FLOAT64))   AS vr_presente,
+			MAX(SAFE_CAST(vr_financiado AS FLOAT64))  AS vr_financiado,
+			MAX(SAFE_CAST(Tx_Pactuada AS FLOAT64))   AS Tx_Pactuada,
+			MAX(qt_parcela)        AS qt_parcela,
+			MAX(vr_prestacao)        AS vr_prestacao,
+			MAX(FlRestruturacaoContrato)     AS FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+		WHERE 	DATE(dt_baixa) > &fim_mes_m0. AND DATE(dt_baixa) <= &fim_mes_m1. and
+				(dt_cancelamento is null or dt_reativacao is not null) and
+				ST_RENEG = 3
+		GROUP BY
+			NuContratoGestao,
+		    NuContratoGestaoNovo
+) AS D
+ON A.nucontrato = INPUT(D.NuContratoGestao, BEST32.) AND A.sqcontratofinanceiro = D.SqContratoFinanceiro
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+
+		MAX(DATE(dt_ultimo_recebimento)) AS dt_ultimo_recebimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'Q' AND DATE(dt_ultimo_recebimento) > &fim_mes_m0. AND DATE(dt_ultimo_recebimento) <= &fim_mes_m1.
+	GROUP BY 1,2
+) as F
+ON A.nucontrato = INPUT(F.cd_Contrato, BEST32.) and A.sqcontratofinanceiro = F.sq_contrato_financeiro
+
+;QUIT;
+
+
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	&anomes. as SAFRA,
+	FX_ATRASO_2,
+	NuDiasAtraso,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO,
+	Data_Execucao,
+	DT_PAGAMENTO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO_2,
+	NuDiasAtraso,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO,
+	Data_Execucao,
+	DT_PAGAMENTO
+;QUIT;
+
+%mend;
+
+%macro performance_reneg_2 (anomes, inicio_mes, fim_mes_m1, fim_mes_m0, tabela);
+
+
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO_2 = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO_2 = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO_2 = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO_2 = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO_2 = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO_2 = '0061-0090';
+ELSE FX_ATRASO_2 = '0090+';
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90_&anomes. AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0,
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN C.DtProcessamentoLiquidacao
+		WHEN D.dt_baixa IS NOT NULL 					THEN D.dt_baixa
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN F.dt_ultimo_recebimento
+	END FORMAT=DDMMYY10. AS DT_PAGAMENTO,
+
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN "Quitacao"
+		WHEN D.dt_baixa IS NOT NULL 					THEN "Reneg"
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN "Pgmt"
+		ELSE "Sem Acao"
+	END AS TP_PAGAMENTO
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = B.NUCONTRATO
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(Date(DtProcessamentoLiquidacao)) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+
+ON A.nucontrato = C.NUCONTRATO
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			NuContratoGestao,
+			MAX(SqContratoFinanceiro)      AS SqContratoFinanceiro,
+			NuContratoGestaoNovo,
+			MAX(sqcontratofinanceironovo)     AS sqcontratofinanceironovo,
+			MAX(DATE(dt_baixa))         AS dt_baixa,
+			MAX(dt_reneg)         AS dt_reneg,
+			MAX(SAFE_CAST(vr_presente AS FLOAT64))   AS vr_presente,
+			MAX(SAFE_CAST(vr_financiado AS FLOAT64))  AS vr_financiado,
+			MAX(SAFE_CAST(Tx_Pactuada AS FLOAT64))   AS Tx_Pactuada,
+			MAX(qt_parcela)        AS qt_parcela,
+			MAX(vr_prestacao)        AS vr_prestacao,
+			MAX(FlRestruturacaoContrato)     AS FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+		WHERE 	DATE(dt_baixa) > &fim_mes_m0. AND DATE(dt_baixa) <= &fim_mes_m1. and
+				(dt_cancelamento is null or dt_reativacao is not null) and
+				ST_RENEG = 3
+		GROUP BY
+			NuContratoGestao,
+		    NuContratoGestaoNovo
+) AS D
+ON A.nucontrato = D.NuContratoGestao AND A.sqcontratofinanceiro = D.SqContratoFinanceiro
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+
+		MAX(DATE(dt_ultimo_recebimento)) AS dt_ultimo_recebimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'Q' AND DATE(dt_ultimo_recebimento) > &fim_mes_m0. AND DATE(dt_ultimo_recebimento) <= &fim_mes_m1.
+	GROUP BY 1,2
+) as F
+ON A.nucontrato = F.cd_Contrato and A.sqcontratofinanceiro = F.sq_contrato_financeiro
+
+;QUIT;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	&anomes. as SAFRA,
+	FX_ATRASO_2,
+	NuDiasAtraso,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO,
+	Data_Execucao,
+	DT_PAGAMENTO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO_2,
+	NuDiasAtraso,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO,
+	Data_Execucao,
+	DT_PAGAMENTO
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%performance_reneg_2 (202511, '2025-11-01', '2025-11-30', '2025-10-31', reneg_ate_90_20251103_tescon_a);
+%performance_reneg_2 (202512, '2025-12-01', '2025-12-31', '2025-11-30', reneg_ate_90_20251202_tescon_a);
+
+DATA CUBO_EXPORT;
+SET CUBO_2025:;
+WHERE NUDIASATRASO IN (5,6,7,8,15,16,17,18,31,32,33,34,35,61,62,63,64,65);
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: perf_menor90_estoque_chuveirinho */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: perf_menor90_estoque */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 41 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: perf_menor90_estoque */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-yf9SKYw76aQdlYUg/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro performance_reneg (anomes, inicio_mes, fim_mes_m1, fim_mes_m0, tabela);
+
+
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.(drop=FX_ATRASO);
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO = '0061-0090';
+ELSE FX_ATRASO = '0090+';
+
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO_2 = '0000-0000'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO_2 = '0001-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO_2 = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO_2 = '0061-0090';
+ELSE FX_ATRASO_2 = '0090+';
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90_&anomes. AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0,
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN C.DtProcessamentoLiquidacao
+		WHEN D.dt_baixa IS NOT NULL 					THEN D.dt_baixa
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN F.dt_ultimo_recebimento
+	END FORMAT=DDMMYY10. AS DT_PAGAMENTO,
+
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN "Quitacao"
+		WHEN D.dt_baixa IS NOT NULL 					THEN "Reneg"
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN "Pgmt"
+		ELSE "Sem Acao"
+	END AS TP_PAGAMENTO
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DATE(DtProcessamentoLiquidacao)) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.)
+
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			NuContratoGestao,
+			MAX(SqContratoFinanceiro)      		AS SqContratoFinanceiro,
+			NuContratoGestaoNovo,
+			MAX(sqcontratofinanceironovo)     	AS sqcontratofinanceironovo,
+			MAX(DATE(dt_baixa))         		AS dt_baixa,
+			MAX(dt_reneg)         				AS dt_reneg,
+			MAX(SAFE_CAST(vr_presente AS FLOAT64))   	AS vr_presente,
+			MAX(SAFE_CAST(vr_financiado AS FLOAT64))  	AS vr_financiado,
+			MAX(SAFE_CAST(Tx_Pactuada AS FLOAT64))   	AS Tx_Pactuada,
+			MAX(qt_parcela)        				AS qt_parcela,
+			MAX(vr_prestacao)        			AS vr_prestacao,
+			MAX(FlRestruturacaoContrato)     	AS FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+		WHERE 	DATE(dt_baixa) > &fim_mes_m0. AND DATE(dt_baixa) <= &fim_mes_m1. and
+				(dt_cancelamento is null or dt_reativacao is not null) and
+				ST_RENEG = 3
+		GROUP BY
+			NuContratoGestao,
+		    NuContratoGestaoNovo
+) AS D
+ON A.nucontrato = INPUT(D.NuContratoGestao, BEST32.) AND A.sqcontratofinanceiro = D.SqContratoFinanceiro
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+
+		MAX(DATE(dt_ultimo_recebimento)) AS dt_ultimo_recebimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'Q' AND DATE(dt_ultimo_recebimento) > &fim_mes_m0. AND DATE(dt_ultimo_recebimento) <= &fim_mes_m1.
+	GROUP BY 1,2
+) as F
+ON A.nucontrato = INPUT(F.cd_Contrato, BEST32.) and A.sqcontratofinanceiro = F.sq_contrato_financeiro
+
+;QUIT;
+
+
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	&anomes. as SAFRA,
+	FX_ATRASO,
+	FX_ATRASO_2,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	FX_ATRASO_2,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO
+
+;QUIT;
+
+%mend;
+
+%macro performance_reneg_2 (anomes, inicio_mes, fim_mes_m1, fim_mes_m0, tabela);
+
+
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.(drop=FX_ATRASO);
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO = '0061-0090';
+ELSE FX_ATRASO = '0090+';
+
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO_2 = '0000-0000'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO_2 = '0001-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO_2 = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO_2 = '0061-0090';
+ELSE FX_ATRASO_2 = '0090+';
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90_&anomes. AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0,
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN C.DtProcessamentoLiquidacao
+		WHEN D.dt_baixa IS NOT NULL 					THEN D.dt_baixa
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN F.dt_ultimo_recebimento
+	END FORMAT=DDMMYY10. AS DT_PAGAMENTO,
+
+	CASE
+		WHEN C.DtProcessamentoLiquidacao IS NOT NULL 	THEN "Quitacao"
+		WHEN D.dt_baixa IS NOT NULL 					THEN "Reneg"
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN "Pgmt"
+		ELSE "Sem Acao"
+	END AS TP_PAGAMENTO
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = B.NUCONTRATO
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(Date(DtProcessamentoLiquidacao)) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+
+ON A.nucontrato = C.NUCONTRATO
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			NuContratoGestao,
+			MAX(SqContratoFinanceiro)      		AS SqContratoFinanceiro,
+			NuContratoGestaoNovo,
+			MAX(sqcontratofinanceironovo)     	AS sqcontratofinanceironovo,
+			MAX(DATE(dt_baixa))         		AS dt_baixa,
+			MAX(dt_reneg)         				AS dt_reneg,
+			MAX(SAFE_CAST(vr_presente AS FLOAT64))   AS vr_presente,
+			MAX(SAFE_CAST(vr_financiado AS FLOAT64))  AS vr_financiado,
+			MAX(SAFE_CAST(Tx_Pactuada AS FLOAT64))   AS Tx_Pactuada,
+			MAX(qt_parcela)        				AS qt_parcela,
+			MAX(vr_prestacao)        			AS vr_prestacao,
+			MAX(FlRestruturacaoContrato)     	AS FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+		WHERE 	DATE(dt_baixa) > &fim_mes_m0. AND DATE(dt_baixa) <= &fim_mes_m1. and
+				(dt_cancelamento is null or dt_reativacao is not null) and
+				ST_RENEG = 3
+		GROUP BY
+			NuContratoGestao,
+		    NuContratoGestaoNovo
+) AS D
+ON A.nucontrato = D.NuContratoGestao AND A.sqcontratofinanceiro = D.SqContratoFinanceiro
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+
+		MAX(DATE(dt_ultimo_recebimento)) AS dt_ultimo_recebimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'Q' AND DATE(dt_ultimo_recebimento) > &fim_mes_m0. AND DATE(dt_ultimo_recebimento) <= &fim_mes_m1.
+	GROUP BY 1,2
+) as F
+ON A.nucontrato = F.cd_Contrato and A.sqcontratofinanceiro = F.sq_contrato_financeiro
+
+;QUIT;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	&anomes. as SAFRA,
+	FX_ATRASO,
+	FX_ATRASO_2,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	FX_ATRASO_2,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_FINAL,
+	GRUPO_FINAL_DECISAO,
+	TESTE_CONTROLE,
+	FILTRO_P0,
+	FILTRO_P1,
+	TP_PAGAMENTO
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+%performance_reneg (202501, '2025-01-01', '2025-01-31', '2024-12-31', reneg_ate_90_20250102_tescon_a);
+%performance_reneg (202502, '2025-02-01', '2025-02-28', '2025-01-31', reneg_ate_90_20250203_tescon_a);
+%performance_reneg (202503, '2025-03-01', '2025-03-31', '2025-02-28', reneg_ate_90_20250307_tescon_a);
+%performance_reneg (202504, '2025-04-01', '2025-04-30', '2025-03-31', reneg_ate_90_20250401_tescon_a);
+%performance_reneg (202505, '2025-05-01', '2025-05-31', '2025-04-30', reneg_ate_90_20250507_tescon_a);
+%performance_reneg (202506, '2025-06-01', '2025-06-30', '2025-05-31', reneg_ate_90_20250602_tescon_a);
+%performance_reneg (202507, '2025-07-01', '2025-07-31', '2025-06-30', reneg_ate_90_20250708_tescon_a);
+
+%performance_reneg_2 (202508, '2025-08-01', '2025-08-31', '2025-07-31', reneg_ate_90_20250808_tescon_a);
+%performance_reneg_2 (202509, '2025-09-01', '2025-09-30', '2025-08-31', reneg_ate_90_20250901_tescon_a);
+%performance_reneg_2 (202510, '2025-10-01', '2025-10-31', '2025-09-30', reneg_ate_90_20251001_tescon_a);
+%performance_reneg_2 (202511, '2025-11-01', '2025-11-30', '2025-10-31', reneg_ate_90_20251103_tescon_a);
+%performance_reneg_2 (202512, '2025-12-01', '2025-12-31', '2025-11-30', reneg_ate_90_20251202_tescon_a);
+
+DATA CUBO_EXPORT;
+SET CUBO_2025:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: perf_menor90_estoque */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ELEG);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ELEG AS
+   SELECT t1.NuContrato,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.BASE_ELEG t1
+      GROUP BY t1.NuContrato;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%LET fim_mes_m0 = '2025-06-30';
+%LET fim_mes_m1 = '2025-07-31';
+%LET inicio_mes_m1 = '2025-07-01';
+%LET SAFRA_M0 = 202506;
+%LET anomes = 202507;
+%LET TABELA = marcacao_reneg_tescon_202507;
+
+%macro performance_reneg (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DtProcessamentoLiquidacao) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.);
+
+QUIT;
+
+
+DATA reneg_menor90_&anomes.;
+SET reneg_menor90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF DtProcessamentoLiquidacao NE .		 									THEN RESULTADO = "Quitacao"; ELSE
+IF nudiasatraso > atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO = '0061-0090';
+ELSE FX_ATRASO = '0090+';
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO
+;QUIT;
+
+%mend;
+
+%macro performance_reneg_2 (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_menor90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	C.DtProcessamentoLiquidacao,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = B.NUCONTRATO
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1,
+			max(DtProcessamentoLiquidacao) as DtProcessamentoLiquidacao
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+
+ON A.nucontrato = C.NUCONTRATO;
+QUIT;
+
+
+DATA reneg_menor90_&anomes.;
+SET reneg_menor90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF DtProcessamentoLiquidacao NE .		 									THEN RESULTADO = "Quitacao"; ELSE
+IF nudiasatraso >= atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+PROC SORT DATA= reneg_menor90_&anomes. NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA reneg_menor90_final_&anomes.;
+SET reneg_menor90_&anomes.;
+IF NUDIASATRASO <= 0 	THEN FX_ATRASO = '0000-0000'; ELSE
+IF NUDIASATRASO <= 4 	THEN FX_ATRASO = '0001-0004'; ELSE
+IF NUDIASATRASO <= 15 	THEN FX_ATRASO = '0005-0015'; ELSE
+IF NUDIASATRASO <= 30 	THEN FX_ATRASO = '0016-0030'; ELSE
+IF NUDIASATRASO <= 60 	THEN FX_ATRASO = '0031-0060'; ELSE
+IF NUDIASATRASO <= 90 	THEN FX_ATRASO = '0061-0090';
+ELSE FX_ATRASO = '0090+';
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_menor90_final_&anomes.
+GROUP BY
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	PERCENT_PAGO,
+	FL_ESTOQUE,
+	TagCMP,
+	Tag50k,
+	CLUSTER,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	RESULTADO
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+%performance_reneg (202501, '2025-01-01', '2025-01-31', '2024-12-31');
+%performance_reneg (202502, '2025-02-01', '2025-02-28', '2025-01-31');
+%performance_reneg (202503, '2025-03-01', '2025-03-31', '2025-02-28');
+%performance_reneg (202504, '2025-04-01', '2025-04-30', '2025-03-31');
+%performance_reneg (202505, '2025-05-01', '2025-05-31', '2025-04-30');
+%performance_reneg (202506, '2025-06-01', '2025-06-30', '2025-05-31');
+%performance_reneg (202507, '2025-07-01', '2025-07-31', '2025-06-30');
+
+%performance_reneg_2 (202508, '2025-08-01', '2025-08-31', '2025-07-31');
+%performance_reneg_2 (202509, '2025-09-01', '2025-09-30', '2025-08-31');
+
+DATA CUBO_EXPORT;
+SET CUBO_2025:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ELEG1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ELEG1 AS
+   SELECT t1.NuContrato,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.BASE_ELEG t1
+      GROUP BY t1.NuContrato;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA CUBO_EXPORT;
+SET CUBO_2025:;
+WHERE NUDIASATRASO IN (5,6,7,8,15,16,17,18,31,32,33,34,35,61,62,63,64,65);
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

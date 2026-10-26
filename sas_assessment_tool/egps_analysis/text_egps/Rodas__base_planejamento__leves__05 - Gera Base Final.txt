@@ -1,0 +1,202 @@
+START_METADATA
+PROJECT: Rodas__base_planejamento
+FILE_SAS: leves__05 - Gera Base Final.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 132
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SAFRAM0, SAFRAM4
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEPOTENCIALFINAL, PRODUCAOIDEALLEVES, SHARE, SHAREREGIONAL, TICKETCDPARCEIROFXIDADE, TICKETREGIONAL, VALIDA_P
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+proc sql;
+create table Share as
+select distinct
+Chave1,
+NuCnpjLoja,
+Sum(QtdContratos_ProjSab) / Sum(qtgravamesplayers_ProjSab) as Share
+from POTENCIAL_RODAS_04
+where  1=1
+/*and chave1 = '1 ou 2LojaMetropoleRegião SudesteAcima de 10 anos'*/
+/*and NuCnpjLoja = '00153640000131'*/
+group by 1,2
+;run;
+
+proc sql;
+create table ShareRegional as
+select distinct
+catt(Chave1,NmSubEstruturaComercialC) As Chave1,
+/*NuCnpjLoja,*/
+Sum(QtdContratos_ProjSab) as QtdContratos_ProjSab,
+Sum(qtgravamesplayers_ProjSab) as qtgravamesplayers_ProjSab,
+case when Sum(QtdContratos_ProjSab) / Sum(qtgravamesplayers_ProjSab) > 0.5 then 0.5
+else Sum(QtdContratos_ProjSab) / Sum(qtgravamesplayers_ProjSab) end as Share
+from POTENCIAL_RODAS_04
+where  1=1
+/*and chave1 = '1 ou 2LojaMetropoleRegião SudesteAcima de 10 anos'*/
+/*and NuCnpjLoja = '00153640000131'*/
+/*and catt(Chave1,NmSubEstruturaComercialC) = 'PSem InfoLojaMetropoleRegião Sudeste3 a 7 anosCanal Rodas e EGV I - Regional I'*/
+group by 1
+;run;
+
+proc sql;
+create table TicketCdParceiroFxIdade as
+select distinct
+/*NuCnpjLoja,*/
+CATT(NmAreaEstruturaComercialC,FXIDADE) AS CHAVE ,
+ChaveCdParceiro_FxIdade,
+Sum(VrProducao_ProjSab)/Sum(QtdContratos_ProjSab) as TicketBV,
+Sum(Vrgravamesplayers_ProjSab) /Sum (qtgravamesplayers_ProjSab) as TicketMercado
+from POTENCIAL_RODAS_04
+where  1=1
+/*and chave1 = '1 ou 2LojaMetropoleRegião SudesteAcima de 10 anos'*/
+/*and NuCnpjLoja = '00153640000131'*/
+group by 1,2
+;run;
+
+proc sql;
+create table TicketRegional as
+select distinct
+/*NuCnpjLoja,*/
+CATT(NmAreaEstruturaComercialC,FXIDADE) AS CHAVE ,
+Sum(VrProducao_ProjSab)/Sum(QtdContratos_ProjSab) as TicketBV,
+Sum(Vrgravamesplayers_ProjSab) /Sum (qtgravamesplayers_ProjSab) as TicketMercado
+from POTENCIAL_RODAS_04
+where  1=1
+/*and chave1 = '1 ou 2LojaMetropoleRegião SudesteAcima de 10 anos'*/
+/*and NuCnpjLoja = '00153640000131'*/
+group by 1
+;run;
+
+proc sql;
+create table BasePotencialFinal as
+select
+A.NuCnpjLoja,
+/*a.ChaveCdParceiro_FxIdade,*/
+a.nuanomes,
+a.cdparceirocomercial,
+catt(a.Chave1,a.NmSubEstruturaComercialC) as Chave2,
+b.Share as ShareIdeal2,
+a.qtgravamesplayers_ProjSab,
+b.Share * a.qtgravamesplayers_ProjSab as ContratosIdeias2,
+C.TicketFinal as TicketFinal1,
+
+Case when c.Ticket_BV_ProjSab <=0 then e.Ticketbv else c.TicketFinal end as TicketRegional,
+
+c.TicketFinal / CALCULATED TicketRegional AS Multiplo FORMAT COMMAX20.2,
+
+/*case when CALCULATED TicketRegional <=0 then CALCULATED TicketRegional else C.TicketFinal end as tss*/
+case when
+	case when	CALCULATED Multiplo >=3 then CALCULATED TicketRegional else C.TicketFinal end =0
+	then case when CALCULATED TicketRegional <=0 then CALCULATED TicketRegional else C.TicketFinal end
+else
+case when	CALCULATED Multiplo >=3 then CALCULATED TicketRegional else C.TicketFinal end
+end
+as TicketFinal,
+
+CALCULATED TicketFinal * CALCULATED ContratosIdeias2 as ProdIdeal2
+
+from POTENCIAL_RODAS_04 as A
+
+	left join ShareRegional as B
+	on catt(a.Chave1,a.NmSubEstruturaComercialC) = b.Chave1
+
+	left join BASE_TICKET_0 as C
+	on a.ChaveCdParceiro_FxIdade = c.ChaveCdParceiro_FxIdade
+
+	Left join TicketCdParceiroFxIdade as D
+	on d.ChaveCdParceiro_FxIdade = a.ChaveCdParceiro_FxIdade
+
+	Left join TicketRegional as e
+	on e.CHAVE = CATT(a.NmAreaEstruturaComercialC,a.FXIDADE)
+
+where  1=1
+/*and a.NuCnpjLoja = '07796847000173'*/
+/*and a.CdParceiroComercial = 774*/
+/*and a.cdparceirocomercial = 1086*/
+/*and catt(a.Chave1,a.NmSubEstruturaComercialC) = '1 ou 2ConcessionariaPequenoRegião Sul3 a 7 anosCanal Rodas e EGV II - Regional VI'*/
+;run;
+
+proc sql;
+create table ProducaoIdealLeves as
+select distinct
+A.cdparceirocomercial,
+Sum(a.qtgravamesplayers_ProjSab) as Gravames,
+/*Sum(a.ContratosIdeias2) as Contratos,*/
+/*Sum(a.ProdIdeal2) as Producao*/
+/*case when  YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) = &SAFRAM0. then Sum(a.ContratosIdeias2) * 0.5 else Sum(a.ContratosIdeias2) end as  Contratos,*/
+/*case when  YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) = &SAFRAM0. then Sum(a.ProdIdeal2) * 0.5 else Sum(a.ProdIdeal2) end as  Producao*/
+
+/*GFM - 19/02/2025*/
+case
+	when YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) <= &SAFRAM0.
+	 and YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) >= &SAFRAM4.
+then sum(0)
+else Sum(a.ContratosIdeias2) end as Contratos,
+
+case
+	when YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) <= &SAFRAM0.
+	 and YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) >= &SAFRAM4.
+then sum(0)
+else Sum(a.ProdIdeal2) end as Producao /*ZERAMOS OS CONTRATOS E PRODUCAO IDEAL DOS PDVS QUE FORAM CADASTRADOS NOS 3 ÚLT MESES.*/
+
+from BasePotencialFinal as A
+	left join tmp.TBPARCEIROCOMERCIAL as B
+	on a.cdparceirocomercial = b.cdparceirocomercial
+where  1=1
+/*and a.NuCnpjLoja = '08330275000103'*/
+group by 1
+;run;
+
+proc sql;
+create table Valida_P as
+select
+202411,
+Sum(a.Gravames) as Gravames,
+Sum(a.Contratos) as Contratos,
+Sum(Producao) as Producao
+from ProducaoIdealLeves as A
+where  1=1
+/*and a.NuCnpjLoja = '08330275000103'*/
+group by 1
+;run;

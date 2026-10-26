@@ -1,0 +1,670 @@
+START_METADATA
+PROJECT: SAS_UC4__Monitoramento_Carga_Behavior_Rodas
+FILE_SAS: Monitoramento_Carga_Behavior_Rodas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:52 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -24
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), PROC DATASETS (4x | +80), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 557
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SQL
+HAS_DATA_STEP: Yes (17x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: BHCHECK = /projetos/ctrcredito/modelos/results; INFRA2 = /projetos/ctrcredito/modelos/historico/bhrodas; WO = /projetos/ctrcredito/modelos/historico/WO
+DETECTED_MACROS_DEFINED: DataRef1, DataRef2, DataRef3, DataRef4, DataRef5, DataRef6, trab
+DETECTED_MACROS_USED: DataRef1, DataRef2, DataRef3, DataRef4, DataRef5, DataRef6, Pop, Produto, Rodas_AnoMes_1, Rodas_AnoMes_2, Rodas_AnoMes_3, Rodas_AnoMes_4, Rodas_AnoMes_5, Rodas_AnoMes_6, Variavel
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: POP, PRODUTO, VARIAVEL
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CDCCG.TBCONTRATO [SYBASEIQ], LSG.TBCONTRATO [SYBASEIQ]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: &VARIAVEL, BHCHECK, BHS&PRODUTO, IEP_&VARIAVEL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): &VARIAVEL._TOTAL [PROC SQL - JOIN; Resolved qualified read (%LET)], BHS&PRODUTO.POP&POP [PROC SQL - FROM], CDCCG.TBCONTRATO [Pass-Through Native (SYBASEIQ) - FROM], LSG.TBCONTRATO [Pass-Through Native (SYBASEIQ) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): BHS&PRODUTO.POP&POP
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): &VARIAVEL._TOTAL, BHCHECK.MONITOR_CARGA_BHRODAS, BHS&PRODUTO.POP&POP, IEP_&VARIAVEL._MIX
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: &VARIAVEL, ANALISEIEP, ANALISEIEP_MIX, AUX_MIGR_BASE, AUX_MIGR_RURODAS, AUX_MIGR_RUTOTAL, BASESPROD_RODAS, BASESVARIAVEIS_RODAS, BASE_MONIT_PROD_RODAS, CDCCG_TBCONTRATO, DATAIEP_RODAS, DATAIEP_RODAS_1, DATAIEP_RODAS_2, DATAIEP_RODAS_3, DATAIEP_RODAS_4, DATAIEP_RODAS_5, DATAIEP_RODAS_6, IEP_&VARIAVEL, LDG_TBCONTRATO, MIGRACAO_RODAS, MIXMEDIO, MIXMEDIO_TOTAL, MONIT_PRODBASE_RODAS, MONIT_PRODBASE_RODAS_TOTAL, MONIT_PROD_RODAS, MONIT_PROD_RODAS_BASE, MONIT_PROD_RODAS_TOTAL, MONIT_PROD_RODAS_VOL, MONIT_PROD_RODAS_VOL_TT, TEMOSMISSING_PROD_RODAS, TEMOSMISSING_RODAS, _TBCONTRATO
+DYNAMIC REFS (Ambiguous): PRODUTO.POP{POP}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*
++-------------------------------------------------------------------------------------------------+
+| Programa   | Monitoramento Carga Behavior Rodas                                                 |
+| Autor      | Vitor Colombo Liberato                                                             |
+| Objetivo   |     Verificar se os dados gerados pelo modelo Behavior Rodas estão de acordo com o |
+|            | esperado.                                                                          |
++-------------------------------------------------------------------------------------------------+
+| HISTÓRICO                                                                                       |
++-------------------------------------------------------------------------------------------------+
+|    DATA    | Responsável                       |            Alteração                           |
+| 08/01/2019 | Ana Lazarini                      | Unificação / Organização códs.                 |
+|            |                                   | Adaptação para alimentar Dashboards Tableau    |
++-------------------------------------------------------------------------------------------------+
+| OUTPUTS SAS                                                                                     |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                       | Nome                          |
+| bhcheck    | /sustentacaomodelos/relatoriosmalha1/bases         | Monitor_carga_bhrodas         |
++-------------------------------------------------------------------------------------------------+
+| INPUTS SAS                                                                                      |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                       | Nome                          |
+| infra2     | /projetos/ctrcredito/modelos/historico/bhrodas     | BHS_CONTRATOS_CARTEIRA_&safra |
+| WO         | /projetos/ctrcredito/modelos/historico/WO          | CARTEIRA_WO_&safra            |
++-------------------------------------------------------------------------------------------------+
+*/
+
+/*** ETAPA 1 - Declaração de libnames ***/
+LIBNAME bhcheck '/projetos/ctrcredito/modelos/results';
+LIBNAME infra2 '/projetos/ctrcredito/modelos/historico/bhrodas';
+LIBNAME WO '/projetos/ctrcredito/modelos/historico/WO';
+
+/*** ETAPA 2 - Declaração de macro variáveis ***/
+/* Definir endereço da Work */
+%LET trab  =  %SYSFUNC(getoption(work));
+
+/* Definir datas que serão consultadas */
+%LET DataRef1 = INTNX('month', DATE(), -1, 'end');
+%LET DataRef2 = INTNX('month', DATE(), -2, 'end');
+%LET DataRef3 = INTNX('month', DATE(), -3, 'end');
+%LET DataRef4 = INTNX('month', DATE(), -4, 'end');
+%LET DataRef5 = INTNX('month', DATE(), -5, 'end');
+%LET DataRef6 = INTNX('month', DATE(), -6, 'end');
+
+DATA DataIEP_Rodas_1;
+    Seq = 1;
+
+    FORMAT Ref ddmmyy10.;
+        Ref = &DataRef1.;
+RUN;
+
+DATA DataIEP_Rodas_2;
+    Seq = 2;
+
+    FORMAT Ref ddmmyy10.;
+        Ref = &DataRef2.;
+RUN;
+
+DATA DataIEP_Rodas_3;
+    Seq = 3;
+
+    FORMAT Ref ddmmyy10.;
+        Ref = &DataRef3.;
+RUN;
+
+DATA DataIEP_Rodas_4;
+    Seq = 4;
+
+    FORMAT Ref ddmmyy10.;
+        Ref = &DataRef4.;
+RUN;
+
+DATA DataIEP_Rodas_5;
+    Seq = 5;
+
+    FORMAT Ref ddmmyy10.;
+        Ref = &DataRef5.;
+RUN;
+
+DATA DataIEP_Rodas_6;
+    Seq = 6;
+
+    FORMAT Ref ddmmyy10.;
+        Ref = &DataRef6.;
+RUN;
+
+DATA DataIEP_Rodas;
+SET DataIEP_Rodas_1
+    DataIEP_Rodas_2
+    DataIEP_Rodas_3
+    DataIEP_Rodas_4
+    DataIEP_Rodas_5
+    DataIEP_Rodas_6;
+
+    Mes = MONTH(Ref);
+    Ano = YEAR(Ref);
+
+    IF mes <= 9 THEN Rodas_AnoMes = COMPRESS('infra2.BHS_CONTRATOS_CARTEIRA_'||Ano||'0'||mes); ELSE
+    IF mes >  9 THEN Rodas_AnoMes = COMPRESS('infra2.BHS_CONTRATOS_CARTEIRA_'||Ano||mes);
+
+    IF mes <= 9 AND Ref = &DataRef1. THEN BaseWO = COMPRESS('WO.CARTEIRA_WO_'||Ano||'0'||mes); ELSE
+    IF mes >  9 AND Ref = &DataRef1. THEN BaseWO = COMPRESS('WO.CARTEIRA_WO_'||Ano||mes);
+RUN;
+
+/* Definir bases que serão consultadas */
+DATA _NULL_;
+SET DataIEP_Rodas;
+   CALL SYMPUT(COMPRESS("Rodas_AnoMes_"!!Seq), Rodas_AnoMes);
+RUN;
+
+DATA _NULL_;
+SET DataIEP_Rodas;
+    CALL SYMPUT(COMPRESS("Base_WO"!!Seq), BaseWO);
+    Ref = &DataRef1.;
+RUN;
+
+/* Separa os produtos, DtBase e informações de atraso e se é recente ou não o contrato */
+DATA BasesProd_Rodas;
+SET &Rodas_AnoMes_1.
+    &Rodas_AnoMes_2.
+    &Rodas_AnoMes_3.
+    &Rodas_AnoMes_4.
+    &Rodas_AnoMes_5.
+    &Rodas_AnoMes_6.;
+    KEEP NuContrato DtBase Prod BASE;
+	WHERE Prod <> 'Leves';
+RUN;
+
+/*** ETAPA 3 - Monitor ***/
+/* Monitoramento por produto */
+PROC SQL;
+CREATE TABLE Base_Monit_Prod_Rodas AS
+    SELECT prod,
+           DtBase,
+           COUNT(NuContrato) AS Quantidade
+    FROM BasesProd_Rodas
+    GROUP BY prod, DtBase;
+QUIT;
+
+PROC SQL;
+CREATE TABLE Monit_Prod_Rodas_Total AS
+    SELECT DtBase,
+           COUNT(NuContrato) AS Total
+    FROM BasesProd_Rodas
+    GROUP BY DtBase;
+QUIT;
+
+/* Acompanhamento do volume (Proporção) */
+PROC SQL;
+CREATE TABLE Monit_Prod_Rodas AS
+    SELECT a.prod AS Analise,
+           a.DtBase,
+           a.Quantidade/b.Total AS Valor,
+           'Produto - Proporção na safra' AS Medida,
+		   '' AS SubMedida
+    FROM Base_Monit_Prod_Rodas AS a
+    LEFT JOIN Monit_Prod_Rodas_Total AS b on a.DtBase = b.DtBase;
+QUIT;
+
+DATA Monit_Prod_Rodas;
+SET Monit_Prod_Rodas;
+    FORMAT DtBase DDMMYY8.;
+RUN;
+
+/* Acompanhamento do volume (Quantidade) */
+PROC SQL;
+CREATE TABLE Monit_Prod_Rodas_Vol_Tt AS
+    SELECT a.prod AS Produto,
+           MEAN(a.Quantidade) AS MediaQuantidade
+    FROM Base_Monit_Prod_Rodas AS a
+    LEFT JOIN Monit_Prod_Rodas_Total AS b on a.DtBase = b.DtBase
+    WHERE a.DtBase = &DataRef2.
+    GROUP BY a.prod;
+QUIT;
+
+PROC SQL;
+CREATE TABLE Monit_Prod_Rodas_Vol AS
+    SELECT a.prod AS Analise,
+           a.DtBase,
+           a.Quantidade/b.MediaQuantidade AS Valor,
+           'Produto - Média entre safras' AS Medida,
+		   '' AS SubMedida
+    FROM Base_Monit_Prod_Rodas AS a
+    LEFT JOIN Monit_Prod_Rodas_Vol_Tt AS b on a.prod = b.Produto;
+QUIT;
+
+PROC SQL;
+CREATE TABLE Monit_Prod_Rodas_Base AS
+    SELECT prod AS Analise,
+           DtBase,
+           Quantidade AS Valor,
+           'Produto - Quantidade' AS Medida,
+		   '' AS SubMedida
+    FROM Base_Monit_Prod_Rodas;
+QUIT;
+
+/* Monitoramento se o contrato é novo, até 15 dias de atraso e superior a 15 dias de atraso */
+PROC SQL;
+CREATE TABLE Monit_ProdBase_Rodas AS
+    SELECT prod,
+           Base,
+           DtBase,
+           COUNT(NuContrato) AS Quantidade
+    FROM BasesProd_Rodas
+    GROUP BY Prod, Base, DtBase;
+QUIT;
+
+PROC SQL;
+CREATE TABLE Monit_ProdBase_Rodas_Total AS
+    SELECT prod,
+           DtBase,
+           COUNT(NuContrato) AS Total
+    FROM BasesProd_Rodas
+    GROUP BY Prod, DtBase;
+QUIT;
+
+PROC SQL;
+CREATE TABLE Monit_ProdBase_Rodas AS
+    SELECT a.Base AS analise,
+           a.DtBase,
+           a.Quantidade/b.Total AS valor,
+           'Base Atraso - Proporção na safra' AS Medida,
+		   '' AS SubMedida
+    FROM Monit_ProdBase_Rodas AS a
+    LEFT JOIN Monit_ProdBase_Rodas_Total AS b on a.Prod = b.Prod AND a.DtBase = b.DtBase;
+QUIT;
+
+DATA Monit_ProdBase_Rodas;
+SET Monit_ProdBase_Rodas;
+    FORMAT DtBase MONYY.;
+RUN;
+
+/*Quantidade de Missing*/
+PROC SQL;
+CREATE TABLE TemosMissing_Prod_Rodas AS
+    SELECT Prod as Produto,
+           COUNT(NuContrato) as Missing
+    FROM &Rodas_AnoMes_1.
+    WHERE p_0 = .
+    AND BASE <>'LIQUIDADOS__'
+/*    AND BASE <>'LEVES___NOVO'*/
+    AND BASE <>'MOTOS___NOVO'
+    AND BASE <>'PESADOS___NOVO'
+    AND BASE <>'PESADOS_NOVO'
+    GROUP BY Prod;
+QUIT;
+
+PROC SQL;
+CREATE TABLE TemosMissing_Rodas AS
+    SELECT 'Todos' AS analise,
+           &DataRef1. FORMAT DDMMYY8. AS DtBase,
+           COUNT(NuContrato) AS valor,
+           'Análise de Missing' AS Medida,
+		   '' AS SubMedida
+    FROM &Rodas_AnoMes_1.
+    WHERE p_0 = .
+    AND BASE <>'LIQUIDADOS__'
+/*    AND BASE <>'LEVES___NOVO'*/
+    AND BASE <>'MOTOS___NOVO'
+    AND BASE <>'PESADOS___NOVO'
+    AND BASE <>'PESADOS_NOVO';
+QUIT;
+
+/* Análise de migrações */
+PROC SQL;
+CREATE TABLE Migracao_Rodas AS
+    SELECT a.NuContrato AS NuContrato_Antes,
+           b.NuContrato AS NuContrato_Agora,
+           b.DtContrato,
+           a.Prod AS Prod_Antes,
+           b.Prod AS Prod_Agora,
+           a.AtrasoAtual AS AtrasoAtual_Antes,
+           b.AtrasoAtual AS AtrasoAtual_Agora,
+           a.BASE AS BASE_Antes,
+           b.BASE AS BASE_Agora,
+           a.Gh_Blend AS GH_Blend_Antes,
+           b.Gh_Blend AS GH_Blend_Agora,
+           a.RU_Rodas AS RU_Rodas_Antes,
+           b.RU_Rodas AS RU_Rodas_Agora,
+           a.RU_Final AS RU_Final_Antes,
+           b.RU_Final AS RU_Final_Agora
+    FROM &Rodas_AnoMes_2. AS a
+    LEFT JOIN &Rodas_AnoMes_1. AS b on a.NuContrato = b.NuContrato;
+QUIT;
+
+PROC SQL;
+CONNECT TO SYBASEIQ AS dbcon
+(host='pta-iqprd01' server=ptaiqprd db=PTAIQCONT user=lgettEtlExtracaoPepr password="{sas002}AC224E4749A76DA011090FAB3B023BCA2730CA040D35CB2F00BDDD352FB437DC");
+CREATE TABLE CDCCG_TbContrato AS
+    SELECT * FROM connection TO dbcon
+    (
+        SELECT NuContrato,
+               DtLiquidacaoEfetiva,
+               DtCancelamento AS DtCancelamento_
+        FROM CDCCG.tbcontrato
+    );
+QUIT;
+
+PROC SQL;
+CONNECT TO SYBASEIQ AS dbcon
+(host='pta-iqprd01' server=ptaiqprd db=PTAIQCONT user=lgettEtlExtracaoPepr password="{sas002}AC224E4749A76DA011090FAB3B023BCA2730CA040D35CB2F00BDDD352FB437DC");
+CREATE TABLE LDG_TbContrato AS
+    SELECT * FROM connection TO dbcon
+    (
+        SELECT NuContrato,
+               DtLiquidacaoEfetiva,
+               DtCancelamento AS DtCancelamento_
+        FROM LSG.tbcontrato
+    );
+QUIT;
+
+DATA _TbContrato;
+SET CDCCG_TbContrato
+    LDG_TbContrato;
+
+    FORMAT DtLiquidacao DDMMYY10.;
+        DtLiquidacao = DATEPART(DtLiquidacaoEfetiva);
+
+    FORMAT DtCancelamento DDMMYY10.;
+        DtCancelamento = DATEPART(DtCancelamento_);
+RUN;
+
+PROC SQL;
+CREATE TABLE Migracao_Rodas AS
+    SELECT a.*,
+           b.DtLiquidacao,
+           b.DtCancelamento
+    FROM Migracao_Rodas AS a
+    LEFT JOIN _TbContrato AS b on a.NuContrato_Antes = b.NuContrato;
+QUIT;
+
+DATA Migracao_Rodas;
+SET Migracao_Rodas;
+    IF Prod_Agora = '' AND DtLiquidacao <> .   THEN Prod_Agora = 'LIQUIDADO';
+    IF Prod_Agora = '' AND DtCancelamento <> . THEN Prod_Agora = 'CANCELADO';
+    IF Prod_Agora = ''                         THEN Prod_Agora = 'OUTROS';
+    IF BASE_Agora = '' AND DtLiquidacao <> .   THEN BASE_Agora = 'LIQUIDADO';
+    IF BASE_Agora = '' AND DtCancelamento <> . THEN BASE_Agora = 'CANCELADO';
+    IF BASE_Agora = ''                         THEN BASE_Agora = 'OUTROS';
+RUN;
+
+PROC SQL;
+CREATE TABLE AUX_MIGR_BASE AS
+    SELECT STRIP(BASE_Antes)||"%%"||STRIP(BASE_Agora) AS Analise,
+           &DataRef1. FORMAT DDMMYY8. AS DtBase,
+           COUNT(NuContrato_Antes) AS valor,
+           'Análise de Migração - Base' AS Medida,
+		   '' AS SubMedida
+    FROM Migracao_Rodas
+    GROUP BY Analise;
+QUIT;
+
+PROC SQL;
+CREATE TABLE AUX_MIGR_RURODAS AS
+    SELECT STRIP(RU_Rodas_Antes)||"%%"||STRIP(RU_Rodas_Agora) AS Analise,
+           &DataRef1. FORMAT DDMMYY8. AS DtBase,
+           COUNT(NuContrato_Antes) AS valor,
+           'Análise de Migração - RU_Rodas' AS Medida,
+		   '' AS SubMedida
+    FROM Migracao_Rodas
+    GROUP BY Analise;
+QUIT;
+
+PROC SQL;
+CREATE TABLE AUX_MIGR_RUTOTAL AS
+    SELECT STRIP(RU_Final_Antes)||"%%"||STRIP(RU_Final_Agora) AS Analise,
+           &DataRef1. FORMAT DDMMYY8. AS DtBase,
+           COUNT(NuContrato_Antes) AS valor,
+           'Análise de Migração - RU_Final' AS Medida,
+		   '' AS SubMedida
+    FROM Migracao_Rodas
+    GROUP BY Analise;
+QUIT;
+
+/* Acompanhamento das variáveis */
+DATA BasesVariaveis_Rodas;
+SET &Rodas_AnoMes_1.
+    &Rodas_AnoMes_2.
+    &Rodas_AnoMes_3.
+    &Rodas_AnoMes_4.
+    &Rodas_AnoMes_5.
+    &Rodas_AnoMes_6.;
+
+    WHERE BASE <>'LIQUIDADOS__'
+/*    AND BASE <>'LEVES___NOVO'*/
+    AND BASE <>'MOTOS___NOVO'
+    AND BASE <>'PESADOS___NOVO'
+    AND BASE <>'PESADOS_NOVO'
+    AND AtrasoAtual < 91
+    AND DtContrato <= &DataRef2.;
+RUN;
+
+%MACRO BaseMonitoramento_Rodas(Produto, Pop);
+/*macro*/ DATA Bhs&Produto.Pop&Pop.;
+/*macro*/ SET BasesVariaveis_Rodas;
+/*macro*/     WHERE Prod = "&Produto." AND Pop = &Pop.;
+/*macro*/ RUN;
+%MEND;
+
+/*%BaseMonitoramento_Rodas(Leves, 1);   /* Leves Pop 1 (Atraso até 15 dias)          */*/
+/*%BaseMonitoramento_Rodas(Leves, 2);   /* Leves Pop 2 (Atraso Superior a 16 dias)   */
+
+%BaseMonitoramento_Rodas(Motos, 1);   /* Motos Pop 1 (Atraso até 15 dias)          */
+%BaseMonitoramento_Rodas(Motos, 2);   /* Motos Pop 2 (Atraso Superior a 16 dias)   */
+%BaseMonitoramento_Rodas(Pesados, 1); /* Pesados Pop 1 (Atraso até 15 dias)        */
+%BaseMonitoramento_Rodas(Pesados, 2); /* Pesados Pop 2 (Atraso Superior a 16 dias) */
+
+%MACRO MonitoramentoVariaveisRodas(Produto, Pop, Variavel);
+/*macro*/ /* encontrar o MIX médio dos ultimos meses (sem contar a referência) */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio AS
+/*macro*/     SELECT &Variavel.,
+/*macro*/            COUNT(NuContrato) AS Contador
+/*macro*/            FROM Bhs&Produto.Pop&Pop.
+/*macro*/     WHERE DtBase >=&DataRef6. AND DtBase <=&DataRef2.
+/*macro*/     GROUP BY &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Total do MIS médio */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio_Total AS
+/*macro*/     SELECT COUNT(NuContrato) AS Total
+/*macro*/     FROM Bhs&Produto.Pop&Pop.
+/*macro*/     WHERE DtBase >= &DataRef6. AND DtBase <= &DataRef2.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Encotrar o Percentual do MIX Médio */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio AS
+/*macro*/     SELECT a.&Variavel.,
+/*macro*/            a.Contador/b.Total AS MixMedio
+/*macro*/     FROM MIXMedio AS a
+/*macro*/     FULL JOIN MIXMedio_Total AS b on a.Contador;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Sumarizar por categoria/DtBase para calcular o MIX */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel. AS
+/*macro*/     SELECT DtBase,
+/*macro*/            &Variavel.,
+/*macro*/     COUNT(NuContrato) AS Contador
+/*macro*/     FROM Bhs&Produto.Pop&Pop.
+/*macro*/     GROUP BY DtBase, &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Total por DtBase para o MIX */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel._Total AS
+/*macro*/     SELECT DtBase,
+/*macro*/            SUM(Contador) AS Total
+/*macro*/     FROM &Variavel.
+/*macro*/     GROUP BY DtBase;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Cálculo do MIX e do Mix Médio para IEP e volume */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel. AS
+/*macro*/     SELECT DISTINCT
+/*macro*/            a.DtBase,
+/*macro*/            a.&Variavel.,
+/*macro*/            a.Contador/b.Total AS Mix,
+/*macro*/            c.MixMedio
+/*macro*/     FROM &Variavel. AS a
+/*macro*/     LEFT JOIN &Variavel._Total AS b on a.DtBase = b.DtBase
+/*macro*/     LEFT JOIN MIXMedio AS c on a.&Variavel. = c.&Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Cálculos e ajuste para o calculo do IEP */
+/*macro*/ DATA &Variavel.;
+/*macro*/ SET &Variavel.;
+/*macro*/     Mix2 = Mix;
+/*macro*/     IF MixMedio = . THEN MixMedio = 2;
+/*macro*/     IF Mix = 0 THEN Mix = 1;
+/*macro*/
+/*macro*/     /* Cálculos par o calculo do IEP */
+/*macro*/     dif = MixMedio - Mix;
+/*macro*/     LNdif = log(MixMedio/Mix);
+/*macro*/     Produto = dif * LNdif;
+/*macro*/ RUN;
+/*macro*/
+/*macro*/ /*Sumarizar o IEP por DtBase para colocar no acompanhamento*/
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE IEP_&Variavel. as
+/*macro*/     SELECT PUT(CATS("&Variavel."), $32.) AS Analise,
+/*macro*/            DtBase,
+/*macro*/            SUM(Produto) AS Valor,
+/*macro*/            PUT(CATS("IEP - &Produto.Pop&Pop."), $32.) AS Medida,
+/*macro*/		     PUT(CATS(&Variavel.), $32.) AS SubMedida
+/*macro*/     FROM &Variavel.
+/*macro*/     WHERE DtBase = &DataRef1.
+/*macro*/     GROUP BY SubMedida;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE IEP_&Variavel._MIX as
+/*macro*/     SELECT PUT(CATS("&Variavel."), $32.) AS Analise,
+/*macro*/            DtBase,
+/*macro*/            Mix2 AS Valor,
+/*macro*/            PUT(CATS("MIX - &Produto.Pop&Pop."), $32.) AS Medida,
+/*macro*/		     PUT(CATS(&Variavel.), $32.) AS SubMedida
+/*macro*/     FROM &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ PROC DATASETS; APPEND base=analiseIEP data=IEP_&Variavel. FORCE;
+/*macro*/ PROC DATASETS; APPEND base=analiseIEP_Mix data=IEP_&Variavel._MIX FORCE;
+%MEND;
+
+PROC DATASETS LIBRARY=WORK;
+   DELETE analiseIEP analiseIEP_Mix;
+RUN;
+
+/*%MonitoramentoVariaveisRodas(Leves, 1, Gh_Blend);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, FxAtMaxU3m);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, FxPctSaldoPago);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, FxAtMaxU4m_12m);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, FxQtMesesAtraso4_12);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, c_QuantidadeT0_D_M1);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, c_QTD_CCFT0_M_M1);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, c_QTD_REFINM2);*/
+/*%MonitoramentoVariaveisRodas(Leves, 1, c_Valor_M1);*/
+/*                                       */
+/*%MonitoramentoVariaveisRodas(Leves, 2, Gh_Blend);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, FxAtrasoAtual);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, FxAtMaxU3m);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, FxPctSaldoPago);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, FxAt4m6mXAt7m12m);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, c_MediaREFINT0);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, c_QuantidadeM1_D_M2);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, c_Valor_T0);*/
+/*%MonitoramentoVariaveisRodas(Leves, 2, c_QTD_CCFT0_D_M1);*/
+
+%MonitoramentoVariaveisRodas(Motos, 1, Gh_Blend);
+%MonitoramentoVariaveisRodas(Motos, 1, FxAtMaxU3m);
+%MonitoramentoVariaveisRodas(Motos, 1, FxPctSaldoPago);
+%MonitoramentoVariaveisRodas(Motos, 1, FxAtMaxU4m_6m);
+%MonitoramentoVariaveisRodas(Motos, 1, FxAtMd7m_12m);
+%MonitoramentoVariaveisRodas(Motos, 1, c_QTD_REFINM2);
+%MonitoramentoVariaveisRodas(Motos, 1, c_Valor_M1);
+%MonitoramentoVariaveisRodas(Motos, 1, c_Media_m2);
+%MonitoramentoVariaveisRodas(Motos, 1, c_QuantidadeT0_M_M1);
+%MonitoramentoVariaveisRodas(Motos, 1, c_QTD_PEFINT0_D_M2);
+
+%MonitoramentoVariaveisRodas(Motos, 2, Gh_Blend);
+%MonitoramentoVariaveisRodas(Motos, 2, FxAtrasoAtual);
+%MonitoramentoVariaveisRodas(Motos, 2, FxPctSaldoPago);
+%MonitoramentoVariaveisRodas(Motos, 2, FxAtMaxU3m);
+%MonitoramentoVariaveisRodas(Motos, 2, FxAt4m6mXAt7m12m);
+%MonitoramentoVariaveisRodas(Motos, 2, c_VL_REFINT0);
+%MonitoramentoVariaveisRodas(Motos, 2, c_Media_T0);
+%MonitoramentoVariaveisRodas(Motos, 2, c_Valor_M1);
+%MonitoramentoVariaveisRodas(Motos, 2, c_QuantidadeM1_M_M2);
+
+%MonitoramentoVariaveisRodas(Pesados, 1, Gh_Blend);
+%MonitoramentoVariaveisRodas(Pesados, 1, FxAtMaxU3m);
+%MonitoramentoVariaveisRodas(Pesados, 1, FxAtMaxU4m_6m);
+%MonitoramentoVariaveisRodas(Pesados, 1, FxPctSaldoPago);
+%MonitoramentoVariaveisRodas(Pesados, 1, FxAtMd7m_12m);
+%MonitoramentoVariaveisRodas(Pesados, 1, c_Media_m2);
+%MonitoramentoVariaveisRodas(Pesados, 1, c_QTD_CCFT0_M_M1);
+%MonitoramentoVariaveisRodas(Pesados, 1, c_QTD_PEFINM1_D_M2);
+%MonitoramentoVariaveisRodas(Pesados, 1, c_QTD_PROTESTOM1_D_M2);
+%MonitoramentoVariaveisRodas(Pesados, 1, c_QuantidadeT0_M_M1);
+%MonitoramentoVariaveisRodas(Pesados, 1, c_Valor_M1);
+
+%MonitoramentoVariaveisRodas(Pesados, 2, Gh_Blend);
+%MonitoramentoVariaveisRodas(Pesados, 2, FxAtrasoAtual);
+%MonitoramentoVariaveisRodas(Pesados, 2, FxPctSaldoPago);
+%MonitoramentoVariaveisRodas(Pesados, 2, FxAtMaxU3m);
+%MonitoramentoVariaveisRodas(Pesados, 2, FxAtMaxU4m_6m);
+%MonitoramentoVariaveisRodas(Pesados, 2, FxAtMd7m_12m);
+%MonitoramentoVariaveisRodas(Pesados, 2, c_VL_REFINT0);
+%MonitoramentoVariaveisRodas(Pesados, 2, c_Media_M1);
+%MonitoramentoVariaveisRodas(Pesados, 2, c_QuantidadeT0_M_M2);
+%MonitoramentoVariaveisRodas(Pesados, 2, c_ValorM1_M_M2);
+
+/* Limpar strings */
+PROC SQL;
+CREATE TABLE analiseIEP as
+    SELECT STRIP(Analise) AS Analise,
+           DtBase,
+           Valor,
+           STRIP(Medida) AS Medida,
+		   STRIP(SubMedida) AS SubMedida
+    FROM analiseIEP;
+QUIT;
+
+/* Limpar strings */
+PROC SQL;
+CREATE TABLE analiseIEP_Mix as
+    SELECT STRIP(Analise) AS Analise,
+           DtBase,
+           Valor,
+           STRIP(Medida) AS Medida,
+		   STRIP(SubMedida) AS SubMedida
+    FROM analiseIEP_Mix;
+QUIT;
+
+/********************************************************/
+/************** UNIFICAÇÃO PARA O TABLEAU ***************/
+/********************************************************/
+PROC SQL;
+CREATE TABLE BHCHECK.monitor_carga_bhrodas AS
+    SELECT * FROM Monit_Prod_Rodas_Base UNION ALL
+    SELECT * FROM Monit_Prod_Rodas_Vol UNION ALL
+    SELECT * FROM Monit_Prod_Rodas UNION ALL
+    SELECT * FROM Monit_ProdBase_Rodas UNION ALL
+    SELECT * FROM TemosMissing_Rodas UNION ALL
+    SELECT * FROM AUX_MIGR_BASE UNION ALL
+    SELECT * FROM AUX_MIGR_RURODAS UNION ALL
+    SELECT * FROM AUX_MIGR_RUTOTAL UNION ALL
+	SELECT * FROM analiseIEP UNION ALL
+	SELECT * FROM analiseIEP_Mix;
+RUN;
+/********************************************************/
+/********************************************************/
+
+/* Limpar work */
+PROC DATASETS LIB=WORK
+    KILL;
+RUN;

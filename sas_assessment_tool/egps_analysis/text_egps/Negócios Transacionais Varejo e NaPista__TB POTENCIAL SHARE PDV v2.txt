@@ -1,0 +1,107 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Negócios Transacionais Varejo e NaPista__TB POTENCIAL SHARE PDV v2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:07 UTC
+BUSINESS_AREA: Negócios Transacionais Varejo e NaPista
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 47
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], BASES.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: POTENCIAL_PDV
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-CHOlx3xamo1kAG1y/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE Potencial_PDV AS
+
+   SELECT
+          t1.NuAnoMes,
+          t1.NmGrupoProduto,
+          case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+          t1.CdParceiroComercial,
+          t1.nucnpjloja,
+          t1.NmLoja,
+          t1.NmTipoParceiroComercial,
+          t1.FlAtivo,
+          t1.CdUf,
+		  t1.nmcidade,
+
+		  case when t1.NmAreaEstruturaComercialC in ('Canal Pesados', 'Canal Motos') then '1' else '0' end as GrDedicado,
+
+          t1.NmAreaEstruturaComercialC,
+          t1.NmSubEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+		  t1.nmcolaboradorC,
+		  t1.cdcolaboradorC,
+
+		  t2.PredominanciaProduto,
+
+            (SUM(t1.QtContrato)) AS QtContrato,
+            (SUM(t1.VrProducao)) AS VrProducao,
+            (SUM(t1.QtGravamesMercado)) AS QtGravamesMercado,
+            (SUM(t1.VrGravamesMercado)) AS VrGravamesMercado,
+            (SUM(t1.VrMargemContribuicao)) AS VrMargemContribuicao
+
+      FROM BASES.TBPOTENCIALRODAS t1
+
+  LEFT JOIN BASES.TBPARCEIROCOMERCIAL t2 on t2.CDPARCEIROCOMERCIAL = t1.CDPARCEIROCOMERCIAL
+      WHERE t1.NuAnoMes BETWEEN 202401 AND 202504 AND t1.FlRefin NOT = 1
+AND t1.FlAtivo = 'S'
+
+and t1.flatualizacaoMercado = 1
+and t1.NmGrupoProduto = 'Pesados'
+
+
+
+
+      GROUP BY
+1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

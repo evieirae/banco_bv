@@ -1,0 +1,111 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__CONSULTA_SAS_PASSIVOS - OTIMIZADO
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:20 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 57
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: DV10AUTO = /projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10; TDV = /projetos/riscosmercado/rmsas/rmone/dv10; TPOS = /projetos/riscosmercado/dados/rmone/posicao
+DETECTED_MACROS_DEFINED: dtref
+DETECTED_MACROS_USED: dtref
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DV10AUTO.FLUXODV10PTA_20250930 [SAS/Local], TPOS.TBPOSICAOMOR_20250930 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DV10AUTO, TPOS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): DV10AUTO.FLUXODV10PTA_20250930 [PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)], TPOS.TBPOSICAOMOR_20250930 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.SAIDA_P10
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET dtref=20250930;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-HGu6Ts1Dtsb2wxd5/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname TPOS '/projetos/riscosmercado/dados/rmone/posicao';
+libname TDV '/projetos/riscosmercado/rmsas/rmone/dv10';
+libname DV10AUTO '/projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10';
+
+%let dtref= 20250930;
+
+PROC SQL;
+   CREATE TABLE WORK.SAIDA_P10 AS
+   SELECT t2.DtReferencia,
+          t2.PosId,
+          t2.Fator_de_Risco,
+          t2.Modalidade,
+          t2.TipoDeNegociacao,
+          t2.MesaOperacao,
+          t2.CarteiraGerencial,
+          t2.BookGerencial,
+          t2.ProdutoGerencial,
+          t2.TpPNL,
+          t2.TipoContabil,
+          t2.Veiculo,
+          t2.Vencimento,
+          t2.Valor_Presente,
+          t2.PresenteBase,
+          t2.FuturoBase,
+          t2.vrDV10,
+          t1.PositionUnits,
+          t1.IndexadorBV,
+          t1.ValorPresenteGerencial,
+          t1.DataCarencia,
+          t1.GrupoContabilBacen,
+          t1.IssueDate,
+          t1.MaturityDate,
+          t1.Notional,
+          t1.Factor,
+          t1.SpreadValue,
+          t1.CouponRateValue,
+          t1.Bacen,
+          t1.Offshore,
+		  t1.FL2060
+      FROM TPOS.TBPOSICAOMOR_&dtref. t1
+           INNER JOIN DV10AUTO.FLUXODV10PTA_&dtref. t2 ON (t1.PosID = t2.PosId)
+			WHERE t2.Fator_de_Risco not contains 'Gerencial'
+			and t2.TipoDeNegociacao = 'BANKING'
+			and t1.GrupoContabilBacen LIKE "P%"
+		
+
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

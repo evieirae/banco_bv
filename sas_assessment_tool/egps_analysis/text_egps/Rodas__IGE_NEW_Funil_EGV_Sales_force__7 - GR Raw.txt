@@ -1,0 +1,130 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 7 - GR Raw.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -6
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 69
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: PRIVADO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): PRIVADO.DGT_CTA_GR_RAW [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): PRIVADO.DGT_CTA_GR_RAW
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): PRIVADO.DGT_CTA_GR_RAW
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PRIVADO.DGT_CTA_GR_RAW
+APPEND_ONLY_OUTPUTS: PRIVADO.DGT_CTA_GR_RAW
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): PRIVADO.DGT_CTA_GR_RAW
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: KEY_GR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	5 - GR Raw.sas														| */
+/* | Descricao:  Programa para tratar o arquivo dos atendimentos realizados pelos GRs via salesforce canal de négocios egv.					| */
+/* |	 																		| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de GRs Raw atualizada=========================*/
+/* ======================================================================================*/
+
+/*PROC SQL;*/
+/**/
+/*DELETE * FROM PRIVADO.DGT_CTA_GR_RAW WHERE 'Hora de início'n >= '01Feb2025:00:0:0'dt;QUIT;*/
+
+proc sql;
+CREATE TABLE KEY_GR AS
+select DISTINCT COMPRESS('Chave da plataforma do Messaging'n)||"-"||COMPRESS(PUT(DATEPART('Hora de início'n),DDMMYY10.)) AS KEY_GR
+FROM PRIVADO.DGT_CTA_GR_RAW;quit;
+
+PROC SQL;
+/*CREATE TABLE teste AS */
+/*CREATE TABLE PRIVADO.DGT_CTA_GR_RAW AS */
+   INSERT INTO PRIVADO.DGT_CTA_GR_RAW
+
+SELECT
+   length(compress(compress(compress(t1.'Chave da plataforma do Messaging'n),'()'),'-')) AS TAMANHO,
+		CASE WHEN length(t1.'Chave da plataforma do Messaging'n)=22 THEN
+		INPUT(substr(substr(t1.'Chave da plataforma do Messaging'n,length(t1.'Chave da plataforma do Messaging'n)-9,0),length(substr(t1.'Chave da plataforma do Messaging'n,length(t1.'Chave da plataforma do Messaging'n)-9,13))-9,13),BEST.)
+		WHEN length(t1.'Chave da plataforma do Messaging'n)=23 THEN
+		INPUT(substr(substr(t1.'Chave da plataforma do Messaging'n,length(t1.'Chave da plataforma do Messaging'n)-10,0),length(substr(t1.'Chave da plataforma do Messaging'n,length(t1.'Chave da plataforma do Messaging'n)-10,14))-10,14),BEST.)
+		WHEN length(t1.'Chave da plataforma do Messaging'n) =12 THEN
+		INPUT(substr(t1.'Chave da plataforma do Messaging'n,length(t1.'Chave da plataforma do Messaging'n)-9,0),13.)
+		WHEN length(compress(compress(compress(t1.'Chave da plataforma do Messaging'n),'()'),'-')) =13 THEN
+		INPUT(substr(compress(compress(compress(t1.'Chave da plataforma do Messaging'n),'()'),'-'),length(compress(compress(compress(t1.'Chave da plataforma do Messaging'n),'()'),'-'))-10,0),13.)
+
+		END AS TEL,
+		t1.'Chave da plataforma do Messaging'n,
+          t1.'Canal do Messaging: Nome do cana'n,
+          t1.'Conta: Nome do Cliente/Grupo com'n,
+          t1.'Nome do usuário do Messaging'n,
+		  t1.'Hora de início'n as teste,
+		  substr(t1.'Hora de início'n,length(t1.'Hora de início'n)-4,5) as timetest,
+          input(put(input(t1.'Hora de início'n,DDMMYY10.),DDMMYY10.)||" "||put(input(substr(t1.'Hora de início'n,length(t1.'Hora de início'n)-4,5), TIME8.),TIME8.),ANYDTDTM32.) format datetime16. as 'Hora de início'n,
+          input(t1.'Hora de término'n,ANYDTDTM32.) format datetime16. as 'End Time'n,
+          t1.'Aceitar tempo'n,
+          t1.'Status de consentimento de mensa'n ,
+          t1.'ID do usuário do Messaging'n,
+          t1.'Nome da Sessão do Messaging'n,
+          t1.Mensagem,
+          t1.'Inserir tipo'n,
+          t1.'Nome do ator'n,
+          t1.'Código de status da mensagem'n,
+          t1.'Oportunidade: CPF/CNPJ'n,
+/*          t1.'Oportunidade: Volume'n, */
+          t1.'Oportunidade: Fase'n,
+          t1.'Conta: CPF/CNPJ'n,
+          t1.Atendente,
+          t1.Status
+      FROM DGT_CTA_GR_RAW t1
+WHERE COMPRESS(t1.'Chave da plataforma do Messaging'n)||"-"||COMPRESS(PUT(INPUT(t1.'Hora de início'n,DDMMYY10.),DDMMYY10.)) NOT IN (SELECT KEY_GR FROM KEY_GR)
+;
+QUIT;
+
+/*proc sql;*/
+/*delete * from PRIVADO.DGT_CTA_GR_RAW*/
+/*where 'Hora de início'n >= '1Nov2024:0:0:0'dt;quit;*/

@@ -1,0 +1,168 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Seguros__FECHAMENTO_CARDIF_ICATU
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:12 UTC
+BUSINESS_AREA: Seguros
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 104
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASES = /projetos/MISV/data/bases; DATASEG = /seguros/dados/; PRODSEG = /infogrc/producao-auxiliar/Base; SEG = /riscosbvf/CRM/SAS/TriboSeguros
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: HIVE
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASES
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: QRY_FECH_CARDIF, QRY_ICATU
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: libs */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: libs */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-umvIUefQGpBH57cF/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME SEG			'/riscosbvf/CRM/SAS/TriboSeguros';
+
+
+
+
+LIBNAME BASES 		'/projetos/MISV/data/bases';
+LIBNAME DATASEG '/seguros/dados/';
+
+
+
+LIBNAME PRODSEG '/infogrc/producao-auxiliar/Base';
+
+OPTIONS COMPRESS=CHAR;
+
+/* =========================FIM TASK=========================== */
+/* TASK: libs */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: CARDIF */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: CARDIF */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5b7AQqcf2AkxlL3u/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname bases '/projetos/MISV/data/bases';
+PROC SQL;
+   CREATE TABLE QRY_FECH_CARDIF AS
+
+SELECT * FROM (
+   SELECT DISTINCT
+t1.NuAnoMes,
+t1.NmGrupoProdutoMeta,
+t1.DsTipoCanalProducao,
+t1.NmCanalEstruturaComercial,
+(COUNT(t1.NuContrato)) AS Qtd_Contrato,
+(SUM(t1.QtParcelas)) AS Qtd_Parcelas,
+(SUM(t1.VpPrazo)) AS Vp_Prazo,
+(SUM(t1.VrProducao)) AS Vr_Producao,
+(SUM(t1.FlBVMais)) AS FlBVMais,
+(SUM(t1.VrBVMais)) AS VrBVMais,
+(SUM(t1.FlBVMaisEleg)) AS FlBVMaisEleg
+
+FROM bases.TBPRODUCAO t1
+WHERE t1.NuAnoMes >=201901
+GROUP BY
+t1.NuAnoMes,
+t1.NmGrupoProdutoMeta,
+t1.DsTipoCanalProducao,
+t1.NmCanalEstruturaComercial)QQ
+WHERE FlBVMaisEleg>0
+
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: CARDIF */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: ICATU */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: ICATU */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-fwN7pnghydeW5STV/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname bases '/projetos/MISV/data/bases';
+
+PROC SQL;
+   CREATE TABLE QRY_ICATU AS
+   SELECT DISTINCT
+t1.NuAnoMes,
+t1.NmGrupoProdutoMeta,
+t1.DsTipoCanalProducao,
+t1.NmCanalEstruturaComercial,
+(COUNT(t1.NuContrato)) AS Qtd_Contrato,
+(SUM(t1.VpPrazo)) AS Vp_Prazo,
+(SUM(t1.VrProducao)) AS Vr_Producao,
+(SUM(t1.FlCap)) AS FlCap,
+(SUM(t1.FlCap07)) AS FlCap07,
+(SUM(t1.FlCap10)) AS FlCap10,
+(SUM(t1.FlCap12)) AS FlCap12,
+(SUM(t1.FlCap15)) AS FlCap15,
+(SUM(t1.FlCap19)) AS FlCap19,
+(SUM(t1.VrCap)) AS VrCap,
+(SUM(t1.VrCap07)) AS VrCap07,
+(SUM(t1.VrCap10)) AS VrCap10,
+(SUM(t1.VrCap12)) AS VrCap12,
+(SUM(t1.VrCap15)) AS VrCap15,
+(SUM(t1.VrCap19)) AS VrCap19,
+(SUM(t1.FlCapEleg)) AS FlCapEleg,
+(SUM(t1.VrCapProjetado)) AS VrCapProjetado
+
+FROM bases.TBPRODUCAO t1
+WHERE t1.NuAnoMes >=201901 and t1.NmGrupoProdutoMeta NOT IN ('CIG','Estudantil','INSS','Market Place','Publico','Saude','Turismo')
+and FlCapEleg>0
+GROUP BY
+t1.NuAnoMes,
+t1.NmGrupoProdutoMeta,
+t1.DsTipoCanalProducao,
+t1.NmCanalEstruturaComercial;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: ICATU */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

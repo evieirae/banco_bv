@@ -1,0 +1,122 @@
+START_METADATA
+PROJECT: Rodas__precoxrisco
+FILE_SAS: 02.input-bases-ptasybctr.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 69
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: inicioCtr
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DBCRED.TBLOGSTATUSPROPOSTA [DBCON], DBCRED.TBPROPOSTA [DBCON], DBCRED.TBPROPOSTAALTERACAO [DBCON], DBCRED.TBPROPOSTAFINANCEIRO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): DBCRED.TBLOGSTATUSPROPOSTA [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBCRED.TBPROPOSTAALTERACAO [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTAFINANCEIRO [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PROPOSTAS_CTR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*
+   STEP 03.01
+   Conexão ao PTASYBCTR para buscar dados de Propostas
+*/
+PROC SQL;
+    %CONECTADB(server=CTR);
+    CREATE TABLE PROPOSTAS_CTR AS SELECT * FROM connection TO dbcon (
+      SELECT
+        Proposta.NuProposta,
+        Proposta.CdLoja,
+        Proposta.PcEntrada,
+        Proposta.VrProposta,
+        Proposta.VrFinanciamento,
+        Proposta.CdTabelaFinanciamento,
+        Proposta.PcCoeficiente,
+        Proposta.QtDiasCarencia,
+        Proposta.QtParcelas,
+        Proposta.PcMargemLiquida,
+        Proposta.VrPrestacao,
+        Proposta.DsLogin,
+	Proposta.TxPactuada,
+	Proposta.TxCetCalculada,
+	Financeiro.PcTaxaRetorno,
+        Financeiro.PcTaxaAlterada AS PcTaxaAlteradaOrig,
+        CASE WHEN Financeiro.TpOrigemTaxa = 'A' THEN Financeiro.PcTaxaAlterada ELSE Proposta.TxPactuada END AS PcTaxaAlterada,
+        Financeiro.TpOrigemTaxa,
+        Financeiro.CdTaxaRetorno,
+		CASE WHEN Origem.NmServidor IN ('mor-fvjprd03','mor-fvjprd01','eqx-fvjprd02','eqx-fvjprd01',
+                                        'mor-fvjprd02','eqx-fvjprd03','mor-fvjprd04','mor-fvjprd05',
+                                        'eqx-fvjprd04','eqx-fvjprd05')
+			 THEN CASE WHEN SUBSTRING(Proposta.DsLogin,1,1) = 'P'
+                            AND SUBSTRING(Proposta.DsLogin,2,1) IN('0', '1' ,'2' ,'3' ,'4' ,'5' ,'6' ,'7' ,'8' ,'9')
+                            THEN 'PPAR'
+                       WHEN Origem.StProposta = 'D' AND Proposta.DsLogin IS NOT NULL THEN 'ACOM'
+                       ELSE 'CREW'
+					   END
+			 ELSE 'CREW'
+		END OrigemProposta,
+        Alteracao.QtAlteracao
+      FROM
+        DBCRED..TbProposta Proposta
+      INNER JOIN
+        DBCRED..TbPropostaFinanceiro Financeiro
+        ON Proposta.NuProposta = Financeiro.NuProposta
+      LEFT JOIN
+        DBCRED..TbPropostaAlteracao Alteracao
+        ON Proposta.NuProposta = Alteracao.NuProposta
+	  LEFT JOIN
+	    DBCRED..TbLogStatusProposta Origem
+		ON Origem.NuProposta = Proposta.NuProposta
+      WHERE
+        Proposta.DtEntradaProposta >= &inicioCtr.
+  )
+;
+RUN;
+
+PROC SQL;
+  CREATE TABLE PROPOSTAS_CTR AS
+    SELECT
+	  *,
+      CASE WHEN OrigemProposta = 'ACOM' THEN 1
+	       WHEN OrigemProposta = 'PPAR' THEN 2
+		   WHEN OrigemProposta = 'CREW' THEN 3
+	  END AS PrioridadeOrigem
+	FROM PROPOSTAS_CTR
+	ORDER BY NuProposta ASC, PrioridadeOrigem ASC;
+RUN;
+
+PROC SORT data=PROPOSTAS_CTR NODUPKEY;
+  BY NuProposta;
+RUN;

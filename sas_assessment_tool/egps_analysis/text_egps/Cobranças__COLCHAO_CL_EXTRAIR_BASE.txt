@@ -1,0 +1,335 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__COLCHAO_CL_EXTRAIR_BASE
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-10-13 14:37:50 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 280
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dt_ini_cart
+DETECTED_MACROS_USED: dt_ini_cart
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_RCVRY.AGENCY [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET_ESP [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR_ESP [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.TB_PAGTO_BOLETO [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3 [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3_ESP [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_RCVRY.AGENCY [Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET_ESP [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR_ESP [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.TB_PAGTO_BOLETO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3 [Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3_ESP [Pass-Through Native (BIGQUERY) - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ACORDO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET dt_ini_cart='2026-08-01';
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%let dt_ini_cart = '2026-08-01';
+
+proc sql;
+	connect to bigquery as perm(project='bv-sadi-dtm' 
+		credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+		schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=100 );
+	Create table ACORDO as select * from connection to perm
+		(
+
+SELECT
+    ac.ahacct AS CHAVE,
+    CAST(SUBSTRING(ac.ahacct, 4) AS INT64) AS NUCONTA,
+    CAST(SUBSTRING(ac.ahacct, 1, 3) AS INT64) AS PRODUTO,
+    P2.NuAcordo AS NuAcordo,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2.DtCriacao) AS DtCriacao,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2.DtClicloCriacao) AS DtClicloCriacao,
+    P2.Plano AS Plano,
+    ac.ahtotpmt AS VLR_Acordo,
+    ac.ahcollid AS CdAgente,
+    ag.agfirm AS NmAgente,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', u3.u3dtpriatr) AS DTPRIMEIROATRASO,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2.DtCriacao) AS DTVENCPRIMEIRAPMT,
+    CASE
+        WHEN pc.apdetid IS NULL AND P2.PMTQuebra IS NULL THEN P2.Plano
+        WHEN pc.apdetid IS NULL THEN P2.PMTQuebra + 1
+        ELSE CAST(pc.apdetid AS INT64) + 1
+    END AS Parcela_ATU,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', (
+        CASE
+            WHEN pc.apduedt IS NULL AND P2.DtQuebra IS NULL THEN P2.DtQuitacao
+            WHEN pc.apduedt IS NULL THEN P2.DtQuebra
+            ELSE pc.apduedt
+        END
+    )) AS DTVENCIMENTO,
+    pc.apamt AS VLR_Parcela,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2.DtQuebraAcordo) AS DtQuebraAcordo,
+    P2.PMTQuebra + 1 AS PMTQuebra,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2.DtVencQuebra) AS DtVencQuebra,
+    CASE
+        WHEN UPPER(ac.ahdscqb) LIKE '%WEBSERVICE%' THEN 1
+        ELSE 0
+    END AS FlQuebraManual,
+    ac.ahdscqb AS DsMtvoQuebra,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2.DtQuitacao) AS DtQuitacao,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', (
+        SELECT
+            MIN(A_INNER.AHDT)
+        FROM
+            bv-pdbd-prd.trusted_rcvry.agrhdr_esp AS A_INNER
+        WHERE
+            ac.ahacct = A_INNER.AHACCT
+            AND A_INNER.AHDT >= P2.DtQuebra
+    )) AS DtPromessa
+FROM
+    (
+        SELECT
+            P1.DtInicio AS DtInicio,
+            P1.DtFim AS DtFim,
+            P1.Tipo AS Tipo,
+            P1.NuAcordo AS NuAcordo,
+            P1.DtCriacao AS DtCriacao,
+            P1.Plano AS Plano,
+            P1.DtQuebraAcordo AS DtQuebraAcordo,
+            P1.QdPMTPgto AS QdPMTPgto,
+            P1.MAXVencPgto AS MAXVencPgto,
+            P1.DtCriacaoCliclo AS DtCriacaoCliclo,
+            P1.MAXDtCicloPgto AS MAXDtCicloPgto,
+            P1.DtVencQuebra AS DtVencQuebra,
+            P1.PMTQuebra AS PMTQuebra,
+            COALESCE(P1.DtCriacaoCliclo, P1.DtCriacao) AS DtClicloCriacao,
+            COALESCE(P1.DtQuebraAcordo, P1.DtVencQuebra) AS DtQuebra,
+            CASE
+                WHEN P1.Plano = P1.QdPMTPgto THEN COALESCE(P1.MAXDtCicloPgto, P1.MAXVencPgto)
+                ELSE NULL
+            END AS DtQuitacao,
+            CASE
+                WHEN P1.Tipo <> 'MIGRA' THEN 'CYBER'
+                ELSE P1.Tipo
+            END AS TpEntrada
+        FROM
+            (
+                SELECT
+                    CAST(&dt_ini_cart. AS DATE) AS DtInicio,
+                    DATE_SUB(DATE_ADD(&dt_ini_cart., INTERVAL 1 MONTH), INTERVAL 1 DAY) AS DtFim,
+                    a.ahtype AS Tipo,
+                    a.ahid AS NuAcordo,
+                    a.ahdt AS DtCriacao,
+                    CAST(a.ahprd AS INT64) + 1 AS Plano,
+                    a.ahdtqb AS DtQuebraAcordo,
+                    SUM(CASE WHEN b.apflag = 'C' THEN 1 ELSE 0 END) AS QdPMTPgto,
+                    MAX(CASE WHEN b.apflag = 'C' THEN b.apduedt END) AS MAXVencPgto,
+                    MIN(CASE WHEN b.apflag = 'C' AND CAST(b.apdetid AS INT64) = 0 THEN c.pbdtciclo END) AS DtCriacaoCliclo,
+                    MAX(CASE WHEN b.apflag = 'C' THEN c.pbdtciclo END) AS MAXDtCicloPgto,
+                    MIN(CASE WHEN b.apflag = 'R' THEN b.apduedt END) AS DtVencQuebra,
+                    MIN(CASE WHEN b.apflag = 'R' THEN CAST(b.apdetid AS INT64) END) AS PMTQuebra
+                FROM
+                    bv-pdbd-prd.trusted_rcvry.agrhdr_esp AS A
+                INNER JOIN
+                    bv-pdbd-prd.trusted_rcvry.agpmtdet_esp AS B
+                    ON a.ahid = b.apahid
+                LEFT JOIN
+                    bv-pdbd-prd.trusted_rcvry.tb_pagto_boleto AS C
+                    ON CAST(b.apahid AS INT64) = CAST(c.pbnumacordo AS INT64)
+                    AND CAST(b.apdetid AS INT64) = CAST(c.pbnumparc AS INT64)
+                WHERE
+                    CAST(a.ahprd AS INT64) > 0
+                    AND DATE(a.ahdt) <= DATE_SUB(DATE_ADD(&dt_ini_cart., INTERVAL 1 MONTH), INTERVAL 1 DAY)
+                GROUP BY
+                    a.ahid,
+                    a.ahdt,
+                    a.ahprd,
+                    a.ahdtqb,
+                    a.ahtype
+            ) AS P1
+    ) AS P2
+JOIN
+    bv-pdbd-prd.trusted_rcvry.agrhdr_esp AS AC
+    ON ac.ahid = P2.NuAcordo
+JOIN
+    bv-pdbd-prd.trusted_rcvry.agency AS AG
+    ON ac.ahcollid = ag.agagency
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.agpmtdet_esp AS PC
+    ON pc.apahid = P2.NuAcordo
+    AND DATE(pc.apduedt) BETWEEN P2.DtInicio AND P2.DtFim
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.uda3_esp AS U3
+    ON ac.ahacct = u3.u3acct
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.tb_pagto_boleto AS PB
+    ON CAST(pc.apahid AS INT64) = CAST(pb.pbnumacordo AS INT64)
+    AND CAST(pc.apdetid AS INT64) = CAST(pb.pbnumparc AS INT64)
+WHERE
+    P2.QdPMTPgto > 0
+    AND (DATE(P2.DtQuebra) >= &dt_ini_cart. OR P2.DtQuebra IS NULL)
+    AND (DATE(P2.DtQuitacao) >= &dt_ini_cart. OR P2.DtQuitacao IS NULL)
+
+UNION DISTINCT
+
+SELECT
+    ac2.ahacct AS CHAVE,
+    CAST(SUBSTRING(ac2.ahacct, 4) AS INT64) AS NUCONTA,
+    CAST(SUBSTRING(ac2.ahacct, 1, 3) AS INT64) AS PRODUTO,
+    P2_2.NuAcordo AS NuAcordo,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2_2.DtCriacao) AS DtCriacao,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2_2.DtClicloCriacao) AS DtClicloCriacao,
+    P2_2.Plano AS Plano,
+    ac2.ahtotpmt AS VLR_Acordo,
+    ac2.ahcollid AS CdAgente,
+    ag2.agfirm AS NmAgente,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', u32.u3dtpriatr) AS DTPRIMEIROATRASO,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2_2.DtCriacao) AS DTVENCPRIMEIRAPMT,
+    CASE
+        WHEN pc2.apdetid IS NULL AND P2_2.PMTQuebra IS NULL THEN P2_2.Plano
+        WHEN pc2.apdetid IS NULL THEN P2_2.PMTQuebra + 1
+        ELSE CAST(pc2.apdetid AS INT64) + 1
+    END AS Parcela_ATU,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', (
+        CASE
+            WHEN pc2.apduedt IS NULL AND P2_2.DtQuebra IS NULL THEN P2_2.DtQuitacao
+            WHEN pc2.apduedt IS NULL THEN P2_2.DtQuebra
+            ELSE pc2.apduedt
+        END
+    )) AS DTVENCIMENTO,
+    pc2.apamt AS VLR_Parcela,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2_2.DtQuebraAcordo) AS DtQuebraAcordo,
+    P2_2.PMTQuebra + 1 AS PMTQuebra,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2_2.DtVencQuebra) AS DtVencQuebra,
+    CASE
+        WHEN UPPER(ac2.ahdscqb) LIKE '%WEBSERVICE%' THEN 1
+        ELSE 0
+    END AS FlQuebraManual,
+    ac2.ahdscqb AS DsMtvoQuebra,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', P2_2.DtQuitacao) AS DtQuitacao,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', (
+        SELECT
+            MIN(A_INNER2.AHDT)
+        FROM
+            bv-pdbd-prd.trusted_rcvry.agrhdr AS A_INNER2
+        WHERE
+            ac2.ahacct = A_INNER2.AHACCT
+            AND A_INNER2.AHDT >= P2_2.DtQuebra
+    )) AS DtPromessa
+FROM
+    (
+        SELECT
+            P1_2.DtInicio AS DtInicio,
+            P1_2.DtFim AS DtFim,
+            P1_2.Tipo AS Tipo,
+            P1_2.NuAcordo AS NuAcordo,
+            P1_2.DtCriacao AS DtCriacao,
+            P1_2.Plano AS Plano,
+            P1_2.DtQuebraAcordo AS DtQuebraAcordo,
+            P1_2.QdPMTPgto AS QdPMTPgto,
+            P1_2.MAXVencPgto AS MAXVencPgto,
+            P1_2.DtCriacaoCliclo AS DtCriacaoCliclo,
+            P1_2.MAXDtCicloPgto AS MAXDtCicloPgto,
+            P1_2.DtVencQuebra AS DtVencQuebra,
+            P1_2.PMTQuebra AS PMTQuebra,
+            COALESCE(P1_2.DtCriacaoCliclo, P1_2.DtCriacao) AS DtClicloCriacao,
+            COALESCE(P1_2.DtQuebraAcordo, P1_2.DtVencQuebra) AS DtQuebra,
+            CASE
+                WHEN P1_2.Plano = P1_2.QdPMTPgto THEN COALESCE(P1_2.MAXDtCicloPgto, P1_2.MAXVencPgto)
+                ELSE NULL
+            END AS DtQuitacao,
+            CASE
+                WHEN P1_2.Tipo <> 'MIGRA' THEN 'CYBER'
+                ELSE P1_2.Tipo
+            END AS TpEntrada
+        FROM
+            (
+                SELECT
+                    CAST(&dt_ini_cart. AS DATE) AS DtInicio,
+                    DATE_SUB(DATE_ADD(&dt_ini_cart., INTERVAL 1 MONTH), INTERVAL 1 DAY) AS DtFim,
+                    a2.ahtype AS Tipo,
+                    a2.ahid AS NuAcordo,
+                    a2.ahdt AS DtCriacao,
+                    CAST(a2.ahprd AS INT64) + 1 AS Plano,
+                    a2.ahdtqb AS DtQuebraAcordo,
+                    SUM(CASE WHEN b2.apflag = 'C' THEN 1 ELSE 0 END) AS QdPMTPgto,
+                    MAX(CASE WHEN b2.apflag = 'C' THEN b2.apduedt END) AS MAXVencPgto,
+                    MIN(CASE WHEN b2.apflag = 'C' AND CAST(b2.apdetid AS INT64) = 0 THEN c2.pbdtciclo END) AS DtCriacaoCliclo,
+                    MAX(CASE WHEN b2.apflag = 'C' THEN c2.pbdtciclo END) AS MAXDtCicloPgto,
+                    MIN(CASE WHEN b2.apflag = 'R' THEN b2.apduedt END) AS DtVencQuebra,
+                    MIN(CASE WHEN b2.apflag = 'R' THEN CAST(b2.apdetid AS INT64) END) AS PMTQuebra
+                FROM
+                    bv-pdbd-prd.trusted_rcvry.agrhdr AS A2
+                INNER JOIN
+                    bv-pdbd-prd.trusted_rcvry.agpmtdet AS B2
+                    ON a2.ahid = b2.apahid
+                LEFT JOIN
+                    bv-pdbd-prd.trusted_rcvry.tb_pagto_boleto AS C2
+                    ON CAST(b2.apahid AS INT64) = CAST(c2.pbnumacordo AS INT64)
+                    AND CAST(b2.apdetid AS INT64) = CAST(c2.pbnumparc AS INT64)
+                WHERE
+                    CAST(a2.ahprd AS INT64) > 0
+                    AND DATE(a2.ahdt) <= DATE_SUB(DATE_ADD(&dt_ini_cart., INTERVAL 1 MONTH), INTERVAL 1 DAY)
+                GROUP BY
+                    a2.ahid,
+                    a2.ahdt,
+                    a2.ahprd,
+                    a2.ahtype,
+                    a2.ahdtqb
+            ) AS P1_2
+    ) AS P2_2
+JOIN
+    bv-pdbd-prd.trusted_rcvry.agrhdr AS AC2
+    ON ac2.ahid = P2_2.NuAcordo
+JOIN
+    bv-pdbd-prd.trusted_rcvry.agency AS AG2
+    ON ac2.ahcollid = ag2.agagency
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.agpmtdet AS PC2
+    ON pc2.apahid = P2_2.NuAcordo
+    AND DATE(pc2.apduedt) BETWEEN P2_2.DtInicio AND P2_2.DtFim
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.uda3 AS U32
+    ON ac2.ahacct = u32.u3acct
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.tb_pagto_boleto AS PB2
+    ON CAST(pc2.apahid AS INT64) = CAST(pb2.pbnumacordo AS INT64)
+    AND CAST(pc2.apdetid AS INT64) = CAST(pb2.pbnumparc AS INT64)
+WHERE
+    P2_2.QdPMTPgto > 0
+    AND (DATE(P2_2.DtQuebra) >= &dt_ini_cart. OR P2_2.DtQuebra IS NULL)
+    AND (DATE(P2_2.DtQuitacao) >= &dt_ini_cart. OR P2_2.DtQuitacao IS NULL)
+
+)
+	;
+	disconnect from perm;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

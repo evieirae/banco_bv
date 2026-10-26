@@ -1,0 +1,401 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 16 - Carteira.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 298
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m0, Base_m1, Base_m2, Base_m3, Base_m4, Base_m5, DtAtualizacao
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBORIGINACAO [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBORIGINACAO [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_CARTEIRA_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_CARTEIRA_CANAL_TOTAL, BASE_CARTEIRA_FILIAL_TOTAL, BASE_CARTEIRA_GRS_TOTAL, BASE_CARTEIRA_PDVS_TOTAL, BASE_PDVS_ORIGINANDO, BASE_PRODUCAO_PDVS, COBANS_SOLAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+
+proc sql noprint;
+    select max(DtAtualizacao) into :DtAtualizacao
+    from Bases.TbOriginacao;
+quit;
+
+/*Gerar a base de PDVs de Solar Ativos*/
+Proc Sql;
+Create Table Cobans_Solar as
+Select Distinct
+NmAreaEstruturaComercialC
+,DsLoginN1C
+,DsLoginN2C
+,DsLoginN3C
+,NmColaboradorC
+,cdParceiroComercial
+,NuCnpjLoja
+,DatePart(DtCadastro) as DtCadastro Format DDMMYY10.
+,(YEAR(DatePart(DtCadastro)) * 100) + MONTH(DatePart(DtCadastro)) as NuAnomes_Cadastro
+,FlAtivo
+,&DtAtualizacao. as DataBase Format DDMMYY10.
+from tmp.tbparceirocomercial
+where 1=1
+and tpatividade = 7 /*and FlAtivo = 'S' and*/
+and NmCanalEstruturaComercialC = 'Canal Solar' and
+		NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+;
+run;
+
+Proc Sql;
+Create Table Base_Producao_PDVs as
+Select
+Orig.NuAnoMes
+,Orig.CdParceiroComercial
+,Orig.NuCnpjLojaFavorecido
+,Orig.QtCorridosDiaUtilMes
+
+,Sum(Orig.FlPropostaOriginada) as FlPropostaOriginada
+,Sum(Orig.FlPropostaAprovada) as FlPropostaAprovada
+,Sum(Orig.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbOriginacao as Orig
+Where Orig.NuAnomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and
+		Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4
+;Quit;
+
+Proc Sql;
+Create Table Base_PDVs_Originando as
+Select Distinct
+Pdvs.NmAreaEstruturaComercialC
+,PDVs.DsLoginN1C
+,PDVs.DsLoginN2C
+,PDVs.DsLoginN3C
+
+,Pdvs.NmColaboradorC
+,Pdvs.cdParceiroComercial
+,Pdvs.NuCnpjLoja
+,Pdvs.DtCadastro Format DDMMYY10.
+,Pdvs.FlAtivo
+,Max(Orig.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+
+,Sum(Case When Orig.FlPropostaOriginada >0 Then 1 Else 0 End) as Qtd_PDVs_Originando
+,Sum(Case When Orig.FlPropostaAprovada  >0 Then 1 Else 0 End) as Qtd_PDVs_Aprovando
+,Sum(Case When Orig.FlPropostaEfetivada >0 Then 1 Else 0 End) as Qtd_PDVs_Efetivando
+
+,Sum(Case When Pdvs.NuAnomes_Cadastro = &Base_m0. Then 1 Else 0 End) as NVParc_&Base_m0.
+,Sum(Case When Pdvs.NuAnomes_Cadastro = &Base_m1. Then 1 Else 0 End) as NVParc_&Base_m1.
+,Sum(Case When Pdvs.NuAnomes_Cadastro = &Base_m2. Then 1 Else 0 End) as NVParc_&Base_m2.
+,Sum(Case When Pdvs.NuAnomes_Cadastro = &Base_m3. Then 1 Else 0 End) as NVParc_&Base_m3.
+,Sum(Case When Pdvs.NuAnomes_Cadastro = &Base_m4. Then 1 Else 0 End) as NVParc_&Base_m4.
+,Sum(Case When Pdvs.NuAnomes_Cadastro = &Base_m5. Then 1 Else 0 End) as NVParc_&Base_m5.
+
+,Sum(Case When Orig.NuAnomes Between &&Base_m3. and &Base_m1. Then Orig.FlPropostaOriginada Else 0 End) as QtPropostaOriginada_90
+,Sum(Case When Orig.NuAnomes Between &&Base_m1. and &Base_m0. Then Orig.FlPropostaOriginada Else 0 End) as QtPropostaOriginada_30
+
+,Sum(Case When Orig.NuAnomes Between &&Base_m3. and &Base_m1. Then Orig.FlPropostaAprovada Else 0 End) as QtPropostaAprovada_90
+,Sum(Case When Orig.NuAnomes Between &&Base_m1. and &Base_m0. Then Orig.FlPropostaAprovada Else 0 End) as QtPropostaAprovada_30
+
+,Sum(Case When Orig.NuAnomes Between &&Base_m3. and &Base_m1. Then Orig.FlPropostaEfetivada Else 0 End) as QtPropostaEfetivada_90
+,Sum(Case When Orig.NuAnomes Between &&Base_m1. and &Base_m0. Then Orig.FlPropostaEfetivada Else 0 End) as QtPropostaEfetivada_30
+,Max(PDVs.DataBase) as DataBase Format DDMMYY10.
+
+From Cobans_Solar as PDVs
+	Left Join Base_Producao_PDVs as Orig On Pdvs.NuCnpjLoja = Orig.NuCnpjLojaFavorecido and Pdvs.CdParceiroComercial = Orig.CdParceiroComercial
+Where Orig.NuANomes >= &Base_m5.
+Group by 1,2,3,4,5,6,7,8,9
+;Quit;
+
+Proc Sql;
+Create Table Base_Carteira_Canal_Total as
+Select
+'Carteira' as Base
+,&Base_m0. as NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Sum(Case When Orig.FlAtivo = 'S' Then 1 Else 0 End) as QtdPDVs_Ativos
+,Sum(Case When Orig.FlAtivo = 'N' Then 1 Else 0 End) as QtdPDVs_Inativos
+
+,Count (distinct Orig.NmColaboradorC) as Qtd_Grs
+
+,Sum(NVParc_&Base_m0.) as NVParc_NVParc_M0
+,Sum(NVParc_&Base_m1.) as NVParc_NVParc_M1
+,Sum(NVParc_&Base_m2.) as NVParc_NVParc_M2
+,Sum(NVParc_&Base_m3.) as NVParc_NVParc_M3
+,Sum(NVParc_&Base_m4.) as NVParc_NVParc_M4
+,Sum(NVParc_&Base_m5.) as NVParc_NVParc_M5
+
+,Sum(Case When Orig.QtPropostaOriginada_90 >0 Then 1 Else 0 End) as QtPropostaOriginada_90Dias
+,Sum(Case When Orig.QtPropostaOriginada_30 >0 Then 1 Else 0 End) as QtPropostaOriginada_30Dias
+
+,Sum(Case When Orig.QtPropostaAprovada_90 >0 Then 1 Else 0 End) as QtPropostaAprovada_90Dias
+,Sum(Case When Orig.QtPropostaAprovada_30 >0 Then 1 Else 0 End) as QtPropostaAprovada_30Dias
+
+,Sum(Case When Orig.QtPropostaEfetivada_90 >0 Then 1 Else 0 End) as QtPropostaEfetivada_90Dias
+,Sum(Case When Orig.QtPropostaEfetivada_30 >0 Then 1 Else 0 End) as QtPropostaEfetivada_30Dias
+,Max(Orig.DataBase) as DataBase Format DDMMYY10.
+
+/*,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando*/
+/*,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando*/
+/*,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando*/
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Porte.NuAnomes = &Base_m0.
+Where Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Carteira_Filial_Total as
+Select
+'Carteira' as Base
+,&Base_m0. as NuAnoMes
+,'Filial' as Visao
+,"" as DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmAreaEstruturaComercialC as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Count (distinct Orig.NmColaboradorC) as Qtd_Grs
+
+,Sum(NVParc_&Base_m0.) as NVParc_NVParc_M0
+,Sum(NVParc_&Base_m1.) as NVParc_NVParc_M1
+,Sum(NVParc_&Base_m2.) as NVParc_NVParc_M2
+,Sum(NVParc_&Base_m3.) as NVParc_NVParc_M3
+,Sum(NVParc_&Base_m4.) as NVParc_NVParc_M4
+,Sum(NVParc_&Base_m5.) as NVParc_NVParc_M5
+
+,Sum(Case When Orig.FlAtivo = 'S' Then 1 Else 0 End) as QtdPDVs_Ativos
+,Sum(Case When Orig.FlAtivo = 'N' Then 1 Else 0 End) as QtdPDVs_Inativos
+
+,Sum(Case When Orig.QtPropostaOriginada_90 >0 Then 1 Else 0 End) as QtPropostaOriginada_90Dias
+,Sum(Case When Orig.QtPropostaOriginada_30 >0 Then 1 Else 0 End) as QtPropostaOriginada_30Dias
+
+,Sum(Case When Orig.QtPropostaAprovada_90 >0 Then 1 Else 0 End) as QtPropostaAprovada_90Dias
+,Sum(Case When Orig.QtPropostaAprovada_30 >0 Then 1 Else 0 End) as QtPropostaAprovada_30Dias
+
+,Sum(Case When Orig.QtPropostaEfetivada_90 >0 Then 1 Else 0 End) as QtPropostaEfetivada_90Dias
+,Sum(Case When Orig.QtPropostaEfetivada_30 >0 Then 1 Else 0 End) as QtPropostaEfetivada_30Dias
+,Max(Orig.DataBase) as DataBase Format DDMMYY10.
+
+/*,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando*/
+/*,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando*/
+/*,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando*/
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Porte.NuAnomes = &Base_m0.
+Where Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Carteira_GRs_Total as
+Select
+'Carteira' as Base
+,&Base_m0. as NuAnoMes
+,'GRs' as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmColaboradorC as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Count (distinct Orig.NmColaboradorC) as Qtd_Grs
+
+,Sum(NVParc_&Base_m0.) as NVParc_NVParc_M0
+,Sum(NVParc_&Base_m1.) as NVParc_NVParc_M1
+,Sum(NVParc_&Base_m2.) as NVParc_NVParc_M2
+,Sum(NVParc_&Base_m3.) as NVParc_NVParc_M3
+,Sum(NVParc_&Base_m4.) as NVParc_NVParc_M4
+,Sum(NVParc_&Base_m5.) as NVParc_NVParc_M5
+
+,Sum(Case When Orig.FlAtivo = 'S' Then 1 Else 0 End) as QtdPDVs_Ativos
+,Sum(Case When Orig.FlAtivo = 'N' Then 1 Else 0 End) as QtdPDVs_Inativos
+
+,Sum(Case When Orig.QtPropostaOriginada_90 >0 Then 1 Else 0 End) as QtPropostaOriginada_90Dias
+,Sum(Case When Orig.QtPropostaOriginada_30 >0 Then 1 Else 0 End) as QtPropostaOriginada_30Dias
+
+,Sum(Case When Orig.QtPropostaAprovada_90 >0 Then 1 Else 0 End) as QtPropostaAprovada_90Dias
+,Sum(Case When Orig.QtPropostaAprovada_30 >0 Then 1 Else 0 End) as QtPropostaAprovada_30Dias
+
+,Sum(Case When Orig.QtPropostaEfetivada_90 >0 Then 1 Else 0 End) as QtPropostaEfetivada_90Dias
+,Sum(Case When Orig.QtPropostaEfetivada_30 >0 Then 1 Else 0 End) as QtPropostaEfetivada_30Dias
+,Max(Orig.DataBase) as DataBase Format DDMMYY10.
+
+/*,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando*/
+/*,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando*/
+/*,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando*/
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Porte.NuAnomes = &Base_m0.
+Where Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Carteira_PDVs_Total as
+Select
+'Carteira' as Base
+,&Base_m0. as NuAnoMes
+,'Cobans' as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,Orig.NmAreaEstruturaComercialC as Dimensao1
+,Orig.NmColaboradorC as Dimensao2
+,Case
+	When Orig.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Orig.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+End as Dimensao3
+/*,put(Orig.CdParceiroComercial, 8.) || '-' || TbParceiro.NmParceiroComercial as Dimensao3*/
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Max(DatePart(TbParceiro.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Count (distinct Orig.NmColaboradorC) as Qtd_Grs
+
+,Sum(NVParc_&Base_m0.) as NVParc_M0
+,Sum(NVParc_&Base_m1.) as NVParc_M1
+,Sum(NVParc_&Base_m2.) as NVParc_M2
+,Sum(NVParc_&Base_m3.) as NVParc_M3
+,Sum(NVParc_&Base_m4.) as NVParc_M4
+,Sum(NVParc_&Base_m5.) as NVParc_M5
+
+,Sum(Case When Orig.FlAtivo = 'S' Then 1 Else 0 End) as QtdPDVs_Ativos
+,Sum(Case When Orig.FlAtivo = 'N' Then 1 Else 0 End) as QtdPDVs_Inativos
+
+,Sum(Case When Orig.QtPropostaOriginada_90 >0 Then 1 Else 0 End) as QtPropostaOriginada_90Dias
+,Sum(Case When Orig.QtPropostaOriginada_30 >0 Then 1 Else 0 End) as QtPropostaOriginada_30Dias
+
+,Sum(Case When Orig.QtPropostaAprovada_90 >0 Then 1 Else 0 End) as QtPropostaAprovada_90Dias
+,Sum(Case When Orig.QtPropostaAprovada_30 >0 Then 1 Else 0 End) as QtPropostaAprovada_30Dias
+
+,Sum(Case When Orig.QtPropostaEfetivada_90 >0 Then 1 Else 0 End) as QtPropostaEfetivada_90Dias
+,Sum(Case When Orig.QtPropostaEfetivada_30 >0 Then 1 Else 0 End) as QtPropostaEfetivada_30Dias
+,Max(Orig.DataBase) as DataBase Format DDMMYY10.
+
+/*,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando*/
+/*,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando*/
+/*,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando*/
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Porte.NuAnomes = &Base_m0.
+Left Join Bases.TbParceiroComercial as TbParceiro ON Orig.CdParceiroComercial = TbParceiro.CdParceiroComercial
+Left Join Base_Cobans_Solar_Saida as Parc On Orig.NuCnpjLoja = Parc.NuCnpjLoja
+Where Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Data ritosol.Base_Carteira_Solar;
+Set
+	Base_Carteira_PDVs_Total
+	Base_Carteira_GRs_Total
+	Base_Carteira_Filial_Total
+	Base_Carteira_Canal_Total
+
+;Run;

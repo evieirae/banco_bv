@@ -1,0 +1,403 @@
+START_METADATA
+PROJECT: SAS_UC4__A509-RWA_BACEN
+FILE_SAS: A509-RWA_BACEN.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:01 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -31
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (4x | +20)
+----------------------------------------
+LINES_OF_CODE: 313
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CAD = /projetos/riscosmercado/rmsas/dados/datamart/rskm/cadastrais; EXP = /projetos/riscosmercado/dados/rmone/regulatorio; EXP1 = /projetos/riscosmercado/dados/rm/relatorios; EXP2 = /projetos/riscosmercado/dados/rmone/regulatorio; POS = /projetos/riscosmercado/dados/rmone/posicao
+DETECTED_MACROS_DEFINED: dtDataBase, nDataBase, stServidor
+DETECTED_MACROS_USED: dtDataBase, nDataBase, nmColuna, sysparm
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: DTDATABASE, NMCOLUNA
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CAD.RWA_PARAMETROSPTA_&NDATABASE [SAS/Local], EXP.EXPORTBACEN_&NDATABASE [SAS/Local], POS.TBPOSICAOMOR_&NDATABASE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CAD, EXP, POS
+EXPORTED_LIBNAMES: CAD, EXP2
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.AUXILIARY_AMOUNT, WORK.BACEN_EXPOSURE_AMOUNT, WORK.BUSINESSDAY, WORK.CAMPOS, WORK.PACS, WORK.PCAM, WORK.PCOM, WORK.PJUR1, WORK.PJUR2, WORK.PJUR3, WORK.PJUR4, WORK.REGULATORIO_AUX, WORK.REGULATORIO_AUX3, WORK.REGULATORIO_FINAL, WORK.REGULATORIO_FINAL2, WORK.REG_TBONDS_ADROPTIONS, WORK.RWA_BACENMOR_AUX, WORK.SUM_TBONDS_ADROPTIONS
+TABLE_READ_PROVENANCE (Flow): CAD.RWA_PARAMETROSPTA_&NDATABASE [DATA Step - SET], EXP.EXPORTBACEN_&NDATABASE [PROC SQL - FROM], POS.TBPOSICAOMOR_&NDATABASE [PROC SQL - JOIN], WORK.AUXILIARY_AMOUNT [PROC SQL - JOIN], WORK.BACEN_EXPOSURE_AMOUNT [PROC SQL - JOIN], WORK.BUSINESSDAY [PROC SQL - FROM], WORK.CAMPOS [PROC SQL - JOIN], WORK.PACS [PROC SQL - JOIN], WORK.PCAM [PROC SQL - JOIN], WORK.PCOM [PROC SQL - JOIN], WORK.PJUR1 [PROC SQL - JOIN], WORK.PJUR2 [PROC SQL - JOIN], WORK.PJUR3 [PROC SQL - JOIN], WORK.PJUR4 [PROC SQL - JOIN], WORK.REGULATORIO_AUX [DATA Step - SET], WORK.REGULATORIO_AUX3 [DATA Step - SET], WORK.REGULATORIO_FINAL [PROC SQL - FROM], WORK.REGULATORIO_FINAL2 [PROC SQL - FROM], WORK.REG_TBONDS_ADROPTIONS [PROC SQL - FROM], WORK.RWA_BACENMOR_AUX [PROC SQL - FROM], WORK.SUM_TBONDS_ADROPTIONS [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CAD.RWA_PARAMETROSMOR_&NDATABASE, EXP2.RWA_BACENMOR_&NDATABASE
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: &NMCOLUNA, BUSINESSDAY, RWA_AUX, WORK.BUSINESSDAY, WORK.CAMPOS, WORK.REGULATORIO_AUX, WORK.REGULATORIO_AUX2, WORK.REGULATORIO_AUX3, WORK.REGULATORIO_FINAL, WORK.REGULATORIO_FINAL2, WORK.REG_AUX, WORK.REG_AUX_TBONDS_ADROPTIONS, WORK.REG_TBONDS_ADROPTIONS, WORK.RWA_AUX, WORK.RWA_BACENMOR_AUX, WORK.SUM_TBONDS_ADROPTIONS
+DYNAMIC REFS (Ambiguous): CAD.RWA_PARAMETROSPTA_{NDATABASE}, EXP.EXPORTBACEN_{NDATABASE}, POS.TBPOSICAOMOR_{NDATABASE}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+OPTIONS SYMBOLGEN COMPRESS=YES;
+OPTIONS dlcreatedir;
+
+libname	Exp		"/projetos/riscosmercado/dados/rmone/regulatorio";
+libname	Exp2	"/projetos/riscosmercado/dados/rmone/regulatorio";
+/*libname	Exp2	"/riscosbv/mercado/riscosmercado/dados/rmone/regulatorio";*/
+libname	Exp1	"/projetos/riscosmercado/dados/rm/relatorios";
+libname	Pos		"/projetos/riscosmercado/dados/rmone/posicao";
+libname Cad		"/projetos/riscosmercado/rmsas/dados/datamart/rskm/cadastrais";
+
+/*%LET sysparm=20250131/MOR;*/
+
+/*Declaracao de variaveis*/
+%LET stServidor = %sysfunc(SCAN(&sysparm.,2,"/"));
+%LET nDataBase = %sysfunc(scan(&sysparm.,1));
+%LET dtDataBase = %sysfunc(mdy(%substr(%scan(&sysparm.,1,"/"),5,2),%substr(%scan(&sysparm.,1,"/"),7,2),%substr(%scan(&sysparm.,1,"/"),1,4)));
+
+/*BusinessDay*/;
+%macro BusinessDay();
+
+PROC SQL;
+   CREATE TABLE WORK.BusinessDay AS
+   SELECT 	t1.ID,
+			tranwrd(t1.BusinessDay, "{", "") as BusinessDay1 length=30000,
+			tranwrd(calculated BusinessDay1, "}", "") as BusinessDay length=30000
+      FROM WORK.rwa_bacenmor_AUX t1
+/*      WHERE t1.ID contains '00009#1#A#211#NULO#375#SPE#8'*/
+;QUIT;
+
+data BusinessDay (drop=BusinessDay1);
+  set BusinessDay;
+  save=BusinessDay ;
+  do i=1 to count(save,'|')+1;
+     BusinessDay=scan(save,i,'|');
+	 output;
+  end;
+  drop i save;
+run;
+
+data BusinessDay;
+  n=_N_;
+  set BusinessDay;
+run;
+
+PROC SQL;
+   CREATE TABLE WORK.BusinessDay AS
+   SELECT t1.n,
+			t1.ID,
+		  INPUT(BusinessDay, commax32.) as BusinessDay
+      FROM WORK.BusinessDay t1
+;QUIT;
+
+%mend BusinessDay;
+
+/*TrataColuna*/;
+%macro TrataColuna(nmColuna);
+/*Tira caracteres "{" "}"*/
+PROC SQL;
+   CREATE TABLE WORK.rwa_AUX AS
+   SELECT   t1.ID,
+			tranwrd(t1.BusinessDay, "{", "") as BusinessDay1 length=30000,
+			tranwrd(calculated BusinessDay1, "}", "") as BusinessDay length=30000,
+			tranwrd(t1.&nmColuna., "{", "") as &nmColuna._1 length=30000,
+			tranwrd(calculated &nmColuna._1, "}", "") as &nmColuna._2 length=30000,
+			tranwrd(calculated &nmColuna._2, "|", "| ") as &nmColuna. length=30000
+       FROM WORK.rwa_bacenmor_AUX t1
+/*      WHERE t1.ID contains '2699588'*/
+;QUIT;
+
+/*Separa e empilha*/
+data rwa_AUX (drop=&nmColuna._1 &nmColuna._2 BusinessDay1);
+  set rwa_AUX;
+  save=&nmColuna. ;
+  do i=1 to count(BusinessDay,'|')+1;
+     &nmColuna.=scan(save,i,'|');
+     output;
+  end;
+  drop i save;
+run;
+
+data &nmColuna.;
+  n=_N_;
+  set rwa_AUX;
+run;
+%mend TrataColuna;
+
+/*Union*/;
+%macro Union(dtDataBase);
+
+	PROC SQL;
+	   CREATE TABLE WORK.Campos AS
+	   SELECT t1.Name,
+	          t1.Type,
+	          t1.UnderlyingCurveIndex,
+	          t1.ID,
+	          t2.PositionUnits,
+			  t2.CodigoModalidade,
+	          t1.THEO_Value,
+	          t1.Delta,
+	          t1.Underlying
+	      FROM WORK.RWA_BACENMOR_AUX t1
+		  INNER JOIN Pos.TBPOSICAOMOR_&nDataBase. t2
+		  ON (t1.ID = t2.PosID)
+		;
+	QUIT;
+
+	/*
+	PROC SQL;
+		CREATE TABLE WORK.Auxiliary_Amount_Aux AS
+		SELECT t1.n,
+			   t1.ID,
+			   input(tranwrd(tranwrd(tranwrd(t1.Auxiliary_Amount, "BRL", ""),")",""),"(","-"),32.10) as Auxiliary_Amount_Ajuste informat BEST32.10 format BEST32.10
+		FROM WORK.Auxiliary_Amount t1;
+	QUIT;
+	*/
+
+	PROC SQL;
+	   CREATE TABLE WORK.REGULATORIO_Aux AS
+	   SELECT t1.n,
+	          t4.Name,
+	          t4.Type,
+	          t4.UnderlyingCurveIndex,
+	          t1.ID,
+	          t4.PositionUnits,
+			  t4.CodigoModalidade,
+	/*          t4.THEO_Value, */
+			  input(tranwrd(tranwrd(tranwrd(t4.THEO_Value, "BRL", ""),")",""),"(","-"),32.10) as THEO_Value informat BEST32.10 format BEST32.10,
+			  input(tranwrd(tranwrd(tranwrd(t4.Delta, "BRL", ""),")",""),"(","-"),32.10) as Delta informat BEST32.10 format BEST32.10,
+	          input(tranwrd(tranwrd(tranwrd(t4.Underlying, "BRL", ""),")",""),"(","-"),32.10) as Underlying informat BEST32.10 format BEST32.10,
+	          t1.BusinessDay,
+			  t5.Pacs,
+	          t2.Pcam,
+			  t6.Pcom,
+	          t3.Pjur1,
+			  t7.Pjur2,
+			  t8.Pjur3,
+			  t9.Pjur4,
+			  input(tranwrd(tranwrd(tranwrd(t11.Bacen_Exposure_Amount, "BRL", ""),")",""),"(","-"),32.10) as Bacen_Exposure_Amount informat BEST32.10 format BEST32.10,
+			  input(tranwrd(tranwrd(tranwrd(t12.Auxiliary_Amount, "BRL", ""),")",""),"(","-"),32.10) as Auxiliary_Amount informat BEST32.10 format BEST32.10
+	/*		  input(tranwrd(t12.Auxiliary_Amount, "BRL", ""),32.10) as Auxiliary_Amount informat BEST32.10 format BEST32.10*/
+	/*          t11.Bacen_Exposure_Amount, */
+	/*          t12.Auxiliary_Amount*/
+
+	      FROM WORK.BUSINESSDAY t1
+		  	   LEFT JOIN WORK.Campos t4 ON (t1.ID = t4.ID)
+		  	   LEFT JOIN WORK.PACS t5 ON (t1.n = t5.n)
+	           LEFT JOIN WORK.PCAM t2 ON (t1.n = t2.n)
+			   LEFT JOIN WORK.PCOM t6 ON (t1.n = t6.n)
+	           LEFT JOIN WORK.PJUR1 t3 ON (t1.n = t3.n)
+			   LEFT JOIN WORK.PJUR2 t7 ON (t1.n = t7.n)
+			   LEFT JOIN WORK.PJUR3 t8 ON (t1.n = t8.n)
+			   LEFT JOIN WORK.PJUR4 t9 ON (t1.n = t9.n)
+			   LEFT JOIN WORK.Bacen_Exposure_Amount t11 ON (t1.n = t11.n)
+			   LEFT JOIN WORK.Auxiliary_Amount t12 ON (t1.n = t12.n)
+
+		ORDER BY 1
+	;
+	QUIT;
+
+	Data WORK.REGULATORIO_Aux2;
+		DtReferencia = &dtDataBase.;
+		attrib DtReferencia informat=ddmmyy10. format=ddmmyy10. ;
+		set WORK.REGULATORIO_Aux;
+		attrib RWA length=$10.;
+		IF Pcam NE "" then do; FatorRisco = left(Pcam); RWA="PCAM"; end;
+		IF Pacs NE "" then do; FatorRisco = left(Pacs); RWA="PACS"; end;
+		IF Pcom NE "" then do; FatorRisco = left(Pcom); RWA="PCOM"; end;
+		IF Pjur1 NE "" then do; FatorRisco =  scan(Pjur1,2,'.'); RWA="PJUR1"; end;
+		IF Pjur2 NE "" then do; FatorRisco =  scan(Pjur2,2,'.'); RWA="PJUR2"; end;
+		IF Pjur3 NE "" then do; FatorRisco =  scan(Pjur3,2,'.'); RWA="PJUR3"; end;
+		IF Pjur4 NE "" then do; FatorRisco =  scan(Pjur4,2,'.'); RWA="PJUR4"; end;
+		IF find(upcase(UnderlyingCurveIndex),"CDI") then do; FatorRisco = "JP1";  RWA = "PJUR1"; end;
+		IF find(upcase(UnderlyingCurveIndex),"SELIC") then do; FatorRisco = "JP2"; RWA = "PJUR1"; end;
+		IF RWA = "PACS" And find(upcase(FatorRisco),"IBOVESPA") then do; FatorRisco = "AA1"; end;
+		IF Type IN ('Asian','European','American','Single Barrier') AND CodigoModalidade NE 328 then do; Bacen_Exposure_Amount = Delta * Underlying; end;
+	run;
+
+	Data WORK.REGULATORIO_Aux3;
+		DtReferencia = &dtDataBase.;
+		attrib DtReferencia informat=ddmmyy10. format=ddmmyy10. ;
+		set WORK.REGULATORIO_Aux;
+		attrib RWA length=$10.;
+		where Auxiliary_Amount NE 0.0 and Auxiliary_Amount NE .;
+	run;
+
+	Data WORK.REGULATORIO_Aux3;
+		set WORK.REGULATORIO_Aux3;
+		if find(upcase(UnderlyingCurveIndex),"CDI") or find(upcase(UnderlyingCurveIndex),"SELIC") then do;
+			FatorRisco = "JJ1";
+			RWA = "PJUR1";
+			Bacen_Exposure_Amount = Auxiliary_Amount;
+		end;
+	run;
+
+	proc sql;
+		CREATE TABLE WORK.REGULATORIO_FINAL AS
+		select * from REGULATORIO_Aux2
+			union all
+		select * from REGULATORIO_Aux3;
+	RUN;
+
+	PROC SQL;
+		CREATE TABLE WORK.REG_TBONDS_ADROPTIONS AS
+			SELECT
+				t1.DtReferencia,
+				t1.ID,
+				t1.RWA,
+				t1.BusinessDay,
+				t1.FatorRisco,
+				t1.Delta,
+				t1.Bacen_Exposure_Amount
+			FROM
+				WORK.REGULATORIO_FINAL t1
+			WHERE
+				t1.CodigoModalidade IN (298,328) AND
+				t1.RWA = 'PJUR2'
+		;
+	QUIT;
+
+	proc sql;
+		CREATE TABLE WORK.SUM_TBONDS_ADROPTIONS AS
+			SELECT
+				t1.DtReferencia,
+				t1.ID,
+				SUM(t1.Bacen_Exposure_Amount) * t1.Delta AS Bacen_Exposure_Amount
+			FROM
+				WORK.REG_TBONDS_ADROPTIONS t1
+			GROUP BY
+				t1.DtReferencia,
+				t1.ID
+		;
+	quit;
+
+	proc sql;
+		CREATE TABLE WORK.REG_AUX_TBONDS_ADROPTIONS AS
+			SELECT
+				t1.DtReferencia,
+				t1.ID,
+				t1.RWA,
+				t1.FatorRisco,
+				MIN(t1.BusinessDay) AS BusinessDay,
+				t2.Bacen_Exposure_Amount
+			FROM
+				WORK.REG_TBONDS_ADROPTIONS t1
+			INNER JOIN
+				WORK.SUM_TBONDS_ADROPTIONS t2
+				ON t2.DtReferencia = t1.DtReferencia
+				AND t2.ID = t1.ID
+			WHERE
+				t1.BusinessDay NE 1
+			GROUP BY
+				t1.DtReferencia,
+				t1.ID,
+				t1.RWA,
+				t1.FatorRisco,
+				t2.Bacen_Exposure_Amount
+		;
+	quit;
+
+	proc sql;
+		CREATE TABLE WORK.REG_AUX AS
+			SELECT
+				*
+			FROM
+				WORK.REGULATORIO_FINAL
+			WHERE
+				CodigoModalidade NOT IN (298,328) OR CodigoModalidade EQ .
+		;
+	quit;
+
+	PROC SQL;
+		CREATE TABLE WORK.REGULATORIO_FINAL2 AS
+		SELECT
+			t1.DtReferencia,
+			t1.ID,
+			t1.RWA,
+			t1.FatorRisco,
+			t1.BusinessDay,
+			t1.Bacen_Exposure_Amount
+		FROM REG_AUX t1
+
+		UNION ALL
+
+		SELECT
+			t2.DtReferencia,
+			t2.ID,
+			t2.RWA,
+			t2.FatorRisco,
+			t2.BusinessDay,
+			t2.Bacen_Exposure_Amount
+		FROM REG_AUX_TBONDS_ADROPTIONS t2
+		;
+	RUN;
+
+	PROC SQL;
+	   CREATE TABLE Exp2.rwa_bacenmor_&nDataBase. AS
+	   SELECT t1.DtReferencia,
+	          t1.ID as PosID,
+	          t1.RWA,
+	          t1.FatorRisco,
+	          t1.BusinessDay as DU,
+	          t1.Bacen_Exposure_Amount as Exposicao
+	      FROM WORK.REGULATORIO_FINAL2 t1;
+	QUIT;
+
+%mend Union;
+
+/*======================*/;
+%macro Principal ();
+
+	data Cad.RWA_PARAMETROSMOR_&nDataBase.;
+		set Cad.RWA_PARAMETROSPTA_&nDataBase.;
+	run;
+
+	/*Prepara tabela*/
+	PROC SQL;
+	   CREATE TABLE WORK.rwa_bacenmor_AUX AS
+	   SELECT  *
+				FROM Exp.ExportBacen_&nDataBase. t1
+	      WHERE t1.BusinessDay NOT = ''
+			AND t1.Name not CONTAINS 'CCAIXA'
+			AND t1.Name not CONTAINS 'DBSTR'
+		  	AND t1.Name not CONTAINS '_TIR'
+	/*		AND t1.Name not CONTAINS 'ACC'*/
+	/*		AND t1.Pjur2 not CONTAINS '{|{'*/
+	/*		AND t1.Pjur2 not CONTAINS '}|{'*/
+		  ORDER BY t1.ID
+		;
+	QUIT;
+	/*;*/
+	/*data WORK.rwa_bacenmor_AUX;*/
+	/*set WORK.rwa_bacenmor_AUX2;*/
+	/*run;*/
+	;
+	%BusinessDay ();
+
+	%TrataColuna (Pacs);
+	%TrataColuna (Pcam);
+	%TrataColuna (Pcom);
+	%TrataColuna (Pjur1);
+	%TrataColuna (Pjur2);
+	%TrataColuna (Pjur3);
+	%TrataColuna (Pjur4);
+	%TrataColuna (Bacen_Exposure_Amount);
+	%TrataColuna (Auxiliary_Amount);
+
+	%Union(&dtDataBase.);
+
+%mend Principal;
+
+%Principal();

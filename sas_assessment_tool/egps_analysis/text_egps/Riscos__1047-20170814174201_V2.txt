@@ -1,0 +1,252 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__1047-20170814174201_V2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:49 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -12
+ODS_OUTPUTS_DETECTED: txt
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 171
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: COMP = /riscosbv/juridico/comp_total; DBEP = /riscosbv/juridico/yribeiro/DB_ExyonProjuris/
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: df
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBV/JURIDICO/YRIBEIRO/RISCO_BCO_DBBVF_LOG.SAS [SAS/Local], DBEP.TBLPROVISAO [SAS/Local], DBEP.VWTBLCAUSACONS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_GERAL
+IMPORTED_LIBNAMES: DBEP
+EXPORTED_LIBNAMES: COMP
+IMPORTED FILES (Requires Ingestion): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_GERAL, WORK.ENTRADAS_SP_2015_V2, WORK.PROVISAO
+TABLE_READ_PROVENANCE (Flow): COMP.TBL1047_JUR_ACOES_CIVEIS_&DF [PROC EXPORT - DATA=], DBEP.TBLPROVISAO [PROC SQL - FROM], DBEP.VWTBLCAUSACONS [PROC SQL - FROM], WORK.BASE_GERAL [PROC SQL - FROM], WORK.ENTRADAS_SP_2015_V2 [PROC SORT - DATA=], WORK.PROVISAO [PROC SORT - DATA=; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+INTERNAL READS (Temp/Local): COMP.TBL1047_JUR_ACOES_CIVEIS_&DF
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): COMP.TBL1047_JUR_ACOES_CIVEIS_&DF
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbv/juridico/comp_total/tbl1047_jur_acoes_civeis_&df..txt
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_GERAL, WORK.ENTRADAS_SP_2015_V2, WORK.PROVISAO
+DYNAMIC REFS (Ambiguous): COMP.TBL1047_JUR_ACOES_CIVEIS_{DF}, {DF}.TXT
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+OUT|/riscosbv/juridico/comp_total/tbl1047_jur_acoes_civeis_&df..txt|/RISCOSBV/JURIDICO/COMP_TOTAL|TBL1047_JUR_ACOES_CIVEIS_#.TXT|DF|ok
+IN|/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas|/RISCOSBV/JURIDICO/YRIBEIRO|RISCO_BCO_DBBVF_LOG.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01 - Parametros */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01 - Parametros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-rucXig1JbVGmoMbB/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname dbep		'/riscosbv/juridico/yribeiro/DB_ExyonProjuris/';
+
+libname comp		'/riscosbv/juridico/comp_total';
+
+DATA _NULL_;
+AnoMesDia=YEAR(TODAY())*10000+MONTH(TODAY())*100+DAY(TODAY());
+CALL SYMPUT('AnoMesDia',STRIP(AnoMesDia));
+;run;
+
+data _null_;
+DF = TODAY();
+call symput( 'df', put(df, yymmddn6.));
+run;
+%put &df;
+
+
+%include '/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01 - Parametros */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Gerando_Base */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Gerando_Base */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ErIxkDbjp9gkPGAF/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table work.provisao	as
+select
+
+CdCausa
+,NmMotivo
+,DtCont
+,NuProbPerdaZero
+,NuProbAcordo
+,NuProbCondenacao
+,VlProbAcordo
+,VlProbCondenacao
+,VlBruto
+,VlValor
+,DtBase
+
+from DBEP.TBLPROVISAO
+where	1=1
+
+;run;
+
+proc sort data=work.provisao; by CdCausa descending dtbase  ; run;
+proc sort data=work.provisao nodupkey; by CdCausa ; run;
+
+proc sql;
+update	work.provisao
+set	VlBruto=VlValor
+where	1=1
+and VlBruto is null
+;run;
+
+PROC SQL;
+CREATE UNIQUE INDEX CdCausa ON WORK.provisao(CdCausa);
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE WORK.ENTRADAS_SP_2015_V2 AS
+
+SELECT
+
+	CdCausa	as	CD_CAUSA
+,	DtCadastramento	as	DT_CADASTRAMENTO
+,	NmAcaoJudicial	as	ACAO_JUDICIAL
+,	DtEncerramento	as	DT_ENCERRAMENTO
+,	NmMotivoEncerramento	as	MOTIVO_ENCERRAMENTO
+,	NmTipoEncerramento	as	TIPO_ENCERRAMENTO
+,	NmMunicipio	as	MUNICIPIO
+,	CdUF	as	UF
+,	NmOrgaoJudicial	as	DENOMINACAO
+,	NmCarteira	as	CARTEIRA
+,	DtBaixaContabil	as	DT_BAIXA_CONTABIL
+,	DtFatoGerador	as	DT_FATO_GERADOR
+,	Prioridade	as	PRIORIDADE_CAUSA
+,	NmMotivo	as	MOTIVO
+,	NmSubMotivo	as	SUBMOTIVO
+,	NomeParte	as	AUTOR
+,	CPFCNPJ	as	CPFCNPJ
+,	NmProcurador	as	PROCURADOR
+,	Empresa	as	EMPRESA
+,	NuContrato1DeN	as	NO_CONTRATO
+,	NmRecurso	as	Recurso
+,	NmProduto	as	PRODUTO_FINAL
+,	NmProdutoGrupo	as	PRODUTO_II
+,	DtCadastramentoYM	as	SAFRA_CADASTRO
+,	NmSafraEncerramento	as	SAFRA_ENCERRAMENTO
+,	NmAssessoria	as	ASSESSORIA
+,	NmRegiaoGrupoAssessoria	as	UF_II
+,	NmEncerramentoBoletim	as	ENCERRAMENTO_BOLETIM
+,	NmMotivoRRO	as	MOTIVO_RRO
+,	TipoAcaoGrupo	as	TpAcao
+,	CdAcaoJudicialCategoria	as	CdAcaoJudicialCategoria
+,	VrEmolumentos	as	VrEmolumentos
+,	VrIndenizacao	as	VrIndenizacao
+,	VrHonorarios	as	VrHonorarios
+
+
+FROM  DBEP.VWTBLCAUSACONS
+WHERE DtCadastramento>='01JAN17'D
+AND CDSISTEMA = 'p'
+AND CDUNIDADEEXYON = 'VAC'
+AND FLLEGADOJUDICIALADMNISTRATIVO ='J'
+
+;
+;RUN;
+
+PROC SORT DATA= WORK.ENTRADAS_SP_2015_V2 NODUPKEY ; BY CD_CAUSA ; RUN;
+
+PROC SQL;
+	CREATE TABLE base_geral AS
+	SELECT
+	 bg.*
+	,p.VlBruto as Vlr_ProvisaoBruto
+	FROM ENTRADAS_SP_2015_V2   as bg
+	left join	work.provisao 	as p	ON p.cdcausa = bg.CD_CAUSA
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Gerando_Base */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Exportar */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Exportar */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dUgviBkfu2ir9ERZ/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table comp.tbl1047_jur_acoes_civeis_&df. (compress=yes) as
+select
+
+CPFCNPJ	 							as CPFCNPJ
+,CD_CAUSA
+,DT_CADASTRAMENTO
+,DT_ENCERRAMENTO
+,tranwrd(motivo, ';', '  ') 		as motivo
+,tranwrd(SUBMOTIVO, ';', ' ') 	as SUBMOTIVO
+,NO_CONTRATO
+,tranwrd(TpAcao, ';', ' ')  	as TpAcao
+,CdAcaoJudicialCategoria			as CdAcaoJudicialCategoria
+,VrEmolumentos						as VrEmolumentos
+,VrIndenizacao						as VrIndenizacao
+,VrHonorarios						as VrHonorarios
+,Vlr_ProvisaoBruto					as Vlr_ProvisaoBruto
+
+from work.base_geral
+;run;
+
+proc export
+data		= comp.tbl1047_jur_acoes_civeis_&df.
+dbms		= dlm
+outfile		= "/riscosbv/juridico/comp_total/tbl1047_jur_acoes_civeis_&df..txt"
+replace;
+delimiter	=';';
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Exportar */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1000 - Fixar Log */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-B4KOHsTRGdLpoJ5m/code.sas */
+/* =========================INÍCIO TASK========================= */
+%log_errors;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

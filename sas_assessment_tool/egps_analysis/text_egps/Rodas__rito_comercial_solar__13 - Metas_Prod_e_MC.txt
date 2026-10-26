@@ -1,0 +1,222 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 13 - Metas_Prod_e_MC.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 154
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5, DtAtualizacao
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBMETANAOISONOMICA [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_METAS_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_META_PROD_CANAL_TOTAL, BASE_META_PROD_FILIAL_TOTAL, BASE_META_PROD_GRS_TOTAL, BASE_META_PROD_PDVS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+
+proc sql noprint;
+    select max(DtAtualizacao) into :DtAtualizacao
+    from tmp.TbProducao;
+quit;
+
+Proc Sql;
+Create Table Base_Meta_Prod_Canal_Total as
+Select
+'Metas' as Base
+,Meta.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Sum(Meta.VrProducao) as VrMeta_Producao
+,Sum(Meta.VrMargem) as VrMeta_MC
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+Left Join Base_Porte_Cobans as Porte On Meta.CdParceiroComercial = Porte.CdParceiroComercial and Meta.NuAnomes = Porte.NuAnomes
+Left Join Bases.TbEstruturaComercial as TbEstrutura ON Meta.NuANomes = TbEstrutura.NuAnomes and Meta.DsLoginN1 = TbEstrutura.DsLoginN1
+Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial, Meta.NmAreaEstruturaComercial) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Meta_Prod_Filial_Total as
+Select
+'Metas' as Base
+,Meta.NuAnoMes
+,'Filial' as Visao
+,"" as DsLoginN1C
+,Meta.DsLoginN2A as DsLoginN2C
+,Meta.DsLoginN3A as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial) as Dimensao2
+,Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial) as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+,Sum(Meta.VrProducao) as VrMeta_Producao
+,Sum(Meta.VrMargem) as VrMeta_MC
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+Left Join Base_Porte_Cobans as Porte On Meta.CdParceiroComercial = Porte.CdParceiroComercial and Meta.NuAnomes = Porte.NuAnomes
+Left Join Bases.TbEstruturaComercial as TbEstrutura ON Meta.NuANomes = TbEstrutura.NuAnomes and Meta.DsLoginN1 = TbEstrutura.DsLoginN1
+Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Meta_Prod_GRs_Total as
+Select
+'Metas' as Base
+,Meta.NuAnoMes
+,'GRs' as Visao
+,Meta.DsLoginN1 as DsLoginN1C
+,Meta.DsLoginN2A as DsLoginN2C
+,Meta.DsLoginN3A as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial) as Dimensao2
+,Coalesce(TbEstrutura.NmColaborador, TbParceiro.NmColaboradorC) as Dimensao3
+,'GRs' as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Sum(Meta.VrProducao) as VrMeta_Producao
+,Sum(Meta.VrMargem) as VrMeta_MC
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+Left Join Base_Porte_Cobans as Porte On Meta.CdParceiroComercial = Porte.CdParceiroComercial and Meta.NuAnomes = Porte.NuAnomes
+Left Join Bases.TbEstruturaComercial as TbEstrutura ON Meta.NuANomes = TbEstrutura.NuAnomes and Meta.DsLoginN1 = TbEstrutura.DsLoginN1
+Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial, Meta.NmAreaEstruturaComercial) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Meta_Prod_PDVs_Total as
+Select
+'Metas' as Base
+,Meta.NuAnoMes
+,'Cobans' as Visao
+,Meta.DsLoginN1 as DsLoginN1C
+,Meta.DsLoginN2A as DsLoginN2C
+,Meta.DsLoginN3A as DsLoginN3C
+,Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial) as Dimensao1
+,Coalesce(TbEstrutura.NmColaborador, TbParceiro.NmColaboradorC) as Dimensao2
+,put(Meta.CdParceiroComercial, 8.) || '-' || TbParceiro.NmParceiroComercial as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Porte.DtCadastro Format ddmmyy10.
+,0 as QtCorridosDiaUtilMes
+
+,Sum(Meta.VrProducao) as VrMeta_Producao
+,Sum(Meta.VrMargem) as VrMeta_MC
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+Left Join Base_Porte_Cobans as Porte On Meta.CdParceiroComercial = Porte.CdParceiroComercial and Meta.NuAnomes = Porte.NuAnomes
+Left Join Bases.TbEstruturaComercial as TbEstrutura ON Meta.NuANomes = TbEstrutura.NuAnomes and Meta.DsLoginN1 = TbEstrutura.DsLoginN1
+Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(TbParceiro.NmAreaEstruturaComercialC, TbEstrutura.NmAreaEstruturaComercial, Meta.NmAreaEstruturaComercial) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Data ritosol.Base_Metas_Solar;
+Set
+	Base_Meta_Prod_PDVs_Total
+	Base_Meta_Prod_GRs_Total
+	Base_Meta_Prod_Filial_Total
+	Base_Meta_Prod_Canal_Total
+;Run;

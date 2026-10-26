@@ -1,0 +1,1909 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__RPDD_TESCON_RENEG
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:53 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 0
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC DATASETS (3x | +60), %MACRO (10x | +50)
+----------------------------------------
+LINES_OF_CODE: 1374
+CODE_TASKS_COUNT: 6
+DETECTED_PROCS: DATASETS, SORT, SQL
+HAS_DATA_STEP: Yes (10x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: MARCACAO = /riscosbv/cobranca/gtavares/Reneg/Marcacao; PRETER = /riscosbv/cobranca/preter; RENEG = /riscosbv/cobranca/gtavares/Reneg
+DETECTED_MACROS_DEFINED: TABELA, base, libname, path, work
+DETECTED_MACROS_USED: ANOMES, MOB, TABELA, anomes, base, dt_fim_anomes, dt_fim_m0, dt_fim_reneg, dt_inicio_reneg, fim_mes_m0, fim_mes_mob, libname, mob, path, tabela, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES, BASE, DT_FIM_ANOMES, DT_FIM_M0, DT_FIM_RENEG, DT_INICIO_RENEG, FIM_MES_M0, FIM_MES_M1, FIM_MES_MOB, LIBNAME, MOB
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): ANOMES._6 [SAS/Local], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [BIGQUERY], MARCACAO.&TABELA [SAS/Local], RENEG.&TABELA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: MARCACAO, RENEG
+EXPORTED_LIBNAMES: CUBO_EXPORT_&ANOMES
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ASSESSORIA_V1
+TABLE_READ_PROVENANCE (Flow): ANOMES._6 [Resolved dynamic lib.member&macro (%LET)], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [PROC SQL - FROM; Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], MARCACAO.&TABELA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], RENEG.&TABELA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], WORK.BASE_ASSESSORIA_V1 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CUBO_EXPORT_&ANOMES._6
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, BASE_ELEG, CALCULA_ATRASO, CUBO_202502, CUBO_EXPORT_MAIOR90, CUBO_EXPORT_MENOR90, CUBO_FINAL, RENEG_RPDD, RENEG_SIMULADOR_202502, RPDD_M0, RPDD_M1, RPDD_MOB, SIMULADOR_FINAL_202502, WORK.QUERY_FOR_BASE_ASSESSORIA_V1
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET libname=%sysfunc(lowcase(&libname.));
+%LET base=%sysfunc(lowcase(&base.));
+%LET fim_mes_m0='2025-01-31';
+%LET fim_mes_m1='2025-02-28';
+%LET fim_mes_mob='2025-07-31';
+%LET anomes=202502;
+%LET TABELA=base_eleg_cont_&anomes.;
+%LET MOB=6;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Perda Esperada_Menor90 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 51 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Perda Esperada_Menor90 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-mOGpAXB6IS7lTisz/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+proc datasets library=work kill nolist;
+quit;
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro perda_esperada(anomes, fim_mes_m1, mob, fim_mes_mob, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO = '000_000'; ELSE
+IF NUDIASATRASO <= 4 		THEN FX_ATRASO = '001_004'; ELSE
+IF NUDIASATRASO <= 15 		THEN FX_ATRASO = '005_015'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO = '016_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO = '091_120'; ELSE
+IF NUDIASATRASO <= 150 		THEN FX_ATRASO = '121_150'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO = '151_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO = '181_360';
+ELSE FX_ATRASO = '361_999';
+
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO_2 = '000_000'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO_2 = '001_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO_2 = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO_2 = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO_2 = '091_120'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO_2 = '121_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO_2 = '181_360';
+ELSE FX_ATRASO_2 = '361_999';
+RUN;
+
+proc sort data=BASE_ELEG NODUPKEY;
+by _all_;
+run;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M0 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_m0.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_MOB AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_mob.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RPDD AS
+SELECT
+	A.*,
+	C.PRODUTO,
+	C.vr_saldo_carteira AS SALDO_M0,
+	C.vr_provisao_total AS PROVISAO_M0,
+	D.vr_saldo_carteira AS SALDO_MOB,
+	D.vr_provisao_total AS PROVISAO_MOB
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN RPDD_M0 AS C
+ON A.NuContrato = INPUT(C.cd_contrato, BEST32.)
+
+LEFT JOIN RPDD_MOB AS D
+ON A.NuContrato = INPUT(D.cd_contrato, BEST32.)
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT_&anomes._&mob. AS
+SELECT
+	&anomes. 	AS SAFRA,
+	&MOB. 		AS MOB,
+	PRODUTO,
+	FX_ATRASO,
+	FX_ATRASO2,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	COUNT(NUCONTRATO) 	AS QNT,
+	SUM(SALDO_M0) 		AS SALDO_M0,
+	SUM(SALDO_MOB) 		AS SALDO_MOB,
+	SUM(PROVISAO_M0) 	AS PROVISAO_M0,
+	SUM(PROVISAO_MOB) 	AS PROVISAO_MOB
+
+FROM RENEG_RPDD
+GROUP BY
+	SAFRA,
+	MOB,
+	PRODUTO,
+	FX_ATRASO,
+	FX_ATRASO2,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA
+
+;QUIT;
+
+%mend;
+
+%macro perda_esperada_2(anomes, fim_mes_m1, mob, fim_mes_mob, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO = '000_000'; ELSE
+IF NUDIASATRASO <= 4 		THEN FX_ATRASO = '001_004'; ELSE
+IF NUDIASATRASO <= 15 		THEN FX_ATRASO = '005_015'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO = '016_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO = '091_120'; ELSE
+IF NUDIASATRASO <= 150 		THEN FX_ATRASO = '121_150'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO = '151_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO = '181_360';
+ELSE FX_ATRASO = '361_999';
+
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO_2 = '000_000'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO_2 = '001_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO_2 = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO_2 = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO_2 = '091_120'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO_2 = '121_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO_2 = '181_360';
+ELSE FX_ATRASO_2 = '361_999';
+RUN;
+
+proc sort data=BASE_ELEG NODUPKEY;
+by _all_;
+run;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M0 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_m0.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_MOB AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_mob.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RPDD AS
+SELECT
+	A.*,
+	C.PRODUTO,
+	C.vr_saldo_carteira AS SALDO_M0,
+	C.vr_provisao_total AS PROVISAO_M0,
+	D.vr_saldo_carteira AS SALDO_MOB,
+	D.vr_provisao_total AS PROVISAO_MOB
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN RPDD_M0 AS C
+
+ON A.NuContrato = C.cd_contrato
+
+LEFT JOIN RPDD_MOB AS D
+
+ON A.NuContrato = D.cd_contrato
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT_&anomes._&mob. AS
+SELECT
+	&anomes. 	AS SAFRA,
+	&MOB. 		AS MOB,
+	PRODUTO,
+	FX_ATRASO,
+	FX_ATRASO2,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	COUNT(NUCONTRATO) 	AS QNT,
+	SUM(SALDO_M0) 		AS SALDO_M0,
+	SUM(SALDO_MOB) 		AS SALDO_MOB,
+	SUM(PROVISAO_M0) 	AS PROVISAO_M0,
+	SUM(PROVISAO_MOB) 	AS PROVISAO_MOB
+
+FROM RENEG_RPDD
+GROUP BY
+	SAFRA,
+	MOB,
+	PRODUTO,
+	FX_ATRASO,
+	FX_ATRASO2,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA
+
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%perda_esperada (202503, '2025-03-31', 9, '2025-11-30', '2025-02-28');
+%perda_esperada (202504, '2025-04-30', 8, '2025-11-30', '2025-03-31');
+%perda_esperada (202505, '2025-05-31', 7, '2025-11-30', '2025-04-30');
+%perda_esperada (202506, '2025-06-30', 6, '2025-11-30', '2025-05-31');
+%perda_esperada (202507, '2025-07-31', 5, '2025-11-30', '2025-06-30');
+%perda_esperada_2 (202508, '2025-08-31', 4, '2025-11-30', '2025-07-31');
+%perda_esperada_2 (202509, '2025-10-31', 3, '2025-11-30', '2025-08-31');
+%perda_esperada_2 (202510, '2025-10-31', 2, '2025-11-30', '2025-09-30');
+%perda_esperada_2 (202511, '2025-11-30', 1, '2025-11-30', '2025-10-31');
+%perda_esperada_2 (202512, '2025-12-31', 0, '2025-11-30', '2025-11-30');
+
+DATA CUBO_EXPORT_MENOR90;
+SET CUBO_EXPORT_202:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Perda Esperada_Menor90 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Perda Esperada_Maior90 */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 51 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Perda Esperada_Maior90 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-mUJunjFABE7ElCUK/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+proc datasets library=work kill nolist;
+quit;
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro perda_esperada(anomes, fim_mes_m1, mob, fim_mes_mob, fim_mes_m0);
+
+%LET TABELA = base_eleg_cont_&anomes.;
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO = '000_000'; ELSE
+IF NUDIASATRASO <= 4 		THEN FX_ATRASO = '001_004'; ELSE
+IF NUDIASATRASO <= 15 		THEN FX_ATRASO = '005_015'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO = '016_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO = '091_120'; ELSE
+IF NUDIASATRASO <= 150 		THEN FX_ATRASO = '121_150'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO = '151_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO = '181_360';
+ELSE FX_ATRASO = '361_999';
+
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO_2 = '000_000'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO_2 = '001_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO_2 = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO_2 = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO_2 = '091_120'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO_2 = '121_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO_2 = '181_360';
+ELSE FX_ATRASO_2 = '361_999';
+WHERE BASE = 'ATIVA';
+RUN;
+
+proc sort data=BASE_ELEG NODUPKEY;
+by _all_;
+run;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M0 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_m0.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_MOB AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_mob.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=20);
+CREATE TABLE RENEG_RPDD AS
+SELECT
+	A.*,
+	CASE
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.02 		THEN "00,0-02,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.05 		THEN "02,1-05,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.08 		THEN "05,1-08,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.13 		THEN "08,1-13,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.19 		THEN "13,1-19,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.27 		THEN "19,1-27,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.37 		THEN "27,1-37,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.56 		THEN "37,1-56,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.85 		THEN "56,1-85,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 1 			THEN "85,1-100%"
+		ELSE "ERRO"
+	END AS PERCENT_PAGO_ATE_30D,
+	CASE
+		WHEN C.vr_saldo_carteira <= 10000 	THEN "01. ATÉ 10K"
+		WHEN C.vr_saldo_carteira <= 20000 	THEN "02. ATÉ 20K"
+		WHEN C.vr_saldo_carteira <= 30000 	THEN "03. ATÉ 30K"
+		WHEN C.vr_saldo_carteira <= 45000 	THEN "04. ATÉ 45K"
+		WHEN C.vr_saldo_carteira >  45000 	THEN "05. ACIMA DE 45K"
+	END AS FX_SALDO,
+	C.vr_saldo_carteira AS SALDO_M0,
+	C.vr_provisao_total AS PROVISAO_M0,
+	D.vr_saldo_carteira AS SALDO_MOB,
+	D.vr_provisao_total AS PROVISAO_MOB
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN RPDD_M0 AS C
+ON A.NuContrato = INPUT(C.cd_contrato, BEST32.)
+
+LEFT JOIN RPDD_MOB AS D
+ON A.NuContrato = INPUT(D.cd_contrato, BEST32.)
+
+LEFT JOIN CONNECTION TO PERM(
+SELECT DISTINCT cd_contrato,
+             	sq_contrato_financeiro,
+				SUM(CASE WHEN st_parcela='Q' AND dt_ultimo_recebimento <= &fim_mes_m0. THEN 1 ELSE 0 END)        AS Parcelas_Pagas,
+                SUM(CASE WHEN st_parcela='A' OR (st_parcela='Q' AND dt_ultimo_recebimento > &fim_mes_m0.) THEN 1 ELSE 0 END)        AS Parcelas_Abertas,
+				SUM(CASE WHEN DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY) < 30 AND dt_ultimo_recebimento <= &fim_mes_m0. THEN 1 ELSE 0 END) AS Parcelas_pagas_ate_30d
+
+FROM bv-pdbd-prd.dvry_core.tbparcela
+GROUP BY cd_contrato,
+         sq_contrato_financeiro) AS G
+ON A.NuContrato = INPUT(G.cd_contrato, BEST32.) AND A.SqContratoFinanceiro = G.sq_contrato_financeiro
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT_&anomes._&mob. AS
+SELECT
+	&anomes. 	AS SAFRA,
+	&MOB. 		AS MOB,
+	BASE,
+	PRODUTO,
+	FX_ATRASO,
+	MODELO_FINAL,
+	Teste_Controle_Final,
+	PERCENT_PAGO_ATE_30D,
+	FX_SALDO,
+	COUNT(NUCONTRATO) 	AS QNT,
+	SUM(SALDO_M0) 		AS SALDO_M0,
+	SUM(SALDO_MOB) 		AS SALDO_MOB,
+	SUM(PROVISAO_M0) 	AS PROVISAO_M0,
+	SUM(PROVISAO_MOB) 	AS PROVISAO_MOB
+
+FROM RENEG_RPDD
+GROUP BY
+	SAFRA,
+	MOB,
+	BASE,
+	PRODUTO,
+	FX_ATRASO,
+	MODELO_FINAL,
+	Teste_Controle_Final,
+	PERCENT_PAGO_ATE_30D,
+	FX_SALDO
+;QUIT;
+
+%mend;
+
+%macro perda_esperada_2 (anomes, fim_mes_m1, mob, fim_mes_mob, fim_mes_m0);
+
+%LET TABELA = base_eleg_cont_&anomes.;
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO = '000_000'; ELSE
+IF NUDIASATRASO <= 4 		THEN FX_ATRASO = '001_004'; ELSE
+IF NUDIASATRASO <= 15 		THEN FX_ATRASO = '005_015'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO = '016_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO = '091_120'; ELSE
+IF NUDIASATRASO <= 150 		THEN FX_ATRASO = '121_150'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO = '151_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO = '181_360';
+ELSE FX_ATRASO = '361_999';
+
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO_2 = '000_000'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO_2 = '001_030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO_2 = '031_060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO_2 = '061_090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO_2 = '091_120'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO_2 = '121_180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO_2 = '181_360';
+ELSE FX_ATRASO_2 = '361_999';
+WHERE BASE = 'ATIVA';
+RUN;
+
+proc sort data=BASE_ELEG NODUPKEY;
+by _all_;
+run;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M0 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_m0.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_MOB AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_mob.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=20);
+CREATE TABLE RENEG_RPDD AS
+SELECT
+	A.*,
+	CASE
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.02 		THEN "00,0-02,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.05 		THEN "02,1-05,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.08 		THEN "05,1-08,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.13 		THEN "08,1-13,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.19 		THEN "13,1-19,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.27 		THEN "19,1-27,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.37 		THEN "27,1-37,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.56 		THEN "10,1-56,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 0.85 		THEN "56,1-85,0%"
+		WHEN Parcelas_pagas_ate_30d/(G.Parcelas_Abertas + G.Parcelas_Pagas) <= 1 			THEN "85,1-100%"
+		ELSE "ERRO"
+	END AS PERCENT_PAGO_ATE_30D,
+	CASE
+		WHEN C.vr_saldo_carteira <= 10000 	THEN "01. ATÉ 10K"
+		WHEN C.vr_saldo_carteira <= 20000 	THEN "02. ATÉ 20K"
+		WHEN C.vr_saldo_carteira <= 30000 	THEN "03. ATÉ 30K"
+		WHEN C.vr_saldo_carteira <= 45000 	THEN "04. ATÉ 45K"
+		WHEN C.vr_saldo_carteira >  45000 	THEN "05. ACIMA DE 45K"
+	END AS FX_SALDO,
+	C.vr_saldo_carteira AS SALDO_M0,
+	C.vr_provisao_total AS PROVISAO_M0,
+	D.vr_saldo_carteira AS SALDO_MOB,
+	D.vr_provisao_total AS PROVISAO_MOB
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN RPDD_M0 AS C
+ON A.NuContrato = C.cd_contrato
+
+LEFT JOIN RPDD_MOB AS D
+ON A.NuContrato = D.cd_contrato
+
+LEFT JOIN CONNECTION TO PERM(
+SELECT DISTINCT cd_contrato,
+             	sq_contrato_financeiro,
+				SUM(CASE WHEN st_parcela='Q' AND dt_ultimo_recebimento <= &fim_mes_m0. THEN 1 ELSE 0 END)        AS Parcelas_Pagas,
+                SUM(CASE WHEN st_parcela='A' OR (st_parcela='Q' AND dt_ultimo_recebimento > &fim_mes_m0.) THEN 1 ELSE 0 END)        AS Parcelas_Abertas,
+				SUM(CASE WHEN DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY) < 30 AND dt_ultimo_recebimento <= &fim_mes_m0. THEN 1 ELSE 0 END) AS Parcelas_pagas_ate_30d
+
+FROM bv-pdbd-prd.dvry_core.tbparcela
+GROUP BY cd_contrato,
+         sq_contrato_financeiro) AS G
+ON A.NuContrato = G.cd_contrato AND A.SqContratoFinanceiro = G.sq_contrato_financeiro
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT_&anomes._&mob. AS
+SELECT
+	&anomes. 	AS SAFRA,
+	&MOB. 		AS MOB,
+	BASE,
+	PRODUTO,
+	FX_ATRASO,
+	MODELO_FINAL,
+	Teste_Controle_Final,
+	PERCENT_PAGO_ATE_30D,
+	FX_SALDO,
+	COUNT(NUCONTRATO) 	AS QNT,
+	SUM(SALDO_M0) 		AS SALDO_M0,
+	SUM(SALDO_MOB) 		AS SALDO_MOB,
+	SUM(PROVISAO_M0) 	AS PROVISAO_M0,
+	SUM(PROVISAO_MOB) 	AS PROVISAO_MOB
+
+FROM RENEG_RPDD
+GROUP BY
+	SAFRA,
+	MOB,
+	BASE,
+	PRODUTO,
+	FX_ATRASO,
+	MODELO_FINAL,
+	Teste_Controle_Final,
+	PERCENT_PAGO_ATE_30D,
+	FX_SALDO
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%perda_esperada (202501, '2025-01-31', 7, '2025-07-31', '2024-12-31');
+%perda_esperada (202502, '2025-02-28', 6, '2025-07-31', '2025-01-31');
+%perda_esperada (202503, '2025-03-31', 5, '2025-07-31', '2025-02-28');
+%perda_esperada (202504, '2025-04-30', 4, '2025-07-31', '2025-03-31');
+%perda_esperada (202505, '2025-05-31', 3, '2025-07-31', '2025-04-30');
+%perda_esperada (202506, '2025-06-30', 2, '2025-07-31', '2025-05-31');
+%perda_esperada (202507, '2025-07-31', 1, '2025-07-31', '2025-06-30');
+%perda_esperada_2 (202508, '2025-08-31', 0, '2025-07-31', '2025-07-31');
+
+
+%perda_esperada (202501, '2025-01-31', 8, '2025-08-31', '2024-12-31');
+%perda_esperada (202502, '2025-02-28', 7, '2025-08-31', '2025-01-31');
+%perda_esperada (202503, '2025-03-31', 6, '2025-08-31', '2025-02-28');
+%perda_esperada (202504, '2025-04-30', 5, '2025-08-31', '2025-03-31');
+%perda_esperada (202505, '2025-05-31', 4, '2025-08-31', '2025-04-30');
+%perda_esperada (202506, '2025-06-30', 3, '2025-08-31', '2025-05-31');
+%perda_esperada (202507, '2025-07-31', 2, '2025-08-31', '2025-06-30');
+%perda_esperada_2 (202508, '2025-08-31', 1, '2025-08-31', '2025-07-31');
+%perda_esperada_2 (202509, '2025-09-30', 0, '2025-08-31', '2025-08-31');
+
+
+%perda_esperada (202501, '2025-01-31', 9, '2025-09-30', '2024-12-31');
+%perda_esperada (202502, '2025-02-28', 8, '2025-09-30', '2025-01-31');
+%perda_esperada (202503, '2025-03-31', 7, '2025-09-30', '2025-02-28');
+%perda_esperada (202504, '2025-04-30', 6, '2025-09-30', '2025-03-31');
+%perda_esperada (202505, '2025-05-31', 5, '2025-09-30', '2025-04-30');
+%perda_esperada (202506, '2025-06-30', 4, '2025-09-30', '2025-05-31');
+%perda_esperada (202507, '2025-07-31', 3, '2025-09-30', '2025-06-30');
+%perda_esperada_2 (202508, '2025-08-31', 2, '2025-09-30', '2025-07-31');
+%perda_esperada_2 (202509, '2025-09-30', 1, '2025-09-30', '2025-08-31');
+%perda_esperada_2 (202510, '2025-10-31', 0, '2025-09-30', '2025-09-30');
+
+
+%perda_esperada (202502, '2025-02-28', 9, '2025-10-31', '2025-01-31');
+%perda_esperada (202503, '2025-03-31', 8, '2025-10-31', '2025-02-28');
+%perda_esperada (202504, '2025-04-30', 7, '2025-10-31', '2025-03-31');
+%perda_esperada (202505, '2025-05-31', 6, '2025-10-31', '2025-04-30');
+%perda_esperada (202506, '2025-06-30', 5, '2025-10-31', '2025-05-31');
+%perda_esperada (202507, '2025-07-31', 4, '2025-10-31', '2025-06-30');
+%perda_esperada_2 (202508, '2025-08-31', 3, '2025-10-31', '2025-07-31');
+%perda_esperada_2 (202509, '2025-09-30', 2, '2025-10-31', '2025-08-31');
+%perda_esperada_2 (202510, '2025-10-31', 1, '2025-10-31', '2025-09-30');
+%perda_esperada_2 (202511, '2025-11-30', 0, '2025-10-31', '2025-10-31');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DATA CUBO_EXPORT_MAIOR90;
+SET CUBO_EXPORT_202:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Perda Esperada_Maior90 */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Análise_Variacao_Saldo */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 51 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Análise_Variacao_Saldo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-zBAO1ksCAZTvgG8E/code.sas */
+/* =========================INÍCIO TASK========================= */
+%macro variacao_saldo (anomes, dt_inicio_reneg, dt_fim_reneg, dt_fim_m0, dt_fim_anomes);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_SIMULADOR_&anomes. AS
+SELECT *
+
+FROM CONNECTION TO PERM(
+
+SELECT DISTINCT
+	nucontratogestao,
+	sqcontratofinanceiro,
+	nucontratogestaonovo,
+	sqcontratofinanceironovo,
+	dt_baixa,
+	dt_reneg,
+	CAST(vr_presente AS NUMERIC) AS vr_presente,
+	CAST(vr_financiado AS NUMERIC) AS vr_financiado,
+	qt_parcela,
+	qt_parc_aberta,
+	vr_prestacao,
+	vr_desconto_mora,
+	vr_desconto_multa,
+	vr_desconto_principal,
+	CAST(tx_pactuada AS NUMERIC) AS tx_pactuada,
+	CAST(tx_contrato AS NUMERIC) AS tx_contrato,
+
+	FlRestruturacaoContrato
+
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE dt_baixa >= &dt_inicio_reneg. AND dt_baixa < &dt_fim_reneg.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+)
+;QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M0 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &dt_fim_m0.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M1 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &dt_fim_anomes.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+CREATE TABLE CALCULA_ATRASO AS
+SELECT *
+FROM CONNECTION TO PERM(
+
+SELECT DISTINCT
+    A.nucontratogestao,
+    A.sqcontratofinanceiro,
+	A.dt_baixa,
+	MIN(B.dt_vencimento) as dt_vencimento,
+
+
+    MAX(DATE_DIFF(A.dt_baixa, B.dt_vencimento, DAY)) as atraso
+
+FROM (
+  SELECT DISTINCT
+	nucontratogestao,
+	sqcontratofinanceiro,
+	MAX(DATE(dt_baixa)) as dt_baixa,
+	MAX(DATE(dt_reneg)) as dt_reneg
+
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE dt_baixa >= &dt_inicio_reneg. AND dt_baixa < &dt_fim_reneg.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+group by 1,2
+) A
+
+LEFT JOIN (
+  SELECT DISTINCT
+	cd_contrato,
+	sq_contrato_financeiro,
+	st_parcela,
+	DATE(dt_ultimo_recebimento) as dt_ultimo_recebimento,
+	DATE(dt_vencimento) as dt_vencimento
+
+FROM bv-pdbd-prd.dvry_core.tbparcela
+
+) B
+ON B.cd_contrato = A.nucontratogestao and B.sq_contrato_financeiro = A.sqcontratofinanceiro
+WHERE B.st_parcela = 'A' OR (B.st_parcela = 'Q' and date(B.dt_ultimo_recebimento) >= date(A.dt_baixa))
+
+
+
+group by 1,2,3
+
+)
+;quit;
+
+PROC SQL;
+CREATE TABLE SIMULADOR_FINAL_&anomes. AS
+SELECT
+	A.*,
+	E.atraso as ATRASO_RENEG,
+	CASE
+		WHEN E.atraso < 0 THEN "0000-0000"
+		WHEN E.atraso < 31 THEN "0001-0030"
+		WHEN E.atraso < 61 THEN "0031-0060"
+		WHEN E.atraso < 91 THEN "0061-0090"
+		WHEN E.atraso < 121 THEN "0091-0120"
+		WHEN E.atraso < 151 THEN "0121-0150"
+		WHEN E.atraso < 181 THEN "0151-0180"
+		WHEN E.atraso < 361 THEN "0181-0360"
+		WHEN E.atraso >= 361 THEN "0361-9999"
+	END AS FX_ATRASO_RENEG,
+	C.PRODUTO,
+	C.vr_saldo_carteira AS SALDO_M0,
+	C.vr_provisao_total AS PROVISAO_M0,
+	D.vr_saldo_carteira AS SALDO_M1,
+	D.vr_provisao_total AS PROVISAO_M1,
+	(D.vr_saldo_carteira-C.vr_saldo_carteira)/C.vr_saldo_carteira AS VAR_SALDO_PCT
+
+FROM RENEG_SIMULADOR_&ANOMES. AS A
+
+LEFT JOIN RPDD_M0 AS C
+ON A.NuContratogestao = C.cd_contrato
+
+LEFT JOIN RPDD_M1 AS D
+ON A.NuContratogestao = D.cd_contrato
+
+LEFT JOIN CALCULA_ATRASO AS E
+ON A.NuContratogestao = E.NuContratogestao
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_&anomes. AS
+SELECT
+	&ANOMES. AS SAFRA,
+	PRODUTO,
+	FX_ATRASO_RENEG,
+	COUNT(NUCONTRATOGESTAO) AS QNT,
+	SUM(SALDO_M0) AS SALDO_M0,
+	SUM(SALDO_M1) AS SALDO_M1
+
+FROM SIMULADOR_FINAL_&anomes.
+GROUP BY SAFRA, PRODUTO, FX_ATRASO_RENEG
+;QUIT;
+
+%mend;
+
+%variacao_saldo (202501, '2025-01-01', '2025-02-01', '2024-12-31', '2025-01-31');
+%variacao_saldo (202502, '2025-02-01', '2025-03-01', '2025-01-31', '2025-02-28');
+%variacao_saldo (202503, '2025-03-01', '2025-04-01', '2025-02-28', '2025-03-31');
+%variacao_saldo (202504, '2025-04-01', '2025-05-01', '2025-03-31', '2025-04-30');
+%variacao_saldo (202505, '2025-05-01', '2025-06-01', '2025-04-30', '2025-05-31');
+%variacao_saldo (202506, '2025-06-01', '2025-07-01', '2025-05-31', '2025-06-30');
+%variacao_saldo (202507, '2025-07-01', '2025-08-01', '2025-06-30', '2025-07-31');
+%variacao_saldo (202508, '2025-08-01', '2025-09-01', '2025-07-31', '2025-08-31');
+%variacao_saldo (202509, '2025-09-01', '2025-10-01', '2025-08-31', '2025-09-30');
+%variacao_saldo (202510, '2025-10-01', '2025-11-01', '2025-09-30', '2025-10-31');
+%variacao_saldo (202511, '2025-11-01', '2025-12-01', '2025-10-31', '2025-11-30');
+%variacao_saldo (202512, '2025-12-01', '2026-01-01', '2025-11-30', '2025-12-31');
+
+DATA CUBO_FINAL;
+SET CUBO_2025:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Análise_Variacao_Saldo */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME MARCACAO    '/riscosbv/cobranca/gtavares/Reneg/Marcacao';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+proc datasets library=work kill nolist;
+quit;
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro perda_esperada(anomes, fim_mes_m1, mob, fim_mes_mob, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO = '000-000'; ELSE
+IF NUDIASATRASO <= 4 		THEN FX_ATRASO = '001-004'; ELSE
+IF NUDIASATRASO <= 15 		THEN FX_ATRASO = '005-015'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO = '016-030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO = '031-060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO = '061-090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO = '091-120'; ELSE
+IF NUDIASATRASO <= 150 		THEN FX_ATRASO = '121-150'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO = '151-180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO = '181-360';
+ELSE FX_ATRASO = '361-999';
+
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO_2 = '000-000'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO_2 = '001-030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO_2 = '031-060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO_2 = '061-090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO_2 = '091-120'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO_2 = '121-180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO_2 = '181-360';
+ELSE FX_ATRASO_2 = '361-999';
+RUN;
+
+proc sort data=BASE_ELEG NODUPKEY;
+by _all_;
+run;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M0 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_m0.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_MOB AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_mob.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RPDD AS
+SELECT
+	A.*,
+	C.PRODUTO,
+	C.vr_saldo_carteira AS SALDO_M0,
+	C.vr_provisao_total AS PROVISAO_M0,
+	D.vr_saldo_carteira AS SALDO_MOB,
+	D.vr_provisao_total AS PROVISAO_MOB
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN RPDD_M0 AS C
+ON A.NuContrato = INPUT(C.cd_contrato, BEST32.)
+
+LEFT JOIN RPDD_MOB AS D
+ON A.NuContrato = INPUT(D.cd_contrato, BEST32.)
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT_&anomes._&mob. AS
+SELECT
+	&anomes. 	AS SAFRA,
+	&MOB. 		AS MOB,
+	PRODUTO,
+	FX_ATRASO,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	COUNT(NUCONTRATO) 	AS QNT,
+	SUM(SALDO_M0) 		AS SALDO_M0,
+	SUM(SALDO_MOB) 		AS SALDO_MOB,
+	SUM(PROVISAO_M0) 	AS PROVISAO_M0,
+	SUM(PROVISAO_MOB) 	AS PROVISAO_MOB
+
+FROM RENEG_RPDD
+GROUP BY
+	SAFRA,
+	MOB,
+	PRODUTO,
+	FX_ATRASO,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA
+
+;QUIT;
+
+%mend;
+
+%macro perda_esperada_2(anomes, fim_mes_m1, mob, fim_mes_mob, fim_mes_m0);
+
+%LET TABELA = marcacao_reneg_tescon_&anomes.;
+%DESCOMPACTA(MARCACAO, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO = '000-000'; ELSE
+IF NUDIASATRASO <= 4 		THEN FX_ATRASO = '001-004'; ELSE
+IF NUDIASATRASO <= 15 		THEN FX_ATRASO = '005-015'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO = '016-030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO = '031-060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO = '061-090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO = '091-120'; ELSE
+IF NUDIASATRASO <= 150 		THEN FX_ATRASO = '121-150'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO = '151-180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO = '181-360';
+ELSE FX_ATRASO = '361-999';
+
+IF NUDIASATRASO <= 0 		THEN FX_ATRASO_2 = '000-000'; ELSE
+IF NUDIASATRASO <= 30		THEN FX_ATRASO_2 = '001-030'; ELSE
+IF NUDIASATRASO <= 60 		THEN FX_ATRASO_2 = '031-060'; ELSE
+IF NUDIASATRASO <= 90 		THEN FX_ATRASO_2 = '061-090'; ELSE
+IF NUDIASATRASO <= 120 		THEN FX_ATRASO_2 = '091-120'; ELSE
+IF NUDIASATRASO <= 180 		THEN FX_ATRASO_2 = '121-180'; ELSE
+IF NUDIASATRASO <= 360 		THEN FX_ATRASO_2 = '181-360';
+ELSE FX_ATRASO_2 = '361-999';
+RUN;
+
+proc sort data=BASE_ELEG NODUPKEY;
+by _all_;
+run;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_M0 AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_m0.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RPDD_MOB AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &fim_mes_mob.);
+   DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RPDD AS
+SELECT
+	A.*,
+	C.PRODUTO,
+	C.vr_saldo_carteira AS SALDO_M0,
+	C.vr_provisao_total AS PROVISAO_M0,
+	D.vr_saldo_carteira AS SALDO_MOB,
+	D.vr_provisao_total AS PROVISAO_MOB
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN RPDD_M0 AS C
+
+ON A.NuContrato = C.cd_contrato
+
+LEFT JOIN RPDD_MOB AS D
+
+ON A.NuContrato = D.cd_contrato
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT_&anomes._&mob. AS
+SELECT
+	&anomes. 	AS SAFRA,
+	&MOB. 		AS MOB,
+	PRODUTO,
+	FX_ATRASO,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA,
+	COUNT(NUCONTRATO) 	AS QNT,
+	SUM(SALDO_M0) 		AS SALDO_M0,
+	SUM(SALDO_MOB) 		AS SALDO_MOB,
+	SUM(PROVISAO_M0) 	AS PROVISAO_M0,
+	SUM(PROVISAO_MOB) 	AS PROVISAO_MOB
+
+FROM RENEG_RPDD
+GROUP BY
+	SAFRA,
+	MOB,
+	PRODUTO,
+	FX_ATRASO,
+	CLUSTER,
+	PERCENT_PAGO,
+	ELEGIBILIDADE_P0,
+	ELEGIBILIDADE_P0_CARÊNCIA,
+	ELEGIBILIDADE_P0_FLEX_TAXA,
+	ELEGIBILIDADE_P1,
+	ELEGIBILIDADE_ADP,
+	ELEGIBILIDADE_RASTREADOR,
+	ELEGIBILIDADE_PRICING,
+	ELEGIBILIDADE_EXPANSAO_5_15,
+	ELEGIBILIDADE_EXPANSAO_5_25,
+	ELEGIBILIDADE_BOLHA
+
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%perda_esperada (202503, '2025-03-31', 9, '2025-11-30', '2025-02-28');
+%perda_esperada (202504, '2025-04-30', 8, '2025-11-30', '2025-03-31');
+%perda_esperada (202505, '2025-05-31', 7, '2025-11-30', '2025-04-30');
+%perda_esperada (202506, '2025-06-30', 6, '2025-11-30', '2025-05-31');
+%perda_esperada (202507, '2025-07-31', 5, '2025-11-30', '2025-06-30');
+%perda_esperada_2 (202508, '2025-08-31', 4, '2025-11-30', '2025-07-31');
+%perda_esperada_2 (202509, '2025-10-31', 3, '2025-11-30', '2025-08-31');
+%perda_esperada_2 (202510, '2025-10-31', 2, '2025-11-30', '2025-09-30');
+%perda_esperada_2 (202511, '2025-11-30', 1, '2025-11-30', '2025-10-31');
+%perda_esperada_2 (202512, '2025-12-31', 0, '2025-11-30', '2025-11-30');
+
+DATA CUBO_EXPORT_MENOR90;
+SET CUBO_EXPORT_202:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ASSESSORIA_V1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ASSESSORIA_V1 AS
+   SELECT t1.NuContrato,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.BASE_ASSESSORIA_V1 t1
+      GROUP BY t1.NuContrato;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%variacao_saldo (202506, '2025-06-01', '2025-07-01', '2025-05-31', '2025-06-30');
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */

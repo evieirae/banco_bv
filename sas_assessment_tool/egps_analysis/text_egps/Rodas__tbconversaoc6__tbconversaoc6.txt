@@ -1,0 +1,199 @@
+START_METADATA
+PROJECT: Rodas__tbconversaoc6
+FILE_SAS: tbconversaoc6.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 137
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAt, a0, a1, safraM13
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPESSOA [SAS/Local], CONVSIMU.CONVERSAO_SIMULACAO_V2 [SAS/Local], TMP.TBORIGINACAO&A0 [SAS/Local], TMP.TBORIGINACAO&A1 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], BASES.TBPESSOA [PROC SQL - JOIN], CONVSIMU.CONVERSAO_SIMULACAO_V2 [PROC SQL - FROM], TMP.TBORIGINACAO&A0 [DATA Step - SET], TMP.TBORIGINACAO&A1 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.TBCONVERSAOC6
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CONVERSAOC6_DADOSCLIENTE, CONVSIMU, CONVSIMU002, ORIGINACAO, TBCOLABORADOR, TBCOLABORADORPDV
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{A0}, TMP.TBORIGINACAO{A1}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* |	Alteração:	Incluido Origem PPAR2								 				| */
+/* |	Resp: 		Gustavo Domingues - MIS IGE											| */
+/* |	Data:		04/03/2025															| */
+/* ====================================================================================== */
+
+%include '/infogrc/utils/all-includes.sas';
+options compress=yes;
+/*
+%VerificaAtualizacao(/infogrc/convsimu/conversao_simulacao_v2.sas7bndx,24,300);
+
+data _null_;
+rc = sleep(900, 1);
+run;
+*/
+PROC SQL;
+CREATE TABLE Convsimu AS
+  SELECT * FROM CONVSIMU.CONVERSAO_SIMULACAO_V2
+ WHERE
+    Canal IN ('CONCESSIONARIAS','MULTIMARCAS')
+    AND FlSimuValidaEfet = 1
+    AND TpPessoa = 'PF'
+    AND SistemaInicial IN ('ACOM','APAR','PPAR','PPAR2')
+    AND FlConversao = 1
+    AND FlConcorrente = 1
+    AND Produto = 'Leves'
+	or Canal IN ('NEGOCIOS CENTRALIZADOS')
+    AND FlSimuValidaEfet = 1
+    AND TpPessoa = 'PF'
+    AND FlConversao = 1
+    AND FlConcorrente = 1
+    AND Produto = 'Leves';
+
+RUN;
+
+/* Busca dados de GF e GR */
+PROC SQL;
+CREATE TABLE TbColaboradorPDV AS
+  SELECT DISTINCT
+    CdColaboradorC AS CdColaborador,
+    NmColaboradorC,
+    CdParceiroComercial,
+    NmParceiroComercial,
+    LstSubstituicaoC
+  FROM BASES.TbParceiroComercial
+  WHERE
+    CdParceiroComercial <> .
+    AND CdColaboradorC <> .;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbColaborador AS
+  SELECT
+    A.DsLoginN1 AS CdGR,
+    A.DsLoginN2A AS CdGF,
+    B.LstSubstituicaoC AS LstFocais,
+    B.CdParceiroComercial
+  FROM
+    BASES.TbEstruturaComercial A
+  INNER JOIN
+    TbColaboradorPDV B
+    ON A.CdColaboradorAtivo = B.CdColaborador
+  WHERE
+    TODAY() BETWEEN A.DtInicioVigencia AND A.DtFimVigencia
+    AND A.DsLoginN1 IS NOT NULL
+    AND A.DsLoginN2A IS NOT NULL;
+RUN;
+
+PROC SQL;
+CREATE TABLE Convsimu002 AS
+  SELECT
+    A.NuAnoMes,
+    A.Banco,
+    A.CdParceiroComercial,
+    A.NmParceiroComercial,
+    A.Regional,
+    A.Filial,
+    B.CdGF,
+    B.CdGR,
+    B.LstFocais,
+    A.CdSimulacaoInicial,
+    CASE WHEN A.NuTelefone <> '()' THEN A.NuTelefone END AS NuTelefone,
+    A.StatusSimulacao,
+    A.Mensageria,
+    A.NuCpfCnpj,
+    A.NuProposta,
+    A.DtRetornoCetip,
+    A.FxIdade,
+    A.StPagoLoja
+  FROM
+    Convsimu A
+  LEFT JOIN
+    TbColaborador B
+    ON A.CdParceiroComercial = B.CdParceiroComercial;
+RUN;
+
+DATA Originacao (KEEP=NuProposta FlTxAlterada);
+SET TMP.TbOriginacao&a1. - TMP.TbOriginacao&a0.;
+  WHERE NuAnoMes >= &safraM13.
+    AND NmGrupoProdutoMeta = 'Leves'
+    AND DsTipoCanalProducao IN ('CONCESSIONARIAS','MULTIMARCAS','NEGOCIOS CENTRALIZADOS');
+RUN;
+
+PROC SQL;
+SELECT MAX(DtSimulacaoInicial) INTO :DtAt FROM CONVSIMU.CONVERSAO_SIMULACAO_V2;
+RUN;
+
+PROC SQL;
+CREATE TABLE ConversaoC6_DadosCliente AS
+  SELECT
+    A.NuAnoMes,
+    A.Banco,
+    A.CdParceiroComercial as CdParceiroComercial,
+    A.NmParceiroComercial,
+    A.Regional,
+    A.Filial,
+    A.CdGF,
+    A.CdGR,
+    A.LstFocais,
+    A.CdSimulacaoInicial,
+    A.StatusSimulacao,
+    A.Mensageria,
+    A.NuCpfCnpj,
+    COALESCE(B.NmPessoa, 'DESCONHECIDO') AS NmPessoa,
+    B.NuTelefone1,
+    B.NuTelefone2,
+    B.NuTelefone3,
+    B.DsEmail,
+    A.NuProposta,
+    C.FlTxAlterada AS FlPA,
+    A.DtRetornoCetip as DtInclusaoGravame,
+    A.StPagoLoja,
+    A.FxIdade,
+    PUT(&DtAt.,DATE9.) AS DtAtualizacao
+  FROM
+    Convsimu002 A
+  LEFT JOIN
+    bases.TbPessoa B
+    ON A.NuCpfCnpj = B.NuCpfCnpj
+  LEFT JOIN
+    Originacao C
+    ON A.NuProposta = C.NuProposta;
+RUN;
+
+%ExportaCSV(ConversaoC6_DadosCliente,ConversaoC6_DadosCliente);
+
+DATA SOLITMP.TbConversaoC6;
+SET ConversaoC6_DadosCliente;
+RUN;

@@ -1,0 +1,429 @@
+START_METADATA
+PROJECT: Rodas__agent_space
+FILE_SAS: 11-Gerainsights_Dia19.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -259
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 331
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (14x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtMaxMsg
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.BASEAGENTESPACEGR_GCP [SAS/Local], AUXL.BASEAGENTESPACEPDV_GCP [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: INPO
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.BASEAGENTESPACEGR_GCP [PROC SQL - FROM], AUXL.BASEAGENTESPACEPDV_GCP [PROC SQL - FROM], BASES.TBCOLABORADOR [PROC SQL - FROM], INPO.TBINSIGHTS [DATA Step - SET; PROC SORT - DATA=; PROC SQL - FROM], INPO.TBMENSAGEM [DATA Step - SET], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): INPO.TBINSIGHTS, INPO.TBMENSAGEM
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): INPO.TBINSIGHTS, INPO.TBINSIGHTS_BKP, INPO.TBMENSAGEM, INPO.TBMENSAGEM_BKP
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PDV, TBCOLABORADOR, TBINSIGHT, TBINSIGHT2, TBINSIGHT3, TBINSIGHT4, TBINSIGHT5, TBINSIGHTSVAZIA, TBMENSAGERIA, TBMENSAGERIA2, TBMENSAGERIA3, TBMENSAGERIA4, TBMENSAGERIA5, TBPDV_GRAV_S_CONT, TBPDV_GRAV_S_CONT_META, TBPDV_MENSAGEM, TBPDV_QUEDA_SHARE, TBPDV_ZERADO_BV, TBPDV_ZERADO_SHARE, TBRECADOPDV
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+Data Inpo.TbInsights_BKP;
+set Inpo.TbInsights
+;run;
+
+Data Inpo.tbMensagem_BKP;
+set Inpo.tbMensagem
+;run;
+
+/*
+Data Inpo.TbInsights;
+set Inpo.TbInsights_BKP
+;run;
+
+Data Inpo.tbMensagem;
+set Inpo.tbMensagem_BKP
+;run;
+*/
+
+proc sql;
+create table tbColaborador as
+select distinct DsLogin,NmColaborador from bases.Tbcolaborador
+where DsLogin<>''
+;run;
+
+/* 1º Primeira mensagem */
+/*analise -  Você tem pdvs que representam mais de 10% da sua meta com Gravames no mercado em sem gravame com a BV/*
+/*Ação - Focar nos PDVS abaixo que estão com a analise acima*/
+
+proc sql;
+create table TbPdv_Grav_s_Cont_Meta as
+select distinct
+/*,input(scan(pdv,1,'-'),10.) as cdpdv*/
+DsLoginN1
+/*,compbl(pdv||'Com Meta de ') || put(TbMetaPDV,2.) ||'%' as PDVMeta*/
+,compbl(pdv||'Com Meta de ') || put(TbMetaPDV ,6.)|| '%' as PDVMeta
+,input(scan(pdv,1,'-'),10.) as PDV
+,'PDVS acima de 10% de meta Sem Contrato BV' as Agrupamento
+,VrMeta
+from auxl.BaseAgenteSpacePDV_GCP
+left join tbMetaPDV on Cdparceirocomercial=input(scan(pdv,1,'-'),10.)
+
+where GR<>''
+and  GravamesMercado_M0 >=1 and GravamesBV_M0 <= 0
+and TbMetaPDV>=10
+order by DsLoginN1
+;run;
+
+proc sql;
+create table TbInsight as
+select
+Today()  as Data format date10.
+,PDV
+,'PDVS acima de 10% de meta Sem Contrato BV' as Agrupamento length=200
+from TbPdv_Grav_s_Cont_Meta
+;run;
+
+data Inpo.TbInsights;
+set Inpo.TbInsights
+ 	 TbInsight
+;run;
+
+proc transpose data=TbPdv_Grav_s_Cont_Meta out=TbPdv_Mensagem (drop=_NAME_) prefix=PDV_;
+    by DsLoginN1  ;
+   /* id DsLoginN1;*/
+    var PDVMeta ;
+run;
+
+proc sql;
+create table TBMENSAGERIA as
+select
+Today()  as Data format date10.
+,DsLoginN1 as Login
+,'Há PDVs que representam uma parte significativa da sua meta com gravames no mercado e sem contratos BV'  as analise length=200
+,compbl('Selecionamos os PDVS com 10% de representatividade :' ||  PDV_1 ||' - '||  PDV_2 ) as Ação  length=200
+from TbPdv_Mensagem
+;run;
+
+data Inpo.tbMensagem;
+set Inpo.tbMensagem
+ 	 TBMENSAGERIA;
+;run;
+
+/* 2º Segunda */
+/*PDVS acima de 10 Gravames no mercado e com queda de no minimo 10pp*/
+
+proc sql;
+create table TbPdv_Queda_Share as
+select distinct
+/*,input(scan(pdv,1,'-'),10.) as cdpdv*/
+DsLoginN1
+,GR
+,compbl(pdv||'Com Meta de ') || put(TbMetaPDV,2.) ||'%' as PDVMeta
+,input(scan(pdv,1,'-'),10.) as PDV
+,'PDVS acima de 10 Gravames no mercado e com queda de no minimo 10pp' as Agrupamento
+,(Share_M0 - Share_M1) as VarSharePP
+,GravamesMercado_M0
+from auxl.BaseAgenteSpacePDV_GCP
+left join tbMetaPDV on Cdparceirocomercial=input(scan(pdv,1,'-'),10.)
+
+where GR<>''
+/*and DsLoginN1='aarao.souza'*/
+and VrMeta > 0
+and GravamesMercado_M0 >=10
+and (Share_M0 - Share_M1)<= -0.10
+and (Share_M0 - Share_M1)<> 0
+order by DsLoginN1
+;run;
+
+Proc sql;
+create table TbMensageria2 as
+Select distinct
+Today()  as Data format date10.
+,DsLoginN1 as Login
+, 'Você tem pdvs com acima de 10 gravames no mercado e com queda de Share de 10pp' as analise
+, 'Focar em relacionamento dos PDVS e no abandono de simulações positivas ' as Ação
+from TbPdv_Queda_Share GR
+where
+1=1
+and GR.DsLoginN1 not in (select Login from tbmensageria)
+order by 2,1
+;run;
+
+data Inpo.tbMensagem;
+set Inpo.tbMensagem
+ 	 TbMensageria2
+;run;
+
+/************************/
+proc sql;
+create table TbInsight2 as
+select distinct
+Today()  as Data format date10.
+,PDV as pdv
+,'PDVS acima de 10 Gravames no mercado e com queda de no minimo 10pp' as Agrupamento
+from TbPdv_Queda_Share
+where GR<>''
+and pdv not in( select pdv from TbInsight)
+;run;
+
+data Inpo.TbInsights;
+set Inpo.TbInsights
+ 	 TbInsight2;
+;run;
+
+/* 3º  mensagem */
+/*PDVS acima de 5 Gravames no mercado, Share anterior maior do que 10% e zerado com a BV*/
+
+proc sql;
+create table TbPdv_zerado_Share as
+select distinct
+/*,input(scan(pdv,1,'-'),10.) as cdpdv*/
+DsLoginN1
+,GR
+,compbl(pdv||'Com Meta de ') || put(TbMetaPDV,2.) ||'%' as PDVMeta
+,input(scan(pdv,1,'-'),10.) as PDV
+,'PDVS acima de 5 Gravames no mercado, Share anterior maior do que 10% e zerado com a BV' as Agrupamento
+,(Share_M0 - Share_M1) as VarSharePP
+,GravamesMercado_M0
+from auxl.BaseAgenteSpacePDV_GCP
+left join tbMetaPDV on Cdparceirocomercial=input(scan(pdv,1,'-'),10.)
+
+where GR<>''
+/*and DsLoginN1='aarao.souza'*/
+and VrMeta > 0
+and GravamesMercado_M0 >=5
+and (Share_M1)>= 0.10
+and (Share_M0)= 0
+order by DsLoginN1
+;run;
+
+Proc sql;
+create table TbMensageria3 as
+Select distinct
+Today()  as Data format date10.
+,DsLoginN1 as Login
+, 'PDVS acima de 5 Gravames no mercado, Share anterior maior do que 10% e zerado com a BV' as analise
+, 'Focar em relacionamento dos PDVS e no abandono de simulações positivas ' as Ação
+from TbPdv_zerado_Share GR
+where
+1=1
+and GR.DsLoginN1 not in (select Login from tbmensageria)
+and GR.DsLoginN1 not in (select Login from tbmensageria2)
+
+order by 2,1
+;run;
+
+data Inpo.tbMensagem;
+set Inpo.tbMensagem
+ 	 TbMensageria3
+;run;
+
+/************************/
+proc sql;
+create table TbInsight3 as
+select distinct
+Today()  as Data format date10.
+,PDV as pdv
+,'PDVS acima de 5 Gravames no mercado, Share anterior maior do que 10% e zerado com a BV' as Agrupamento
+from TbPdv_zerado_Share
+where GR<>''
+and pdv not in( select pdv from TbInsight2)
+and pdv not in( select pdv from TbInsight)
+;run;
+
+data Inpo.TbInsights;
+set Inpo.TbInsights
+ 	 TbInsight3;
+;run;
+
+/* 4º  mensagem */
+/*PDVS acima de 5 Gravames no mercado e zerado com a BV*/
+
+proc sql;
+create table TbPdv_zerado_BV as
+select distinct
+/*,input(scan(pdv,1,'-'),10.) as cdpdv*/
+DsLoginN1
+,GR
+,compbl(pdv||'Com Meta de ') || put(TbMetaPDV,2.) ||'%' as PDVMeta
+,input(scan(pdv,1,'-'),10.) as PDV
+,'PDVS acima de 5 Gravames no mercado e zerado com a BV' as Agrupamento
+from auxl.BaseAgenteSpacePDV_GCP
+left join tbMetaPDV on Cdparceirocomercial=input(scan(pdv,1,'-'),10.)
+where GR<>''
+/*and DsLoginN1='aarao.souza'*/
+and VrMeta > 0
+and GravamesMercado_M0 >=5
+and (Share_M0)= 0
+/*and GravamesBV_M0 <=0*/
+order by DsLoginN1
+;run;
+
+Proc sql;
+create table TbMensageria4 as
+Select distinct
+Today()  as Data format date10.
+,DsLoginN1 as Login
+, 'PDVS acima de 5 Gravames no mercado, Share anterior maior do que 10% e zerado com a BV' as analise
+, 'Focar em relacionamento dos PDVS e no abandono de simulações positivas ' as Ação
+from TbPdv_zerado_BV GR
+where
+1=1
+and GR.DsLoginN1 not in (select Login from tbmensageria)
+and GR.DsLoginN1 not in (select Login from tbmensageria2)
+and GR.DsLoginN1 not in (select Login from tbmensageria3)
+order by 2,1
+;run;
+
+data Inpo.tbMensagem;
+set Inpo.tbMensagem
+ 	 TbMensageria4
+;run;
+
+/************************/
+proc sql;
+create table TbInsight4 as
+select distinct
+Today()  as Data format date10.
+,PDV as pdv
+,'PDVS acima de 5 Gravames no mercado e zerado com a BV' as Agrupamento
+from TbPdv_zerado_BV
+where GR<>''
+and pdv not in( select pdv from TbInsight)
+and pdv not in( select pdv from TbInsight2)
+and pdv not in( select pdv from TbInsight3)
+;run;
+
+data Inpo.TbInsights;
+set Inpo.TbInsights
+ 	 TbInsight4;
+;run;
+
+/* 5º  mensagem */
+/*Mais de 30% de Pdvs C\Gravame e S\Contrato BV*/
+
+proc sql;
+create table TbPdv_Grav_s_Cont as
+select distinct
+GR
+from auxl.BaseAgenteSpacePDV_GCP
+where GR<>''
+and  GravamesMercado_M0 >=1 and GravamesBV_M0 <=0
+and input(scan(pdv,1,'-'),10.) in (select PDV from TbPdv_Grav_s_Cont_Meta)
+group by GR
+;run;
+
+/************************/
+proc sql;
+create table TbRecadoPDV as
+select
+GR
+,sum(case when GravamesMercado_M0 >=1 and GravamesBV_M0 <=0 then GravamesMercado_M0 else 0 end) as GravamesGR_SemContrato
+,sum(case when GravamesMercado_M0 >=1 and GravamesBV_M0 <=0 then GravamesMercado_M0 else 0 end)*35000 as VrGravameMercado
+,Sum(GravamesMercado_M0) as QtdGravamesCarteira
+,sum(GravamesBV_M0) as QtdContratosCarteira
+,sum(case when GravamesMercado_M0 >=1 and GravamesBV_M0 <=0 then 1 else 0 end) as QTDPdvsGR_SemContrato
+,count(distinct PDV) as QtdPDVsCarteira
+,(calculated QTDPdvsGR_SemContrato / calculated QtdPDVsCarteira)*100  as PDVsSemProduçãoBV
+,(calculated GravamesGR_SemContrato / calculated QtdGravamesCarteira)*100 as PDVsSemRepresentaTotal
+from auxl.BaseAgenteSpacePDV_GCP
+where GR<>''
+and GR not in (select GR from TbPdv_Grav_s_Cont)
+group by GR
+having calculated PDVsSemProduçãoBV>=30
+;run;
+
+Proc sql;
+create table TbMensageria5 as
+Select distinct
+Today()  as Data format date10.
+,DsLogin as Login
+, 'Você tem mais do que 30% de PDVS com produção no Mercado e sem contrato bv' as analise
+, 'Focar em relacionamento em PDVS zerados com a BV e com Gravame no Mercado' as Ação
+
+from auxl.BaseAgenteSpaceGR_GCP GR
+
+Left join tbColaborador on GR.GR = NmColaborador
+INNER join TbRecadoPDV Rec on Rec.GR = GR.GR
+
+where DsLogin not in (select login from TbMensageria)
+and DsLogin not in (select login from TbMensageria2)
+and DsLogin not in (select login from TbMensageria3)
+and DsLogin not in (select login from TbMensageria4)
+and Login<>''
+order by 2,1
+;run;
+
+data Inpo.tbMensagem;
+set Inpo.tbMensagem
+ 	 TbMensageria5;
+;run;
+
+/************************/
+proc sql;
+create table TbInsight5 as
+select distinct
+Today()  as Data format date10.
+,input(scan(pdv,1,'-'),10.) as pdv
+,'Mais de 30% de Pdvs C\Gravame e S\Contrato BV' as Agrupamento
+from auxl.BaseAgenteSpacePDV_GCP
+where GR<>''
+and GR in (select distinct GR from TbRecadoPDV)
+and input(scan(pdv,1,'-'),10.) not in( select pdv from TbInsight)
+and input(scan(pdv,1,'-'),10.) not in( select pdv from TbInsight2)
+and input(scan(pdv,1,'-'),10.) not in( select pdv from TbInsight3)
+and input(scan(pdv,1,'-'),10.) not in( select pdv from TbInsight4)
+and GravamesMercado_M0 >=1 and GravamesBV_M0<=0
+;run;
+
+data Inpo.TbInsights;
+set Inpo.TbInsights
+ 	 TbInsight5;
+;run;
+
+PROC SQL;
+SELECT MAX(data) format date9. INTO :DtMaxMsg  FROM Inpo.TbInsights;
+RUN;
+
+proc sql;
+create table TbInsightsVazia as
+select distinct
+ Today()  as Data format date10.
+,cdparceirocomercial as PDV
+,'' as Agrupamento
+from tmp.tbparceirocomercial
+where  1=1
+and flativo = 'S'
+and pdv not in(select distinct pdv from Inpo.TbInsights Where Data = "&DtMaxMsg."d)
+;run;
+
+data Inpo.TbInsights;
+set Inpo.TbInsights
+ 	 TbInsightsVazia;
+;run;
+
+PROC SORT DATA=Inpo.TbInsights NODUPKEY;
+BY Data	PDV;
+RUN;

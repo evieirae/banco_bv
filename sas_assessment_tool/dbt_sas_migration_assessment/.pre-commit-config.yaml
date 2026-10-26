@@ -1,0 +1,246 @@
+files: ^models/
+
+repos:
+  - repo: https://github.com/dbt-checkpoint/dbt-checkpoint
+    rev: v2.0.5
+    hooks:
+    # This is the only pos-build in this repo. Other ones are custom hooks in the local repo, located in the end of this file.
+    - id: check-model-has-all-columns
+      name: Ensure all columns defined in the properties file exists in the database and vice versa.
+      alias: pos-build
+      args: ["--catalog", "target/catalog.json"]
+
+    - id: check-model-columns-have-desc
+      name: Ensure models have descriptions in all its columns.
+      alias: pre-build
+
+    - id: check-model-has-description
+      name: Ensure every model has a description in its yaml file.
+      alias: pre-build
+
+    - id: check-source-table-has-description
+      name: Ensure every source has a description on the yaml file.
+      alias: pre-build
+
+    - id: check-script-has-no-table-name
+      name: Ensures that the script is using only source or ref macro to specify the table name.
+      alias: pre-build
+      exclude: ^models/marts/conformed_dimensions/dim_dates.sql
+
+    - id: check-model-has-tests
+      name: Ensure every model has at least 2 data-tests configured.
+      alias: pre-build
+      args: ["--test-cnt", "2", "--"]
+      exclude: models/staging/
+
+    # Source checks
+    - id: check-source-has-meta-keys
+      name: Ensures that the source has a list of valid meta keys. (usually schema.yml).
+      args: ['--meta-keys', 'contains_pii', 'source_system', 'source_owner', 'source_contact_email', 'load_frequency', "--"]
+      alias: pre-build
+
+    # Staging checks happen with custom hooks since this layer only have ephemeral models and certain hooks dont work with this kind of models.
+
+    # Trusted checks
+    - id: check-model-has-meta-keys
+      name: Ensures that every trusted model has a list of valid meta keys. (usually schema.yml).
+      files: ^models/trusted/
+      args: ["--include-disabled", '--meta-keys', 'graining', 'contains_pii', 'table_owner', 'area_owner', 'email_owner', 'model_maturity', 'access_type', 'load_frequency', "--"]
+      alias: pre-build
+
+    - id: check-model-has-meta-keys
+      name: Ensures that every databricks trusted monitoring model has a list of valid meta keys. (usually schema.yml).
+      files: ^models/monitoring/monitoring_databricks/trusted/
+      args: ["--include-disabled", '--meta-keys', 'graining', 'contains_pii', 'table_owner', 'area_owner', 'email_owner', 'model_maturity', 'access_type', 'load_frequency', "--"]
+      alias: pre-build-databricks
+
+    - id: check-model-has-meta-keys
+      name: Ensures that every snowflake trusted monitoring model has a list of valid meta keys. (usually schema.yml).
+      files: ^models/monitoring/monitoring_snowflake/trusted/
+      args: ["--include-disabled", '--meta-keys', 'graining', 'contains_pii', 'table_owner', 'area_owner', 'email_owner', 'model_maturity', 'access_type', 'load_frequency', "--"]
+      alias: pre-build-snowflake
+
+    - id: check-model-name-contract
+      name: Check model name contract Trusted.
+      args: [--pattern, "(tru_).*"]
+      files: ^models/trusted/
+      alias: pre-build
+
+    # Marts checks
+    - id: check-model-has-meta-keys
+      name: Ensures that every marts model has a list of valid meta keys. (usually schema.yml).
+      files: ^models/marts/
+      args: ['--meta-keys', 'graining', 'contains_pii', 'table_owner', 'area_owner', 'email_owner', 'model_maturity', 'access_type', 'load_frequency', 'main_kpis', "--"]
+      alias: pre-build
+
+    - id: check-model-has-meta-keys
+      name: Ensures that every marts monitoring model has a list of valid meta keys. (usually schema.yml).
+      files: ^models/monitoring/monitoring_databricks/marts/
+      args: ['--meta-keys', 'graining', 'contains_pii', 'table_owner', 'area_owner', 'email_owner', 'model_maturity', 'access_type', 'load_frequency', 'main_kpis', "--"]
+      alias: pre-build-databricks
+
+    - id: check-model-has-meta-keys
+      name: Ensures that every snowflake marts monitoring model has a list of valid meta keys. (usually schema.yml).
+      files: ^models/monitoring/monitoring_snowflake/marts/
+      args: ['--meta-keys', 'graining', 'contains_pii', 'table_owner', 'area_owner', 'email_owner', 'model_maturity', 'access_type', 'load_frequency', 'main_kpis', "--"]
+      alias: pre-build-snowflake
+
+    - id: check-model-name-contract
+      name: Check model name contract marts.
+      args: [--pattern, "(dim_|fct_).*"]
+      files: ^models/marts/
+      alias: pre-build
+
+    # Serving checks
+    - id: check-model-has-meta-keys
+      name: Ensures that every serving model has a list of valid meta keys. (usually schema.yml).
+      files: ^models/serving/|^models/monitoring/monitoring_databricks/serving/|^models/monitoring/monitoring_snowflake/serving/
+      args: ['--meta-keys', 'graining', 'contains_pii', 'table_owner', 'area_owner', 'email_owner', 'model_maturity', 'access_type', 'main_kpis', 'product_usage', 'load_frequency', "--"]
+      alias: pre-build
+
+    - id: check-model-name-contract
+      name: Check model name contract serving.
+      args: [--pattern, "(obt_).*"]
+      files: ^models/serving/
+      alias: pre-build
+
+  # Checking ephemeral models
+  - repo: local
+    hooks:
+      - id: custom-check-model-columns-have-desc
+        name: Ensure stagings have descriptions in all its columns.
+        entry: hooks/custom-check-model-columns-have-desc.py
+        language: python
+        alias: pre-build
+        additional_dependencies:
+          - PyYAML
+        files: models/staging/
+        args:
+          - --include-ephemeral
+  - repo: local
+    hooks:
+      - id: custom-check-model-has-description
+        name: Ensure stagings has a description in its yaml file.
+        entry: hooks/custom-check-model-has-description.py
+        language: python
+        alias: pre-build
+        additional_dependencies:
+          - PyYAML
+        files: models/staging/
+        args:
+          - --include-ephemeral
+  - repo: local
+    hooks:
+      - id: custom-check-model-has-tests
+        name: Ensure stagings have at least two tests.
+        entry: hooks/custom-check-model-has-tests.py
+        language: python
+        alias: pre-build
+        additional_dependencies:
+          - PyYAML
+        files: models/staging/
+        args:
+          - --include-ephemeral
+          - --test-cnt
+          - "2"
+          - --
+  # Custom hook to check the presence of some columns
+  - repo: local
+    hooks:
+      - id: check-ephemeral-models-column-name-exists
+        name: Ensure staging models have required SQL columns
+        entry: hooks/check-ephemeral-models-column-name-exists.py
+        language: python
+        alias: pre-build
+        additional_dependencies:
+          - PyYAML
+        files: models/staging/
+        args:
+          - --include-ephemeral
+          - --meta-columns
+          - extracted_at
+          - updated_at
+          - system_name
+          - --
+
+      - id: check-column-name-exists
+        name: Ensure trusted models have required SQL columns
+        entry: hooks/check-column-name-exists.py
+        language: python
+        alias: pos-build
+        additional_dependencies:
+          - PyYAML
+        files: models/trusted/
+        args:
+          - --meta-columns
+          - extracted_at
+          - updated_at
+          - loaded_at
+          - --
+
+      - id: check-column-name-exists
+        name: Ensure marts models have required SQL columns
+        entry: hooks/check-column-name-exists.py
+        language: python
+        alias: pos-build
+        additional_dependencies:
+          - PyYAML
+        files: models/marts/
+        args:
+          - --meta-columns
+          - updated_at
+          - loaded_at
+          - --
+
+      - id: check-column-name-exists
+        name: Ensure serving models have required SQL columns
+        entry: hooks/check-column-name-exists.py
+        language: python
+        alias: pos-build
+        additional_dependencies:
+          - PyYAML
+        files: models/serving/
+        args:
+          - --meta-columns
+          - updated_at
+          - loaded_at
+          - --
+
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.0.7
+    hooks:
+    - id: sqlfluff-lint
+      name: SQLFluff lint (Databricks)
+      alias: pre-build-databricks
+      language: python
+      exclude: models/monitoring/monitoring_snowflake
+      # Need these two dependencies.
+      # sqlfluff-templater-dbt should match the version of sqlfluff above in rev (pip show sqlfluff-templater-dbt)
+      # dbt-databricks needs to match the version in requirements.txt.
+      additional_dependencies:
+        ["sqlfluff-templater-dbt==3.0.7", "dbt-databricks==v1.8.5"]
+      args:
+        [--config, .sqlfluff, --dialect, databricks]
+
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.0.7
+    hooks:
+    - id: sqlfluff-lint
+      name: SQLFluff lint (Snowflake)
+      alias: pre-build-snowflake
+      language: python
+      exclude: models/monitoring/monitoring_databricks
+      # Need these two dependencies.
+      # sqlfluff-templater-dbt should match the version of sqlfluff above in rev (pip show sqlfluff-templater-dbt)
+      # dbt-snowflake needs to match the version in requirements.txt.
+      additional_dependencies:
+        ["sqlfluff-templater-dbt==3.0.7", "dbt-snowflake"]
+      args:
+        [--config, .sqlfluff, --dialect, snowflake]
+
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        alias: pre-build
+        args: [-c=.yamllint]

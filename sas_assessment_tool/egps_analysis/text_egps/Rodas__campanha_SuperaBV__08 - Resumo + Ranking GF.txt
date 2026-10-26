@@ -1,0 +1,434 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 08 - Resumo + Ranking GF.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -394
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 291
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: RANK, SORT, SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CSBV = /infogrc/Campanha_SuperaBV
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.ARQ_META_ORCAMENTO [SAS/Local], BASEGRC.TBMETANAOISONOMICA [SAS/Local], CSBV.TBSUPERABV [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_HC_CN, WORK.BASE_HC_CN_02, WORK.BASE_SUPERABV_RESUMO_GF, WORK.BASE_SUPERABV_RESUMO_GF_05, WORK.BASE_SUPERABV_RESUMO_GF_CN, WORK.BASE_SUPERABV_RESUMO_GF_CV, WORK.TBENCARTEIRAMENTONI, WORK.TBENCARTEIRAMENTONI_02
+IMPORTED_LIBNAMES: CSBV
+EXPORTED_LIBNAMES: CSBV
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_HC_CN, WORK.BASE_HC_CN_02, WORK.BASE_SUPERABV_RESUMO_GF, WORK.BASE_SUPERABV_RESUMO_GF_01, WORK.BASE_SUPERABV_RESUMO_GF_02, WORK.BASE_SUPERABV_RESUMO_GF_03, WORK.BASE_SUPERABV_RESUMO_GF_04, WORK.BASE_SUPERABV_RESUMO_GF_05, WORK.BASE_SUPERABV_RESUMO_GF_CN, WORK.BASE_SUPERABV_RESUMO_GF_CV, WORK.TBENCARTEIRAMENTONI, WORK.TBENCARTEIRAMENTONI_02, WORK.TBMETANAOISONOMICA, WORK.TBSUPERABV_CN
+TABLE_READ_PROVENANCE (Flow): BASEGRC.ARQ_META_ORCAMENTO [DATA Step - SET], BASEGRC.TBMETANAOISONOMICA [DATA Step - SET], CSBV.TBSUPERABV [DATA Step - SET; PROC SQL - FROM], WORK.BASE_HC_CN [PROC SQL - FROM], WORK.BASE_HC_CN_02 [PROC SQL - JOIN], WORK.BASE_SUPERABV_RESUMO_GF [PROC SORT - DATA=], WORK.BASE_SUPERABV_RESUMO_GF_01 [PROC RANK - DATA=], WORK.BASE_SUPERABV_RESUMO_GF_02 [PROC SORT - DATA=], WORK.BASE_SUPERABV_RESUMO_GF_03 [PROC RANK - DATA=], WORK.BASE_SUPERABV_RESUMO_GF_04 [PROC SQL - FROM], WORK.BASE_SUPERABV_RESUMO_GF_05 [DATA Step - SET], WORK.BASE_SUPERABV_RESUMO_GF_CN [DATA Step - SET], WORK.BASE_SUPERABV_RESUMO_GF_CV [DATA Step - SET], WORK.TBENCARTEIRAMENTONI [DATA Step - SET; PROC SQL - FROM], WORK.TBENCARTEIRAMENTONI_02 [PROC SQL - JOIN], WORK.TBMETANAOISONOMICA [PROC SQL - FROM], WORK.TBSUPERABV_CN [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CSBV.TBSUPERABV
+COMMENT-ONLY QUALIFIED READS (SAS comments only, not executable scan): CSBV.TBSUPERABV_RESUMO_GF
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CSBV.TBENCARTEIRAMENTONI, CSBV.TBENCARTEIRAMENTONI_ANALITICA, CSBV.TBSUPERABV_RESUMO_GF
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_HC_CN, BASE_HC_CN_02, BASE_SUPERABV_RESUMO_GF, BASE_SUPERABV_RESUMO_GF_05, BASE_SUPERABV_RESUMO_GF_CN, BASE_SUPERABV_RESUMO_GF_CV, PRIMEIRO_RANKING_GF_MED, PRIMEIRO_RANKING_GF_PTS, TBENCARTEIRAMENTONI, TBENCARTEIRAMENTONI_02, TBSUPERABV_CN, WORK.BASE_SUPERABV_RESUMO_GF_01, WORK.BASE_SUPERABV_RESUMO_GF_02, WORK.BASE_SUPERABV_RESUMO_GF_03, WORK.BASE_SUPERABV_RESUMO_GF_04, WORK.TBMETANAOISONOMICA, WORK.TBSUPERABV_CN
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+LIBNAME CSBV '/infogrc/Campanha_SuperaBV';
+
+/******************************************************************************************/
+/*AJUSTE ANDERSON - 22/07/2025*/
+/*GR SERÁ CONSIDERADO NA BASE DE CALCULO DO GF, SEMPRE QUE TIVER META NÃO ISONOMICA NO MÊS*/
+/*CANAL VEICULOS*/
+/******************************************************************************************/
+
+DATA WORK.TbMetaNaoisonomica;
+SET BASEGRC.TbMetaNaoisonomica;
+WHERE NUANOMES in (202507,202508, 202509)
+and DsLoginN1 IS NOT NULL
+and Produto in ('Leves', 'Motos', 'Pesados')
+;RUN;
+
+/***************************************/
+/*SEM MARCAÇÃO DE GF NA BASE DE META NI*/
+/***************************************/
+
+proc sql;
+update WORK.TbMetaNaoisonomica set DsLoginN2A = 'ivan.castro'
+WHERE NmAreaEstruturaComercial = 'Canal Jundiaí' AND NUANOMES = 202507 AND DsLoginN2A = '';
+;run;
+
+/*******************************************************************************/
+/*DELETA OS DSLOGINN2A VAZIOS, ONDE TEMOS GRS DESLIGADOS E GRS MARCADOS PARA CN*/
+/*******************************************************************************/
+
+PROC SQL;
+DELETE FROM WORK.TbMetaNaoisonomica
+WHERE DSLOGINN2A = '';
+;RUN;
+
+/*****************************************************/
+/*SALVA A BASE ANALITICA DO ENCARTEIRAMENTO UTILIZADO*/
+/*PARA SABER QUAIS GRS ESTAMOS UTILIZANDO NA CONTAGEM*/
+/*****************************************************/
+
+PROC SQL;
+CREATE TABLE CSBV.TbEncarteiramentoNI_Analitica AS
+SELECT DISTINCT
+
+A.NuAnoMes,
+A.DsLoginN2A,
+a.DsLoginN1,
+count(distinct A.DsLoginN1) as Qtd_DsLoginN1 format commax20.2
+
+FROM WORK.TbMetaNaoisonomica A
+
+/*INNER JOIN CSBV.ESTRUTURA_COMERCIAL_01 B ON B.DSLOGINN1 = A.DSLOGINN1 AND B.NUANOMES = A.NUANOMES*/
+/**/
+/*WHERE B.NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias')*/
+
+group by 1,2,3
+ORDER BY 2,3,1
+;RUN;
+
+/************************************************************************************/
+/*CRUZA A BASE DE METAS NI COM A BASE DE ESTRUTURA COMERCIAL FILTRANDO OS GRS ATIVOS*/
+/************************************************************************************/
+
+PROC SQL;
+CREATE TABLE TbEncarteiramentoNI AS
+SELECT DISTINCT
+
+A.NuAnoMes,
+A.DsLoginN2A,
+count(distinct A.DsLoginN1) as Qtd_DsLoginN1 format commax20.2
+
+FROM WORK.TbMetaNaoisonomica A
+
+/*INNER JOIN CSBV.ESTRUTURA_COMERCIAL_01 B ON B.DSLOGINN1 = A.DSLOGINN1 AND B.NUANOMES = A.NUANOMES*/
+/**/
+/*WHERE B.NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias')*/
+
+group by 1,2
+ORDER BY 2,1
+;RUN;
+
+/*******************************************/
+/*SALVA A BASE DE HC QUE ESTAMOS UTILIZANDO*/
+/*******************************************/
+
+DATA CSBV.TbEncarteiramentoNI;
+SET WORK.TbEncarteiramentoNI;
+;RUN;
+
+/*********************/
+/*MÉDIA DE GRS POR GF*/
+/*********************/
+
+PROC SQL;
+CREATE TABLE TbEncarteiramentoNI_02 AS
+SELECT
+
+DsLoginN2A,
+AVG(Qtd_DsLoginN1) AS Med_Qtd_DsLoginN1
+
+FROM WORK.TbEncarteiramentoNI
+
+group by 1
+
+;RUN;
+
+/*****************************/
+/*SALVA A BASE FINAL - RESUMO*/
+/*****************************/
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO_GF_CV AS
+SELECT
+
+today() as Data format ddmmyy10.,
+/*A.NUANOMES,*/
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NmAreaEstruturaComercial,
+'' AS LstSubstituicao,
+'' AS LstColaboradorFocal,
+A.DsLoginN3A,
+A.DsLoginN2A,
+
+/*SUM(CASE WHEN TpValor = 'VrSPF_VrAP_VrAuto' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_SegurosTotal,*/
+/*SUM(CASE WHEN TpValor = 'VrMargemContribuicao' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_McTotal,*/
+/*SUM(CASE WHEN TpValor = 'ContaDigital' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_ContaDigital,*/
+
+SUM(A.VrPontosAtingimento) AS VrPontosAtingimento,
+SUM(A.VrPontosExtra) AS VrPontosExtra,
+CALCULATED VrPontosAtingimento + CALCULATED VrPontosExtra AS VrPontosTotal,
+count( distinct A.DsLoginN1) AS Qtd_GR,
+B.Med_Qtd_DsLoginN1,
+
+CALCULATED VrPontosTotal / B.Med_Qtd_DsLoginN1 AS VrMedTrim_GF
+
+FROM CSBV.TbSuperaBV A
+
+INNER JOIN WORK.TbEncarteiramentoNI_02 B ON B.DsLoginN2A = A.DsLoginN2A /*JOIN PARA CONSIDERAR APENAS OS GRS COM CARTEIRA DE METAS NI*/
+
+where NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias') AND NmCanalEstruturaComercial = 'Canal Veiculos'
+
+GROUP BY 1,2,3,4,5,6,7,8,13
+
+;RUN;
+
+DATA BASE_HC_CN;
+SET BASEGRC.ARQ_META_ORCAMENTO;
+WHERE AaReferencia = 2025 AND MmReferencia IN (7, 8, 9) AND DsTipoCanalProducao = 'Canal Negocios' and NmGrupoProdutoMeta = 'Motos';
+keep AaReferencia MmReferencia QtGR NmAreaEstruturaComercial DsTipoCanalProducao;
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_HC_CN_02 AS
+SELECT
+
+NmAreaEstruturaComercial,
+CASE
+	WHEN NmAreaEstruturaComercial = 'Canal de Negócios I' THEN 'marcelo.olmedo'
+	WHEN NmAreaEstruturaComercial = 'Canal de Negócios II' THEN 'carlos.bento'
+	WHEN NmAreaEstruturaComercial = 'Canal de Negócios III' THEN 'renata.fuzzato'
+	WHEN NmAreaEstruturaComercial = 'Canal de Negócios IV' THEN 'cyntia.pita'
+	WHEN NmAreaEstruturaComercial = 'Canal de Negócios V' THEN 'giselle.chastel'
+	WHEN NmAreaEstruturaComercial = 'Canal de Negócios VI' THEN 'cristiane.girone'
+END AS DsLoginN2A,
+AVG(QtGR) AS Med_Qtd_DsLoginN1 format commax20.2
+
+FROM WORK.BASE_HC_CN
+
+group by 1,2
+
+;RUN;
+
+DATA TbSuperaBV_CN;
+SET CSBV.TbSuperaBV;
+where NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias') AND NmCanalEstruturaComercial = 'Canal Negocios';
+;RUN;
+
+proc sql;
+update work.TbSuperaBV_CN set DsLoginN2A = 'cyntia.pita'
+where DsLoginN2A = 'cadeira.vazia' and NmAreaEstruturaComercial = 'Canal de Negócios IV';
+;run;
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO_GF_CN AS
+SELECT
+
+today() as Data format ddmmyy10.,
+/*A.NUANOMES,*/
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NmAreaEstruturaComercial,
+'' as LstSubstituicao,
+'' AS LstColaboradorFocal,
+A.DsLoginN3A,
+/*A.DsLoginN2A AS DsLoginN2A_Old,*/
+
+CASE
+	WHEN A.NmAreaEstruturaComercial = 'Canal de Negócios I' THEN 'marcelo.olmedo'
+	WHEN A.NmAreaEstruturaComercial = 'Canal de Negócios II' THEN 'carlos.bento'
+	WHEN A.NmAreaEstruturaComercial = 'Canal de Negócios III' THEN 'renata.fuzzato'
+	WHEN A.NmAreaEstruturaComercial = 'Canal de Negócios IV' THEN 'cyntia.pita'
+	WHEN A.NmAreaEstruturaComercial = 'Canal de Negócios V' THEN 'giselle.chastel'
+	WHEN A.NmAreaEstruturaComercial = 'Canal de Negócios VI' THEN 'cristiane.girone'
+END AS DsLoginN2A,
+
+/*SUM(CASE WHEN TpValor = 'VrSPF_VrAP_VrAuto' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_SegurosTotal,*/
+/*SUM(CASE WHEN TpValor = 'VrMargemContribuicao' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_McTotal,*/
+/*SUM(CASE WHEN TpValor = 'ContaDigital' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_ContaDigital,*/
+
+SUM(A.VrPontosAtingimento) AS VrPontosAtingimento,
+SUM(A.VrPontosExtra) AS VrPontosExtra,
+CALCULATED VrPontosAtingimento + CALCULATED VrPontosExtra AS VrPontosTotal,
+count( distinct A.DsLoginN1) AS Qtd_GR,
+B.Med_Qtd_DsLoginN1,
+
+CALCULATED VrPontosTotal / B.Med_Qtd_DsLoginN1 AS VrMedTrim_GF
+
+FROM WORK.TbSuperaBV_CN A
+
+LEFT JOIN WORK.BASE_HC_CN_02 B ON B.DSLOGINN2A = A.DSLOGINN2A
+
+/*where A.NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias') AND A.NmCanalEstruturaComercial = 'Canal Negocios'*/
+
+GROUP BY 1,2,3,4,5,6,7,8,13
+
+;RUN;
+
+DATA BASE_SUPERABV_RESUMO_GF;
+SET WORK.BASE_SUPERABV_RESUMO_GF_CV
+	WORK.BASE_SUPERABV_RESUMO_GF_CN;
+;RUN;
+
+/**********************/
+/*RANKING TOTAL PONTOS*/
+/**********************/
+
+PROC SORT DATA=WORK.BASE_SUPERABV_RESUMO_GF OUT=WORK.BASE_SUPERABV_RESUMO_GF_01;
+BY NmCanalEstruturaComercial NmSubEstruturaComercialA NmAreaEstruturaComercial DESCENDING VrPontosTotal;
+;RUN;
+
+proc rank data=WORK.BASE_SUPERABV_RESUMO_GF_01 descending out=WORK.BASE_SUPERABV_RESUMO_GF_02 ties=dense;
+    var VrPontosTotal;
+    ranks Ranking_VrPontosTotal;
+    by NmCanalEstruturaComercial NmSubEstruturaComercialA;
+run;
+
+/**********************/
+/*RANKING MÃ‰DIA PONTOS*/
+/**********************/
+
+PROC SORT DATA=WORK.BASE_SUPERABV_RESUMO_GF_02 OUT=WORK.BASE_SUPERABV_RESUMO_GF_03;
+BY NmCanalEstruturaComercial NmSubEstruturaComercialA NmAreaEstruturaComercial DESCENDING VrMedTrim_GF;
+;RUN;
+
+proc rank data=WORK.BASE_SUPERABV_RESUMO_GF_03 descending out=WORK.BASE_SUPERABV_RESUMO_GF_04 ties=dense;
+    var VrMedTrim_GF;
+    ranks Ranking_VrMediaTotal;
+    by NmCanalEstruturaComercial NmSubEstruturaComercialA;
+run;
+
+/*********************************************/
+/*TABELA COM O PRIMEIRO DO RANKING POR FILIAL*/
+/*********************************************/
+
+PROC SQL;
+CREATE TABLE PRIMEIRO_RANKING_GF_PTS AS
+SELECT
+
+/*NUANOMES,*/
+NmCanalEstruturaComercial,
+NmSubEstruturaComercialA,
+NmAreaEstruturaComercial,
+DsLoginN2A,
+Ranking_VrPontosTotal,
+VrPontosTotal
+
+FROM BASE_SUPERABV_RESUMO_GF_04 A
+
+WHERE Ranking_VrPontosTotal = 1 AND NmCanalEstruturaComercial <> ''
+
+ORDER BY 1,2,3
+
+;RUN;
+
+/*********************************************/
+/*TABELA COM O PRIMEIRO DO RANKING POR FILIAL*/
+/*********************************************/
+
+PROC SQL;
+CREATE TABLE PRIMEIRO_RANKING_GF_MED AS
+SELECT
+
+/*NUANOMES,*/
+NmCanalEstruturaComercial,
+NmSubEstruturaComercialA,
+NmAreaEstruturaComercial,
+DsLoginN2A,
+Ranking_VrMediaTotal,
+VrMedTrim_GF
+
+FROM BASE_SUPERABV_RESUMO_GF_04 A
+
+WHERE Ranking_VrMediaTotal = 1 AND NmCanalEstruturaComercial <> ''
+
+ORDER BY 1,2,3
+
+;RUN;
+
+/*******************/
+/*CONSOLIDA RANKING*/
+/*******************/
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO_GF_05 AS
+SELECT
+
+A.Data format ddmmyy10.,
+. AS NUANOMES,
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NmAreaEstruturaComercial,
+A.LstSubstituicao,
+A.LstColaboradorFocal,
+A.DsLoginN3A,
+A.DsLoginN2A,
+
+A.VrPontosAtingimento,
+A.VrPontosExtra,
+A.VrPontosTotal,
+
+A.Ranking_VrPontosTotal,
+B.VrPontosTotal AS VrPontosPrimeiroRankingRegional,
+A.VrPontosTotal - B.VrPontosTotal as VrGAP_PontosPrimRankingRegional,
+
+A.Qtd_GR,
+A.Med_Qtd_DsLoginN1,
+A.VrMedTrim_GF,
+A.Ranking_VrMediaTotal,
+C.VrMedTrim_GF AS VrMedTrim_PrimRankingRegional,
+A.VrMedTrim_GF - C.VrMedTrim_GF as VrGAP_MedTriPrimRankingRegional
+
+FROM WORK.BASE_SUPERABV_RESUMO_GF_04 A
+
+LEFT JOIN PRIMEIRO_RANKING_GF_PTS B ON
+/*	B.NUANOMES = A.NUANOMES*/
+/*and*/ B.NmCanalEstruturaComercial = A.NmCanalEstruturaComercial
+and B.NmSubEstruturaComercialA = A.NmSubEstruturaComercialA
+
+LEFT JOIN PRIMEIRO_RANKING_GF_MED C ON
+/*	C.NUANOMES = A.NUANOMES*/
+/*and */C.NmCanalEstruturaComercial = A.NmCanalEstruturaComercial
+and C.NmSubEstruturaComercialA = A.NmSubEstruturaComercialA
+
+where a.NmCanalEstruturaComercial <> ''
+/*AND A.NmSubEstruturaComercialA = 'Canal Rodas e EGV I - Regional I'*/
+
+;RUN;
+
+DATA CSBV.TbSuperaBV_Resumo_GF;
+SET work.BASE_SUPERABV_RESUMO_GF_05;
+;RUN;
+
+/*PROC SQL;*/
+/*CREATE TABLE MAX_DATA AS*/
+/*SELECT*/
+/*MAX(NuAnoMes) AS Max_TbSuperaBV_Resumo_GF*/
+/*FROM CSBV.TbSuperaBV_Resumo_GF*/
+/*WHERE NUANOMES = &Base_Mes.*/
+/*;run;*/
+/**/
+/*DATA _NULL_;*/
+/*SET WORK.MAX_DATA;*/
+/*CALL SYMPUT ('Max_TbSuperaBV_Resumo_GF',Max_TbSuperaBV_Resumo_GF);*/
+/*;run;*/
+/*%PUT &Max_TbSuperaBV_Resumo_GF;*/
+/**/
+/*PROC SQL;*/
+/*DELETE FROM CSBV.TbSuperaBV_Resumo_GF*/
+/*WHERE NUANOMES = &Max_TbSuperaBV_Resumo_GF.;*/
+/*;RUN;*/
+/**/
+/*PROC APPEND BASE=CSBV.TbSuperaBV_Resumo_GF DATA=WORK.BASE_SUPERABV_RESUMO_GF_03;RUN;*/

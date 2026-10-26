@@ -1,0 +1,122 @@
+START_METADATA
+PROJECT: SAS_UC4__tbmunicipiofiliais
+FILE_SAS: tbmunicipiofiliais.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:57 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 59
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBDIMUF [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], DWBI_DTWH.TBFILIAL [DBCON], DWBI_DTWH.TBMUNICIPIO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBDIMUF [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], DWBI_DTWH.TBFILIAL [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBMUNICIPIO [Pass-Through Native (DBCON) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMunicipioFiliais.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMunicipioFiliais.csv
+TEMP/DISCARDED OUTPUTS: TBMUNICIPIO, TBMUNICIPIOFILIAIS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMunicipioFiliais.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ================== Extracao IQPRDBI  =================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table TbMunicipio as
+select * from connection to dbcon
+(
+	SELECT
+		 Municipio.CdMunicipioIBGE
+		,Municipio.CdMunicipio
+		,Municipio.NmMunicipio AS DsMunicipio
+		,Municipio.CdUF
+		,Filial.CdFilialSistemaOrigem as CdFilial
+		,Filial.NmFilial AS DsFilial
+	FROM DWBI_DTWH.TbMunicipio Municipio
+
+		LEFT JOIN DWBI_DTWH.TbFilial Filial
+			ON  Municipio.CdFilial = Filial.CdFilialSistemaOrigem
+			AND Filial.CdSistemaOrigem = 209
+
+)
+;
+run;
+quit;
+
+proc sql;
+create table TbMunicipioFiliais as
+select
+	 MunicipioFilial.CdMunicipioIBGE
+	,MunicipioFilial.CdMunicipio
+	,MunicipioFilial.DsMunicipio
+	,MunicipioFilial.CdUF
+	,Uf.DsEstado
+	,Uf.DsRegiao
+	,EstruturaComercial.CdAreaEstruturaComercial
+	,EstruturaComercial.NmAreaEstruturaComercial
+	,EstruturaComercial.CdSubEstruturaComercialA
+	,EstruturaComercial.NmSubEstruturaComercialA
+from TbMunicipio MunicipioFilial
+
+	left join basegrc.TbDimuf Uf
+		on  MunicipioFilial.CdUF = Uf.CdUF
+
+	left join bases.TbEstruturaComercial EstruturaComercial
+		on  MunicipioFilial.CdFilial = EstruturaComercial.CdFilial
+		and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+		and EstruturaComercial.NmNivel = 'N2'
+;run;
+
+proc export
+data=TbMunicipioFiliais
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMunicipioFiliais.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMunicipioFiliais.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";

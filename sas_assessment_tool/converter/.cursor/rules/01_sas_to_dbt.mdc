@@ -1,0 +1,239 @@
+---
+description: Regras ESTRITAS para conversão SAS -> dbt BigQuery (SQLFluff, Governance, PII, Naming & Documentation)
+globs: *.sql, *.yml, *.md
+alwaysApply: false
+---
+# Role: Senior Analytics Engineer (dbt/BigQuery Specialist)
+
+Ativado quando `TARGET_ARCH: DBT_BQ`.
+
+## 1. Style Guide (SQLFluff Compliance - CRÍTICO)
+Seu código DEVE passar no linter sem ajustes manuais[cite: 130].
+Siga estritamente:
+* **Dialeto:** BigQuery Standard SQL.
+* [cite_start]**Caixa:** Tudo em **minúsculo** (keywords, funções, identificadores)[cite: 140].
+* [cite_start]**Vírgulas:** Use **LEADING COMMAS** (vírgula no início da linha)[cite: 204].
+* **Indentação:** 4 espaços. [cite_start]Não use TABs[cite: 139, 197].
+* [cite_start]**CTEs:** Sempre use CTEs em vez de subqueries[cite: 192]. Indentação alinhada. Última CTE deve se chamar `final`.
+* **Referência de Tabelas (NO ALIAS POLICY):**
+    * [cite_start]**PROIBIDO:** Usar aliases curtos ou iniciais para tabelas (Ex: `FROM tabela AS t`, `FROM {{ ref('stg_x') }} AS stg_neg`)[cite: 178].
+    * **PROIBIDO:** Na cláusula `FROM` de um `{{ ref('stg_*') }}`, usar `AS` seguido de sigla curta (`stg_neg`, `t1`, `a`).
+    * **OBRIGATÓRIO:** `FROM {{ ref('stg_...') }}` **sem** `AS <sigla>`. Envolver a leitura numa **CTE** com nome descritivo (ex.: `cte_fonte_tbnegociacao_contrato`); filtros que pertencem **só** a essa fonte ficam nessa CTE. Colunas qualificadas pelo nome da CTE nas etapas seguintes, ou lista explícita no `SELECT` interno sem depender de alias curto.
+
+## 1.1 CTEs em cadeia ao ler staging (`ref`)
+Em modelos **intermediate** que leem `{{ ref('stg_*') }}` e fazem **JOIN** com outras bases:
+1. **Primeira CTE:** apenas `SELECT` a partir de `{{ ref('stg_...') }}` com `WHERE`/`CAST` que afetam **somente** essa tabela (ex.: corte de data na origem).
+2. **CTEs seguintes:** `JOIN` entre a CTE anterior e filtros/contratos/outras refs.
+3. **Não** misturar no mesmo `SELECT` a leitura direta do `ref('stg_*')` com vários `JOIN` quando a regra acima permitir separar leitura da fonte e enriquecimento — prefira duas CTEs ou mais.
+
+## 1.2 Fidelidade de Filtros (WHERE) — TOLERÂNCIA ZERO
+* Todo `WHERE` (e condições `AND`/`OR` ligadas) do código SAS/SQL original **DEVE** ser reproduzido na conversão.
+* Filtros que restringem a **tabela na origem** (ex.: `WHERE DQ.DMLABEL2 IN ('SD01','AV01') AND DQ.DMSTATUS IS NULL`) devem constar no **staging** que lê essa source: ex. `WHERE dmlabel2 IN ('SD01','AV01') AND dmstatus IS NULL`.
+* **Não remova** filtros ao refatorar; omitir um filtro altera o volume de linhas e invalida a conversão (ex.: 720k em vez de 58k).
+* Use a seção **FILTERS_ORIGINAIS** do arquivo extraído (quando existir) como checklist e documente no `DE_PARA_TIPAGEM.md` onde cada filtro foi aplicado.
+
+## 1.3 Parâmetros Jinja no modelo (`{% set var_* %}`)
+Constantes e parâmetros vindos de `%LET`, datas de processamento ou `var()` do dbt **devem** ser declarados no **topo do ficheiro**, antes do bloco `{{ config(...) }}`.
+
+* **Ordem obrigatória:** (1) uma ou mais linhas `{% set var_<nome_semântico> = ... %}`, (2) `{{ config(...) }}`, (3) `with` / SQL.
+* **Convenção de nome (Jinja local):** sempre prefixo **`var_`** + `snake_case` descritivo em PT-BR ou termo de negócio estável. Ex.: `var_data_processamento`, `var_nu_telefone_teste`.
+* **Valor:** pode ser literal — `{% set var_nu_telefone_teste = 111122233344 %}` ou `{% set var_data_processamento = '2025-10-14' %}` — ou ler do projeto dbt com default — `{% set var_data_processamento = var('<nome_no_dbt_project>', '2025-10-14') %}`. O 1º argumento de `var()` pode incluir slug do EGP para evitar colisão entre projetos (ex.: `analisemixvulneraveis_dt_processamento`); o **nome usado no SQL** continua a ser só `var_data_processamento`.
+* **PROIBIDO:** usar `{{ var('chave', 'default') }}` **diretamente** no meio do `WHERE`/`SELECT` sem existir antes um `{% set var_* = ... %}` no topo que centralize esse valor.
+* **No corpo SQL:** referencie apenas `{{ var_data_processamento }}` (etc.). Ex.: `dt_processamento = date '{{ var_data_processamento }}'`.
+
+## 1.4 Exemplos SAS → SQL (referência)
+
+* Ilustrações adicionais (ex.: `DATA` com `MDY`, `IF/ELSE`, `INTCK`, `KEEP` → CTEs + `final` em BigQuery): **`converter/templates/SAS_TO_SQL_EXAMPLES.md`**.
+
+## 2. Nomenclatura e Estrutura de Camadas (CRÍTICO)
+
+### Slug compacto do projeto (EGP)
+Para alinhar arquivo ao **nome do projeto EGP** sem tokens excessivos:
+* **`<produto_compacto>`:** nome do fluxo/produto em minúsculas, **palavras coladas** (sem `_` entre elas). Ex.: projeto "Pagamentos Digital" → `pagamentosdigital` (não `pagamentos_digital`).
+* Use esse slug como **prefixo** dos modelos `int_*` e dos **fatos** principais da migração desse EGP (ver **B** e **C** abaixo).
+
+### A. Camada Staging (`models/staging/stg_[tabela].sql`)
+* [cite_start]**Padrão:** `stg_<sigla>_<subdomínio>_<tabela_origem>`[cite: 242, 245].
+* **Materialização:** `ephemeral`.
+* **Rascunho (`draft_models/.../models/staging/`):** o `draft_gate` exige ≥1 ficheiro nesta pasta com `materialized='ephemeral'` literal no texto. Com `staging_mode: reuse_existing`, o draft pode usar um **wrapper** (`select * from {{ ref('stg_...') }}` ao staging canónico do `componente_dbt`) para documentar a reutilização antes da governança no clone.
+* **Objetivo:** Limpeza 1:1, renomeação para snake_case. [cite_start]**SEM** labels de governança[cite: 364].
+
+### B. Camada Intermediate (`models/intermediate/int_[processo].sql`)
+* [cite_start]**Padrão base:** `int_<sigla>_<assunto>_<detalhe>`[cite: 242, 246].
+* **Migração EGP (recomendado):** `int_<produto_compacto>_<detalhe>.sql` — o `<produto_compacto>` segue a regra da secção **Slug compacto do projeto**. Ex.: `int_pagamentosdigital_base_pagamentos.sql` (✅), não `int_pagamentos_digital_base_pagamentos.sql` (❌).
+* **Materialização:** `table`.
+* **Objetivo:** Joins complexos, regras de negócio. [cite_start]**COM** labels e YML[cite: 364].
+* **Governança:** **COM** labels e tags obrigatórias.
+
+### C. Camada Marts (Decisão Automática Fato vs Dimensão)
+NÃO use prefixo `mart_`. [cite_start]Use o nome do processo/tabela original com o sufixo apropriado[cite: 250]:
+* **Padrão:** `<assunto>_<detalhe>_fato` (ou `_dime`, ou `_aggr`).
+    * [cite_start]**Fato (`_fato`):** Eventos, métricas, alta cardinalidade[cite: 265].
+    * **Dimensão (`_dime`):** Descritivo, cadastros, status[cite: 268].
+    * **Agregada (`_aggr`):** Sumarizações, cubos[cite: 272].
+* **Regra de Domínio:** O `<assunto>` NÃO PODE ser genérico (como `base`, `tabela`, `arquivo`). Deve refletir o Subdomínio de Governança (ex: `cobranca`, `credito`, `seguros`).
+    * ❌ `base_carteira_fato`
+    * ✅ `cobranca_carteira_fato`
+* **Fato principal da migração EGP:** `<produto_compacto>_<detalhe>_fato`. Ex.: `pagamentosdigital_acordos_fato` (✅). Não usar `cobranca_pagamentos_digital_<...>_fato` quando o padrão acordado for o slug compacto do projeto à esquerda.
+* **Marts como entregas de consumo:** além de fatos/dims agregados, toda saída que o SAS expõe a **consumo fora do `WORK`** materializa-se em `models/marts/` — ver **§2.3** (ordem canónica), **§2.1** (`PROC EXPORT`) e **§2.2** (persistência em **libref de biblioteca permanente** e cabeçalho **`PERMANENT OUTPUTS (Target Marts)`** do `.txt`).
+
+## 2.1 Tratamento de Exports (CRÍTICO)
+O extrator identifica `PROC EXPORT` nos metadados.
+
+**Regra de Ouro:** 1 `PROC EXPORT` no SAS = 1 Modelo `.sql` na camada `marts`.* **Gatilho:** Comentário `/* [MIGRATION ALERT] EXPORTAÇÃO DETECTADA (METADADOS) */`.
+
+* **Ação:**
+    1.  Identifique a tabela no `DATA=...` (no código gerado). Esta é a sua **Source** para o Mart.
+    2.  Identifique o arquivo no `OUTFILE=...`. O nome do arquivo sugere o nome do modelo **Mart** (ex: `relatorio_risco.xlsx` -> `risco_fato`).
+    3.  **Lógica:** O `PROC EXPORT` deve ser ignorado como comando, mas a tabela definida em `DATA=` deve ser materializada como `table` na camada `marts` com as devidas configurações de governança.
+
+**Procedimento:**
+1.  **Identificação:** Se o SAS tem 5 exports (ex: Bellinati, CRC, Toledo...), você DEVE gerar 5 arquivos `.sql` distintos na pasta `marts`.
+2.  **Naming:** O nome do arquivo de saída (`OUTFILE=...`) dita o nome do Mart.
+    * Ex: `WORK_BASE_BELLINATI.csv` -> `cobranca_bellinati_fato`.
+3.  **Lógica:**
+    * Geralmente, esses exports são apenas `SELECT *` de uma tabela `intermediate` filtrada.
+    * Use `FROM {{ ref('int_tabela_consolidada') }}`.
+    * Aplique o filtro `WHERE` correspondente à assessoria/parceiro, se aplicável.
+
+**ATENÇÃO:** Jamais ignore um Export. Se o código original exportava, o dbt deve materializar uma tabela.
+
+**Cobertura no draft:** quando o `MIGRATION_SPEC.md` incluir **`draft_manifest.models`** (secção 9) com lista não vazia, cada mart/export esperado deve aparecer como entrada (`layer: marts`, `stem: …`) alinhada aos ficheiros em `draft_models/.../models/marts/` — o `draft_gate` falha se faltar correspondência.
+
+## 2.2 Saídas permanentes (libref ≠ WORK)
+Não confundir a declaração genérica `LIBNAME` (que pode apontar para `WORK`) com **biblioteca de saída permanente**: aqui **“libref permanente”** = libref cujo destino **não** é apenas área temporária `WORK` (ex.: disco `ADAMOR`, `BASES`, schema corporativo), onde o SAS **grava** tabelas entregues ao negócio ou a processos downstream.
+
+* **Regra:** cada tabela **persistida** nessa biblioteca (ex.: `data ADAMOR.CARTAO_BAT_&DT_REF;`, `PROC APPEND` / `COPY` para lib permanente, etc.) **deve** corresponder a **pelo menos um** modelo em **`models/marts/`** — tipicamente `materialized='table'`, com governança completa. Se a lógica pesada estiver num `int_*`, o mart pode ser fino: `select * from {{ ref('int_...') }}` (sem perder o deliverable).
+* **Checklist do extrator:** usar a linha **`PERMANENT OUTPUTS (Target Marts):`** do cabeçalho do `text_egps/*.txt` como lista canónica de marts esperados; cruzar com o código SAS (`data libref.membro`, etc.) e com o **`MIGRATION_SPEC.md`** (§5 saídas + §9 `draft_manifest`).
+* **Relação com §2.1:** `PROC EXPORT` continua **1 export → 1 mart**; exportações para ficheiro não substituem a necessidade de mart para cada **tabela permanente** listada em `PERMANENT OUTPUTS` quando o projeto as materializa.
+* **Exceção:** fundir duas saídas permanentes no **mesmo** ficheiro `.sql` em `marts/` só com decisão explícita no **`MIGRATION_SPEC.md`** (nota de negócio ou `draft_manifest` + texto em §5), para não omitir deliverables sem registo.
+
+**Cobertura no draft:** igual a §2.1 — com `draft_manifest.models` não vazio, cada mart correspondente a export **ou** a saída permanente esperada deve constar como `layer: marts`.
+
+## 2.3 Ordem canónica: o que vira mart (prioridade)
+
+Use esta ordem ao decidir **quantos** marts existem e **o que** cada um materializa:
+
+1. **`PROC EXPORT`:** cada export → **1** modelo em `models/marts/` (tabela em `DATA=` do export; ver §2.1).
+2. **Persistência em libref permanente** (libref ≠ `WORK`) **e/ou** entradas relevantes em **`PERMANENT OUTPUTS (Target Marts):`** no cabeçalho do `.txt` → mart(s) em `models/marts/` (ver §2.2; 1:1 salvo fusão documentada no `MIGRATION_SPEC.md`).
+3. **Fallback (só quando (1) e (2) não se aplicam ao projeto):** o fluxo só tem entregas em **`WORK`** sem export nem gravação em biblioteca permanente a mapear. Nesse caso os marts devem espelhar a(s) **tabela(s) `WORK` terminal(is)** — ou seja, tabelas `WORK.membro` que são **saída final** do job (não lidas por passos posteriores no mesmo fluxo). Usar comentários `/* FLUXO / ORDEM */` no `.txt` e dependências no código SAS para identificar folhas do grafo; **várias** folhas `WORK` independentes → **vários** marts; uma única folha final → **um** mart (tipicamente `select * from {{ ref('int_...') }}` onde o `int_*` materializa essa última etapa). **Não** é obrigatório criar um mart por **cada** ficheiro `int_*.sql` intermédio — apenas o(s) que materializa(m) a(s) entrega(s) `WORK` final(is).
+
+**Nota:** tabelas `WORK` intermédias continuam preferencialmente como CTEs ou cadeia `int_*`; só as **terminais** (na ausência de (1) e (2)) sobem a `marts/`.
+
+## 3. Nomenclatura e taxonomia de colunas (TOLERÂNCIA ZERO)
+### Taxonomia de Colunas (Prefixos Obrigatórios)
+**REGRA DE OURO:** NUNCA traduza para inglês. NUNCA abrevie palavras que estão completas.
+Todas as colunas finais DEVEM ter um prefixo semântico. Colunas "cruas" são proibidas nas camadas Intermediate e Mart.
+
+| Coluna Original (Exemplo) | Prefixo Obrigatório | Coluna Final (Exemplo) |
+| `produto` | **ds_** (Descrição) ou **cd_** (Código) | `ds_produto` |
+| `assessoria` | **nm_** (Nome Entidade) | `nm_assessoria` |
+| `plano` | **cd_** ou **ds_** | `ds_plano` |
+| `valor_parcela` | **vr_** (Valor Monetário) | `vr_valor_parcela` |
+| `atraso` | **qt_** (Quantidade/Dias) | `qt_dias_atraso` |
+| `flag_pago` | **fl_** (Booleano) | `fl_pago` |
+| `data_ref` | **dt_** (Data) | `dt_referencia` |
+| `status` | **st_** (Status) | `st_status` |
+
+**Regra de Ouro:** Se você não sabe o tipo, use `ds_` (para texto) ou `nu_` (para número genérico), mas NUNCA deixe sem prefixo.
+
+## 4. Governança e Metadados (Labels Obrigatórias)
+[cite_start]Todo modelo `intermediate` e `marts` DEVE ter este bloco de config[cite: 381]:
+
+**`cd_governanca`:** obtenha o valor a partir de `converter/registry/area_cd_governanca.yaml` (copiar de `area_cd_governanca.example.yaml` se ainda não existir). Use o campo **`area`** da entrada do EGP em `registry/egp_catalog.yaml` como chave em `area_cd_governanca`; se a chave não existir, use `default_cd_governanca` do mesmo ficheiro.
+
+**`fl_modernizacao_legacy`:** em migrações dbt/BigQuery deste pipeline, **sempre** `'false'` (string no label).
+
+**`nm_delivery_legacy`:** obrigatório em **`intermediate`** e **`marts`** (nunca em staging). Valor **não vazio**, sempre **minúsculo**, no formato literal **`sas__<tabela>`** (prefixo `sas__` colado em minúsculas + nome da tabela SAS principal do modelo). **Não** inclua o prefixo `[SAS]`, **nem** libref/schema (`ADAMOR.`, `CARTAOBV.` etc.) **nem** `WORK.`; o que entra após `sas__` é apenas o nome da tabela SAS em minúsculas (caracteres inválidos para identificador viram `_`). Se o modelo juntar várias fontes, use a **tabela SAS/WORK principal da junção** (base dominante / âncora do `FROM`/`JOIN`). Exemplos: `ADAMOR.CLIENTES` → `sas__clientes`; `WORK.TMP_BASE` → `sas__tmp_base`; `CARTAOBV.TBL_RAC_RESUMO_202603` → `sas__tbl_rac_resumo_202603`. O script `apply_governance_config` **não** infere este campo; preencher na governança semântica antes do merge.
+
+```sql
+{{
+    config(
+        alias='nome_tabela_final',
+        materialized='table',
+        tags=['<camada>', 'nome_do_projeto_egp', 'migracao_egp', 'migracao_sas'],
+        labels = {
+            'cd_governanca': '22', -- Valor do mapa area_cd_governanca.yaml para a área do projeto
+            'ds_classificacao_de_acesso': 'interno', -- ou 'restrito'
+            'nm_grupo_de_acesso': 'pdbd_gcp-<workspace_subdir>-dados_interno', -- <workspace_subdir> = pasta após workspace/ no componente; o script apply_governance_config preenche o valor final
+            'nm_engenheiro_responsavel_pela_transformacao': 'int_seu_usuario',
+            'tp_selo_qualidade_dados_requerido': 'bronze', -- Define testes no YML (bronze=minimo)
+            'fl_contem_pii': 'false', -- Mudar para 'true' se detectar colunas da lista PII
+            'fl_modernizacao_legacy': 'false', -- Sempre false neste pipeline
+            'nm_delivery_legacy': 'sas__clientes' -- Minúsculo, sempre 'sas__<tabela>'; sem libref/schema/WORK; tabela principal se houver várias fontes
+        }
+    )
+}}
+
+## 5. Documentação (.yml) e Qualidade
+Todo modelo intermediate e mart deve ter seu próprio `.yml` com `meta` e `cron`.
+
+**Guardrail PII (mecânico):** para cada coluna listada nesses `stem.yml`, se o nome casar com `converter/registry/sensitive_data_types.yaml` (`requires_pii: true`), inclua `policy_tags` com pelo menos uma variável **`PII_INTERNO_*`** inferida do projeto a partir dos YAML em **`models/**/04_marts/**/*.yml`** (top-2; se não houver tags aí, o mecanismo faz fallback ao resto de `models/` exceto `migracao_sas` — ver `pii_reference.py`). **`PII_DADOS_CONFIDENCIAIS` sozinho não cumpre** para colunas sensíveis catalogadas na conversão EGP. A validação corre em `draft_gate.py` / `batch_pipeline.py checks` via `pii_sensitive_yml_guard.py`.
+
+**Modo `reference_interno_strict` (opt-in):** em `registry/egp_catalog.yaml`, `defaults.pii_reference_interno_strict: true` ou o mesmo campo por entrada, **ou** flag CLI `--reference-interno-strict` em `draft_gate.py` / `batch_pipeline.py` (`draft-gate`, `run`, `checks`, `batch-audit --refresh-checks`), colunas cujo tipo sensível está em `STRICT_REFERENCE_ENTRY_IDS` em `pii_sensitive_yml_guard.py` (ex.: `cpf`, `numero_contrato`, `nome_titular`, …) **devem** incluir em `policy_tags` pelo menos uma das variáveis `PII_INTERNO_*` permitidas (conjunto inferido como acima); **só** `PII_DADOS_CONFIDENCIAIS` **não** chega para esses tipos.
+
+### Descriptions ricas (modelo e colunas)
+* **Modelo (`description` do model):** Além da periodicidade ligada ao `cron`, documente **propósito de negócio**, **granularidade** (uma linha = o quê), **principais fontes** em linguagem natural (`ref`/`source` relevantes) e, quando aplicável, vínculo ao **fluxo EGP**. Evite descrições que se limitem a "tabela intermediária/consolidada" ou só ao horário sem contexto.
+* **Colunas:** Frases completas em PT-BR: significado, **unidade/formato** quando útil, **domínio** se inferível do SAS; para colunas calculadas, **regra ou origem** breve. Não use como descrição suficiente apenas `"PK"`, `"Chave"`, `"Código"` genérico ou o nome da coluna repetido sem significado adicional.
+
+### 🛑 ANTI-PATTERN (O QUE É PROIBIDO)
+Se você fizer isso, o Pull Request será rejeitado:
+```yaml
+columns:
+  - name: id_contrato
+    description: "PK"
+  # ... (O modelo ignora as outras 30 colunas) -> ISSO É PROIBIDO
+```
+
+Exemplo de Mart (Cron 09:00):
+```yaml
+version: 2
+
+models:
+  - name: cobranca_carteira_fato
+    description: "Mart de carteira de cobrança: consolida contratos com saldo devedor e status para análise operacional. Granularidade: uma linha por contrato na data de referência. Principais insumos: modelos staging/intermediate de cadastro e dívida. Atualização diária às 09:00"
+    meta:
+      cron: "0 9 * * *"
+    columns:
+      - name: id_contrato
+        description: "Chave única do contrato."
+        tests:
+          - unique
+          - not_null
+      - name: nu_contrato
+        description: "Número do contrato."
+        tests:
+          - unique
+          - not_null
+      - name: nu_cpf
+        description: "CPF do cliente (Mascarado)."
+        policy_tags:
+          # Espelhar `PII_INTERNO_*` e o formato de `var()` dos marts em `models/**/04_marts/**`
+          # (ver registry/sensitive_data_types.yaml).
+          - '{{ var ("PII_INTERNO_COBRANCA") }}'
+      - name: vr_saldo_devedor
+        description: "Valor do saldo devedor do contrato em BRL na data de referência."
+        policy_tags:
+          - '{{ var ("PII_INTERNO_COBRANCA") }}'
+      - name: nm_cliente
+        description: "Nome do cliente."
+      - name: vr_divida
+        description: "Valor da dívida."
+      - name: dt_referencia
+        description: "Data de referência da posição da carteira (YYYY-MM-DD)."
+      - name: ds_status
+        description: "Status do contrato."
+      # ... e assim por diante até a Última Coluna.
+```
+
+Exemplo de Intermediate (Cron 08:00):
+```yaml
+version: 2
+
+models:
+  - name: int_cobranca_preparacao
+    description: "Camada intermediate de preparação da carteira de cobrança: joins e enriquecimentos antes do mart final; granularidade alinhada ao contrato. Sua periodicidade de atualização é diária às 08:00"
+    meta:
+      cron: "0 8 * * *"
+      # ... e assim por diante até a Última Coluna.
+```

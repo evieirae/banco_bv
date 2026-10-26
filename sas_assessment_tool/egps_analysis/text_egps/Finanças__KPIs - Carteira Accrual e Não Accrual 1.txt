@@ -1,0 +1,494 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__KPIs - Carteira Accrual e Não Accrual 1
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:39 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 348
+CODE_TASKS_COUNT: 6
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: login, senha
+DETECTED_MACROS_USED: login, senha
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DBCON, MYDB, PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES_DRE.DBO.CARTEIRA_1402 [SQLSVR], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBA.TBMODALIDADEPRODUTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBSALDOCONTABIL [BIGQUERY], DBA.TBMODALIDADEPRODUTO [SYBASEIQ], GESTAOCONTABIL.TBSALDOCONTABIL [SYBASEIQ]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CARTEIRA_CUSTOS_FINAL, WORK.CARTEIRA_ESTAGIO_FINAL
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_CARTEIRA, WORK.CARTEIRA_CUSTOS_FINAL, WORK.CARTEIRA_ESTAGIO_FINAL
+TABLE_READ_PROVENANCE (Flow): BASES_DRE.DBO.CARTEIRA_1402 [Pass-Through Native (SQLSVR) - FROM], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DBA.TBMODALIDADEPRODUTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBSALDOCONTABIL [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], DBA.TBMODALIDADEPRODUTO [Pass-Through Native (SYBASEIQ) - JOIN], GESTAOCONTABIL.TBSALDOCONTABIL [Pass-Through Native (SYBASEIQ) - FROM], WORK.BASE_CARTEIRA [PROC SQL - FROM], WORK.CARTEIRA_CUSTOS_FINAL [PROC SQL - JOIN], WORK.CARTEIRA_ESTAGIO_FINAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CARTEIRA, CARTEIRAS, CARTEIRA_ACCRUAL, CARTEIRA_CUSTOS, CARTEIRA_CUSTOS_FINAL, CARTEIRA_DIFERIDA, CARTEIRA_ESTAG, CARTEIRA_ESTAGIO, CARTEIRA_ESTAGIO_FINAL, CARTEIRA_FINAL, CARTEIRA_TRATADA, DUPLICADAS, NUCONTRATOGESTAO, PRODUTO, WORK.BASE_CARTEIRA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET login=tainara_alves;
+%LET senha="7f31!1C5F571";
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira 1402 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira 1402 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1OdtKKdzZhc84YtY/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+   connect to sqlsvr as mydb
+   (datasrc="SQLPRD08"  user=consulta password="consulta");
+   create table work.Base_Carteira as
+   select * from connection to mydb
+       (
+SELECT  CAST(DATEPART(MONTH, mes) AS varchar)+ '/'+ CAST(DATEPART(YEAR, mes) AS varchar) AS Data,
+		Grupo_Produto AS Produto,
+		NuContratoGestao,
+		CAST(SUM(VrSaldo) AS float) AS Carteira
+
+FROM bases_dre.dbo.carteira_1402
+WHERE mes BETWEEN '20251001' AND '20251031' AND Base <> 'reativadas 3533'
+GROUP BY Grupo_Produto,
+		 CAST(DATEPART(MONTH, mes) AS varchar)+ '/'+ CAST(DATEPART(YEAR, mes) AS varchar),
+		 NuContratoGestao
+
+ORDER BY CAST(DATEPART(MONTH, mes) AS varchar)+ '/'+ CAST(DATEPART(YEAR, mes) AS varchar),
+		 Grupo_Produto,
+		 NuContratoGestao
+
+		);
+    Disconnect from mydb;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira 1402 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira Custos Old */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira Custos Old */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-UxyUyxyQJErsBGev/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let login = tainara_alves;
+%let senha = "7f31!1C5F571";
+
+
+PROC SQL;
+CONNECT TO SYBASEIQ AS DBCON
+(host='pta-iqprd01' server=ptaiqprd db=PTAIQCONT USER=&login. password=&senha.);
+CREATE TABLE carteira_custos AS
+SELECT * FROM connection to dbcon (
+
+SELECT
+
+a.CdCarteira
+
+,a.DtProcessamento
+,a.NuContrato
+,a.CdModalidadeProduto
+,b.NmModalidadeProduto
+,sum(coalesce(VrSaldo,0))*-1 as Carteira_Diferida
+FROM gestaocontabil.TbSaldoContabil a
+INNER JOIN dba.tbmodalidadeproduto b ON (a.CdModalidadeProduto = b.CdModalidadeProduto)
+
+WHERE a.DtProcessamento = '20250531'
+
+		AND a.CdCarteira NOT IN (13)
+		AND (a.NuContaContabil || a.CdModalidadeProduto) <> '060'
+		AND DsAgrupamentoContabil IN (
+		'Diferimento Acordos Comerciais',
+		'Diferimento Comissao',
+		'Diferimento Comissao de GR',
+		'Diferimento GRAVAME',
+		'Diferimento Lead Digital')
+
+Group by
+
+a.CdCarteira
+
+,a.DtProcessamento
+,a.NuContrato
+,a.CdModalidadeProduto
+,b.NmModalidadeProduto
+
+)
+;
+QUIT
+;
+
+proc sql;
+create table duplicadas as
+
+select NuContrato
+
+from carteira_custos
+
+group by 1
+
+having count	(*) > 1
+
+;
+QUIT
+;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira Custos Old */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira Est 3 */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira Est 3 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-3KFebgiXG5eJnOGT/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table Carteira_estagio as
+   select * from connection to perm
+     (SELECT
+		dt_referencia as Data,
+		cd_modalidade,
+		cd_contrato,
+		cd_estagio_final as Estagio,
+
+		sum(vr_provisao_total) as Carteira_Estag
+
+      from bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+	  WHERE cd_modalidade not in ('204','218','1304','210','1904')
+	  and dt_referencia = '2025-09-30'
+
+group by
+		Data,
+		cd_modalidade,
+		cd_contrato,
+		Estagio
+
+);
+   disconnect from perm;
+quit;
+
+proc sql;
+
+create table Carteira_estagio_final as
+	select
+		Data,
+		cd_modalidade,
+		input(cd_contrato,comman15.) as NuContratoGestao format best15.,
+		Estagio,
+		Carteira_Estag
+
+	from Carteira_estagio
+
+;
+quit
+;
+
+proc sql;
+create table duplicadas as
+
+select cd_contrato
+
+from Carteira_estagio
+
+group by 1
+
+having count	(*) > 1
+
+;
+QUIT
+;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira Est 3 */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira Final */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira Final */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-R4kPLWvu16hUdiUY/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+
+create table carteira_final as
+select
+	a.Data,
+	a.Produto,
+	a.NuContratoGestao,
+	a.Carteira,
+	b.Carteira_Diferida,
+	c.Estagio,
+	c.Carteira_Estag
+
+	from work.base_carteira as a
+	left join work.carteira_custos_final as b on (a.NuContratoGestao = b.NuContrato)
+	left join work.Carteira_estagio_final as c on (a.NuContratoGestao = c.NuContratoGestao)
+
+;
+QUIT
+;
+
+proc sql;
+create table duplicadas as
+
+select NuContratoGestao
+
+from carteira_final
+
+group by 1
+
+having count	(*) > 1
+
+;
+QUIT
+;
+
+data carteira_tratada;
+	set carteira_final;
+
+	Estagio_num = input(Estagio, 8.);
+
+	if missing(Carteira) then Carteira = 0;
+	if missing(Carteira_Diferida) then Carteira_Diferida = 0;
+	if missing(Carteira_Estag) then Carteira_Estag = 0;
+
+	if Estagio_num in (1,2) then Carteira_Accrual = Carteira - Carteira_Diferida;
+	else if Estagio_num = 3 then Carteira_Accrual = 0;
+
+	
+	keep data Produto NuContratoGestao Carteira Carteira_Diferida Carteira_Estag Carteira_Accrual;
+
+	run;
+
+proc sql;
+create table carteiras as
+	select
+		data,
+		Produto,
+		sum(Carteira) as Carteira,
+		sum(Carteira_Diferida) as Carteira_Custos,
+		(sum(Carteira)-sum(Carteira_Accrual)-sum(Carteira_Diferida)) as Carteira_Nao_Accrual,
+		sum(Carteira_Accrual) as Carteira_Accrual
+
+	from carteira_tratada
+
+	group by 1,2
+
+;
+QUIT
+;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira Final */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira Custos */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira Custos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-DGe2fy8D7SZqlz4G/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table carteira_custos as
+   select * from connection to perm
+     (SELECT
+
+	 a.CdCarteira
+
+	,a.DtProcessamento
+	,a.NuContrato
+    ,a.CdModalidadeProduto
+    ,b.NmModalidadeProduto
+    ,sum(coalesce(CAST (VrSaldo AS FLOAT64),0))*-1 as Carteira_Diferida
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbsaldocontabil a
+	INNER JOIN bv-pdbd-prd.trusted_dba.tbmodalidadeproduto b ON (a.CdModalidadeProduto = b.CdModalidadeProduto)
+
+WHERE a.DtProcessamento = '2025-10-31'
+		AND a.CdCarteira NOT IN (13)
+		AND (a.NuContaContabil || a.CdModalidadeProduto) <> '060'
+		AND DsAgrupamentoContabil IN (
+		'Diferimento Acordos Comerciais',
+		'Diferimento Comissao',
+		'Diferimento Comissao de GR',
+		'Diferimento GRAVAME',
+		'Diferimento Lead Digital',
+		'Diferimento BV Compensa',
+		'Diferimento Meu Financiamento Solar')
+
+GROUP BY
+ a.CdCarteira
+
+,a.DtProcessamento
+,a.NuContrato
+,a.CdModalidadeProduto
+,b.NmModalidadeProduto
+
+);
+   disconnect from perm;
+quit;
+
+proc sql;
+create table carteira_custos_final as
+
+select
+CdCarteira,
+DtProcessamento,
+input(NuContrato,comman15.) as NuContrato format best15.,
+CdModalidadeProduto,
+NmModalidadeProduto,
+Carteira_Diferida
+
+from carteira_custos
+;
+quit
+;
+
+proc sql;
+create table duplicadas as
+
+select NuContrato
+
+from carteira_custos
+
+group by 1
+
+having count	(*) > 1
+
+;
+QUIT
+;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira Custos */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table carteira_custos as
+   select * from connection to perm
+     (SELECT
+
+	 a.CdCarteira
+
+	,a.DtProcessamento
+	,a.NuContrato
+    ,a.CdModalidadeProduto
+    ,b.NmModalidadeProduto
+    ,sum(coalesce(CAST (VrSaldo AS FLOAT64),0))*-1 as Carteira_Diferida
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbsaldocontabil a
+	INNER JOIN bv-pdbd-prd.trusted_dba.tbmodalidadeproduto b ON (a.CdModalidadeProduto = b.CdModalidadeProduto)
+
+WHERE a.DtProcessamento = '2025-07-31'
+		AND a.CdCarteira NOT IN (13)
+		AND (a.NuContaContabil || a.CdModalidadeProduto) <> '060'
+		AND DsAgrupamentoContabil IN (
+		'Diferimento Acordos Comerciais',
+		'Diferimento Comissao',
+		'Diferimento Comissao de GR',
+		'Diferimento GRAVAME',
+		'Diferimento Lead Digital',
+		'Diferimento BV Compensa',
+		'Diferimento Meu Financiamento Solar')
+
+GROUP BY
+ a.CdCarteira
+
+,a.DtProcessamento
+,a.NuContrato
+,a.CdModalidadeProduto
+,b.NmModalidadeProduto
+
+);
+   disconnect from perm;
+quit;
+
+proc sql;
+create table carteira_custos_final as
+
+select
+CdCarteira,
+DtProcessamento,
+input(NuContrato,comman15.) as NuContrato format best15.,
+CdModalidadeProduto,
+NmModalidadeProduto,
+Carteira_Diferida
+
+from carteira_custos
+;
+quit
+;
+
+proc sql;
+create table duplicadas as
+
+select NuContrato
+
+from carteira_custos
+
+group by 1
+
+having count	(*) > 1
+
+;
+QUIT
+;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */

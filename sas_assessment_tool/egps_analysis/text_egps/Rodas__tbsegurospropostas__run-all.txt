@@ -1,0 +1,133 @@
+START_METADATA
+PROJECT: Rodas__tbsegurospropostas
+FILE_SAS: run-all.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: html
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (2x | +24), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 67
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, ODSTEXT, REPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_dur, W_fim, W_ini
+DETECTED_MACROS_USED: W_dur, W_fim, W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/tbsegurospropostas/codigo/script.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/TBSEGUROSPROPOSTAS/CODIGO/SCRIPT.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: IGELOG
+IMPORTED FILES (Requires Ingestion): /infogrc/tbsegurospropostas/codigo/script.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/tbsegurospropostas/codigo/script.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): IGELOG.LOGEXECUCAOPROCESSOS
+APPEND_ONLY_OUTPUTS: IGELOG.LOGEXECUCAOPROCESSOS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): IGELOG.LOGEXECUCAOPROCESSOS
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: DATA_ATUALIZA, LOGEXE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/tbsegurospropostas/codigo/script.sas
+
+END_METADATA
+================================================================================
+options validvarname=any;
+options nofmterr;
+
+/* Marcar horário de início da atualização */
+%LET W_ini = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+SUBJECT="Seguros de Propostas | Início da atualização";
+
+DATA _NULL_;
+	FILE MAIL_INI;
+		PUT "Processamento das bases de contato iniciado.";
+		PUT "Este processo gerará as seguintes bases:";
+		PUT " - AUXL.TbSegurosPropostas";
+RUN;
+
+/* Execução dos processos */
+%include '/infogrc/tbsegurospropostas/codigo/script.sas';
+
+/* Calcular tempo de processamento total */
+%LET W_fim = %SYSFUNC(datetime());
+%LET W_dur = %SYSFUNC(intck(SECOND, &W_ini, &W_fim), tod8.);
+
+/* Enviar e-mail de finalização da atualização */
+PROC SQL;
+CREATE TABLE DATA_ATUALIZA AS
+  SELECT
+    NmGrupoProdutoMeta AS Produto,
+    MAX(DtEntradaProposta) AS DtMaxSeguro FORMAT=DATE9.
+  FROM
+    TbOriginacaoSeguros
+  WHERE
+    (FlAuto + FlSPF + FlCap + FlImobiliario + FlSeguroVida) > 0
+  GROUP BY
+    1;
+RUN;
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br" "allan.machado@bv.com.br")
+    TYPE="text/html"
+    SUBJECT="Seguros de Propostas | Fim da atualização";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+PROC REPORT DATA=DATA_ATUALIZA nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 9pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 9pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 9pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS Produto DtMaxSeguro;
+RUN;
+
+PROC ODSTEXT;
+   p "Prezados,";
+   p "";
+   p "As bases de contatos foram atualizadas.";
+   p "A geração das bases demorou &W_dur. para ser concluída.";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+
+DATA LOGEXE;
+  IdProcesso = 'SEGPROPS';
+  LENGTH Processo $40.;
+  Processo = 'Seguros de propostas';
+  FORMAT Inicio Final DATETIME18.;
+  Inicio = &W_ini.;
+  Final = &W_fim.;
+  Duracao = "&W_dur.";
+RUN;
+
+PROC APPEND DATA=LOGEXE BASE=IGELOG.LogExecucaoProcessos; RUN;

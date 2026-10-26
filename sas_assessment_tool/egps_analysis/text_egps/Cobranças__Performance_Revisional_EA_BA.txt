@@ -1,0 +1,146 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Performance_Revisional_EA_BA
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:55 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 88
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: EST_BNDU = /riscosbv/cobranca/dpompei/estoquebndu; REVI = /riscosbv/cobranca/mlamera/Revisional
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): EST_BNDU.ENTRADA [SAS/Local], REVI.MIS_TABLEAU_REVI_GERAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: EST_BNDU, REVI
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): \\bvnet\global\DTEC\Desenvolvimento\Tableau\CobrancaVarejo\Revisional\meta_revi.xlsx[SHEET='meta_revi']
+TEMP/DISCARDED_FILE_INPUT: WORK.meta_revi <- \\bvnet\global\DTEC\Desenvolvimento\Tableau\CobrancaVarejo\Revisional\meta_revi.xlsx[SHEET='meta_revi']
+TABLE_READ_PROVENANCE (Flow): EST_BNDU.ENTRADA [PROC SQL - FROM], REVI.MIS_TABLEAU_REVI_GERAL [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_REVI, RETOMADOS_EA_BA, REVISIONAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|\\bvnet\global\DTEC\Desenvolvimento\Tableau\CobrancaVarejo\Revisional\meta_revi.xlsx[SHEET='meta_revi']|//BVNET/GLOBAL/DTEC/DESENVOLVIMENTO/TABLEAU/COBRANCAVAREJO/REVISIONAL|META_REVI.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: RETOMADOS EA / BA */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: RETOMADOS EA / BA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-keu2EQ3oCNg4S6TQ/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME EST_BNDU 	BASE '/riscosbv/cobranca/dpompei/estoquebndu';
+
+PROC SQL;
+CREATE TABLE RETOMADOS_EA_BA AS
+SELECT DISTINCT
+	SAFRA,
+	FASE,
+	GRUPO,
+ 	ASSESSORIA,
+	(COUNT(NUCONTRATOGESTAO)) AS QTD
+FROM EST_BNDU.ENTRADA
+WHERE
+	ASSESSORIA NOT IN ('OUTROS', 'REALE')
+	AND SAFRA >= 202402
+GROUP BY
+	SAFRA,
+	FASE,
+	GRUPO,
+ 	ASSESSORIA
+;QUIT;
+
+DATA RETOMADOS_EA_BA;
+SET RETOMADOS_EA_BA;
+IF ASSESSORIA = 'MENDES_E_CUNHA' THEN ASSESSORIA = 'MENDES E CUNHA';
+IF ASSESSORIA = 'RN_ADV' THEN ASSESSORIA = 'RN ADV';
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: RETOMADOS EA / BA */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Revisional */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Revisional */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-beyRw9NQZWpSLtdD/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME REVI 		BASE '/riscosbv/cobranca/mlamera/Revisional';
+
+DATA REVISIONAL;
+SET REVI.MIS_TABLEAU_REVI_GERAL;
+WHERE SAFRA >= 202402
+AND ASSESSORIA_FINAL NOT IN('BV','VERIFICAR')
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_REVI AS
+SELECT
+	A.SAFRA,
+	'REVISIONAL' AS FASE,
+	A.ASSESSORIA_FINAL AS ASSESSORIA,
+	'RECUPERADO' AS TIPO,
+	SUM(A.VLR_RECEB) AS VALOR
+
+FROM REVISIONAL AS A
+JOIN (SELECT DISTINCT
+				SAFRA,
+				MAX(DT_REF) AS DT_REF FORMAT DDMMYY10.
+				FROM REVISIONAL
+				GROUP BY
+					SAFRA
+				) AS B
+ON A.SAFRA = B.SAFRA
+AND A.DT_REF = B.DT_REF
+GROUP BY
+	A.SAFRA,
+	A.ASSESSORIA_FINAL
+UNION
+SELECT
+	SAFRA,
+	'REVISIONAL' AS FASE,
+	ASSESSORIA,
+	'META' AS TIPO,
+	META
+FROM meta_revI
+WHERE SAFRA >= 202402
+AND ASSESSORIA <> 'BV'
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Revisional */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

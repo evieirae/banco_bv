@@ -1,0 +1,473 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Auditoria__IAC59
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:48 UTC
+BUSINESS_AREA: Auditoria
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -77
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 347
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: data_atual, fim_3m_formatado, fim_periodo_3m, inicio_3m_formatado, inicio_periodo_3m, nome_mes_anterior, primeiro_dia_atual
+DETECTED_MACROS_USED: data_atual, fim_3m_formatado, fim_mes_anterior, fim_periodo_3m, inicio_3m_formatado, inicio_mes_anterior, inicio_periodo_3m, nome_mes_anterior, primeiro_dia_atual
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PRT
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): FORNEC.PAGAMENTOS_S_APROVACAO_2025&NOME_MES_ANTERIOR [SAS/Local], PRT.SA2700 [SQLSVR], PRT.SC7700 [SQLSVR], PRT.SCR700 [SQLSVR], PRT.SD1700 [SQLSVR], PRT.SE2700 [SQLSVR], PRT.SE5700 [SQLSVR]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: PRT
+EXPORTED_LIBNAMES: FORNEC
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): FORNEC.COLUNA_CHAVE_2025 [PROC SQL - FROM], FORNEC.PAGAMENTOS_C_APROVACAO&NOME_MES_ANTERIOR [PROC SQL - FROM], FORNEC.PAGAMENTOS_S_APROVACAO&NOME_MES_ANTERIOR [PROC SQL - FROM], FORNEC.PAGAMENTOS_S_APROVACAO_2025&NOME_MES_ANTERIOR [PROC SQL - FROM], FORNEC.PAGAMENTO_COUNT_2025 [PROC SQL - FROM], FORNEC.PAG_C_APROV&NOME_MES_ANTERIOR [PROC SQL - FROM], FORNEC.PAG_ESTORNO&NOME_MES_ANTERIOR [PROC SQL - JOIN], PRT.SA2700 [PROC SQL - JOIN], PRT.SC7700 [PROC SQL - JOIN], PRT.SCR700 [PROC SQL - JOIN], PRT.SD1700 [PROC SQL - JOIN], PRT.SE2700 [PROC SQL - FROM], PRT.SE5700 [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): FORNEC.COLUNA_CHAVE_2025, FORNEC.PAGAMENTOS_C_APROVACAO&NOME_MES_ANTERIOR, FORNEC.PAGAMENTOS_S_APROVACAO&NOME_MES_ANTERIOR, FORNEC.PAGAMENTO_COUNT_2025, FORNEC.PAG_C_APROV&NOME_MES_ANTERIOR, FORNEC.PAG_ESTORNO&NOME_MES_ANTERIOR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): FORNEC.COLUNA_CHAVE_2025, FORNEC.PAGAMENTOS_C_APROVACAO&NOME_MES_ANTERIOR, FORNEC.PAGAMENTOS_S_APROVACAO&NOME_MES_ANTERIOR, FORNEC.PAGAMENTO_COUNT_2025, FORNEC.PAG_C_APROV&NOME_MES_ANTERIOR, FORNEC.PAG_DUPLICIDADE_2025, FORNEC.PAG_ESTORNO&NOME_MES_ANTERIOR, FORNEC.PEDIDO_COMPRA2025
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &FIM_3M_FORMATADO, &INICIO_3M_FORMATADO, DE, FIM, PAGAMENTOS_&NOME_MES_ANTERIOR
+DYNAMIC REFS (Ambiguous): FORNEC.PAGAMENTOS_C_APROVACAO{NOME_MES_ANTERIOR}, FORNEC.PAGAMENTOS_S_APROVACAO_2025{NOME_MES_ANTERIOR}, FORNEC.PAGAMENTOS_S_APROVACAO{NOME_MES_ANTERIOR}, FORNEC.PAG_C_APROV{NOME_MES_ANTERIOR}, FORNEC.PAG_ESTORNO{NOME_MES_ANTERIOR}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET data_atual=%sysfunc(date());
+%LET primeiro_dia_atual=%sysfunc(intnx(month, &data_atual, 0, BEGINNING));
+%LET fim_periodo_3m=%sysfunc(intnx(day, &primeiro_dia_atual, -1));
+%LET inicio_periodo_3m=%sysfunc(intnx(month, &primeiro_dia_atual, -3, BEGINNING));
+%LET inicio_3m_formatado=%sysfunc(putn(&inicio_periodo_3m, yymmddn8.));
+%LET fim_3m_formatado=%sysfunc(putn(&fim_periodo_3m, yymmddn8.));
+%LET nome_mes_anterior=%sysfunc(putn(&fim_periodo_3m, monname3.));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: EXTRAI_BASE_PAGAMENTOS */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: EXTRAI_BASE_PAGAMENTOS */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ikTKlB7iN3xnhgof/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PRT SQLSVR DATASRC=DBERPPROTHEUS_AD SCHEMA=dbo USER=rafael.santana PASSWORD="xxxxx";
+
+
+%let data_atual = %sysfunc(date());
+
+
+%let primeiro_dia_atual = %sysfunc(intnx(month, &data_atual, 0, BEGINNING));
+
+
+
+%let fim_periodo_3m = %sysfunc(intnx(day, &primeiro_dia_atual, -1));
+
+
+
+%let inicio_periodo_3m = %sysfunc(intnx(month, &primeiro_dia_atual, -3, BEGINNING));
+
+
+
+
+
+%let inicio_3m_formatado = %sysfunc(putn(&inicio_periodo_3m, yymmddn8.));
+%let fim_3m_formatado = %sysfunc(putn(&fim_periodo_3m, yymmddn8.));
+
+
+%let nome_mes_anterior = %sysfunc(putn(&fim_periodo_3m, monname3.));
+
+
+
+
+
+%put Data de Início do Período (3 meses): &inicio_3m_formatado;
+%put Data de Fim do Período (3 meses): &fim_3m_formatado;
+%put Mes Anterior: &nome_mes_anterior;
+
+
+proc sql;
+CREATE TABLE PAGAMENTOS_&nome_mes_anterior (COMPRESS=YES) AS
+    SELECT
+        E2.*,
+        A2.A2_XPARC,
+        E5.E5_FILIAL, E5.E5_DATA, E5.E5_VALOR, E5.E5_BANCO, E5.E5_AGENCIA, E5.E5_CONTA,
+        E5.E5_BENEF, E5.E5_VLMOED2, E5.E5_FORNECE, E5.E5_CCUSTO, E5.E5_DOCUMEN, E5.E5_HISTOR, E5.E5_TIPODOC,
+        C7.C7_NUM, C7.C7_DESCRI,
+        CR.CR_NUM, CR.CR_USERLIB, CR.CR_TIPO, CR.CR_USER, CR.CR_APROV, CR.CR_NIVEL, CR.CR_STATUS, CR.CR_DATALIB, CR.CR_TOTAL
+    FROM PRT.SE2700 E2
+    INNER JOIN PRT.SE5700 E5
+        ON E2.E2_FILIAL  = E5.E5_FILIAL
+        AND E5.E5_PREFIXO= E2.E2_PREFIXO
+        AND E5.E5_NUMERO = E2.E2_NUM
+        AND E5.E5_PARCELA= E2_PARCELA
+        AND E5.E5_TIPO   = E2.E2_TIPO
+        AND E5.E5_CLIFOR = E2.E2_FORNECE
+        AND E5.E5_LOJA  = E2.E2_LOJA
+        AND E5.D_E_L_E_T_= ''
+    LEFT JOIN PRT.SD1700 D1
+        ON SUBSTR(D1.D1_FILIAL,1,4) = E2.E2_FILIAL
+        AND D1.D1_DOC   = E2.E2_NUM
+        AND D1.D1_SERIE = E2.E2_PREFIXO
+        AND D1.D1_FORNECE= E2.E2_FORNECE
+        AND D1.D1_LOJA  = E2.E2_LOJA
+        AND D1.D_E_L_E_T_= ''
+    LEFT JOIN PRT.SC7700 C7
+        ON C7.C7_FILIAL = E2.E2_FILIAL
+        AND C7.C7_NUM   = D1_PEDIDO
+        AND C7.D_E_L_E_T_= ''
+    LEFT JOIN PRT.SCR700 CR
+        ON CR.CR_FILIAL = C7.C7_FILIAL
+        AND CR.CR_NUM   = C7.C7_NUM
+        AND CR.D_E_L_E_T_= ''
+    LEFT JOIN PRT.SA2700 A2
+        ON A2.A2_COD = E2.E2_FORNECE
+        AND A2.D_E_L_E_T_ <> '*'
+    WHERE E2.E2_VENCREA BETWEEN "&inicio_mes_anterior" AND "&fim_mes_anterior"
+        AND E2.E2_PREFIXO NOT IN ('RE ','COM')
+        AND E2.E2_NATUREZ NOT IN ('0000000999','0000000998')
+        AND E2.D_E_L_E_T_= '';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: EXTRAI_BASE_PAGAMENTOS */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: LIBNAME */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-wZSwoEMJ91evj2Fu/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME FORNEC"/auditoria/Corporativo/Cross/Indicador - Fornecedor";
+
+/* =========================FIM TASK=========================== */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: PAGAMENTOS_FULL */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: PAGAMENTOS_FULL */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-SFU1rAq1jpGvVT8u/code.sas */
+/* =========================INÍCIO TASK========================= */
+;
+
+DATA FORNEC.PAGAMENTOS_C_APROVACAO&nome_mes_anterior.;
+SET PAGAMENTOS_&nome_mes_anterior.;
+RUN;
+
+;
+
+PROC SQL;
+   CREATE TABLE FORNEC.COLUNA_CHAVE_2025 AS
+   SELECT DISTINCT *,
+            (CATS(C7_NUM,E5_DOCUMEN)) AS CHAVE_ESTORNO
+      FROM FORNEC.PAGAMENTOS_C_APROVACAO&nome_mes_anterior.;
+QUIT;
+
+;
+
+PROC SQL;
+CREATE TABLE FORNEC.PAG_ESTORNO&nome_mes_anterior. AS
+SELECT *
+FROM FORNEC.COLUNA_CHAVE_2025
+WHERE E5_TIPODOC = 'ES';
+QUIT;
+
+;
+
+PROC SQL;
+	CREATE TABLE FORNEC.PAG_C_APROV&nome_mes_anterior. AS
+		SELECT DISTINCT a.*
+		FROM FORNEC.COLUNA_CHAVE_2025 a
+		LEFT JOIN  FORNEC.PAG_ESTORNO&nome_mes_anterior. b
+			ON b.C7_NUM = a.C7_NUM
+		WHERE  b.CHAVE_ESTORNO <> a.CHAVE_ESTORNO
+			AND a.E2_HIST  NOT CONTAINS 'CL'
+			AND a.E2_HIST  NOT CONTAINS 'PASTA'
+			AND a.A2_XPARC <> '1';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: PAGAMENTOS_FULL */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: PAGAMENTOS_SEM_APROVACAO */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: PAGAMENTOS_SEM_APROVACAO */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-WsGoduGvtqQYzI9d/code.sas */
+/* =========================INÍCIO TASK========================= */
+;
+
+PROC SQL;
+	CREATE TABLE FORNEC.PAGAMENTOS_S_APROVACAO&nome_mes_anterior. AS
+		SELECT DISTINCT
+			E2_FILIAL,
+			E2_LANCAME,
+			E2_FILENAM,
+			E2_PREFIXO,
+			E2_TIPO,
+			E2_NUM,
+			E2_PARCELA,
+			E2_XIDFLUI,
+			E2_FORNECE,
+			E2_NOMFOR,
+			E2_FCGC,
+			E2_XFRMPGT,
+			E2_XITP,
+			E2_XPAGTO,
+			E2_CODBAR,
+			E2_XCPMF,
+			E2_VALOR,
+			E2_IRRF,
+			E2_ISS,
+			E2_INSS,
+			E2_PIS,
+			E2_COFINS,
+			E2_CSLL,
+			E2_VLCRUZ,
+			E2_HIST,
+			E2_SALDO,
+			E2_VALJUR,
+			E2_XBANCO,
+			E2_XAGENCI,
+			E2_OK,
+			E2_XNUMCON,
+			E2_XDIGCON,
+			E2_XNOME,
+			E2_XCGC,
+			E2_EMISSAO,
+			E2_VENCTO,
+			E2_VENCREA,
+			E2_ITEMD,
+			E2_CCD,
+			E2_CLVLDB,
+			E2_NATUREZ,
+			E2_MULTNAT,
+			E2_PORTADO,
+			E2_PORCJUR,
+			E2_MOEDA,
+			E2_APROVA,
+			E2_IDENTEE,
+			E2_FLUXO,
+			E2_DATALIB,
+			E2_USUALIB,
+			E2_ITPDTEN,
+			E2_ITPPROT,
+			E2_MSFIL,
+			E2_BAIXA,
+			E2_BCOPAG,
+			E2_EMIS1,
+			E2_LA,
+			E2_LOTE,
+			E2_MOTIVO,
+			E2_MOVIMEN,
+			E2_VALLIQ,
+			E2_VENCORI,
+			E2_NUMBOR,
+			E2_OCORREN,
+			E2_ORIGEM,
+			E2_IDCNAB,
+			E2_FILORIG,
+			E2_DEBITO,
+			E2_VRETPIS,
+			E2_VRETCOF,
+			E2_VRETCSL,
+			E2_BASECOF,
+			E2_BASEPIS,
+			E2_BASECSL,
+			E2_VRETISS,
+			E2_MDRTISS,
+			E2_DTBORDE,
+			E2_XNRPGTO,
+			E2_XGRUPO,
+			E2_XDESCIT,
+			A2_XPARC,
+			E5_FILIAL,
+			E5_DATA,
+			E5_VALOR,
+			E5_BANCO,
+			E5_AGENCIA,
+			E5_CONTA,
+			E5_BENEF,
+			E5_VLMOED2,
+			E5_FORNECE,
+			E5_CCUSTO,
+			E5_HISTOR,
+			E5_TIPODOC,
+			C7_NUM,
+			C7_DESCRI
+	FROM FORNEC.PAG_C_APROV&nome_mes_anterior.;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: PAGAMENTOS_SEM_APROVACAO */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: SEM_PEDIDO_COMPRA */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: SEM_PEDIDO_COMPRA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-2eRelO9BoghpXBzM/code.sas */
+/* =========================INÍCIO TASK========================= */
+;
+
+LIBNAME FORNEC"/auditoria/Corporativo/Cross/Indicador - Fornecedor";
+	PROC SQL;
+	CREATE TABLE FORNEC.PEDIDO_COMPRA2025 AS
+		SELECT *
+		FROM FORNEC.PAGAMENTOS_S_APROVACAO&nome_mes_anterior.
+		WHERE C7_NUM IN ('0','.')
+			OR C7_NUM IS MISSING
+AND E2_PREFIXO NOT CONTAINS 'MDR'
+AND E2_PREFIXO NOT CONTAINS 'CYB'
+AND E2_PREFIXO NOT CONTAINS 'IPV'
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: SEM_PEDIDO_COMPRA */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: DUPLICIDADE */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: DUPLICIDADE */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1oWjEp1HlvlggLZ4/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE FORNEC.PAGAMENTO_COUNT_2025 AS
+	SELECT DISTINCT
+		E2_FORNECE, 	E2_NOMFOR,
+		E2_FCGC,		E2_XIDFLUI,
+		
+		(COUNT(E2_NOMFOR)) AS COUNT_E2_NOMFOR,
+		E2_VALOR,
+		
+		(COUNT(E2_VALOR)) AS COUNT_E2_VALOR,
+		(COUNT (E2_XIDFLUI)) AS COUNT_E2_XIDFLUI,
+		E2_VENCTO
+	FROM fornec.pagamentos_s_aprovacao_2025&nome_mes_anterior.
+	      GROUP BY E2_FORNECE,	           E2_NOMFOR,
+	               E2_FCGC,				   E2_XIDFLUI,
+	               E2_VALOR,	           E2_VENCTO;
+QUIT;
+
+PROC SQL;
+CREATE TABLE FORNEC.PAG_DUPLICIDADE_2025 AS
+SELECT DISTINCT *
+FROM FORNEC.PAGAMENTO_COUNT_2025
+WHERE COUNT_E2_XIDFLUI > 1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: DUPLICIDADE */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%let data_atual = %sysfunc(date());
+
+
+%let primeiro_dia_atual = %sysfunc(intnx(month, &data_atual, 0, BEGINNING));
+
+
+
+%let fim_periodo_3m = %sysfunc(intnx(day, &primeiro_dia_atual, -1));
+
+
+
+%let inicio_periodo_3m = %sysfunc(intnx(month, &primeiro_dia_atual, -3, BEGINNING));
+
+
+
+
+
+%let inicio_3m_formatado = %sysfunc(putn(&inicio_periodo_3m, yymmddn8.));
+%let fim_3m_formatado = %sysfunc(putn(&fim_periodo_3m, yymmddn8.));
+
+
+%let nome_mes_anterior = %sysfunc(putn(&fim_periodo_3m, monname3.));
+
+
+
+
+
+%put Data de Início do Período (3 meses): &inicio_3m_formatado;
+%put Data de Fim do Período (3 meses): &fim_3m_formatado;
+%put Mes Anterior: &nome_mes_anterior;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME FORNEC"/auditoria/Corporativo/Cross/Indicador - Fornecedor";
+	PROC SQL;
+	CREATE TABLE FORNEC.PEDIDO_COMPRA2025 AS
+		SELECT *
+		FROM FORNEC.PAGAMENTOS_S_APROVACAO&nome_mes_anterior.
+		WHERE C7_NUM IN ('0','.')
+			OR C7_NUM IS MISSING
+AND E2_PREFIXO NOT CONTAINS 'MDR'
+AND E2_PREFIXO NOT CONTAINS 'CYB'
+AND E2_PREFIXO NOT CONTAINS 'IPV'
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

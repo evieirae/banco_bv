@@ -1,0 +1,186 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 05 - Processo Encarteiramento Seguros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -28
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), PROC APPEND (2x | +30)
+----------------------------------------
+LINES_OF_CODE: 106
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes, Max_BASE_SEGUROS_NI, Max_BASE_SEGUROS_NI_RESUMO
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBMETANAOISONOMICA [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_SEGUROS_NI, WORK.BASE_SEGUROS_NI_01, WORK.MAX_DATA, WORK.TBENCARTEIRAMENTONI
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CSBV
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_SEGUROS_NI, WORK.BASE_SEGUROS_NI_01, WORK.MAX_DATA, WORK.TBENCARTEIRAMENTONI
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], CSBV.BASE_SEGUROS_NI [PROC SQL - FROM], CSBV.BASE_SEGUROS_NI_RESUMO [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM], WORK.BASE_SEGUROS_NI [PROC APPEND - DATA=; PROC SQL - FROM], WORK.BASE_SEGUROS_NI_01 [PROC APPEND - DATA=], WORK.MAX_DATA [DATA Step - SET], WORK.TBENCARTEIRAMENTONI [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): CSBV.BASE_SEGUROS_NI, CSBV.BASE_SEGUROS_NI_RESUMO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CSBV.BASE_SEGUROS_NI, CSBV.BASE_SEGUROS_NI_RESUMO
+APPEND_ONLY_OUTPUTS: CSBV.BASE_SEGUROS_NI, CSBV.BASE_SEGUROS_NI_RESUMO
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CSBV.BASE_SEGUROS_NI, CSBV.BASE_SEGUROS_NI_RESUMO
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SEGUROS_NI, BASE_SEGUROS_NI_01, MAX_DATA, TBENCARTEIRAMENTONI
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE TbEncarteiramentoNI AS
+SELECT DISTINCT
+A.NuAnoMes,
+CdColaborador,
+DsLoginN1,
+CdParceiroComercial
+FROM
+BASEGRC.TbMetaNaoisonomica A
+WHERE NUANOMES = &Base_Mes.
+and DsLoginN1 IS NOT NULL
+
+ORDER BY 1,2,3,4
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_SEGUROS_NI AS
+SELECT
+
+A.NUANOMES,
+A.NmGrupoCargoColaborador,
+a.DsLoginN1,
+A.DsLoginN1CartPDV,
+B.DsLoginN1 AS DSLoginMetaNI,
+COALESCE(B.DsLoginN1, A.DsLoginN1) AS DsLoginN1NovaCart,
+a.CdColaborador,
+b.CdColaborador as CdColaboradorMetaNI,
+coalesce(b.CdColaborador, a.CdColaborador) as CdColaboradorNovaCart,
+A.NmGrupoProdutoMeta,
+a.cdparceirocomercial,
+'VrSPF_VrAP_VrAuto' as TpValor,
+
+nucontrato,
+VrSeguros as VrMedida
+/*sum(a.VrBVMais) as VrBVMais,*/
+/*sum(a.VrCap) as VrCap,*/
+/*sum(a.VrDemaisComCompletoMax) as VrAutoTotal*/
+
+FROM TMP.TBPRODUCAO A
+
+LEFT JOIN WORK.TbEncarteiramentoNI B ON B.NUANOMES = A.NUANOMES AND A.CDPARCEIROCOMERCIAL = B.CDPARCEIROCOMERCIAL
+
+WHERE
+A.NUANOMES = &Base_Mes.
+and A.NmCanalEstruturaComercial = 'Canal Veiculos'
+and A.NmGrupoCargoColaborador in ('Gerente Relacionamento Motos', 'Gerente Relacionamento Pesados', 'Gerente Relacionamento Veiculos')
+and A.NmGrupoProdutoMeta in ('Leves', 'Motos', 'Pesados', 'CVG Leves', 'CVG Pesados')
+/*and a.dsloginn1 = 'arlete.leitao'*/
+/*and a.NmAreaEstruturaComercial = 'Canal São Luís'*/
+/*AND (a.dsloginn1 in ('arlete.leitao', 'monica.pinheiro') or DsLoginN1CartPDV in ('arlete.leitao', 'monica.pinheiro'))*/
+
+/*group by 1,2,3,4,5*/
+
+order by a.DsLoginN1
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_SEGUROS_NI_01 AS
+SELECT
+
+A.NUANOMES,
+A.CdColaboradorNovaCart AS CdColaborador,
+B.NmGrupoCargo as NmGrupoCargoColaborador,
+A.DsLoginN1NovaCart AS DsLoginN1,
+A.TpValor,
+SUM(A.VrMedida) AS VrMedida
+
+FROM WORK.BASE_SEGUROS_NI A
+
+LEFT JOIN BASES.TBESTRUTURACOMERCIAL B ON B.DSLOGINN1 = A.DSLOGINN1 AND B.NUANOMES = A.NUANOMES
+
+GROUP BY 1,2,3,4,5
+order by 1,3,4
+
+;RUN;
+
+/****************/
+/*BASE ANALITICA*/
+/****************/
+
+/*DATA CSBV.BASE_SEGUROS_NI;*/
+/*SET WORK.BASE_SEGUROS_NI;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_BASE_SEGUROS_NI
+FROM CSBV.BASE_SEGUROS_NI
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_BASE_SEGUROS_NI',Max_BASE_SEGUROS_NI);
+;run;
+%PUT &Max_BASE_SEGUROS_NI;
+
+PROC SQL;
+DELETE FROM CSBV.BASE_SEGUROS_NI
+WHERE NUANOMES = &Max_BASE_SEGUROS_NI.;
+;RUN;
+
+PROC APPEND BASE=CSBV.BASE_SEGUROS_NI DATA=WORK.BASE_SEGUROS_NI;RUN;
+
+/*************/
+/*BASE RESUMO*/
+/*************/
+
+/*DATA CSBV.BASE_SEGUROS_NI_RESUMO;*/
+/*SET WORK.BASE_SEGUROS_NI_01;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_BASE_SEGUROS_NI_RESUMO
+FROM CSBV.BASE_SEGUROS_NI_RESUMO
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_BASE_SEGUROS_NI_RESUMO',Max_BASE_SEGUROS_NI_RESUMO);
+;run;
+%PUT &Max_BASE_SEGUROS_NI_RESUMO;
+
+PROC SQL;
+DELETE FROM CSBV.BASE_SEGUROS_NI_RESUMO
+WHERE NUANOMES = &Max_BASE_SEGUROS_NI_RESUMO.;
+;RUN;
+
+PROC APPEND BASE=CSBV.BASE_SEGUROS_NI_RESUMO DATA=WORK.BASE_SEGUROS_NI_01;RUN;

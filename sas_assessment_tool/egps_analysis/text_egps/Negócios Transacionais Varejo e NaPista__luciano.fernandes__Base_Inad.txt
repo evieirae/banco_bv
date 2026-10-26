@@ -1,0 +1,72 @@
+START_METADATA
+PROJECT: Negócios Transacionais Varejo e NaPista__luciano.fernandes
+FILE_SAS: Base_Inad.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:38:11 UTC
+BUSINESS_AREA: Negócios Transacionais Varejo e NaPista
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 18
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_BVO_ATRASO_OUT, BASE_INAD
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+proc sql;
+create table base_inad as
+select *
+from Base_BVO_Atraso
+where nuproposta not in (select distinct NuProposta from Base where StProposta="Aprovada e Paga" )
+;
+quit;
+
+proc sql;
+create table Base_BVO_Atraso_out as
+select a.*
+,b.NuCpfCnpj
+
+from Base_BVO_Atraso as a
+left join Base as b
+on a.nuproposta=b.NuProposta
+where NuCpfCnpj>0
+
+;
+quit;
+
+proc sort data=Base_BVO_Atraso_out nodupkey; by _all_; run;

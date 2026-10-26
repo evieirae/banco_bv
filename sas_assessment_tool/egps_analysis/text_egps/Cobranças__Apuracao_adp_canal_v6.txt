@@ -1,0 +1,1371 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Apuracao_adp_canal_v6
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:39 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 95)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 39
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), RETAIN (1x | +10), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 1012
+CODE_TASKS_COUNT: 9
+DETECTED_PROCS: FREQ, PRINT, SORT, SQL
+HAS_DATA_STEP: Yes (17x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: HRENGD = /riscosbv/cobranca/rribeiro/analises/reneg; MRENHIST = /riscosbv/cobranca/rribeiro/analises/reneg/
+DETECTED_MACROS_DEFINED: alvo, fim_mes, fim_mes_m0, fim_mes_m1, inicio_mes
+DETECTED_MACROS_USED: Data_fim, SAFRA, alvo, fim_mes, fim_mes_m0, fim_mes_m1, inicio_mes, safra
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: FIM_MES_M0, FIM_MES_M1, MEIO_MES, SAFRA
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY], BV-PDBD-PRD.DVRY_CORP_CREDITO.VISAOCLIENTE_SAIDADERISCO_DIME [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY/GCP], HRENGD.RENEG_HISTORICA_CELULA [SAS/Local], MRENHIST.CUBO_RENEG_MAILING [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: HRENGD, MRENHIST
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.ALVO_10K_POR_DIA, WORK.CUBO_AGG, WORK.CUBO_CUM, WORK.CUBO_CUM_DIFF
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [PROC SQL - FROM; Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.DVRY_CORP_CREDITO.VISAOCLIENTE_SAIDADERISCO_DIME [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [PROC SQL - JOIN], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM], HRENGD.RENEG_HISTORICA_CELULA [DATA Step - SET], MRENHIST.CUBO_RENEG_MAILING [DATA Step - SET; PROC SQL - FROM], WORK.ALVO_10K_POR_DIA [PROC PRINT - DATA=; PROC SORT - DATA=], WORK.CUBO_AGG [DATA Step - SET; PROC SORT - DATA=], WORK.CUBO_CUM [DATA Step - SET], WORK.CUBO_CUM_DIFF [DATA Step - SET; PROC SORT - DATA=]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_APURACAO, BASE_APURACAO_2, BASE_APURACAO_3, BASE_APURACAO_5, BASE_APURACAO_6, BASE_APURACAO_FULL, BASE_APURACAO_V1, BASE_APURACAO_V2_&SAFRA, BASE_FINAL, BASE_FINAL_AUX, BASE_PAGAMENTOS, BASE_PAGAMENTOS_FINAL, BASE_PAGAMENTOS_V1, BASE_PAGAMENTOS_V2, CUBO, CUBO_PAGAMENTOS, DT_ARQ, MAX_ENVIO, PAGAMENTOS_EM_DIA, WORK.ALVO_10K_POR_DIA, WORK.CUBO_AGG, WORK.CUBO_CUM, WORK.CUBO_CUM_DIFF
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 90 Apuração OFF */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 90 Apuração OFF */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-tcYwEuJqnRnqGf7W/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME HRENGD '/riscosbv/cobranca/rribeiro/analises/reneg';
+
+DATA BASE_APURACAO;
+SET HRENGD.Reneg_Historica_Celula;
+SAFRA = YEAR(DT_ARQ) * 100 + MONTH(DT_ARQ);
+;
+RUN;
+
+
+
+
+
+
+PROC SQL;
+
+CREATE TABLE BASE_APURACAO_V1 AS
+SELECT
+	*,
+
+	CASE
+		WHEN SEGMENTACAO_PUBLICO IN ('Verificar', 'TESTE') 					THEN "Sem Comunicação"
+		WHEN SEGMENTACAO_PUBLICO IN ("COMUNICACAO_INT", "INTERVALOR") AND Flag_CarrAbd = 1 	THEN "HUMANO"
+		WHEN SEGMENTACAO_PUBLICO = "INTERVALOR" 							THEN "COMUNICACAO_INT"
+
+		ELSE SEGMENTACAO_PUBLICO
+	END AS GRUPO_FINAL,
+	CASE
+		WHEN ATRASO < -15 	THEN '-999 A -016'
+		WHEN ATRASO < 0 	THEN '-015 A -001'
+		WHEN ATRASO < 5 	THEN '0000 A 0004'
+		ELSE '0005 A 0999'
+	END AS FX_ATRASO
+
+FROM BASE_APURACAO
+
+;quit;
+
+PROC SQL;
+CREATE TABLE DT_ARQ AS
+SELECT
+	NUCONTRATO,
+	PARCELA,
+	MAX(DT_ARQ) FORMAT=DDMMYY10. AS FIM_MARCACAO,
+	MIN(DT_ARQ) FORMAT=DDMMYY10. AS INIC_MARCACAO
+
+
+FROM BASE_APURACAO_V1
+GROUP BY NUCONTRATO, PARCELA
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=20);
+CREATE TABLE BASE_APURACAO_V2_&SAFRA. AS
+SELECT
+	A.*,
+	B.*,
+	C.SEGMENTACAO_PUBLICO AS MARCACAO_INICIAL,
+	D.SEGMENTACAO_PUBLICO AS MARCACAO_FINAL,
+	ADP.ClassADP
+
+
+FROM BASE_APURACAO_V1 AS A
+
+LEFT JOIN DT_ARQ AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+
+LEFT JOIN BASE_APURACAO_V1 AS C
+ON A.NUCONTRATO = C.NUCONTRATO AND B.INIC_MARCACAO = C.DT_ARQ
+
+LEFT JOIN BASE_APURACAO_V1 AS D
+ON A.NUCONTRATO = D.NUCONTRATO AND B.FIM_MARCACAO = D.DT_ARQ
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_contrato,
+		fl_eleg_reneg,
+		vr_nova_tx_juros 		AS TxJurosADP,
+		qt_novo_prazo_min 		AS PrazoMinADP,
+		qt_novo_prazo_max 		AS PrazoMaxADP,
+		ds_class_reneg_adim 	AS ClassADP,
+		MAX(DATE(dt_inicio_vigencia)) AS dt_inicio_vigencia,
+		MAX(DATE(dt_fim_vigencia)) 	AS dt_fim_vigencia
+
+	FROM	bv-pdbd-prd.dvry_corp_credito.visaocliente_saidaderisco_dime
+
+	WHERE cd_contrato IS NOT NULL
+
+	GROUP BY 1,2,3,4,5,6
+
+) AS ADP
+ON A.NUCONTRATO = INPUT(ADP.cd_contrato, BEST32.) AND
+	A.DT_ARQ <= ADP.dt_fim_vigencia AND A.DT_ARQ >= ADP.dt_inicio_vigencia
+
+WHERE (MARCACAO_INICIAL = MARCACAO_FINAL OR MARCACAO_FINAL = "Sem Comunicação") AND (FIM_MARCACAO-INIC_MARCACAO) >= 15;
+QUIT;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE base_pagamentos AS
+SELECT
+	A.*,
+
+
+
+
+
+
+
+	B.SALDO_M0,
+	CASE
+		WHEN D.dt_baixa IS NOT NULL 					THEN D.dt_baixa
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN F.dt_ultimo_recebimento
+	END FORMAT=DDMMYY10. AS DT_PAGAMENTO,
+	CASE
+		WHEN D.dt_baixa IS NOT NULL 					THEN "Reneg"
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN "Pgmt"
+	END AS TP_PAGAMENTO
+
+FROM BASE_APURACAO_6 AS A
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			DATE(A.dtprocessamento) as dtprocessamento,
+			A.Nucontrato,
+
+
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) > &fim_mes_m0. AND DATE(A.dtprocessamento) <= &fim_mes_m1.
+			AND A.NUCONTRATO >= '12000000000000'
+		GROUP BY A.nucontrato, A.dtprocessamento, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+AND A.DT_ARQ = B.dtprocessamento
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			NuContratoGestao,
+			MAX(SqContratoFinanceiro)      AS SqContratoFinanceiro,
+			NuContratoGestaoNovo,
+			MAX(sqcontratofinanceironovo)     AS sqcontratofinanceironovo,
+			MAX(DATE(dt_baixa))         AS dt_baixa,
+			MAX(dt_reneg)         AS dt_reneg,
+			MAX(SAFE_CAST(vr_presente AS FLOAT64))   AS vr_presente,
+			MAX(SAFE_CAST(vr_financiado AS FLOAT64))  AS vr_financiado,
+			MAX(SAFE_CAST(Tx_Pactuada AS FLOAT64))   AS Tx_Pactuada,
+			MAX(qt_parcela)        AS qt_parcela,
+			MAX(vr_prestacao)        AS vr_prestacao,
+			MAX(FlRestruturacaoContrato)     AS FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+		WHERE 	DATE(dt_baixa) > &fim_mes_m0. AND DATE(dt_baixa) <= &fim_mes_m1. and
+				(dt_cancelamento is null or dt_reativacao is not null) and
+				ST_RENEG = 3
+		GROUP BY
+			NuContratoGestao,
+		    NuContratoGestaoNovo
+) AS D
+ON A.nucontrato = INPUT(D.NuContratoGestao,BEST32.) AND A.SQCONTRATOFINANCEIROATIVO = D.SqContratoFinanceiro
+	AND D.dt_baixa >= A.DT_ARQ AND D.dt_baixa <= A.DT_AVAL
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+		nu_parcela,
+		DATE(dt_ultimo_recebimento) AS dt_ultimo_recebimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'Q' AND DATE(dt_ultimo_recebimento) > &fim_mes_m0. AND DATE(dt_ultimo_recebimento) <= &fim_mes_m1.
+) as F
+ON A.nucontrato = INPUT(F.cd_Contrato,BEST32.) and A.SQCONTRATOFINANCEIROATIVO = F.sq_contrato_financeiro
+	AND F.dt_ultimo_recebimento >= A.DT_ARQ AND F.dt_ultimo_recebimento <= A.DT_AVAL AND A.parcela = F.nu_parcela
+
+;QUIT;
+
+
+DATA base_pagamentos_v1;
+SET base_pagamentos;
+FORMAT RESULTADO $15.;
+IF DT_PAGAMENTO < DT_AVAL AND TP_PAGAMENTO = "Reneg"						THEN RESULTADO = "Reneg"; ELSE
+
+IF DT_PAGAMENTO < DT_AVAL and TP_PAGAMENTO = "Pgmt"							THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+DATA BASE_PAGAMENTOS_V2;
+SET BASE_PAGAMENTOS_V1;
+WHERE RESULTADO IN ("Reneg", "Pagamento");
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_FINAL_AUX AS
+SELECT
+	A.nucontrato,
+	A.parcela,
+	max(A.dt_arq) FORMAT=DDMMYY10. as dt_arq,
+	A.resultado,
+	min(A.dt_pagamento) FORMAT=DDMMYY10. as dt_pagamento,
+	A.saldo_m0
+
+FROM base_pagamentos_v1 AS A
+
+LEFT JOIN base_pagamentos_v2 AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+
+WHERE (A.resultado = "Sem acao" AND B.NUCONTRATO IS MISSING) or (A.dt_arq < A.dt_pagamento and A.resultado in ("Reneg", "Pagamento"))
+
+GROUP BY
+	A.nucontrato,
+	A.parcela,
+	A.resultado,
+	A.saldo_m0
+;QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_FINAL AS
+SELECT
+	A.*,
+	B.PARCELA,
+	B.PLANO,
+	B.VLR_PARCELA,
+	B.flprivatebank,
+	B.flfamilyoffice,
+	B.flblacklist,
+	B.flescudocrm,
+	B.flobito,
+	B.flbndu,
+	B.flbloqueiomdm,
+	B.ATRASO,
+	B.FX_ATRASO,
+	B.Flag_Prop_Dig,
+	B.Flag_ReducTaxa,
+	B.Flag_CarrAbd,
+	B.SAFRA,
+	B.GRUPO_FINAL
+
+FROM BASE_FINAL_AUX AS A
+
+LEFT JOIN BASE_APURACAO_V2 AS B
+ON A.NUCONTRATO = B.NUCONTRATO AND A.DT_ARQ = B.DT_ARQ
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO AS
+SELECT
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq,
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO_M0) AS SALDO_M0
+
+FROM BASE_FINAL
+GROUP BY
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq
+
+;QUIT;
+
+%mend;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 90 Apuração OFF */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 10 INFO_Marcação_Rafa */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 10 INFO_Marcação_Rafa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Qe7D8j2qtkiUlry5/code.sas */
+/* =========================INÍCIO TASK========================= */
+, CASE
+ WHEN SUBSTR(A.NUCPFCNPJ,7,2) IN ('90','91','92','93','94','95','96','97','98','99') THEN 'CONTROLE'
+
+WHEN
+  
+B.flfamilyoffice = 'N' AND
+B.flblacklist = 'N' AND
+B.flescudocrm = 'N' AND
+B.flobito = 'N' AND
+B.flbloqueiomdm = 'N'
+  AND A.ATRASO BETWEEN -15 AND -1
+  AND SUBSTR(A.NUCPFCNPJ,7,2) IN ('00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35', '36', '37', '38', '39', '40', '41')
+  AND F.Flag_Prop_Dig = 0   THEN 'HUMANO'
+
+WHEN 
+B.flfamilyoffice = 'N' AND
+B.flblacklist = 'N' AND
+B.flescudocrm = 'N' AND
+B.flobito = 'N' AND
+B.flbloqueiomdm = 'N'
+  AND   A.ATRASO BETWEEN -15 AND -1
+  AND   F.Flag_Prop_Dig = 1
+  AND   SUBSTR(A.NUCPFCNPJ,7,2) IN ('00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50','51','52','53','54','55','56','57','58','59','60')
+  AND   F.Flag_Prop_Dig = 1   THEN 'COMUNICACAO_INT' 
+
+WHEN 
+B.flfamilyoffice = 'N' AND
+B.flblacklist = 'N' AND
+B.flescudocrm = 'N' AND
+B.flobito = 'N' AND
+B.flbloqueiomdm = 'N'
+  AND   A.ATRASO BETWEEN -15 AND -1
+  AND   SUBSTR(A.NUCPFCNPJ,7,2) IN ('42','43','44','45','46','47','48','49','50','51','52','53','54','55','56','57','58','59','60','61','62','63','64','65','66','67','68','69','70','71','72','73','74','75','76','77','78','79','80','81','82','83','84','85','86','87','88','89')
+  THEN 'COMUNICACAO_INT'
+
+WHEN SUBSTR(A.NUCPFCNPJ,7,2) IN ('00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35', '36', '37', '38', '39', '40', '41','42','43','44','45','46','47','48','49','50','51','52','53','54','55','56','57','58','59','60','61','62','63','64','65','66','67','68','69','70','71','72','73','74','75','76','77','78','79','80','81','82','83','84','85','86','87','88','89')
+	THEN 'TESTE'
+ELSE 'Verificar' END AS SEGMENTACAO_PUBLICO
+
+/* =========================FIM TASK=========================== */
+/* TASK: 10 INFO_Marcação_Rafa */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01 Apuração_Kevin */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01 Apuração_Kevin */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-D3MB5iih9g7Jdr2g/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME HRENGD '/riscosbv/cobranca/rribeiro/analises/reneg';
+
+%let fim_mes_m1 = '2025-09-30';
+%LET fim_mes_m0 = '2025-07-31';
+
+
+
+DATA BASE_APURACAO_FULL;
+SET HRENGD.Reneg_Historica_Celula;
+SAFRA = YEAR(DT_ARQ) * 100 + MONTH(DT_ARQ);
+
+	LENGTH GRUPO_FINAL $30.;
+	IF SEGMENTACAO_PUBLICO IN ('Verificar', 'TESTE')  THEN GRUPO_FINAL = "Sem Comunicação"; ELSE
+
+	IF SEGMENTACAO_PUBLICO IN ("COMUNICACAO_INT", "INTERVALOR") AND Flag_CarrAbd = 1   THEN GRUPO_FINAL = "HUMANO"; ELSE
+	IF SEGMENTACAO_PUBLICO IN ("INTERVALOR") THEN GRUPO_FINAL = "COMUNICACAO_INT";
+	ELSE GRUPO_FINAL = SEGMENTACAO_PUBLICO;
+
+	IF ATRASO < -15 THEN FX_ATRASO = '-999 A -016'; ELSE
+	IF ATRASO < 0  THEN FX_ATRASO = '-015 A -001'; ELSE
+	IF ATRASO < 5   THEN FX_ATRASO = '0000 A 0004';
+	ELSE FX_ATRASO = '0005 A 0999';
+
+WHERE
+	flfamilyoffice = 'N' AND
+	flblacklist = 'N' AND
+	flescudocrm = 'N' AND
+	flobito = 'N' AND
+	flbloqueiomdm = 'N'
+
+
+;RUN;
+
+DATA BASE_APURACAO;
+SET BASE_APURACAO_FULL;
+WHERE FX_ATRASO = '-015 A -001';
+;RUN;
+
+
+
+PROC SORT DATA=BASE_APURACAO;
+	BY NUCONTRATO PARCELA ATRASO GRUPO_FINAL;
+RUN;
+
+PROC SORT DATA=BASE_APURACAO OUT=BASE_APURACAO_2 NODUPKEY;
+	BY NUCONTRATO SQCONTRATOFINANCEIROATIVO PARCELA GRUPO_FINAL;
+RUN;
+
+PROC SORT DATA=BASE_APURACAO_2;
+	BY NUCONTRATO SQCONTRATOFINANCEIROATIVO PARCELA DESCENDING DT_ARQ ;
+RUN;
+
+
+DATA BASE_APURACAO_3;
+	SET BASE_APURACAO_2;
+	BY NUCONTRATO SQCONTRATOFINANCEIROATIVO PARCELA;
+	FORMAT DT_PROX_ARQ YYMMDD10.;
+	DT_PROX_ARQ = LAG1(DT_ARQ);
+	IF FIRST.NUCONTRATO OR FIRST.SQCONTRATOFINANCEIROATIVO OR FIRST.PARCELA  THEN DT_PROX_ARQ=.;
+RUN;
+
+PROC SORT DATA=BASE_APURACAO_3;
+	BY NUCONTRATO DESCENDING PARCELA DESCENDING DT_ARQ;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE MAX_ENVIO AS
+SELECT
+MAX(DT_ARQ) FORMAT YYMMDD10. AS  MAX_ENVIO
+FROM BASE_APURACAO_3
+;QUIT;
+
+
+
+DATA _NULL_;
+SET MAX_ENVIO;
+	CALL SYMPUT('Data_fim', MAX_ENVIO);
+RUN;
+
+
+DATA BASE_APURACAO_5;
+SET BASE_APURACAO_3 (WHERE=(ATRASO BETWEEN -15 AND -1 AND NUCONTRATO BETWEEN 12000000000000 AND 13000000000000));
+
+	FORMAT DT_AVAL YYMMDD10.;
+	IF DT_PROX_ARQ <> . THEN DT_AVAL = DT_PROX_ARQ; ELSE
+	IF DT_PROX_ARQ = . THEN DT_AVAL = &Data_fim.;
+
+	PERIODO_TESTE = INTCK('DAYS', DT_ARQ, DT_AVAL);
+
+RUN;
+
+PROC FREQ DATA = BASE_APURACAO_5;
+TABLES PERIODO_TESTE*GRUPO_FINAL/NOPERCENT NOROW NOCOL;
+RUN;
+
+PROC FREQ DATA = BASE_APURACAO_5;
+TABLES PERIODO_TESTE;
+RUN;
+
+TITLE 'TESTE 05';
+PROC FREQ DATA = BASE_APURACAO_5 (WHERE = (PERIODO_TESTE >= 5));
+TABLES PERIODO_TESTE*GRUPO_FINAL/NOPERCENT NOROW NOCOL;
+RUN;
+
+TITLE 'TESTE 10';
+PROC FREQ DATA = BASE_APURACAO_5 (WHERE = (PERIODO_TESTE >= 10));
+TABLES PERIODO_TESTE*GRUPO_FINAL/NOPERCENT NOROW NOCOL;
+RUN;
+
+TITLE 'TESTE 15';
+PROC FREQ DATA = BASE_APURACAO_5 (WHERE = (PERIODO_TESTE >= 15));
+TABLES PERIODO_TESTE*GRUPO_FINAL/NOPERCENT NOROW NOCOL;
+RUN;
+
+
+
+
+
+DATA BASE_APURACAO_6;
+SET BASE_APURACAO_5;
+
+RUN;
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE base_pagamentos AS
+SELECT
+	A.*,
+	B.SALDO,
+	CASE
+		WHEN D.dt_baixa IS NOT NULL 					THEN D.dt_baixa
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN F.dt_ultimo_recebimento
+	END FORMAT=DDMMYY10. AS DT_PAGAMENTO,
+	CASE
+		WHEN D.dt_baixa IS NOT NULL 					THEN "Reneg"
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN "Pgmt"
+	END AS TP_PAGAMENTO
+
+FROM BASE_APURACAO_6 AS A
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			DATE(A.dtprocessamento) as dtprocessamento,
+			A.Nucontrato,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) > &fim_mes_m0. AND DATE(A.dtprocessamento) <= &fim_mes_m1.
+			AND A.NUCONTRATO >= '12000000000000'
+		GROUP BY A.nucontrato, A.dtprocessamento, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+AND A.DT_ARQ = B.dtprocessamento
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			NuContratoGestao,
+			MAX(SqContratoFinanceiro)      AS SqContratoFinanceiro,
+			NuContratoGestaoNovo,
+			MAX(sqcontratofinanceironovo)     AS sqcontratofinanceironovo,
+			MAX(DATE(dt_baixa))         AS dt_baixa,
+			MAX(dt_reneg)         AS dt_reneg,
+			MAX(SAFE_CAST(vr_presente AS FLOAT64))   AS vr_presente,
+			MAX(SAFE_CAST(vr_financiado AS FLOAT64))  AS vr_financiado,
+			MAX(SAFE_CAST(Tx_Pactuada AS FLOAT64))   AS Tx_Pactuada,
+			MAX(qt_parcela)        AS qt_parcela,
+			MAX(vr_prestacao)        AS vr_prestacao,
+			MAX(FlRestruturacaoContrato)     AS FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+		WHERE 	DATE(dt_baixa) > &fim_mes_m0. AND DATE(dt_baixa) <= &fim_mes_m1. and
+				(dt_cancelamento is null or dt_reativacao is not null) and
+				ST_RENEG = 3
+		GROUP BY
+			NuContratoGestao,
+		    NuContratoGestaoNovo
+) AS D
+ON A.nucontrato = INPUT(D.NuContratoGestao,BEST32.) AND A.SQCONTRATOFINANCEIROATIVO = D.SqContratoFinanceiro
+	AND D.dt_baixa >= A.DT_ARQ AND D.dt_baixa <= A.DT_AVAL
+
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+		nu_parcela,
+		DATE(dt_ultimo_recebimento) AS dt_ultimo_recebimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'Q' AND DATE(dt_ultimo_recebimento) > &fim_mes_m0. AND DATE(dt_ultimo_recebimento) <= &fim_mes_m1.
+) as F
+ON A.nucontrato = INPUT(F.cd_Contrato,BEST32.) and A.SQCONTRATOFINANCEIROATIVO = F.sq_contrato_financeiro
+	AND F.dt_ultimo_recebimento >= A.DT_ARQ AND F.dt_ultimo_recebimento <= A.DT_AVAL AND A.parcela = F.nu_parcela
+
+;QUIT;
+
+
+DATA base_pagamentos_v1;
+SET base_pagamentos;
+FORMAT RESULTADO $15.;
+IF DT_PAGAMENTO <= DT_AVAL AND TP_PAGAMENTO = "Reneg"						THEN RESULTADO = "Reneg"; ELSE
+IF DT_PAGAMENTO <= DT_AVAL and TP_PAGAMENTO = "Pgmt"							THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+
+PERIODO_PAGAMENTO = INTCK('DAYS', DT_ARQ, DT_PAGAMENTO);
+RUN;
+
+PROC SORT DATA=base_pagamentos_v1 OUT=base_pagamentos_final NODUPKEY;
+	BY NUCONTRATO PARCELA;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO AS
+SELECT
+
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq,
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO) AS SALDO
+
+FROM base_pagamentos_final
+WHERE PERIODO_PAGAMENTO <= 10 AND PERIODO_TESTE >= 10
+
+GROUP BY
+
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01 Apuração_Kevin */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02 Periodo_pagamento */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02 Periodo_pagamento */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-UYmL3NN5zlyMZf1f/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET inicio_mes = '2025-09-01';
+%LET fim_mes = '2025-09-30';
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE PAGAMENTOS_EM_DIA AS
+SELECT
+	A.*,
+	B.SALDO_M0
+
+FROM CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+		st_parcela,
+		nu_parcela,
+		DATE(dt_vencimento) as dt_vencimento,
+		DATE(dt_ultimo_recebimento) AS dt_ultimo_recebimento,
+		DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY) AS periodo_pagamento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE DATE(dt_vencimento) >= &inicio_mes. AND DATE(dt_vencimento) <= &fim_mes.
+		AND st_parcela = 'Q' AND cd_contrato > '12000000000000'
+) AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			DATE(A.dtprocessamento) as dtprocessamento,
+			A.Nucontrato,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = '2025-08-31'
+			AND A.NUCONTRATO >= '12000000000000'
+		GROUP BY A.nucontrato, A.dtprocessamento, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.CD_CONTRATO = B.NUCONTRATO
+
+;
+quit;
+
+PROC SQL;
+CREATE TABLE CUBO_PAGAMENTOS AS
+SELECT
+	dt_vencimento,
+	dt_ultimo_recebimento,
+	periodo_pagamento,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(cd_contrato) AS QNT
+
+FROM PAGAMENTOS_EM_DIA
+WHERE periodo_pagamento >= -30 AND periodo_pagamento <= 0
+GROUP BY 1,2,3;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02 Periodo_pagamento */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-z9bGcB2ZHcxh7klb/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MRENHIST '/riscosbv/cobranca/rribeiro/analises/reneg/';
+
+DATA CUBO (keep=DT_ARQ Intervalo_Carrinho Qtd);
+SET MRENHIST.CUBO_RENEG_MAILING;
+WHERE SEGMENTACAO_PUBLICO IN ('HUMANO', 'COMUNICACAO_INT')
+	AND ATRASO IN ('-1', '-2', '-3', '-4', '-5', '-6', '-7', '-8', '-9', '-10', '-11', '-12', '-13', '-14', '-15');
+RUN;
+
+
+proc sql;
+  create table work.cubo_agg as
+  select
+      DT_ARQ,
+      Intervalo_Carrinho,
+      sum(Qtd) as Qtd
+  from MRENHIST.CUBO_RENEG_MAILING
+  where SEGMENTACAO_PUBLICO in ('HUMANO','COMUNICACAO_INT') and Intervalo_Carrinho <> .
+    and ATRASO in ('-1','-2','-3','-4','-5','-6','-7','-8','-9','-10','-11','-12','-13','-14','-15')
+  group by DT_ARQ, Intervalo_Carrinho
+  ;
+quit;
+
+
+proc sort data=work.cubo_agg;
+  by DT_ARQ Intervalo_Carrinho;
+run;
+
+
+data work.cubo_cum;
+  set work.cubo_agg;
+  by DT_ARQ Intervalo_Carrinho;
+  retain Qtd_cum;
+  if first.DT_ARQ then Qtd_cum = 0;
+  Qtd_cum + Qtd;
+run;
+
+%let alvo = 10000;
+
+
+data work.cubo_cum_diff;
+  set work.cubo_cum;
+  if not missing(Qtd_cum);
+  Dif = abs(Qtd_cum - &alvo.);
+run;
+
+
+proc sort data=work.cubo_cum_diff;
+  by DT_ARQ Dif Intervalo_Carrinho;
+run;
+
+
+data work.alvo_10k_por_dia;
+  set work.cubo_cum_diff;
+  by DT_ARQ;
+  if first.DT_ARQ then do;
+    Status = 'Mais proximo de 10k';
+    output;
+  end;
+  keep DT_ARQ Intervalo_Carrinho Qtd_cum Dif Status;
+run;
+
+
+proc sort data=work.alvo_10k_por_dia; by DT_ARQ; run;
+
+proc print data=work.alvo_10k_por_dia noobs;
+  var DT_ARQ Intervalo_Carrinho Qtd_cum Dif Status;
+  format DT_ARQ date9. Qtd_cum Dif comma12.;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME HRENGD '/riscosbv/cobranca/rribeiro/analises/reneg';
+
+DATA BASE_APURACAO;
+SET HRENGD.Reneg_Historica_Celula;
+SAFRA = YEAR(DT_ARQ) * 100 + MONTH(DT_ARQ);
+;
+RUN;
+
+%macro apuracao_segmentacao_adp (safra, fim_mes_m1, fim_mes_m0, meio_mes);
+
+
+
+
+PROC SQL;
+CREATE TABLE BASE_APURACAO_V1_&SAFRA. AS
+SELECT
+	*,
+
+	CASE
+		WHEN SEGMENTACAO_PUBLICO IN ('Verificar', 'TESTE') 					THEN "Sem Comunicação"
+		WHEN SEGMENTACAO_PUBLICO IN ("COMUNICACAO_INT", "INTERVALOR") AND Flag_CarrAbd = 1 	THEN "HUMANO"
+		WHEN SEGMENTACAO_PUBLICO = "INTERVALOR" 							THEN "COMUNICACAO_INT"
+
+		ELSE SEGMENTACAO_PUBLICO
+	END AS GRUPO_FINAL,
+	CASE
+		WHEN ATRASO < -15 	THEN '-999 A -016'
+		WHEN ATRASO < -0 	THEN '-015 A 0000'
+		WHEN ATRASO < 5 	THEN '0001 A 0004'
+		ELSE '0005 A 0999'
+	END AS FX_ATRASO
+
+FROM BASE_APURACAO
+WHERE SAFRA = &safra.
+;quit;
+
+PROC SQL;
+CREATE TABLE DT_ARQ AS
+SELECT
+	NUCONTRATO,
+	MAX(DT_ARQ) FORMAT=DDMMYY10. AS FIM_MARCACAO,
+	MIN(DT_ARQ) FORMAT=DDMMYY10. AS INIC_MARCACAO
+
+FROM BASE_APURACAO_V1_&SAFRA.
+GROUP BY NUCONTRATO
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=20);
+CREATE TABLE BASE_APURACAO_V2_&SAFRA. AS
+SELECT
+	A.*,
+	B.*,
+	C.SEGMENTACAO_PUBLICO AS MARCACAO_INICIAL,
+	D.SEGMENTACAO_PUBLICO AS MARCACAO_FINAL,
+	ADP.ClassADP
+
+FROM BASE_APURACAO_V1_&SAFRA. AS A
+
+LEFT JOIN DT_ARQ AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+
+LEFT JOIN BASE_APURACAO_V1_&SAFRA. AS C
+ON A.NUCONTRATO = C.NUCONTRATO AND B.INIC_MARCACAO = C.DT_ARQ
+
+LEFT JOIN BASE_APURACAO_V1_&SAFRA. AS D
+ON A.NUCONTRATO = D.NUCONTRATO AND B.FIM_MARCACAO = D.DT_ARQ
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_contrato,
+		fl_eleg_reneg,
+		vr_nova_tx_juros 		AS TxJurosADP,
+		qt_novo_prazo_min 		AS PrazoMinADP,
+		qt_novo_prazo_max 		AS PrazoMaxADP,
+		ds_class_reneg_adim 	AS ClassADP,
+		MAX(DATE(dt_inicio_vigencia)) AS dt_inicio_vigencia,
+		MAX(DATE(dt_fim_vigencia)) 	AS dt_fim_vigencia
+
+	FROM	bv-pdbd-prd.dvry_corp_credito.visaocliente_saidaderisco_dime
+
+	WHERE cd_contrato IS NOT NULL
+
+	GROUP BY 1,2,3,4,5,6
+
+) AS ADP
+ON A.NUCONTRATO = INPUT(ADP.cd_contrato, BEST32.) AND
+	A.DT_ARQ <= ADP.dt_fim_vigencia AND A.DT_ARQ >= ADP.dt_inicio_vigencia
+
+WHERE (MARCACAO_INICIAL = MARCACAO_FINAL OR MARCACAO_FINAL = "Sem Comunicação") AND (FIM_MARCACAO-INIC_MARCACAO) >= 15;
+QUIT;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE base_pagamentos AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	CASE
+		WHEN B.sqcontratofinanceiro_m0 = C.sqcontratofinanceiro_m1 THEN INTCK("day",E.dt_vencimento, INPUT(&fim_mes_m1.,yymmdd10.))
+		ELSE C.atraso_m1
+	END AS atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	B.SALDO_M0,
+	CASE
+		WHEN D.dt_baixa IS NOT NULL 					THEN D.dt_baixa
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN F.dt_ultimo_recebimento
+	END FORMAT=DDMMYY10. AS DT_PAGAMENTO,
+	CASE
+		WHEN D.dt_baixa IS NOT NULL 					THEN "Reneg"
+		WHEN F.dt_ultimo_recebimento IS NOT NULL 		THEN "Pgmt"
+	END AS TP_PAGAMENTO
+
+
+
+
+FROM BASE_APURACAO_V2_&SAFRA. AS A
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.)
+
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			NuContratoGestao,
+			MAX(SqContratoFinanceiro)      AS SqContratoFinanceiro,
+			NuContratoGestaoNovo,
+			MAX(sqcontratofinanceironovo)     AS sqcontratofinanceironovo,
+			MAX(DATE(dt_baixa))         AS dt_baixa,
+			MAX(dt_reneg)         AS dt_reneg,
+			MAX(SAFE_CAST(vr_presente AS FLOAT64))   AS vr_presente,
+			MAX(SAFE_CAST(vr_financiado AS FLOAT64))  AS vr_financiado,
+			MAX(SAFE_CAST(Tx_Pactuada AS FLOAT64))   AS Tx_Pactuada,
+			MAX(qt_parcela)        AS qt_parcela,
+			MAX(vr_prestacao)        AS vr_prestacao,
+			MAX(FlRestruturacaoContrato)     AS FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+		WHERE 	DATE(dt_baixa) > &fim_mes_m0. and
+				(dt_cancelamento is null or dt_reativacao is not null) and
+				ST_RENEG = 3
+		GROUP BY
+			NuContratoGestao,
+		    NuContratoGestaoNovo
+) AS D
+ON A.nucontrato = INPUT(D.NuContratoGestao,BEST32.) AND D.sqcontratofinanceironovo = C.sqcontratofinanceiro_m1
+
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+		MIN(dt_vencimento) AS dt_vencimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'A' OR (DATE(dt_ultimo_recebimento) > &fim_mes_m1. AND st_parcela = 'Q')
+	GROUP BY 1,2
+) as E
+ON A.nucontrato = INPUT(E.cd_Contrato,BEST32.) and A.SQCONTRATOFINANCEIROATIVO = E.sq_contrato_financeiro
+
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		cd_Contrato,
+		sq_contrato_financeiro,
+		MAX(DATE(dt_ultimo_recebimento)) AS dt_ultimo_recebimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+	WHERE st_parcela = 'Q' AND DATE(dt_ultimo_recebimento) > &fim_mes_m0. AND DATE(dt_ultimo_recebimento) <= &fim_mes_m1.
+GROUP BY 1,2
+) as F
+ON A.nucontrato = INPUT(F.cd_Contrato,BEST32.) and A.SQCONTRATOFINANCEIROATIVO = F.sq_contrato_financeiro
+
+
+
+
+
+
+
+
+
+
+
+
+
+WHERE A.NUCONTRATO > 12000000000000
+
+;QUIT;
+
+
+DATA base_pagamentos_v1;
+SET base_pagamentos;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 AND TP_PAGAMENTO = "Reneg"		THEN RESULTADO = "Reneg"; ELSE
+
+IF DT_PAGAMENTO > INIC_MARCACAO and TP_PAGAMENTO = "Pgmt"							THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+DATA BASE_PAGAMENTOS_V2;
+SET BASE_PAGAMENTOS_V1;
+WHERE RESULTADO IN ("Reneg", "Pagamento");
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_FINAL_AUX AS
+SELECT
+	A.nucontrato,
+	max(A.dt_arq) FORMAT=DDMMYY10. as dt_arq,
+	A.resultado,
+	min(A.dt_pagamento) FORMAT=DDMMYY10. as dt_pagamento,
+	A.saldo_m0
+
+FROM base_pagamentos_v1 AS A
+
+LEFT JOIN base_pagamentos_v2 AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+
+WHERE (A.resultado = "Sem acao" AND B.NUCONTRATO IS MISSING) or (A.dt_arq < A.dt_pagamento and A.resultado in ("Reneg", "Pagamento"))
+
+GROUP BY
+	A.nucontrato,
+	A.resultado,
+	A.saldo_m0
+;QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_FINAL_&safra. AS
+SELECT
+	A.*,
+	B.PARCELA,
+	B.PLANO,
+	B.VLR_PARCELA,
+	B.flprivatebank,
+	B.flfamilyoffice,
+	B.flblacklist,
+	B.flescudocrm,
+	B.flobito,
+	B.flbndu,
+	B.flbloqueiomdm,
+	B.ATRASO,
+	B.FX_ATRASO,
+	B.Flag_Prop_Dig,
+	B.Flag_ReducTaxa,
+	B.Flag_CarrAbd,
+	B.SAFRA,
+	B.GRUPO_FINAL
+
+FROM BASE_FINAL_AUX AS A
+
+LEFT JOIN BASE_APURACAO_V2_&SAFRA. AS B
+ON A.NUCONTRATO = B.NUCONTRATO AND A.DT_ARQ = B.DT_ARQ
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_&safra. AS
+SELECT
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq,
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO_M0) AS SALDO_M0
+
+FROM BASE_FINAL
+GROUP BY
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq
+
+;QUIT;
+
+%mend;
+
+%apuracao_segmentacao_adp (202508, '2025-08-31', '2025-07-31');
+%apuracao_segmentacao_adp (202509, '2025-09-30', '2025-08-31');
+
+DATA CUBO_EXPORT;
+SET CUBO_202:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE CUBO AS
+SELECT
+
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq,
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO) AS SALDO
+
+FROM base_pagamentos_final
+WHERE PERIODO_PAGAMENTO <= 10 AND PERIODO_TESTE >= 10
+
+GROUP BY
+
+
+	flprivatebank,
+	flfamilyoffice,
+	flblacklist,
+	flescudocrm,
+	flobito,
+	flbndu,
+	flbloqueiomdm,
+	Flag_Prop_Dig,
+	Flag_ReducTaxa,
+	Flag_CarrAbd,
+	SAFRA,
+	GRUPO_FINAL,
+	FX_ATRASO,
+	RESULTADO,
+	dt_arq
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE CUBO_PAGAMENTOS AS
+SELECT
+	dt_vencimento,
+	dt_ultimo_recebimento,
+	periodo_pagamento,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(cd_contrato) AS QNT
+
+FROM PAGAMENTOS_EM_DIA
+WHERE periodo_pagamento >= -30 AND periodo_pagamento <= 0
+GROUP BY 1,2,3;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MRENHIST '/riscosbv/cobranca/rribeiro/analises/reneg/';
+
+DATA CUBO (keep=DT_ARQ Intervalo_Carrinho Qtd);
+SET MRENHIST.CUBO_RENEG_MAILING;
+WHERE SEGMENTACAO_PUBLICO IN ('HUMANO', 'COMUNICACAO_INT')
+	AND ATRASO IN ('-1', '-2', '-3', '-4', '-5', '-6', '-7', '-8', '-9', '-10', '-11', '-12', '-13', '-14', '-15')
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */

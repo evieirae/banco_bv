@@ -1,0 +1,274 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Carteira NaPista
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 192
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBCOLABORADOR [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.PARCEIROSATIVOS
+TABLE_READ_PROVENANCE (Flow): BASES.TBCOLABORADOR [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], WORK.PARCEIROSATIVOS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.PARCEIROSATIVOS, WORK.PARCEIROSATIVOS_01
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-FOh3WKQgkiZkiP9T/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.PARCEIROSATIVOS AS
+SELECT
+
+A.CdParceiroComercial,
+A.NuCnpjLoja,
+A.DsAtividadeFinanciamento,
+A.NmFilialC,
+A.NmTipoParceiroComercial,
+A.NmAutoShopping,
+A.NmGrupoConcessionaria,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN A.NmGrupoConcessionaria
+	WHEN A.NmAutoShopping <> '' THEN A.NmAutoShopping
+	WHEN A.NmTipoParceiroComercial <> '' THEN A.NmTipoParceiroComercial
+	ELSE 'Outros'
+END) AS NmClassificacaoGrupoParceiro,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN 'GRANDES GRUPOS'
+	WHEN A.NmAutoShopping <> '' THEN 'AUTO SHOPPING'
+	WHEN A.NmTipoParceiroComercial <> '' THEN UPCASE(A.NmTipoParceiroComercial)
+	ELSE 'OUTROS'
+END) AS NmClassificacaoTipoGrupoParceiro,
+
+A.NmParceiroComercial,
+A.CdUf,
+A.CdColaboradorC,
+A.NmColaboradorC,
+A.DsLoginN1C,
+B.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.DtCadastro,
+A.FlAtivo
+
+FROM BASES.TBPARCEIROCOMERCIAL A
+
+LEFT JOIN BASES.TBCOLABORADOR B ON B.DSLOGIN = A.DsLoginN1C AND B.CDCOLABORADOR = A.CdColaboradorC
+
+WHERE
+A.FlAtivo = 'S'
+AND A.NmCanalEstruturaComercialC = 'Canal Veiculos'
+AND A.DsAtividadeFinanciamento = 'VEÍCULO'
+AND B.NmGrupoCargoColaborador = 'Gerente Relacionamento Veiculos'
+
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV BALCAO%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'RENG SAO JOSE DO RIO PRETO' 
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'CA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJAS RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV MESA%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV REMANESCENTE%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE '%BV PESADOS RENEG%'
+AND upcase(CALCULATED NmClassificacaoGrupoParceiro) NOT IN ('PARCEIRO DE INDICAÇÃO - CANAL PRÓPRIO')
+AND upcase(NmParceiroComercial) NOT LIKE '%RENEG%'
+AND upcase(NmParceiroComercial) NOT LIKE '%BV CP%'
+AND upcase(NmParceiroComercial) NOT LIKE '%BV PARTICULAR%'
+AND upcase(NmParceiroComercial) NOT LIKE '%RENG%'
+
+
+
+ORDER BY 1
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE WORK.PARCEIROSATIVOS_01 AS
+SELECT
+
+CdParceiroComercial,
+NuCnpjLoja,
+DsAtividadeFinanciamento,
+NmAreaEstruturaComercialC AS NmFilial,
+NmTipoParceiroComercial,
+NmAutoShopping,
+NmGrupoConcessionaria,
+NmClassificacaoGrupoParceiro,
+NmClassificacaoTipoGrupoParceiro,
+NmParceiroComercial,
+CdUf,
+CdColaboradorC AS CdColaborador,
+NmColaboradorC AS NmColaborador,
+DsLoginN1C AS DsLogin,
+NmGrupoCargoColaborador,
+CdFilialC AS CdFilial,
+NmAreaEstruturaComercialC AS NmAreaEstruturaComercial,
+NmSubEstruturaComercialC as NmSubEstruturaComercialC,
+NmCanalEstruturaComercialC AS NmCanalEstruturaComercial,
+DtCadastro
+
+FROM WORK.PARCEIROSATIVOS
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.PARCEIROSATIVOS AS
+SELECT
+
+A.CdParceiroComercial,
+A.NuCnpjLoja,
+A.DsAtividadeFinanciamento,
+A.NmFilialC,
+A.NmTipoParceiroComercial,
+A.NmAutoShopping,
+A.NmGrupoConcessionaria,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN A.NmGrupoConcessionaria
+	WHEN A.NmAutoShopping <> '' THEN A.NmAutoShopping
+	WHEN A.NmTipoParceiroComercial <> '' THEN A.NmTipoParceiroComercial
+	ELSE 'Outros'
+END) AS NmClassificacaoGrupoParceiro,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN 'GRANDES GRUPOS'
+	WHEN A.NmAutoShopping <> '' THEN 'AUTO SHOPPING'
+	WHEN A.NmTipoParceiroComercial <> '' THEN UPCASE(A.NmTipoParceiroComercial)
+	ELSE 'OUTROS'
+END) AS NmClassificacaoTipoGrupoParceiro,
+
+A.NmParceiroComercial,
+A.CdUf,
+A.CdColaboradorC,
+A.NmColaboradorC,
+A.DsLoginN1C,
+B.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.DtCadastro,
+A.FlAtivo
+
+FROM BASES.TBPARCEIROCOMERCIAL A
+
+LEFT JOIN BASES.TBCOLABORADOR B ON B.DSLOGIN = A.DsLoginN1C AND B.CDCOLABORADOR = A.CdColaboradorC
+
+WHERE
+A.FlAtivo = 'S'
+AND A.NmCanalEstruturaComercialC = 'Canal Veiculos'
+AND A.DsAtividadeFinanciamento = 'VEÍCULO'
+AND B.NmGrupoCargoColaborador = 'Gerente Relacionamento Veiculos'
+
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV BALCAO%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'RENG SAO JOSE DO RIO PRETO' 
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'CA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJAS RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV MESA%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV REMANESCENTE%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE '%BV PESADOS RENEG%'
+AND upcase(CALCULATED NmClassificacaoGrupoParceiro) NOT IN ('PARCEIRO DE INDICAÇÃO - CANAL PRÓPRIO')
+AND upcase(NmParceiroComercial) NOT LIKE '%RENEG%'
+AND upcase(NmParceiroComercial) NOT LIKE '%BALCAO%'
+AND upcase(NmParceiroComercial) NOT LIKE '%BV CP%'
+AND upcase(NmParceiroComercial) NOT LIKE '%BV PARTICULAR%'
+AND upcase(NmParceiroComercial) NOT LIKE '%RENG%'
+
+
+
+ORDER BY 1
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE WORK.PARCEIROSATIVOS_01 AS
+SELECT
+
+CdParceiroComercial,
+NuCnpjLoja,
+DsAtividadeFinanciamento,
+NmAreaEstruturaComercialC AS NmFilial,
+NmTipoParceiroComercial,
+NmAutoShopping,
+NmGrupoConcessionaria,
+NmClassificacaoGrupoParceiro,
+NmClassificacaoTipoGrupoParceiro,
+NmParceiroComercial,
+CdUf,
+CdColaboradorC AS CdColaborador,
+NmColaboradorC AS NmColaborador,
+DsLoginN1C AS DsLogin,
+NmGrupoCargoColaborador,
+CdFilialC AS CdFilial,
+NmAreaEstruturaComercialC AS NmAreaEstruturaComercial,
+NmSubEstruturaComercialC as NmSubEstruturaComercialC,
+NmCanalEstruturaComercialC AS NmCanalEstruturaComercial,
+DtCadastro
+
+FROM WORK.PARCEIROSATIVOS
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

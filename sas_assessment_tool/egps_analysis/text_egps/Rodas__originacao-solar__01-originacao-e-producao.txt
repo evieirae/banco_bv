@@ -1,0 +1,250 @@
+START_METADATA
+PROJECT: Rodas__originacao-solar
+FILE_SAS: 01-originacao-e-producao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 181
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBFILTROCVG [SAS/Local], TMP.TBORIGINACAO2025 [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_ORIGINACAO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ORIGINACAO
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBFILTROCVG [PROC SQL - JOIN], TMP.TBORIGINACAO2025 [DATA Step - SET], TMP.TBPRODUCAO [PROC SQL - FROM], WORK.BASE_ORIGINACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_ORIGINACAO, TBAPROVACAO, TBCONSOLIDADO, TBORIGINACAO, TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+option compress = binary;
+
+DATA Base_Originacao;
+SET tmp.TbOriginacao2025;
+;RUN;
+
+/*********************/
+/*DADOS DE ORIGINACAO*/
+/*********************/
+
+PROC SQL;
+CREATE TABLE TbOriginacao AS
+SELECT
+	Originacao.DtAtualizacao as DtAtualizacaoOriginacao
+	,CASE WHEN Originacao.DtEntradaProposta >= today()-30 THEN Originacao.DtEntradaProposta
+		ELSE intnx('month',Originacao.DtEntradaProposta,0)
+	 END AS DtReferencia format date9.
+	,Originacao.DtEntradaProposta
+	,'Originacao' AS TpDados
+	,Originacao.NuAnoMes
+	,Originacao.NmGrupoProdutoMeta
+	,Originacao.NmTipoParceiroComercial
+	,Originacao.CdParceiroComercial
+	,Originacao.NmParceiroComercial
+	,Originacao.DsTipoCanalProducao
+	,Originacao.NmColaborador
+	,Originacao.DsLoginN1
+	,Originacao.NmAreaEstruturaComercial
+	,Originacao.DsLoginN2A
+	,Originacao.DsLoginN2H
+	,Originacao.NmSubEstruturaComercialA
+	,Originacao.DsLoginN3A
+	,Originacao.DsLoginN3H
+	,Originacao.LstSubstituicao
+	,Originacao.CdFilial
+	,Originacao.FxParcela
+	,Originacao.FxIdade
+	,Originacao.FxEntrada
+	,Originacao.TpPessoa
+	,Originacao.QtParcelas
+	,Originacao.NmCanalEstruturaComercial
+	,Originacao.QtTotalDiaUtilMes as QtTotalDiaUtilMes
+	,Originacao.QtCorridosDiaUtilMes as QtCorridosDiaUtilMes
+	,CanalOrigem.FiltroCVG as Canal_Origem
+	,SUM(Originacao.FlPropostaOriginada) as Qtd
+	,SUM(Originacao.VrPropostaOriginada) as VrLiberado
+	,SUM(Originacao.VrPDD) as VrPerdaEsperada
+	,SUM(Originacao.VrFinanciamento) as VrFinanciamento
+	,SUM(Originacao.VpSpread) as VpSpread
+	,SUM(Originacao.VpTxGerencial) as VpTxGerencial
+	,SUM(Originacao.VpTirContabil) as VpTirContabil
+	,SUM(Originacao.FlTxAlterada) as QtTxAlterada
+	,SUM(Originacao.VpIdade) as VpIdade
+	,SUM(Originacao.VpPrazo) as VpPrazo
+	,SUM(Originacao.VpEntrada) as VpEntrada
+	,SUM(Originacao.VpScore) as VpScore
+
+FROM WORK.Base_Originacao Originacao
+	 Left join BaseGrc.TbFiltroCVG as CanalOrigem On Originacao.NuProposta = CanalOrigem.NuProposta
+	WHERE Originacao.NmCanalEstruturaComercial in ('Canal Negocios') and Originacao.NmGrupoProdutoMeta IN ('CP', 'CVG Leves', 'CVG Pesados', 'Leves', 'Motos', 'Pesados') or
+		  Originacao.NmCanalEstruturaComercial in ('Canal Veiculos') and Originacao.NmAreaEstruturaComercial IN ('Canal Motos') or
+		  Originacao.NmGrupoProdutoMeta = 'Solar'
+	AND Originacao.NuAnoMes >= &Base_m1.
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
+;run;
+
+/********************/
+/*DADOS DE APROVAÇÃO*/
+/********************/
+
+PROC SQL;
+CREATE TABLE TbAprovacao AS
+SELECT
+	Aprovacao.DtAtualizacao as DtAtualizacaoOriginacao
+	,CASE WHEN Aprovacao.DtEntradaProposta >= today()-30 THEN Aprovacao.DtEntradaProposta
+		ELSE intnx('month',Aprovacao.DtEntradaProposta,0)
+		END AS DtReferencia	format date9.
+	,Aprovacao.DtEntradaProposta
+	,'Aprovacao' AS TpDados
+	,Aprovacao.NuAnoMes
+	,Aprovacao.NmGrupoProdutoMeta
+	,Aprovacao.NmTipoParceiroComercial
+	,Aprovacao.CdParceiroComercial
+	,Aprovacao.NmParceiroComercial
+	,Aprovacao.DsTipoCanalProducao
+	,Aprovacao.NmColaborador
+	,Aprovacao.DsLoginN1
+	,Aprovacao.NmAreaEstruturaComercial
+	,Aprovacao.DsLoginN2A
+	,Aprovacao.DsLoginN2H
+	,Aprovacao.NmSubEstruturaComercialA
+	,Aprovacao.DsLoginN3A
+	,Aprovacao.DsLoginN3H
+	,Aprovacao.LstSubstituicao
+	,Aprovacao.CdFilial
+	,Aprovacao.FxParcela
+	,Aprovacao.FxIdade
+	,Aprovacao.FxEntrada
+	,Aprovacao.TpPessoa
+	,Aprovacao.QtParcelas
+	,Aprovacao.NmCanalEstruturaComercial
+	,Aprovacao.QtTotalDiaUtilMes as QtTotalDiaUtilMes
+	,Aprovacao.QtCorridosDiaUtilMes as QtCorridosDiaUtilMes
+	,CanalOrigem.FiltroCVG as Canal_Origem
+	,SUM(Aprovacao.FlPropostaAprovada) as Qtd
+	,SUM(Aprovacao.VrPropostaAprovada) as VrLiberado
+	,SUM(Aprovacao.VrPDD) as VrPerdaEsperada
+	,SUM(Aprovacao.VrFinanciamento) as VrFinanciamento
+	,SUM(Aprovacao.VpSpread) as VpSpread
+	,SUM(Aprovacao.VpTxGerencial) as VpTxGerencial
+	,SUM(Aprovacao.VpTirContabil) as VpTirContabil
+	,SUM(Aprovacao.FlTxAlterada) as QtTxAlterada
+	,SUM(Aprovacao.VpIdade) as VpIdade
+	,SUM(Aprovacao.VpPrazo) as VpPrazo
+	,SUM(Aprovacao.VpEntrada) as VpEntrada
+	,SUM(Aprovacao.VpScore) as VpScore
+
+FROM WORK.Base_Originacao Aprovacao
+	 Left join BaseGrc.TbFiltroCVG as CanalOrigem On Aprovacao.NuProposta = CanalOrigem.NuProposta
+
+	WHERE Aprovacao.NmCanalEstruturaComercial in ('Canal Negocios') and Aprovacao.NmGrupoProdutoMeta IN ('CP', 'CVG Leves', 'CVG Pesados', 'Leves', 'Motos', 'Pesados') or
+		  Aprovacao.NmCanalEstruturaComercial in ('Canal Veiculos') and Aprovacao.NmAreaEstruturaComercial IN ('Canal Motos') or
+		  Aprovacao.NmGrupoProdutoMeta = 'Solar'
+	AND Aprovacao.NuAnoMes >= &Base_m1. AND Aprovacao.FlPropostaAprovada = 1
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
+;run;
+
+/*********************/
+/*DADOS DE PRODUÇÃO***/
+/*********************/
+
+PROC SQL;
+CREATE TABLE TbProducao AS
+SELECT
+	Producao.DtAtualizacao as DtAtualizacaoProducao
+	,Producao.DtContrato AS DtReferencia format date9.
+	,Producao.DtContrato
+	,'Producao' AS TpDados
+	,Producao.NuAnoMes
+	,Producao.NmGrupoProdutoMeta
+	,Producao.NmTipoParceiroComercial
+	,Producao.CdParceiroComercial
+	,Producao.NmParceiroComercial
+	,Producao.DsTipoCanalProducao
+	,Producao.NmColaborador
+	,Producao.DsLoginN1
+	,Producao.NmAreaEstruturaComercial
+	,Producao.DsLoginN2A
+	,Producao.DsLoginN2H
+	,Producao.NmSubEstruturaComercialA
+	,Producao.DsLoginN3A
+	,Producao.DsLoginN3H
+	,Producao.LstSubstituicao
+	,Producao.CdFilial
+	,Producao.FxParcela
+	,Producao.FxIdade
+	,Producao.FxEntrada
+	,Producao.TpPessoa
+	,Producao.QtParcelas
+	,Producao.NmCanalEstruturaComercial
+	,Producao.QtTotalDiaUtilMes as QtTotalDiaUtilMes
+	,Producao.QtCorridosDiaUtilMes as QtCorridosDiaUtilMes
+	,CanalOrigem.FiltroCVG as Canal_Origem
+	,COUNT(Producao.NuContrato) as Qtd
+	,SUM(Producao.VrProducao) as VrLiberado
+	,. as VrPerdaEsperada
+	,SUM(Producao.VrFinanciamento) as VrFinanciamento
+	,SUM(Producao.VpSpread) as VpSpread
+	,SUM(Producao.VpTxGerencial) as VpTxGerencial
+	,SUM(Producao.VpTirContabil) as VpTirContabil
+	,SUM(Producao.FlTxAlterada) as QtTxAlterada
+	,SUM(Producao.VpIdade) as VpIdade
+	,SUM(Producao.VpPrazo) as VpPrazo
+	,SUM(Producao.VpEntrada) as VpEntrada
+	,SUM(Producao.VpScore) as VpScore
+
+FROM tmp.TbProducao Producao
+	 Left join BaseGrc.TbFiltroCVG as CanalOrigem On Producao.NuProposta = CanalOrigem.NuProposta
+
+	WHERE Producao.NmCanalEstruturaComercial in ('Canal Negocios') and Producao.NmGrupoProdutoMeta IN ('CP', 'CVG Leves', 'CVG Pesados', 'Leves', 'Motos', 'Pesados') or
+		  Producao.NmCanalEstruturaComercial in ('Canal Veiculos') and Producao.NmAreaEstruturaComercial IN ('Canal Motos') or
+		  Producao.NmGrupoProdutoMeta = 'Solar'
+	AND Producao.NuAnoMes >= &Base_m1.
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
+;run;
+
+/********************/
+/*CONSOLIDA AS BASES*/
+/********************/
+
+data TbConsolidado;
+set TbOriginacao
+	TbAprovacao
+	TbProducao;
+;run;

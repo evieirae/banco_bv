@@ -1,0 +1,118 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_EGV_Parceiros_digitais
+FILE_SAS: 6 - Envia email com csv forca comercial cn.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 57
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISV_TMP = /projetos/MISV/data/bases/tmp; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: HH, MM, NOW, TIMESTAMP, TIMESTAMPDATA, TIMESTAMPHORA, dir_csv
+DETECTED_MACROS_USED: HH, MM, TIMESTAMPDATA, dir_csv, now
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /EGV_RecusaTargetEnvioEmail_CN.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /EGV_RecusaTargetEnvioEmail_CN.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /EGV_RecusaTargetEnvioEmail_CN.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	5 - Envia e-mail com csv para forca comercial tlmk.sas														| */
+/* | Descricao: Programa para realizar o enaio do csv de recusas target para forca comercial CN				| */
+/* | Objetivo: 	Apuração do Dash EGV Parceiras 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname MISV_TMP '/projetos/MISV/data/bases/tmp';
+/* ======================================================================================*/
+/* =====================Envia e-mail com csv para forca comercial CN=========================*/
+/* ======================================================================================*/
+
+OPTIONS COMPRESS=BINARY;
+%LET TIMESTAMP = %SYSFUNC(DATE(),ddmmyy10.);
+%LET TIMESTAMPDATA = %SYSFUNC(date(),YYMMDDN8.);
+%LET TIMESTAMPHORA = %sysfunc(TIME(),hour4.);
+%LET NOW=%sysfunc(time());
+%LET HH=%sysfunc(hour(&now),z2.);
+%LET MM=%sysfunc(minute(&now),z2.);
+/* CANAL NEGÓCIO*/
+data _NULL_;
+
+OPTIONS
+	EMAILHOST=smtprelay.bvnet.bv
+	EMAILPORT=25
+	EMAILAUTHPROTOCOL=NONE
+	EMAILID='srv_emprestimos@bv.com.br';
+
+FILENAME MAIL EMAIL
+CONTENT_TYPE="text/html"
+attach="&dir_csv./EGV_RecusaTargetEnvioEmail_CN.csv"
+
+TO=('ewerton.furtado@bv.com.br','giselle.chastel@bv.com.br', 'renata.fuzzato@bv.com.br','roberto.castanheira@bv.com.br','marcelo.olmedo@bv.com.br','cristiane.girone@bv.com.br','cyntia.pita@bv.com.br','carlos.bento@bv.com.br')
+CC=('flavio.luis@bv.com.br','inf-gerenciais@bv.com.br')
+/*BCC=('marcio.shiroma@bv.com.br')*/
+/*REPLYTO=(&MAILINGWC_WCFGTS.)*/
+/**BCC=(&FGTSMAILING.)**/
+SENSITIVITY="Confidential"
+SUBJECT="Base Recusa Target CN &TIMESTAMPDATA. &HH.:&MM.";
+
+ods html3
+body=MAIL
+style=HTMLBlue
+rs=none;
+
+ods text="Olá,";
+ods text=' ';
+ods text="segue arquivo atualizado em anexo.";
+ods text=' ';
+ods text="***Atenção: Este é um envio automatizado, em caso de dúvidas envie e-mail para: <inf-gerenciais@bv.com.br> ***";
+ods text=' ';
+ods text='Att,';
+ods text=' ';
+ods text="srv_emprestimos - BV";
+ods text='MIS IGE';
+
+ods html3 close;
+
+run;

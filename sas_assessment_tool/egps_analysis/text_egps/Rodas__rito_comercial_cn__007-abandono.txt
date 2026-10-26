@@ -1,0 +1,203 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 007-abandono.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 146
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: LEADS = /riscosbvf/coaching/tribo_veiculos/SAS/Funil_Leads/bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): LEADS.ABANDONO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: LEADS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): LEADS.ABANDONO [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): LEADS.ABANDONO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEPDVS, TBABANDONOSUMARIZADAMES01, TBABANDONOSUMARIZADAMES02, TBABANDONOSUMARIZADAMES03
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+LIBNAME LEADS '/riscosbvf/coaching/tribo_veiculos/SAS/Funil_Leads/bases';
+/*Gera qtd de abando, preenchidas e asserividade*/
+
+PROC SQL;
+CREATE TABLE TbAbandonoSumarizadaMes01 as
+SELECT DISTINCT
+	 RITO.NUANOMES
+	,RITO.DTSIMULACAOINICIAL AS Dt_Simulacao_Proposta
+	,RITO.cdsimulacaoinicial
+	,RITO.NuCpfCnpj
+	,RITO.CdParceiroComercial
+	,RITO.StPagoLoja
+	,RITO.FxEntradaMinima
+	,RITO.ProbabilidadeAprovacao
+	,CASE WHEN RITO.BANCO = 'N/A' THEN "" ELSE RITO.BANCO END AS BANCO
+	,ABANDONO.FL_ABANDONADA
+	,ABANDONO.NM_CONTATO_OBSERVACAO
+	,ABANDONO.Class
+	,ABANDONO.DS_CLASSIFICACAO AS dsClassificacao
+	,ABANDONO.DS_MOTIVO_CLASSIFICACAO AS dsMotivoClassificacao
+	,CASE 	WHEN ABANDONO.CD_GRUPO_HOMOGENIO IN (4,5,6,7) 	THEN 'Prioridade 1'
+			WHEN ABANDONO.CD_GRUPO_HOMOGENIO IN (8,9,10) 	THEN 'Prioridade 2'
+			WHEN ABANDONO.CD_GRUPO_HOMOGENIO IN (1,2,3) 	THEN 'Prioridade 3'
+			ELSE 'Sem Prioridade' END AS Prioridade
+	,input(scan(compress(ABANDONO.ds_objecao_motivo_clssfcco, "R$ -."),1,","),10.) as ds_objecao_motivo_clssfcco
+	,input(scan(compress(ABANDONO.ds_detalhe_preco_concorrencia, "R$ -."),1,","),10.) as ds_detalhe_preco_concorrencia
+	,CASE   WHEN ABANDONO.DS_CONCORRENCIA = 'Bradesco' AND RITO.Banco = 'Bradesco' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'C6' AND RITO.Banco = 'C6' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Cooperativa' AND RITO.Banco = 'Cooperativa' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Itaú' AND RITO.Banco = 'Itau' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Montadora' AND RITO.Banco = 'Montadoras' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Pan' AND RITO.Banco = 'Panamericano' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Safra' AND RITO.Banco = 'Safra' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Santander' AND RITO.Banco = 'Santander' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Volkswagen' AND RITO.Banco = 'Volkswagen' THEN 1
+		 	WHEN ABANDONO.DS_CONCORRENCIA = 'Outros' AND RITO.Banco <> '' AND
+                 RITO.Banco NOT IN ('Bradesco','C6','Cooperativa','Itau','Montadoras','Panamericano','Safra','Santander','Volkswagen') THEN 1
+/*			WHEN ABANDONO.DS_CLASSIFICACAO = 'Em negociação' AND RITO.Banco = 'N/A' THEN 1*/
+/*			WHEN ABANDONO.DS_CLASSIFICACAO = 'Desistência do cliente' and RITO.StPagoLoja <> 'S' then 1*/
+		    ELSE 0 END AS flMesmoBanco
+	,CASE WHEN ABANDONO.FL_ABANDONADA IN('C','S') THEN 1 ELSE 0 END AS flVisualizada
+	,CASE WHEN ABANDONO.FL_ABANDONADA IN('C','S') AND RITO.FlPropostaOriginada = 1 THEN 1 ELSE 0 END AS flVisualizadaOriginada
+	,CASE WHEN ABANDONO.FL_ABANDONADA IN('C','S') AND RITO.FlPropostaEfetivada = 1 THEN 1 ELSE 0 END AS flVisualizadaEfetivada
+	,CASE WHEN ABANDONO.FL_ABANDONADA IN('C','S') AND ABANDONO.nm_contato_observacao = 'Vendedor' THEN 1 ELSE 0 END AS flPreenchida
+	,RITO.VrVeiculoMolicar
+	,RITO.VpEntradaMinima
+	,RITO.VrVeiculoSimulacao
+	,RITO.PcEntradaMinima
+	FROM SIMULACOESRITO AS RITO
+	LEFT JOIN LEADS.ABANDONO AS ABANDONO
+		ON RITO.CDSIMULACAOINICIAL = ABANDONO.CD_SIMULACAO_PROPOSTA
+	LEFT JOIN (SELECT DISTINCT CD_SIMULACAO_PROPOSTA FROM LEADS.ABANDONO WHERE FL_ABANDONADA IN ("N"))  AS ABANDONOREM
+		ON RITO.CDSIMULACAOINICIAL = ABANDONOREM.CD_SIMULACAO_PROPOSTA
+	WHERE 1=1
+	AND RITO.GRUPOMSG = 'P'
+	AND ABANDONOREM.CD_SIMULACAO_PROPOSTA EQ .
+;run;
+
+data TbAbandonoSumarizadaMes02; set TbAbandonoSumarizadaMes01;
+
+	if class = 'DC-VP' and ds_objecao_motivo_clssfcco ne . and ds_objecao_motivo_clssfcco <= 2500  then do;
+		VrDiferencaDCVP = ds_objecao_motivo_clssfcco;
+		QtdDCVP = 1;
+		VrParcelaDCVP = ds_detalhe_preco_concorrencia;
+		VrBVParcelaDCVP = ds_objecao_motivo_clssfcco+ds_detalhe_preco_concorrencia;
+		VrEntradaMinimaDCVP = PcEntradaMinima*VrVeiculoSimulacao;
+	end;
+	if class = 'DC-QC' and ds_objecao_motivo_clssfcco >= 200 and ds_detalhe_preco_concorrencia ne .
+		and VrVeiculoSimulacao > ds_detalhe_preco_concorrencia
+		then do;
+			VrDiferencaDCQC = ds_objecao_motivo_clssfcco;
+			QtdDCQC = 1;
+			VrCreditoDCQC = ds_detalhe_preco_concorrencia;
+			VrBVQuebraDCQC = ds_objecao_motivo_clssfcco+ds_detalhe_preco_concorrencia;
+			VrEntradaMinimaDCQC = PcEntradaMinima*VrVeiculoSimulacao;
+	end;
+	if class = 'FC-VP' and ds_objecao_motivo_clssfcco ne . and ds_objecao_motivo_clssfcco <= 2500 then do;
+		VrDiferencaFCVP = ds_objecao_motivo_clssfcco;
+		QtdFCVP = 1;
+		VrParcelaFCVP = ds_detalhe_preco_concorrencia;
+		VrBVParcelaFCVP = ds_objecao_motivo_clssfcco+ds_detalhe_preco_concorrencia;
+		VrEntradaMinimaFCVP = PcEntradaMinima*VrVeiculoSimulacao;
+	end;
+	if class = 'FC-QC' and ds_objecao_motivo_clssfcco >= 200 and ds_detalhe_preco_concorrencia ne .
+		and VrVeiculoSimulacao > ds_detalhe_preco_concorrencia
+		then do;
+			VrDiferencaFCQC = ds_objecao_motivo_clssfcco;
+			QtdFCQC = 1;
+			VrCreditoFCQC = ds_detalhe_preco_concorrencia;
+			VrBVQuebraFCQC = ds_objecao_motivo_clssfcco+ds_detalhe_preco_concorrencia;
+			VrEntradaMinimaFCQC = PcEntradaMinima*VrVeiculoSimulacao;
+	end;
+
+	if flMesmoBanco = 1 and StPagoLoja = 'S' and QtdFCQC = 1  then flAcurado = 1;
+run;
+
+proc sql;
+create table BasePdvs as
+	select distinct
+		 	 a.NuAnoMes
+			,a.CdParceiroComercial
+from TbRitoPDV_A001 as a
+where 1=1
+;run;
+
+proc sql;
+create table tbabandonosumarizadames03 as
+select
+a.nuanomes,
+a.cdparceirocomercial,
+b.fxentradaminima,
+b.stpagoloja,
+b.class,
+b.dsClassificacao,
+b.banco,
+b.prioridade,
+b.flacurado,
+count(b.cdsimulacaoinicial) as QtdTotal,
+sum(b.flvisualizada) as QtdVisualizada,
+sum(b.flVisualizadaOriginada) as QtdVisualizadaOriginada,
+sum(b.flVisualizadaEfetivada) as QtdVisualizadaEfetivada,
+sum(b.flpreenchida) as QtdPreenchida,
+sum(b.vrveiculomolicar) as TotalVrMolicar,
+sum(b.VrVeiculoSimulacao) as TotalVrVeiculoSimulacao,
+sum(b.vpentradaminima) as TotalVpEntradaminima,
+sum(b.vrdiferencadcvp) as VrDiferencadcvp,
+sum(b.vrdiferencafcvp) as VrDiferencafcvp,
+sum(b.vrdiferencadcqc) as VrDiferencadcqc,
+sum(b.vrdiferencafcqc) as VrDiferencafcqc,
+sum(b.vrbvparceladcvp) as VrBVParceladcvp,
+sum(b.vrbvparcelafcvp) as VrBVParcelafcvp,
+sum(b.vrbvquebradcqc)  as VrBVQuebradcqc,
+sum(b.vrbvquebrafcqc)  as VrBVQuebrafcqc,
+sum(VrCreditoFCQC) as VrCreditoFCQC,
+sum(VrParcelaFCVP) as VrParcelaFCVP,
+sum(VrCreditoDCQC) as VrCreditoDCQC,
+sum(VrParcelaDCVP) as VrParcelaDCVP,
+sum(b.qtddcvp) as QtdDCVP,
+sum(b.qtdfcvp) as QtdFCVP,
+sum(b.qtddcqc) as QtdDCQC,
+sum(b.qtdfcqc) as QtdFCQC,
+sum(b.vrentradaminimadcvp) as vrentradaminimadcvp,
+sum(b.vrentradaminimadcqc) as vrentradaminimadcqc,
+sum(b.vrentradaminimafcqc) as vrentradaminimafcqc,
+sum(b.vrentradaminimafcvp) as vrentradaminimafcvp,
+sum(b.ProbabilidadeAprovacao) as ProbabilidadeAprovacao
+from basepdvs as a
+left join tbabandonosumarizadames02 as b
+on a.cdparceirocomercial = b.cdparceirocomercial
+and a.nuanomes = b.nuanomes
+group by 1,2,3,4,5,6,7,8,9
+;run;

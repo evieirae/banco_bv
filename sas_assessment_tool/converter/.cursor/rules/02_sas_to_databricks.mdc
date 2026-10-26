@@ -1,0 +1,162 @@
+---
+description: Regras para conversão SAS -> dbt Python Models (Databricks Execution) com Governança Estrita
+globs: *.py, *.yml
+alwaysApply: false
+---
+# Role: Senior Analytics Engineer (dbt Python & Governance Specialist)
+
+Ativado quando `TARGET_ARCH: DATABRICKS`.
+
+## 1. Conceito e Arquitetura
+O objetivo NÃO é criar notebooks ou scripts soltos. Você deve gerar **dbt Python Models**.
+* **Lógica:** PySpark DataFrame API (para performance no Databricks).
+* **Infraestrutura:** dbt (metadados, linagem, testes e governança).
+
+## 2. Configuração e Governança (CRÍTICO)
+
+### A. Camada Staging (`models/staging/`)
+* **Padrão:** `stg_<sigla>_<subdomínio>_<tabela_origem>`
+* **Materialização:** `ephemeral` ou `view`.
+* **Rascunho (`draft_models/.../models/staging/`):** o `draft_gate` exige ≥1 modelo `.py` aqui com `materialized="ephemeral"` ou `materialized="view"` literal em `dbt.config`. Com `reuse_existing`, pode ser wrapper com `dbt.ref("stg_...")` ao staging do componente.
+* **Governança:** NÃO requer bloco de labels complexo.
+* **Boilerplate:**
+    ```python
+    def model(dbt, session):
+        dbt.config(materialized="view")
+        # ... lógica ...
+    ```
+
+### B. Camadas Intermediate e Marts (CRÍTICO)
+* **Padrão Intermediate:** `int_<sigla>_<assunto>_<detalhe>`
+* **Padrão Marts:** `<assunto>_<detalhe>_fato` ou `<assunto>_<detalhe>_dime`.
+* **PROIBIDO:** Usar prefixo `mart_`.
+Todo modelo `intermediate` ou `marts` DEVE conter o bloco de configuração completo.
+Traduza os labels obrigatórios do padrão SQL para um dicionário Python dentro de `dbt.config`.
+
+* **Template Obrigatório de Configuração:**
+```python
+def model(dbt, session):
+  dbt.config(
+      alias="nome_tabela_final", # Use o nome de saída original do SAS
+      materialized="table",
+      tags=["camada (intermediate ou mart)", "nome_do_projeto_egp", "migracao_egp", "migracao_sas"],
+      labels={
+          "cd_governanca": "1", # AJUSTE conforme subdomínio real
+          "ds_classificacao_de_acesso": "interno", # ou 'restrito'
+          "nm_grupo_de_acesso": "pdbd_gcp_dados_interno",
+          "nm_engenheiro_responsavel_pela_transformacao": "int_seu_usuario",
+          "tp_selo_qualidade_dados_requerido": "bronze",
+          "fl_contem_pii": "false", # Mude para 'true' se houver dados sensíveis
+          "fl_modernizacao_legacy": "false", # Sempre false neste pipeline (alinhado a 01_sas_to_dbt.mdc §4)
+          "nm_delivery_legacy": "sas__clientes" # Obrigatório; minúsculo; sempre 'sas__<tabela>'; sem libref/schema/WORK; tabela principal em joins — ver 01 §4
+      }
+  )
+  # ... restante do código python...
+```
+* **Boilerplate do Código (.py):**
+    ```python
+    import pyspark.sql.functions as F
+    from pyspark.sql.window import Window
+    from datetime import date
+
+    def model(dbt, session):
+        # 1. Configuração (Inserir o bloco de Governança aqui se for Int/Mart)
+        dbt.config(...) # Ver regras da seção 2
+
+        # 2. Leitura (Abstração dbt)
+        # Staging: Lê da source (Raw)
+        # df = dbt.source("src_sas", "tabela_origem_sas") 
+        
+        # Int/Marts: Lê de modelos anteriores
+        df = dbt.ref("stg_tabela_anterior")
+
+        # 3. Transformação (PySpark DataFrame API)
+        # Use variáveis Python para datas dinâmicas (substituindo macros SAS &dt_ref.)
+        dt_processamento = date.today().strftime("%Y-%m-%d")
+        
+        # Exemplo de lógica
+        df_filtered = df.filter(F.col("DT_PROCESSAMENTO") == dt_processamento)
+        
+        df_final = df_filtered.withColumn("nova_coluna", F.lit(1))
+
+        # 4. Retorno (Obrigatório retornar o DataFrame final)
+        # O dbt cuidará do 'create table' ou 'insert'
+        return df_final
+    ```
+
+## 3. Tradução de Lógica e Taxonomia (De -> Para)
+
+### A. Taxonomia de Colunas (Renomeação Obrigatória)
+**REGRA DE OURO:** Mantenha o português. NUNCA traduza `contrato` para `contract` ou `account`.
+Você DEVE renomear as colunas finais para seguir os prefixos semânticos:
+
+| Prefixo | Uso Obrigatório Para | Exemplo |
+| **id_** | Identificadores (PK/FK) | `id_contrato` |
+| **cd_** | Códigos de texto | `cd_agencia` |
+| **nu_** | Números, Scores, Documentos | `nu_cpf` |
+| **vr_** | Valores Monetários | `vr_saldo` |
+| **qt_** | Quantidades | `qt_parcelas` |
+| **dt_** | Datas | `dt_venda` |
+| **fl_** | Flags | `fl_ativo` |
+| **nm_** | Nomes | `nm_cliente` |
+| **ds_** | Descrições | `ds_motivo` |
+| **st_** | Status | `st_status` |
+
+### B. Tratamento de PII (Casting)
+Se identificar colunas sensíveis (CPF, Email, Telefone, etc.):
+
+* **Regra:** O campo DEVE ser convertido para STRING explicitamente.
+
+```python
+# PySpark
+df = df.withColumn("nu_cpf", F.col("cpf").cast("string"))
+```
+
+### C. Snippets PySpark Úteis
+* **SAS Macros (&data.):** Use `date.today()` ou f-strings.
+* **Data Step IF/THEN:** `F.when(cond, val).otherwise(val)`
+* **Filtros:** `df.filter(F.col("col") == val)`
+* **Joins:** `df.join(other_df, on="key", how="left")`
+* **Output:** NUNCA use `df.write`. Use apenas `return df`.
+
+## 4. Documentação e Contratos (.yml)
+Geração obrigatória de `.yml` para todos os models Python com **Selo Bronze** e **Policy Tags**.
+
+### Descriptions ricas (modelo e colunas)
+Mesmo critério que em `01_sas_to_dbt.mdc` §5: **`description` do model** com propósito de negócio, granularidade, principais fontes (`ref`/`source`) e periodicidade; **colunas** com frases completas em PT-BR (unidade, domínio, regra de campos calculados). Proibido contentar-se com `"PK"` ou só o horário do `cron` sem contexto.
+
+### Regra de Completude (Checksum)
+O número de colunas no DataFrame `df_final` DEVE ser igual ao número de itens na lista `columns` do YAML.
+
+### 🛑 ERRO COMUM (PROIBIDO)
+```yaml
+columns:
+  - name: id_contrato
+  # ... (modelo omite colunas por preguiça)
+```
+
+**Exemplo esperado:**
+
+```yaml
+version: 2
+
+models:
+  - name: risco_analise_fato
+    description: "Mart de análise de risco: métricas e atributos por contrato para monitoramento de exposição. Granularidade: uma linha por contrato. Insumos principais: intermediários de cadastro e exposição. Atualização diária às 09:00"
+    meta:
+      cron: "0 9 * * *"
+    columns:
+      - name: id_contrato
+        description: "Chave única."
+        tests: [unique, not_null]
+      - name: nu_cpf
+        description: "CPF mascarado."
+        policy_tags: ['{{ var("PII_INTERNO_CREDITO") }}']
+      - name: vr_saldo
+        description: "Valor do saldo devedor em BRL na posição atual."
+      - name: dt_vencimento
+        description: "Data de vencimento."
+      - name: ds_produto
+        description: "Nome do produto."
+      # Liste 100% das colunas do DataFrame.
+```

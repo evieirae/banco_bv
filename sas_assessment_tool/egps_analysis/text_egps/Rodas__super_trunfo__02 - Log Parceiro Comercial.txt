@@ -1,0 +1,143 @@
+START_METADATA
+PROJECT: Rodas__super_trunfo
+FILE_SAS: 02 - Log Parceiro Comercial.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 50)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 70
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], DBCOR.TBLOGPARCEIROCOMERCIAL [DBCON], DBCOR.TBPARCEIROCOMERCIAL [DBCON], DBCOR.TBPESSOA [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_00, WORK.BASE_01, WORK.BASE_03, WORK.BASE_LOG_PARCEIROCOMERCIAL, WORK.MAX_REG_PC
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_00, WORK.BASE_01, WORK.BASE_03, WORK.BASE_LOG_PARCEIROCOMERCIAL, WORK.MAX_REG_PC
+TABLE_READ_PROVENANCE (Flow): DBCOR.TBLOGPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - FROM], DBCOR.TBPESSOA [Pass-Through Native (DBCON) - JOIN], WORK.BASE_00 [DATA Step - SET], WORK.BASE_01 [PROC SORT - DATA=], WORK.BASE_03 [PROC SQL - FROM], WORK.BASE_LOG_PARCEIROCOMERCIAL [PROC SQL - FROM], WORK.MAX_REG_PC [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_00, BASE_01, BASE_03, BASE_LOG_PARCEIROCOMERCIAL, MAX_REG_PC, VALIDACAO_LOG, WORK.BASE_02
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ================== Extracao CTR ======================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=CTR);
+create table BASE_00 as
+select * from connection to dbcon
+(
+
+SELECT
+
+p.CdParceiroComercial,
+p.DtUltimaAtualizacao,
+p.FlAtivo,
+p.NmFantasia,
+q.DsLog,
+q.CdLog,
+q.CdOcorrencia,
+q.DtOcorrencia,
+w.TpPessoa
+
+FROM dbcor..TbParceiroComercial AS p
+
+INNER JOIN DBCOR..TbLogParceiroComercial AS q
+ON q.CdParceiroComercial = p.CdParceiroComercial
+
+INNER JOIN dbcor..TbPessoa AS w
+ON w.CdPessoa = p.CdPessoa
+
+WHERE p.DtUltimaAtualizacao BETWEEN '20230101 00:00:00' AND '20241231 23:59:59'
+AND p.FlAtivo = 'N'
+AND q.DtOcorrencia >= '20230101'
+
+);
+;run;
+
+DATA BASE_01;
+SET WORK.BASE_00;
+DSLOG_ABREV = UPCASE(scan(DsLog,1,"-"));
+;RUN;
+
+PROC SORT DATA=WORK.BASE_01 OUT=WORK.BASE_02;BY CdParceiroComercial DtOcorrencia;RUN;
+
+DATA BASE_03;
+SET BASE_02;
+RETAIN QTD_PC;
+IF FIRST.CdParceiroComercial THEN QTD_PC = 1;
+ELSE QTD_PC = QTD_PC + 1;
+BY CdParceiroComercial;
+RUN;
+
+PROC SQL;
+CREATE TABLE MAX_REG_PC AS
+SELECT
+CdParceiroComercial,
+MAX(QTD_PC) AS MAX_REG_PC
+
+FROM WORK.BASE_03 A
+GROUP BY 1
+;RUN;
+
+PROC SQL;
+CREATE TABLE Base_Log_ParceiroComercial AS
+SELECT
+
+A.*
+
+FROM WORK.BASE_03 A
+
+INNER JOIN WORK.MAX_REG_PC B ON
+B.CDPARCEIROCOMERCIAL = A.CDPARCEIROCOMERCIAL
+AND B.MAX_REG_PC = A.QTD_PC
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE VALIDACAO_LOG AS
+SELECT
+CDPARCEIROCOMERCIAL,
+COUNT(CDPARCEIROCOMERCIAL) AS QTD
+FROM WORK.Base_Log_ParceiroComercial
+GROUP BY 1
+;RUN;

@@ -1,0 +1,263 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-simu
+FILE_SAS: 05-originacao-e-producao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 177
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: AnoXM, SafraXM, anoAtual
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/verifica/verifica-originacao.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/VERIFICA/VERIFICA-ORIGINACAO.SAS [SAS/Local], AQUISIC.PREANALISE_SIMU_PROP [SAS/Local], AUXL.TAXAS_PROPOSTAS [SAS/Local], BASEGRC.TBAGRUPAMENTOCREDITOBVO [SAS/Local], BASEGRC.TBCLASSIFICACAORISCOSPDVS [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], TMP.TBEXTPROPOSTA [SAS/Local], TMP.TBORIGINACAO&ANOATUAL [SAS/Local], TMP.TBORIGINACAO&ANOXM [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/verifica/verifica-originacao.sas
+TABLE_READ_PROVENANCE (Flow): AQUISIC.PREANALISE_SIMU_PROP [DATA Step - SET], AUXL.TAXAS_PROPOSTAS [DATA Step - SET], BASEGRC.TBAGRUPAMENTOCREDITOBVO [PROC SQL - JOIN], BASEGRC.TBCLASSIFICACAORISCOSPDVS [PROC SQL - JOIN], BASES.TBEXTCONTRATO [PROC SQL - FROM], TMP.TBEXTPROPOSTA [PROC SQL - FROM], TMP.TBORIGINACAO&ANOATUAL [DATA Step - SET], TMP.TBORIGINACAO&ANOXM [DATA Step - SET], TMP.TBPRODUCAO [DATA Step - SET; PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/verifica/verifica-originacao.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: FNI, ORIGINACAO, ORIGINACAO01, PRODUCAO, PRODUCAO01, SCORECONTRATO, SCORECONTRATO01, SCOREPROPOSTA, SCOREPROPOSTA01, TAXASPROPOSTAS, TAXASPROPOSTASPRD, TBPDECLEVESPROP, TBPDECLEVESPROPSORT
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{ANOATUAL}, TMP.TBORIGINACAO{ANOXM}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/verifica/verifica-originacao.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/verifica/verifica-originacao.sas';
+
+/* ORIGINAÇÃO */
+DATA Originacao01;
+SET TMP.TbOriginacao&AnoXM. - TMP.TbOriginacao&anoAtual.;
+  WHERE NuAnoMes >= &SafraXM.
+    AND NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados','Leves-BVO','Credito Auto-BV');
+RUN;
+
+proc sql;create index NuProposta on Originacao01;quit;
+
+PROC SQL;
+CREATE TABLE ScoreProposta01 AS
+  SELECT DISTINCT
+    NuProposta,
+	FxIdade,
+    VrFinanciamento,
+	COALESCE(NuRating,NuScoreFim) AS NuRating
+  FROM TMP.TBEXTPROPOSTA
+  WHERE NuAnoMes >= &SafraXM.;
+RUN;
+
+PROC SORT DATA=ScoreProposta01 OUT=ScoreProposta NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on ScoreProposta;quit;
+
+DATA TbPdecLevesProp;SET AQUISIC.PREANALISE_SIMU_PROP;WHERE DtTransacaoFluxoDecisao >= "01JAN2024"d AND NuProposta NE . AND Visao = 'Proposta';RUN;
+
+PROC SORT  DATA=TbPdecLevesProp OUT=TbPdecLevesPropSort NODUPKEY; BY NuProposta; RUN;
+
+PROC SQL;
+CREATE TABLE Originacao AS
+  SELECT
+    A.*,
+	B.NuRating,
+	CASE WHEN A.VrPrestacao = . THEN ''
+	     WHEN A.VrPrestacao BETWEEN 0 AND 100 THEN 'Até R$ 100'
+		 WHEN A.VrPrestacao BETWEEN 100 AND 250 THEN 'Até R$ 250'
+		 WHEN A.VrPrestacao BETWEEN 250 AND 500 THEN 'Até R$ 500'
+		 WHEN A.VrPrestacao BETWEEN 500 AND 750 THEN 'Até R$ 750'
+		 WHEN A.VrPrestacao BETWEEN 750 AND 1000 THEN 'Até R$ 1000'
+		 WHEN A.VrPrestacao BETWEEN 1000 AND 1500 THEN 'Até R$ 1500'
+		 WHEN A.VrPrestacao BETWEEN 1500 AND 2000 THEN 'Até R$ 2000'
+         WHEN A.VrPrestacao > 2000 THEN 'Acima de R$ 2000'
+	END AS FxPrestacao,
+	CASE WHEN A.VrFinanciamento = . THEN ''
+	     WHEN A.VrFinanciamento BETWEEN 0 AND 15000 THEN 'Até R$ 15.000'
+		 WHEN A.VrFinanciamento BETWEEN 15000 AND 20000 THEN 'Até R$ 20.000'
+		 WHEN A.VrFinanciamento BETWEEN 20000 AND 30000 THEN 'Até R$ 30.000'
+		 WHEN A.VrFinanciamento BETWEEN 30000 AND 40000 THEN 'Até R$ 40.000'
+		 WHEN A.VrFinanciamento BETWEEN 40000 AND 50000 THEN 'Até R$ 50.000'
+         WHEN A.VrFinanciamento > 50000 THEN 'Acima de R$ 50.000'
+	END AS FxFinanciamento,
+	B.FxIdade,
+	CASE WHEN A.NuContratoGestao <> . THEN INTCK('DAY', A.DtEntradaProposta, A.DtStatusProposta) END AS DiasEfetivacao,
+	((1+(A.VpTxGerencial/A.VrLiberado)) / (1+(((A.TxTirContabil/100) * (A.VrLiberado))/A.VrLiberado)) -1 ) * A.VrLiberado AS VpSpread2,
+	((1+((case when A.VrRetencao > 1 then (Finance('RATE', A.QtParcelas, A.VrPrestacao, -((A.VrProposta-A.VrRetencao)+A.VrIofCpmfIss+A.VrTac))*case when A.StProposta IN ('AP') then A.VrLiberado else 0 end) ELSE A.VpTxGerencial END)/A.VrLiberado)) / (1+(((A.TxTirDivulgada/100) * (A.VrLiberado))/A.VrLiberado)) -1 ) * A.VrLiberado AS VpSpreadRebate2
+	,C.StProposta as AgrupamentoCredito
+
+	,X.MotivoRecusaPropostaAgp as MotivoRecusaPropostaAgp
+
+	,CASE WHEN A.DtEntradaProposta >= Y.DtInclusao_BVO AND A.NmGrupoProdutoMeta = 'Leves-BVO' THEN 1 ELSE 0 END AS FlBVOCredito
+
+  FROM Originacao01 A
+  LEFT JOIN ScoreProposta B
+    ON A.NuProposta = B.NuProposta
+  LEFT JOIN basegrc.TbAgrupamentoCreditoBVO C
+	ON A.NUPROPOSTA = C.NUPROPOSTA
+
+	LEFT JOIN TbPdecLevesPropSort X
+		ON A.NuProposta NE . AND A.NuProposta = X.NuProposta
+	LEFT JOIN basegrc.TbClassificacaoRiscosPDVs Y
+		on A.CdParceiroComercial = Y.CdLoja
+;
+RUN;
+
+proc sql;create index NuAnoMes on Originacao;quit;
+proc sql;create index CdFilial on Originacao;quit;
+proc sql;create index NuProposta on Originacao;quit;
+proc sql;create index NmGrupoProdutoMeta on Originacao;quit;
+proc sql;create index CdParceiroComercial on Originacao;quit;
+proc sql;create index DtEntradaProposta on Originacao;quit;
+
+PROC SQL;
+SELECT MAX(DtAtualizacao) INTO :DtOrig FROM Originacao;
+RUN;
+
+DATA Producao01 (DROP=VrFinanciamento);
+SET TMP.TbProducao;
+  WHERE NuAnoMes >= &SafraXM.
+    AND NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados','Leves-BVO','Credito Auto-BV');
+RUN;
+
+proc sql;create index NuContrato on Producao01;quit;
+
+PROC SQL;
+CREATE TABLE ScoreContrato01 AS
+  SELECT DISTINCT
+    NuContrato,
+	COALESCE(NuRating,NuScoreFim) AS NuRating,
+	VrRetencao,
+    VrPrestacao,
+    VrIof
+  FROM BASES.TBEXTCONTRATO
+  WHERE NuAnoMes >= &SafraXM.;
+RUN;
+
+PROC SORT DATA=ScoreContrato01 OUT=ScoreContrato NODUPKEY;
+BY NuContrato;
+RUN;
+
+proc sql;create index NuContrato on ScoreContrato;quit;
+
+PROC SQL;
+CREATE TABLE Producao AS
+  SELECT
+    A.*,
+	B.NuRating,
+	CASE WHEN B.VrPrestacao = . THEN ''
+	     WHEN B.VrPrestacao BETWEEN 0 AND 100 THEN 'Até R$ 100'
+		 WHEN B.VrPrestacao BETWEEN 100 AND 250 THEN 'Até R$ 250'
+		 WHEN B.VrPrestacao BETWEEN 250 AND 500 THEN 'Até R$ 500'
+		 WHEN B.VrPrestacao BETWEEN 500 AND 750 THEN 'Até R$ 750'
+		 WHEN B.VrPrestacao BETWEEN 750 AND 1000 THEN 'Até R$ 1000'
+		 WHEN B.VrPrestacao BETWEEN 1000 AND 1500 THEN 'Até R$ 1500'
+		 WHEN B.VrPrestacao BETWEEN 1500 AND 2000 THEN 'Até R$ 2000'
+         WHEN B.VrPrestacao > 2000 THEN 'Acima de R$ 2000'
+	END AS FxPrestacao,
+        C.VrFinanciamento,
+	CASE WHEN C.VrFinanciamento = . THEN ''
+	     WHEN C.VrFinanciamento BETWEEN 0 AND 15000 THEN 'Até R$ 15.000'
+		 WHEN C.VrFinanciamento BETWEEN 15000 AND 20000 THEN 'Até R$ 20.000'
+		 WHEN C.VrFinanciamento BETWEEN 20000 AND 30000 THEN 'Até R$ 30.000'
+		 WHEN C.VrFinanciamento BETWEEN 30000 AND 40000 THEN 'Até R$ 40.000'
+		 WHEN C.VrFinanciamento BETWEEN 40000 AND 50000 THEN 'Até R$ 50.000'
+         WHEN C.VrFinanciamento > 50000 THEN 'Acima de R$ 50.000'
+	END AS FxFinanciamento,
+	INTCK('DAY', A.DtEntradaProposta, A.DtContrato) AS DiasEfetivacao,
+	((1+(A.VpTxGerencial/A.VrProducao)) / (1+(((A.TxTirContabil/100) * (A.VrProducao))/A.VrProducao)) -1 ) * A.VrProducao AS VpSpread2,
+	((1+((case when B.VrRetencao > 1 then (Finance('RATE', A.QtParcelas, B.VrPrestacao, -((A.VrContrato-B.VrRetencao)+B.VrIof+coalesce(A.VrTarifaCadastro,0)))*A.VrProducao) ELSE A.VpTxGerencial END)/A.VrProducao)) / (1+(((A.TxTirContabil/100) * (A.VrProducao))/A.VrProducao)) -1 ) * A.VrProducao AS VpSpreadRebate2
+	,D.StProposta as AgrupamentoCredito
+
+	,CASE WHEN A.DtEntradaProposta >= Y.DtInclusao_BVO AND A.NmGrupoProdutoMeta = 'Leves-BVO' THEN 1 ELSE 0 END AS FlBVOCredito
+
+	FROM Producao01 A
+  LEFT JOIN ScoreContrato B
+    ON A.NuContrato = B.NuContrato
+  LEFT JOIN ScoreProposta C
+    ON A.NuProposta = C.NuProposta
+  LEFT JOIN basegrc.TbAgrupamentoCreditoBVO D
+	ON A.NUPROPOSTA = D.NUPROPOSTA
+
+	LEFT JOIN basegrc.TbClassificacaoRiscosPDVs Y
+		on A.CdParceiroComercial = Y.CdLoja
+;RUN;
+
+proc sql;create index NuAnoMes on Producao;quit;
+proc sql;create index NuProposta on Producao;quit;
+proc sql;create index NuContrato on Producao;quit;
+proc sql;create index NmGrupoProdutoMeta on Producao;quit;
+proc sql;create index CdParceiroComercial on Producao;quit;
+proc sql;create index DtEntradaProposta on Producao;quit;
+
+PROC SQL;
+SELECT MAX(DtAtualizacao) INTO :DtProd FROM Producao;
+RUN;
+
+DATA TaxasPropostas;
+SET AUXL.Taxas_Propostas;
+  WHERE Safra >= &SafraXM.;
+RUN;
+
+PROC SORT DATA=TaxasPropostas NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on TaxasPropostas;quit;
+
+PROC SORT DATA=TaxasPropostas OUT=TaxasPropostasPrd NODUPKEY;
+BY NuContrato;
+RUN;
+
+proc sql;create index NuContrato on TaxasPropostasPrd;quit;
+
+/* Dados de F&I
+PROC SQL;
+CREATE TABLE FNI AS
+  SELECT DISTINCT NuProposta
+  FROM FNI.BASE_FNI
+  WHERE flag_origem_integrado = 'Sim'
+  ORDER BY NuProposta;
+RUN;*/
+
+/* Dados de F&I inserido trecho para forçar a tabela vazia pois a abse de FNI nao esta disponivel.
+qdo for restaurada retirar esse trecho.Gustavo D.
+*/
+
+PROC SQL;
+CREATE TABLE FNI AS
+  SELECT DISTINCT NuProposta
+  FROM TMP.TBPRODUCAO
+  WHERE nuanomes= 20
+  ORDER BY NuProposta;
+RUN;
+
+PROC SORT DATA=FNI NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on FNI;quit;

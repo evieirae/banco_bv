@@ -1,0 +1,142 @@
+START_METADATA
+PROJECT: Negócios Transacionais Varejo e NaPista__luciano.fernandes
+FILE_SAS: Base_contratadas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:38:11 UTC
+BUSINESS_AREA: Negócios Transacionais Varejo e NaPista
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 82
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_1, BASE_2, BASE_3, BASE_COMPAR, BASE_TRATADA3
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+data base_1;
+set base;
+keep NuProposta StProposta  TpDados DtPrimeiroVencimento '(%) SpreadPactuado'n VrComissaoTotal
+VrAcordoComercial VrRetornoPlus '(%) Comissao'n '(%) Acordo'n '(%) TotalComissao'n ;
+run;
+
+proc sql;
+create table base_2 as
+select NuProposta
+		,max(StProposta) as StProposta
+		,max(TpDados) as TpDados
+		,max(DtPrimeiroVencimento) as DtPrimeiroVencimento format date9.
+		,max('(%) SpreadPactuado'n) as '(%) SpreadPactuado'n
+		,max(VrComissaoTotal) as VrComissaoTotal
+		,max(VrAcordoComercial) as VrAcordoComercial
+		,max(VrRetornoPlus) as VrRetornoPlus
+		,max('(%) Comissao'n) as '(%) Comissao'n
+		,max('(%) Acordo'n) as '(%) Acordo'n
+		,max('(%) TotalComissao'n) as '(%) TotalComissao'n
+from base_1
+where NuProposta>0
+group by NuProposta
+
+;
+quit;
+
+data base_3;
+set base;
+drop  TpDados StProposta DtPrimeiroVencimento '(%) SpreadPactuado'n VrComissaoTotal
+VrAcordoComercial VrRetornoPlus '(%) Comissao'n '(%) Acordo'n '(%) TotalComissao'n ;
+run;
+
+proc sort data=base_3(where=(NuProposta>0)) nodupkey; by NuProposta; run;
+
+proc sql;
+create table base_tratada3 as
+select a.*
+		,b.*
+from base_3 as a
+left join base_2 as b
+on a.NuProposta=b.NuProposta
+/*where (DtEntradaProposta<="30jun2025"d and DtEntradaProposta>="01apr2025"d) */
+;
+quit;
+
+/*data base_cont;*/
+/*set cont_21_25;*/
+/*where CD_EST_ENT_EXNO="AP";*/
+/*run;*/
+proc sort data=base_cont(where=(CD_EST_ENT_EXNO="AP")) nodupkey; by CD_PRPT_FNTO_EXNO; run;
+
+proc sql;
+create table base_compar as
+select TpDados,
+		NuProposta,
+DtEntradaProposta,
+DtPrimeiroVencimento,
+Parcela,
+StProposta,
+NuCpfCnpj,
+FxEntrada,
+FxIdade,
+AaModelo,
+CdMarca,
+CdModelo,
+CdMolicar,
+NmGrupoConcessionaria,
+VrDoBem,
+VrEntrada,
+VrPerdaEsperada,
+VrParcela,
+'(%) PE'n,
+VrLiberado,
+VrFinanciamento,
+'(%) TxPactuada'n,
+'(%) Tir'n,
+'(%) SpreadPactuado'n,
+VrComissaoTotal,
+VrAcordoComercial,
+VrRetornoPlus,
+'(%) Comissao'n,
+'(%) Acordo'n,
+'(%) TotalComissao'n
+
+from base_tratada3
+where NuProposta in (select CD_PRPT_FNTO_EXNO from base_cont) and StProposta="Aprovada e Paga"
+;
+quit;
+
+proc sort data=base_compar(where=(NuProposta not in (331447999 662115456 371991223 277355472 421295076)))   nodupkey; by NuProposta; run;
+
+/*************************************************************/

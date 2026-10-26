@@ -1,0 +1,296 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 20 - Potencial_e_Target.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 228
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5, DtAtualizacao
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPARCEIROCOMERCIAL [SAS/Local], RITOSOL.CLASSIFICACAO_PARCEIROS_MIS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], RITOSOL.CLASSIFICACAO_PARCEIROS_MIS [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_TARGET_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PRODUCAO, BASE_TARGET_AGRUPADA, BASE_TARGET_AGRUPADA2, BASE_TARGET_CANAL_TOTAL, BASE_TARGET_FILIAL_TOTAL, BASE_TARGET_GRS_TOTAL, BASE_TARGET_PDVS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**Libname ritosol '/infogrc/rito_comercial_solar';**/
+
+proc sql noprint;
+    select max(DtAtualizacao) into :DtAtualizacao
+    from tmp.TbProducao;
+quit;
+
+/*Gerando a base de Target sem o efeito da duplicidade devido migração da Sinergia para o CS*/
+Proc Sql;
+Create Table Base_Target_Agrupada as
+Select Distinct
+Target.NuAnomes
+,Parc.NmCanalEstruturaComercialC
+,Parc.NmAreaEstruturaComercialC
+,Parc.NmColaboradorC
+,Parc.DsLoginN1C
+,Parc.DsLoginN2C
+,Parc.DsLoginN3C
+,Target.NuCnpjLojaFavorecido
+,Target.Cluster_Final as Porte
+,Target.TipoParceiro
+,Parc.FlAtivo
+,AVG(Target.'Potencial CNPJ'n) as Potencial
+,AVG(Target.Target) as Target
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From ritosol.Classificacao_Parceiros_MIS as Target
+Left Join Bases.TbParceiroComercial as Parc
+	On Target.CdParceiroComercial = Parc.CdParceiroComercial
+Group by 1,2,3,4,5,6,7,8,9,10,11
+Order by NuCnpjLojaFavorecido, NmColaboradorC Desc
+;Quit;
+
+/*Excluindo a duplicidade dos CNPJs*/
+Proc Sort Nodupkey data=Base_Target_Agrupada out=Base_Target_Agrupada2; By NuAnomes NuCnpjLojaFavorecido; Quit;
+
+Proc Sql;
+Create Table Base_Producao as
+Select
+Prod.NuAnoMes
+,Prod.NmCanalEstruturaComercial
+,Prod.NmAreaEstruturaComercial as NmAreaEstruturaComercialC
+,Prod.NmColaboradorC
+,Case
+	When Prod.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Parc.CdParceiroComercial
+	Else Prod.CdParceiroComercial
+End as CdParceiroComercial
+,Case
+	When Prod.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Parc.NmParceiroComercial
+	Else Prod.NmParceiroComercial
+End as NmParceiroComercial
+,Prod.NuCnpjLojaFavorecido
+,Prod.QtCorridosDiaUtilMes
+,Count(Prod.NuContrato) as QtContratos
+,Sum(Prod.VrProducao) as VrProducao
+,Sum(Prod.VrProducaoDiaUtil) as VrProducaoDiaUtil
+,Sum(Prod.VrProducaoProjetado) as VrProducaoProjetado
+,Sum(Prod.VrMargem) as VrMargem
+,Max(Prod.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Cobans_Solar_Saida as Parc On Prod.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8
+;Quit;
+
+Proc Sql;
+Create Table Base_Target_Canal_Total as
+Select
+'Target' as Base
+,Target.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,Target.Porte
+,Target.TipoParceiro
+,Max(Prod.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(QtContratos) as QtContratos_Target Format COMMAX10.
+,Sum(Target.Potencial) as Potencial Format COMMAX10.2
+,Sum(Target.Target) as Target Format COMMAX10.2
+,Sum(Prod.VrProducao) as VrProducao_Target Format COMMAX10.2
+,Sum(Prod.VrProducaoDiaUtil) as VrProducaoDiaUtil Format COMMAX10.2
+,Sum(Prod.VrProducaoProjetado) as VrProducaoProjetado Format COMMAX10.2
+,Sum(Prod.VrMargem) as VrMargem Format COMMAX10.2
+,Max(Target.DataBase) as DataBase Format DDMMYY10.
+
+From Base_Target_Agrupada2 as Target
+	Left join
+		(Select NuAnomes, NuCnpjLojaFavorecido, QtCorridosDiaUtilMes,
+				sum(QtContratos) as QtContratos,
+				sum(VrProducao) as VrProducao,
+				sum(VrProducaoDiaUtil) as VrProducaoDiaUtil,
+				sum(VrProducaoProjetado) as VrProducaoProjetado,
+				sum(VrMargem) as VrMargem
+		 From Base_Producao
+		 Group by 1,2,3) as Prod
+		On Target.NuCnpjLojaFavorecido = Prod.NuCnpjLojaFavorecido and Target.NuAnomes = Prod.NuAnomes
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_Target_Filial_Total as
+Select
+'Target' as Base
+,Target.NuAnoMes
+,'Filial' as Visao
+,"" as DsLoginN1C
+,Target.DsLoginN2C as DsLoginN2C
+,Target.DsLoginN3C as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Parc.NmAreaEstruturaComercialC as Dimensao2
+,Parc.NmAreaEstruturaComercialC as Dimensao3
+,'Mês Fechado' as Semana
+,Target.Porte
+,Target.TipoParceiro
+,Max(Prod.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(QtContratos) as QtContratos_Target Format COMMAX10.
+,Sum(Target.Potencial) as Potencial Format COMMAX10.2
+,Sum(Target.Target) as Target Format COMMAX10.2
+,Sum(Prod.VrProducao) as VrProducao_Target Format COMMAX10.2
+,Sum(Prod.VrProducaoDiaUtil) as VrProducaoDiaUtil Format COMMAX10.2
+,Sum(Prod.VrProducaoProjetado) as VrProducaoProjetado Format COMMAX10.2
+,Sum(Prod.VrMargem) as VrMargem Format COMMAX10.2
+,Max(Target.DataBase) as DataBase Format DDMMYY10.
+
+From Base_Target_Agrupada2 as Target
+Left Join Base_Cobans_Solar_Saida as Parc On Target.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+
+	Left join
+		(Select NuAnomes, NuCnpjLojaFavorecido, QtCorridosDiaUtilMes, NmAreaEstruturaComercialC,
+				sum(QtContratos) as QtContratos,
+				sum(VrProducao) as VrProducao,
+				sum(VrProducaoDiaUtil) as VrProducaoDiaUtil,
+				sum(VrProducaoProjetado) as VrProducaoProjetado,
+				sum(VrMargem) as VrMargem
+		 From Base_Producao
+		 Group by 1,2,3,4) as Prod
+		On Target.NuCnpjLojaFavorecido = Prod.NuCnpjLojaFavorecido and Target.NuAnomes = Prod.NuAnomes
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_Target_Grs_Total as
+Select
+'Target' as Base
+,Target.NuAnoMes
+,'GRs' as Visao
+,Target.DsLoginN1C as DsLoginN1C
+,Target.DsLoginN2C as DsLoginN2C
+,Target.DsLoginN3C as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Parc.NmAreaEstruturaComercialC as Dimensao2
+,Parc.NmColaboradorC as Dimensao3
+,'Mês Fechado' as Semana
+,Target.Porte
+,Target.TipoParceiro
+,Max(Prod.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(QtContratos) as QtContratos_Target Format COMMAX10.
+,Sum(Target.Potencial) as Potencial Format COMMAX10.2
+,Sum(Target.Target) as Target Format COMMAX10.2
+,Sum(Prod.VrProducao) as VrProducao_Target Format COMMAX10.2
+,Sum(Prod.VrProducaoDiaUtil) as VrProducaoDiaUtil Format COMMAX10.2
+,Sum(Prod.VrProducaoProjetado) as VrProducaoProjetado Format COMMAX10.2
+,Sum(Prod.VrMargem) as VrMargem Format COMMAX10.2
+,Max(Target.DataBase) as DataBase Format DDMMYY10.
+
+From Base_Target_Agrupada2 as Target
+Left Join Base_Cobans_Solar_Saida as Parc On Target.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+	Left join
+		(Select NuAnomes, NuCnpjLojaFavorecido, QtCorridosDiaUtilMes, NmAreaEstruturaComercialC, NmColaboradorC,
+				sum(QtContratos) as QtContratos,
+				sum(VrProducao) as VrProducao,
+				sum(VrProducaoDiaUtil) as VrProducaoDiaUtil,
+				sum(VrProducaoProjetado) as VrProducaoProjetado,
+				sum(VrMargem) as VrMargem
+		 From Base_Producao
+		 Group by 1,2,3,4,5) as Prod
+		On Target.NuCnpjLojaFavorecido = Prod.NuCnpjLojaFavorecido and Target.NuAnomes = Prod.NuAnomes
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_Target_PDVs_Total as
+Select
+'Target' as Base
+,Target.NuAnoMes
+,'Cobans' as Visao
+,Parc.DsLoginN1C as DsLoginN1C
+,Parc.DsLoginN2C as DsLoginN2C
+,Parc.DsLoginN3C as DsLoginN3C
+,Parc.NmAreaEstruturaComercialC as Dimensao1
+,Parc.NmColaboradorC as Dimensao2
+,put(Parc.CdParceiroComercial, 8.) || '-' || Parc.NmParceiroComercial as Dimensao3
+,'Mês Fechado' as Semana
+,Target.Cluster_Final as Porte
+,Target.TipoParceiro
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Max(Prod.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(Prod.QtContratos) as QtContratos_Target Format COMMAX10.
+,Sum(Target.'Potencial CNPJ'n) as Potencial Format COMMAX10.2
+,Sum(Target.Target) as Target Format COMMAX10.2
+,Sum(Prod.VrProducao) as VrProducao_Target Format COMMAX10.2
+,Sum(Prod.VrProducaoDiaUtil) as VrProducaoDiaUtil Format COMMAX10.2
+,Sum(Prod.VrProducaoProjetado) as VrProducaoProjetado Format COMMAX10.2
+,Sum(Prod.VrMargem) as VrMargem Format COMMAX10.2
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+/*Tive que pegar a base origem para cruzar pelo CdParceiroComercial*/
+From ritosol.Classificacao_Parceiros_MIS as Target
+Left join Base_Cobans_Solar_Saida as Parc On Target.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+	Left join
+		(Select NuAnomes, QtCorridosDiaUtilMes, NmAreaEstruturaComercialC, NmColaboradorC, CdParceiroComercial, NmParceiroComercial,
+				sum(QtContratos) as QtContratos,
+				sum(VrProducao) as VrProducao,
+				sum(VrProducaoDiaUtil) as VrProducaoDiaUtil,
+				sum(VrProducaoProjetado) as VrProducaoProjetado,
+				sum(VrMargem) as VrMargem
+		 From Base_Producao
+		 Group by 1,2,3,4,5,6) as Prod
+		On Target.CdParceiroComercial = Prod.CdParceiroComercial and Target.NuAnomes = Prod.NuAnomes
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Data ritosol.Base_Target_Solar;
+Set
+	Base_Target_PDVs_Total
+	Base_Target_Grs_Total
+	Base_Target_Filial_Total
+	Base_Target_Canal_Total
+;Run;

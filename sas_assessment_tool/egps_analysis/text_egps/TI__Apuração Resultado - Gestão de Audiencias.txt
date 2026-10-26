@@ -1,0 +1,141 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: TI__Apuração Resultado - Gestão de Audiencias
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:09 UTC
+BUSINESS_AREA: TI
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 62
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CONVSIMU = /infogrc/convsimu; FINAL = /riscosbvf/financas/varejo/dre_rateio_final
+DETECTED_MACROS_DEFINED: anomes
+DETECTED_MACROS_USED: anomes, anomes_fim, anomes_financas, anomes_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES_FIM, ANOMES_FINANCAS, ANOMES_INI
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): FINAL.TABELAO_&ANOMES_FINANCAS._AUTOMACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: FINAL
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): C:\Users\augusto.cheida\Banco Votorantim S.A\Escritório CDO - 04. Gestão de Resultados\02. Valuation\04. Medição\spk_mar_0002 (Gestão de Audiências)\01. Cálculo via Notebook\Base Analítica\base_anlt_202506.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.base_anlt_202506 <- C:\Users\augusto.cheida\Banco Votorantim S.A\Escritório CDO - 04. Gestão de Resultados\02. Valuation\04. Medição\spk_mar_0002 (Gestão de Audiências)\01. Cálculo via Notebook\Base Analítica\base_anlt_202506.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ANLT_&ANOMES
+TABLE_READ_PROVENANCE (Flow): FINAL.TABELAO_&ANOMES_FINANCAS._AUTOMACAO [PROC SQL - FROM], WORK.BASE_ANLT_&ANOMES [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: AGRUP_SAFRA_VP_&ANOMES_FIM, BASE_CONTRATOS, BASE_CONTRATOS_INICIAL, CAIXA_&ANOMES_FIM
+DYNAMIC REFS (Ambiguous): FINAL.TABELAO_{ANOMES_FINANCAS}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET anomes=%eval(&anomes. + 88);
+
+[[ FILE_REFS_MACRO ]]
+IN|C:\Users\augusto.cheida\Banco Votorantim S.A\Escritório CDO - 04. Gestão de Resultados\02. Valuation\04. Medição\spk_mar_0002 (Gestão de Audiências)\01. Cálculo via Notebook\Base Analítica\base_anlt_202506.csv|C:/USERS/AUGUSTO.CHEIDA/BANCO VOTORANTIM S.A/ESCRITÓRIO CDO - 04. GESTÃO DE RESULTADOS/02. VALUATION/04. MEDIÇÃO/SPK_MAR_0002 (GESTÃO DE AUDIÊNCIAS)/01. CÁLCULO VIA NOTEBOOK/BASE ANALÍTICA|BASE_ANLT_202506.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Mês a Mês */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Mês a Mês */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-PY55yc1l5luLIFhb/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname FINAL  "/riscosbvf/financas/varejo/dre_rateio_final";
+libname convsimu '/infogrc/convsimu';
+
+%macro caixa(anomes_ini, anomes_fim, anomes_financas);
+
+
+
+data base_contratos_inicial;
+set _null_;
+run;
+
+%let anomes = &anomes_ini.;
+%do %while (&anomes. <= &anomes_fim.);
+
+	data base_contratos_inicial;
+	set base_contratos_inicial work.base_anlt_&anomes.;
+
+	run;
+
+	%let anomes = %eval(&anomes. + 1);
+	%if %sysfunc(mod(&anomes., 100)) = 13 %then %let anomes = %eval(&anomes. + 88);
+
+%end;
+
+
+
+proc sql;
+
+	create table caixa_&anomes_fim. as
+		select NUCONTRATOGESTAO,
+		sum(VLR_MARGEM_SERVICOS) as VLR_MARGEM_SERVICOS,
+		sum(VLR_PDD_BRUTA) as VLR_PDD_BRUTA,
+		sum(VLR_RECUPERACAO) as VLR_RECUPERACAO,
+		sum(VLR_DESC_PRINCIPAL) as VLR_DESC_PRINCIPAL,
+		sum(RECEITA_SERVICO) as RECEITA_SERVICO
+
+		from FINAL.TABELAO_&anomes_financas._AUTOMACAO
+		group by 1;
+
+	quit;
+
+
+
+proc sql;
+	create table base_contratos as
+	select
+		a.*,
+		b.*,
+	    sum(b.VLR_MARGEM_SERVICOS, b.VLR_PDD_BRUTA, b.VLR_RECUPERACAO, b.VLR_DESC_PRINCIPAL) as MARGEM_LIQUIDA
+	from
+		base_contratos_inicial as a
+	left join caixa_&anomes_fim. as b
+  		on a.nucontratogestao = b.NUCONTRATOGESTAO;
+
+quit;
+
+
+
+proc sql;
+	create table AGRUP_SAFRA_VP_&anomes_fim. as
+		select
+		ds_grupo,
+		&anomes_fim. as carteira,
+		safra,
+		sum(RECEITA_SERVICO) as RECEITA_SERVICO,
+		sum(MARGEM_LIQUIDA) as MARGEM_LIQUIDA
+		from base_contratos
+		group by 1,2,3;
+
+quit;
+
+%mend;
+%caixa(202506, 202506, jun25);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Mês a Mês */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,266 @@
+START_METADATA
+PROJECT: SAS_UC4__ext_colaborador
+FILE_SAS: ext_colaborador.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:54 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -41
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 187
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], DBA.TBCOLABORADOR [DBCON], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [DBCON], DWBI_DTWH.TBAREAESTRUTURACOMERCIAL [DBCON], DWBI_DTWH.TBCARGOCOLABORADOR [DBCON], DWBI_DTWH.TBDEPARAHIERARQUIA [DBCON], DWBI_DTWH.TBPESSOA [DBCON], TBCOLABORADORAJUSTE [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBCOLABORADOR [DATA Step - SET], DBA.TBCOLABORADOR [Pass-Through Native (DBCON) - FROM], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBAREAESTRUTURACOMERCIAL [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBCARGOCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBDEPARAHIERARQUIA [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBPESSOA [Pass-Through Native (DBCON) - JOIN], TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN], TBCOLABORADORAJUSTE [Pass-Through Native (DBCON) - FROM; Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASES.TBCOLABORADOR, TBCOLABORADOR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBCOLABORADOR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBCOLABORADOR, TBOPERADOR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_colaborador.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	ext_colaborador.sas													| */
+/* |	Descricao: 	Programa para extrair informacoes de colaboradores.					| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableua utilizados pela		| */
+/* |				area comercial.														| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de BA								| */
+/* |	Criador: 	Carlos Makoto - BA													| */
+/* |	Data:		01/04/2020															| */
+/* ====================================================================================== */
+/* |	Atualizacao:	08/04/2020														| */
+/* |	Responsavel: 	Paulo Oliveira - Squad MIS Comercial							| */
+/* |	Alt. Realizada:	- Inclusao de cabecalho											| */
+/* |					- Testes iniciais												| */
+/* ====================================================================================== */
+/* |	Atualizacao:	24/04/2020														| */
+/* |	Responsavel: 	Nome - Squad MIS Comercial										| */
+/* |	Alt. Realizada:	- Utilizacao do usuario sistemico								| */
+/* ====================================================================================== */
+/* |	Atualizacao:	03/06/2020														| */
+/* |	Responsavel: 	Magda Crosgnac - Squad MIS Comercial					    	| */
+/* |	Alt. Realizada:	- Alteração da query 		     								| */
+/* |																			    	| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ================ Extracao Colaborador  ================= */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table TbColaborador as
+select * from connection to dbcon
+(
+	WITH
+		TbColaboradorAjuste AS
+		(
+			SELECT
+
+				 CdPessoa
+				,DtInicioVigencia
+				,CdSistemaOrigem
+				,CdFilialComercial
+				,CdCargoColaborador
+				,CdAreaEstruturaComercial
+				,CdEstadoColaborador
+				,CdEmpresa
+				,CdVinculoEmpregaticio
+				,CdHierarquiaColaborador
+				,CdFilialCadastro
+			/*	,CdColaboradorRH*/
+				,CASE
+					WHEN CdColaboradorRH = 80767
+					AND DsLogin = 'caroliny.guarize'
+					AND CdSistemaOrigem = 209
+					THEN 80720 ELSE CdColaboradorRH
+				END  AS CdColaboradorRH
+			/*	CdColaboradorRH = 80767 AND CdSistemaOrigem = 209 AND DsLogin = 'caroliny.guarize'*/
+				,CdColaboradorSistemaOrigem
+				,CdNivelCargoColaborador
+				,CdOperadorRH
+				,DtAdmissaoColaborador
+				,DtDesligamentoColaborador
+				,DtFimVigencia
+				,DsEmail
+				,DsLogin
+				,NuExecucaoProcessoInclusao
+				,NuExecucaoProcessoAtualizacao
+				,CdEstruturaComercial
+				,CdSubEstruturaComercial
+
+				FROM DWBI_DTWH.TbColaborador Colaborador
+
+			)
+	SELECT
+		 Colaborador.CdColaboradorSistemaOrigem CdColaborador
+		,Colaborador.CdColaboradorRH IdMatricula
+		,HierarquiaComercial.CdColaborador CdColaboradorBI
+		,lower(HierarquiaComercial.DsLogin) DsLogin
+   		,upper(coalesce(HierarquiaComercial.NmColaborador,Pessoa.NmPessoa)) NmColaborador
+		,DeParaHierarquia.CdGrupoCargo CdGrupoCargoColaborador
+		,DeParaHierarquia.NmGrupoCargo NmGrupoCargoColaborador
+
+	FROM TbColaboradorAjuste Colaborador
+
+		LEFT JOIN DWBI_DTWH.TbPessoa Pessoa
+			ON  Colaborador.CdPessoa = Pessoa.CdPessoa
+
+		LEFT JOIN TbColaboradorAjuste ColaboradorRH
+			ON  Colaborador.CdColaboradorRH = ColaboradorRH.CdColaboradorRH
+			AND ColaboradorRH.CdSistemaOrigem = 202
+			AND today() BETWEEN ColaboradorRH.DtInicioVigencia AND ColaboradorRH.DtFimVigencia
+
+			LEFT JOIN DWBI_DIME.TbDimHierarquiaComercial HierarquiaComercial
+				ON  ColaboradorRH.CdPessoa = HierarquiaComercial.CdColaborador
+				AND today() BETWEEN HierarquiaComercial.DtInicioVigencia AND HierarquiaComercial.DtFimVigencia
+
+				LEFT JOIN DWBI_DTWH.TbAreaEstruturaComercial AreaEstruturaComercial
+					ON  HierarquiaComercial.CdAreaEstruturaComercial = AreaEstruturaComercial.CdAreaEstruturaComercial
+
+				LEFT JOIN DWBI_DTWH.TbCargoColaborador CargoColaborador
+					ON  HierarquiaComercial.CdCargoColaborador = CargoColaborador.CdCargoColaborador
+
+					LEFT JOIN DWBI_DTWH.TbDeParaHierarquia DeParaHierarquia
+						ON  AreaEstruturaComercial.CdAreaEstruturaCmrclStmaOrgm = DeParaHierarquia.CdAreaEstruturaComercial
+						AND CargoColaborador.CdCargoColaboradorStmaOrgm = DeParaHierarquia.CdCargoColaborador
+
+	WHERE 1=1
+	  AND today() BETWEEN Colaborador.DtInicioVigencia AND Colaborador.DtFimVigencia
+	  AND Colaborador.CdSistemaOrigem = 209
+	  ORDER BY ColaboradorRH.CdPessoa
+)
+;quit;
+
+proc sort data=TbColaborador nodupkey;by CdColaborador;run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+create table TbOperador as
+select * from connection to dbcon
+(
+WITH TbColaborador as
+(
+	SELECT DISTINCT
+		 Colaborador.CdOperador
+		,first_value(Colaborador.CdColaborador)
+			over (partition BY Colaborador.CdOperador ORDER BY
+				CASE
+					WHEN (Colaborador.NmColaborador LIKE 'DUP%'
+						OR Colaborador.DsLogin LIKE 'neo.%'
+						OR Colaborador.DsLogin LIKE 'parla.%'
+						OR Colaborador.DsLogin LIKE 'tivit%'
+						OR Colaborador.FlAtivo = 'N') THEN 1 ELSE 0 END) AS CdColaborador
+		,first_value(Colaborador.CdFilial)
+			over (partition BY Colaborador.CdOperador ORDER BY
+				CASE
+					WHEN (Colaborador.NmColaborador LIKE 'DUP%'
+						OR Colaborador.DsLogin LIKE 'neo.%'
+						OR Colaborador.DsLogin LIKE 'parla.%'
+						OR Colaborador.DsLogin LIKE 'tivit%'
+						OR Colaborador.FlAtivo = 'N') THEN 1 ELSE 0 END) AS CdFilial
+
+	FROM DBA.TbColaborador Colaborador
+	WHERE Colaborador.CdColaborador > 0
+	AND Colaborador.CdOperador > 0
+)
+
+	SELECT
+	 	 Colaborador.CdColaborador
+		,Colaborador.CdOperador
+		,Colaborador.CdFilial
+	FROM DBA.TbColaborador Colaborador
+
+		INNER JOIN TbColaborador ColaboradorAtivo
+			ON  Colaborador.CdColaborador = ColaboradorAtivo.CdColaborador
+)
+;quit;
+
+proc sql;
+create table bases.TbColaborador as
+select
+	 Colaborador.CdColaborador
+	,Operador.CdOperador
+	,Colaborador.IdMatricula
+	,Colaborador.CdColaboradorBI
+	,Colaborador.DsLogin
+	,Colaborador.NmColaborador
+	,Colaborador.CdGrupoCargoColaborador
+	,Colaborador.NmGrupoCargoColaborador
+	,Operador.CdFilial
+from TbColaborador Colaborador
+
+	left join TbOperador Operador
+		on Colaborador.CdColaborador = Operador.CdColaborador
+;run;
+
+proc sql;update bases.TbColaborador set NmGrupoCargoColaborador = 'Gerente Relacionamento Privado' where NmColaborador like 'GR VIRTUAL%';run;
+proc sql;update bases.TbColaborador set NmGrupoCargoColaborador = 'Gerente Relacionamento Coban/B2B' where NmColaborador like 'GR VIRTUAL%';run;
+proc sql;update bases.TbColaborador set CdGrupoCargoColaborador = 15 where NmColaborador like 'GR VIRTUAL%';run;
+proc sql;update bases.TbColaborador set CdGrupoCargoColaborador = 5 where NmColaborador like 'GR VIRTUAL%';run;
+
+data bases.TbColaborador;
+length CdColaborador 5.;
+length CdOperador 5.;
+length IdMatricula 5.;
+length CdColaboradorBI 8.;
+length DsLogin $25.;
+length NmColaborador $70.;
+length CdGrupoCargoColaborador 5.;
+length NmGrupoCargoColaborador $50.;
+length CdFilial 5.;
+set bases.TbColaborador
+;run;
+
+proc sql;create index CdColaborador on bases.TbColaborador;quit;
+
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* ====================================================================================== */
+%PUT #!# FIM ext_colaborador.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%PUT #!# TEMPO PROCESSAMENTO:   %SYSFUNC(intck(SECOND, &W_ini, %SYSFUNC(datetime())), tod8.);

@@ -1,0 +1,90 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 004-market-share-rito.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 38
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: POTENCIALRODAS, TBRITOPDV_B001
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE PotencialRodas AS
+  SELECT
+    POT.NuAnomes
+    ,POT.CdParceiroComercial
+    ,POT.FxIdade AS FxIdade
+	,SUM(POT.QtContrato) AS Part_ContratosBV
+    ,SUM(POT.QtGravamesMercado) AS Part_Mercado
+	,coalesce(sum(POT.VrGravamesMercado),0) AS VrGravamesMercado
+	,coalesce(sum(POT.VrGravamesMercado / TotalDiaUtilPrd * B.TotalDiaUtilMes),0) AS VrGravamesMercadoProj
+  FROM TMP.TbPotencialRodas POT
+		LEFT JOIN TbDiasUteis02 B
+		ON POT.NuAnomes = b.NuAnomes
+  WHERE 1=1
+    AND POT.NuAnoMes >= &safraM6.
+    AND POT.FlAtualizacaoMercado = 1
+	And CASE WHEN POT.FxIdade IS NULL THEN ''
+         WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+         END = 'Usados'
+	and Pot.NmGrupoProduto = 'Leves'
+	and POT.NmCanalEstruturaComercialC = 'Canal Negocios'
+	and POT.FlAtivo = 'S'
+	and POT.NmTipoParceiroComercial in ('Concessionaria','Loja')
+GROUP BY 1,2,3
+;run;
+
+proc sql;
+create table TbRitoPDV_B001 as
+select
+*
+From
+	PotencialRodas B
+	LEFT JOIN TbBaseInicialRito A
+		on A.CdParceiroComercial = B.CdParceiroComercial
+		AND A.NuAnoMes = B.NuAnoMes
+		and A.Fxidade = B.Fxidade
+/*		group by 1,2,3*/
+;run;

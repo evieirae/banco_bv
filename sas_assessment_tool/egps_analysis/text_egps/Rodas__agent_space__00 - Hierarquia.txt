@@ -1,0 +1,120 @@
+START_METADATA
+PROJECT: Rodas__agent_space
+FILE_SAS: 00 - Hierarquia.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 60
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dia, hoje
+DETECTED_MACROS_USED: dia, hoje
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [Pass-Through Native (DBCON) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBADMISSAOCOLABORADOR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+/*****************************************/
+/*TABELA COM DATA DE ADMISSAO COLABORADOR*/
+/*****************************************/
+
+%let hoje = %sysfunc(today());
+%let dia = %sysfunc(day(&hoje));
+
+%if &dia = 1 %then %do;
+
+    DATA _NULL_;
+      /* Define data base */
+      hoje = today(); CALL SYMPUT('hoje', put(hoje,DATE9.));
+      /* Meses */
+      m0 = INTNX('MONTH', hoje, -1, 'BEG'); CALL SYMPUT('m0', put(m0,DATE9.));
+      m1 = INTNX('MONTH', hoje, -2, 'BEG'); CALL SYMPUT('m1', put(m1,DATE9.));
+      m2 = INTNX('MONTH', hoje, -3, 'BEG'); CALL SYMPUT('m2', put(m2,DATE9.));
+      m3 = INTNX('MONTH', hoje, -4, 'BEG'); CALL SYMPUT('m3', put(m3,DATE9.));
+      m4 = INTNX('MONTH', hoje, -5, 'BEG'); CALL SYMPUT('m4', put(m4,DATE9.));
+      m5 = INTNX('MONTH', hoje, -6, 'BEG'); CALL SYMPUT('m5', put(m5,DATE9.));
+      m6 = INTNX('MONTH', hoje, -7, 'BEG'); CALL SYMPUT('m6', put(m6,DATE9.));
+      m7 = INTNX('MONTH', hoje, -8, 'BEG'); CALL SYMPUT('m7', put(m7,DATE9.));
+      /* Formato: safra */
+      CALL SYMPUT('safraM0', put(m0,YYMMn6.));
+      CALL SYMPUT('safraM1', put(m1,YYMMn6.));
+      CALL SYMPUT('safraM2', put(m2,YYMMn6.));
+      CALL SYMPUT('safraM3', put(m3,YYMMn6.));
+      CALL SYMPUT('safraM4', put(m4,YYMMn6.));
+      CALL SYMPUT('safraM5', put(m5,YYMMn6.));
+      CALL SYMPUT('safraM6', put(m6,YYMMn6.));
+      CALL SYMPUT('safraM7', put(m7,YYMMn6.));
+    RUN;
+%end;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+CREATE TABLE TbAdmissaoColaborador AS
+SELECT
+	NmSubEstruturaComercial
+	,NmAreaEstruturaComercial
+	,CdColaborador
+	,NmColaborador
+	,DsLogin
+	,DsEmail
+	,NmCargoColaborador
+	,CdEstadoColaborador
+	,NmEstadoColaborador
+	,DtAdmissaoColaborador
+	,DtDesligamentoColaborador
+	,DsLoginColaboradorImediato
+	,DATEPART(DtDesligamentoColaborador) as DtDesligamentoColaborador2 FORMAT DATE9.
+
+FROM connection to dbcon
+	(
+		SELECT * FROM DWBI_DIME.TbDimHierarquiaComercial HierarquiaComercial
+		WHERE today() BETWEEN HierarquiaComercial.DtInicioVigencia AND HierarquiaComercial.DtFimVigencia
+		AND YEAR(HierarquiaComercial.DtInicioVigencia) BETWEEN YEAR(today())-1 AND YEAR(today())
+/*		AND YEAR(DtDesligamentoColaborador) BETWEEN YEAR(today())-1 AND YEAR(today())*/
+		AND CdEstruturaComercial = 8 /*and HierarquiaComercial.CdEstadoColaborador = 5 EM ATIVIDADE NORMAL*/
+
+		ORDER BY DtDesligamentoColaborador desc
+	)
+
+/*where dslogin = 'aarao.souza'*/
+
+;run;
+quit;

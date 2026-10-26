@@ -1,0 +1,905 @@
+START_METADATA
+PROJECT: SAS_UC4__tbpotencialrodas
+FILE_SAS: tbpotencialrodas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:54 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -57
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40), PROC DATASETS (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 727
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m0, Base_m6, DtAtualizacao, DtAtualizacaoCetip, DtAtualizacaoDiario
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], BASEGRC.TBMUNICIPIOCHAVE [SAS/Local], BASES.TBTEMPODATA [SAS/Local], DWBI_DTWH.TBANALITICO [DBCON], DWBI_DTWH.TBMUNICIPIO [DBCON], TBCETIPANALITICOFINAL [DBCON], TBCETIPRANKINGFINAL [DBCON], TMP.TBEXTPROPOSTA [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPOTENCIALPDVS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TMP
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBLEVESNOVOSBVO [PROC SQL - JOIN], BASEGRC.TBMUNICIPIOCHAVE [PROC SQL - JOIN], BASES.TBTEMPODATA [PROC SQL - FROM], DWBI_DTWH.TBANALITICO [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBMUNICIPIO [Pass-Through Native (DBCON) - FROM], TBCETIPANALITICOFINAL [Pass-Through Native (DBCON) - FROM], TBCETIPRANKINGFINAL [Pass-Through Native (DBCON) - FROM], TMP.TBCETIPCONSOLIDADO [PROC SQL - FROM], TMP.TBCETIPMERCADO [DATA Step - SET], TMP.TBCETIPORIGINACAO [DATA Step - SET], TMP.TBCETIPPRODUCAO [DATA Step - SET], TMP.TBEXTPROPOSTA [PROC SQL - JOIN], TMP.TBORIGINACAO [PROC SQL - FROM], TMP.TBPOTENCIALPDVS [PROC SQL - FROM; PROC SQL - JOIN], TMP.TBPOTENCIALRODAS [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): TMP.TBCETIPCONSOLIDADO, TMP.TBCETIPMERCADO, TMP.TBCETIPORIGINACAO, TMP.TBCETIPPRODUCAO, TMP.TBPOTENCIALRODAS
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TMP.TBCETIPCONSOLIDADO, TMP.TBCETIPMERCADO, TMP.TBCETIPORIGINACAO, TMP.TBCETIPPRODUCAO, TMP.TBPOTENCIALRODAS, TMP.TBRANKINGQTBANCOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PDV_DEDICADO, GRUPOSCNPJ, TBATUALIZACAOCETIP, TBCETIPMERCADO, TBCNPJRAIZ, TBCNPJRAIZ01, TBCNPJRAIZ02, TBEXTCETIPANALITCO, TBMUNICIPIO, TBMUNICIPIOPARCEIROSEMCODIGO, TBPOTENCIALPDVSMERCADO, TBRANKINGCETIP, TBTEMPODATA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== 	| */
+/* |	Atualizacao:	04/04/2024  														| */
+/* |	Responsavel: Ramon Sales Soares			                      					 	| */
+/* |	Alt. Realizada:	Inclusão do produto Leves-BVO										| */
+/* ====================================================================================== 	| */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* =================== Potencial Rodas ==================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = BI);
+create table TbAtualizacaoCetip as
+select * from connection to dbcon
+(
+	SELECT CAST(MAX(substr(NmArquivo,26,8)) AS DATE) AS DtUltimoArquivo
+	FROM DWBI_DTWH.TbAnalitico
+)
+;quit;
+
+proc sql noprint;
+SELECT max(DtUltimoArquivo) into: DtAtualizacaoCetip
+FROM TbAtualizacaoCetip;
+quit;
+
+proc sql noprint;
+SELECT MAX(DtContrato) into: DtAtualizacao
+FROM tmp.TbProducao
+WHERE DtContrato < &DtAtualizacaoCetip.;
+quit;
+
+proc sql noprint;
+SELECT MAX(DtAtualizacao) into: DtAtualizacaoDiario
+FROM tmp.TbProducao
+;quit;
+
+proc sql;
+CREATE TABLE TbTempoData AS
+SELECT
+	NuAnoMes
+	,MAX(QtCorridosDiaUtilDia) AS QtCorridosDiaUtilCetip
+FROM bases.TbTempoData
+WHERE DtTempo < &DtAtualizacaoCetip.
+GROUP BY 1
+;RUN;
+
+proc sql;
+create table tmp.TbCetipProducao as
+select
+	 Producao.NuAnoMes
+	,compress(tranwrd(Producao.NmGrupoProdutoMeta,'CVG ','')) as NmGrupoProdutoMeta
+	,case when substr(Producao.NmGrupoProdutoMeta,1,4) = 'CVG ' then 1 else 0 end as FlRefin
+	,Producao.FxIdade
+	,Producao.CdParceiroComercial
+
+	,Producao.NuCnpjLoja
+	,case when Producao.NmGrupoProdutoMeta in ('Leves', 'CVG Leves', 'Leves-BVO') then PDVsParceiro.FlPorteA end as FlPorteA
+	,case when Producao.NmGrupoProdutoMeta in ('Motos') 						  then PDVsParceiro.FlPorteMotos end as FlPorteMotos
+	,case when Producao.NmGrupoProdutoMeta in ('Leves', 'CVG Leves', 'Leves-BVO') then PDVsParceiro.DsClassificacaoA end as DsClassificacaoA
+
+	,tbextproposta.TpVeiculo AS DsCategoriaVeiculo
+
+	,PDVsParceiro.FlAtivo
+	,PDVsParceiro.NmLoja
+	,PDVsParceiro.NmTipoParceiroComercial
+	,Producao.FlIntegracaoParceiroFeI
+	,PDVsParceiro.NmLogradouro
+	,PDVsParceiro.NuEndereco
+	,PDVsParceiro.DsComplementoEndereco
+	,PDVsParceiro.NmBairro
+	,PDVsParceiro.CdCep
+	,PDVsParceiro.NmCidade
+	,PDVsParceiro.CdUf
+	,PDVsParceiro.DtCadastro
+	,PDVsParceiro.DtUltimaAtualizacao
+
+	,PotencialPDVs.CnaePrimario
+	,PotencialPDVs.TpCnae
+	,PotencialPDVs.CdColaboradorC
+	,PotencialPDVs.NmColaboradorC
+	,PotencialPDVs.CdFilialC
+	,PotencialPDVs.NmFilialC
+	,PotencialPDVs.NmAreaEstruturaComercialC
+	,PotencialPDVs.NmSubEstruturaComercialC
+	,PotencialPDVs.NmCanalEstruturaComercialC
+	,PotencialPDVs.DsLoginN1C
+	,PotencialPDVs.DsLoginN2C
+	,PotencialPDVs.DsLoginN3C
+	,PotencialPDVs.LstSubstituicaoC
+
+/*	,Producao.NmAutoShopping*/
+/*	,Producao.NmCorredor*/
+/*	,Producao.NmGrupoConcessionaria*/
+/*	,Producao.NmBandeiraGrupoConcessionaria*/
+	,Producao.FlDiasUteisMaturacao
+	,CASE WHEN Producao.DtContrato < &DtAtualizacaoCetip. THEN 1 ELSE 0 END AS FlAtualizacaoMercado
+	,count(*) as QtContrato
+	,sum(Producao.VrProducao) as VrProducao
+	,sum(Producao.VrMargemContribuicao) as VrMargemContribuicao
+	,sum(Producao.VrMargemContribuicaoFinal) as VrMargemContribuicaoFinal
+	,sum(Producao.VrMargem) as VrMargem
+	,sum(Producao.VrFinanciamento) as VrFinanciamento
+	,sum(Producao.VrPerdaEstimada) as VrPerdaEstimada
+	,sum(Producao.VpDuration) as VpDuration
+
+	,sum(Producao.VrComissaoTotal) as VrComissaoTotal
+	,sum(Producao.VrComissaoParcelada) as VrComissaoParcelada
+	,sum(Producao.VrAcordoComercial) as VrAcordoComercial
+
+	,sum(Producao.VpTirDivulgada) as VpTirDivulgada
+	,sum(Producao.VpTirContabil) as VpTirContabil
+	,sum(Producao.VpIdade) as VpIdade
+	,sum(Producao.VpPrazo) as VpPrazo
+	,sum(Producao.VpRoe) as VpRoe
+
+	,sum(Producao.FlTxAlterada) as QtTxAlteradaProducao
+	,sum(Producao.VpTxGerencial) as VpTxGerencialProducao
+	,sum(Producao.VpScore) as VpScoreProducao
+
+	,sum(Producao.FlBvMais) as QtBvMais
+	,sum(Producao.FlCap) as QtCap
+	,sum(Producao.FlDemais) as QtDemais
+
+	,sum(Producao.VrBvMais) as VrBvMais
+	,sum(Producao.VrCap) as VrCap
+	,sum(Producao.VrDemais) as VrDemais
+	,sum(Producao.FlBVMaisEleg) as QtBVMaisEleg
+	,sum(Producao.FlCapEleg) as QtCapEleg
+	,sum(Producao.FlDemaisEleg) as QtDemaisEleg
+
+from tmp.TbProducao Producao
+
+	left join tmp.TbPotencialPDVs PotencialPDVs
+		on  Producao.NuCnpjLoja = PotencialPDVs.NuCnpjLoja
+		and PotencialPDVs.FlPrioridade = 1
+
+	left join tmp.TbPotencialPDVs  PDVsParceiro
+		on  Producao.CdParceiroComercial = PDVsParceiro.CdParceiroComercial
+		and PDVsParceiro.CdParceiroComercial is not null
+
+	LEFT JOIN tmp.tbextproposta tbextproposta
+		ON Producao.NuProposta = tbextproposta.NuProposta
+
+where Producao.NmGrupoProdutoMeta in ('Leves','Motos','Pesados','CVG Leves','CVG Pesados','Leves-BVO')
+	and Producao.NuAnoMes >= 201901
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,32,33,34,35,36,37,38
+;run;
+
+proc sql;
+create table tmp.TbCetipOriginacao as
+select
+	 Originacao.NuAnoMes
+	,compress(tranwrd(Originacao.NmGrupoProdutoMeta,'CVG ','')) as NmGrupoProdutoMeta
+	,case when substr(Originacao.NmGrupoProdutoMeta,1,4) = 'CVG ' then 1 else 0 end as FlRefin
+	,Originacao.FxIdade
+	,Originacao.CdParceiroComercial
+	,Originacao.NuCnpjLoja
+
+	,case when Originacao.NmGrupoProdutoMeta in ('Leves', 'CVG Leves', 'Leves-BVO') then PDVsParceiro.FlPorteA end as FlPorteA
+	,case when Originacao.NmGrupoProdutoMeta in ('Motos') then PDVsParceiro.FlPorteMotos end as FlPorteMotos
+	,case when Originacao.NmGrupoProdutoMeta in ('Leves', 'CVG Leves', 'Leves-BVO') then PDVsParceiro.DsClassificacaoA end as DsClassificacaoA
+
+	,tbextproposta.TpVeiculo AS DsCategoriaVeiculo
+
+	,PDVsParceiro.FlAtivo
+	,PDVsParceiro.NmLoja
+	,PDVsParceiro.NmTipoParceiroComercial
+
+	,Originacao.FlIntegracaoParceiroFeI
+	,PDVsParceiro.NmLogradouro
+	,PDVsParceiro.NuEndereco
+	,PDVsParceiro.DsComplementoEndereco
+	,PDVsParceiro.NmBairro
+	,PDVsParceiro.CdCep
+	,PDVsParceiro.NmCidade
+	,PDVsParceiro.CdUf
+	,PDVsParceiro.DtCadastro
+	,PDVsParceiro.DtUltimaAtualizacao
+
+	,PotencialPDVs.CnaePrimario
+	,PotencialPDVs.TpCnae
+	,PotencialPDVs.CdColaboradorC
+	,PotencialPDVs.NmColaboradorC
+	,PotencialPDVs.CdFilialC
+	,PotencialPDVs.NmFilialC
+	,PotencialPDVs.NmAreaEstruturaComercialC
+	,PotencialPDVs.NmSubEstruturaComercialC
+	,PotencialPDVs.NmCanalEstruturaComercialC
+	,PotencialPDVs.DsLoginN1C
+	,PotencialPDVs.DsLoginN2C
+	,PotencialPDVs.DsLoginN3C
+	,PotencialPDVs.LstSubstituicaoC
+
+/*	,Originacao.NmAutoShopping*/
+/*	,Originacao.NmCorredor*/
+/*	,Originacao.NmGrupoConcessionaria*/
+/*	,Originacao.NmBandeiraGrupoConcessionaria*/
+	,Originacao.FlDiasUteisMaturacao
+	,CASE WHEN Originacao.DtEntradaProposta < &DtAtualizacaoCetip. THEN 1 ELSE 0 END AS FlAtualizacaoMercado
+	,sum(case when Originacao.FlConcorrente = 1 then FlPropostaAPNP else 0 end) as QtPropostaMercado
+	,sum(case when Originacao.FlConcorrente = 1 then VrPropostaAPNP else 0 end) as VrPropostaMercado
+	,sum(case when Originacao.pgto_loja = 'S' then FlPropostaAPNP else 0 end) as QtPropostaMercadoLoja
+	,sum(case when Originacao.pgto_loja = 'S' then VrPropostaAPNP else 0 end) as VrPropostaMercadoLoja
+	,sum(case when Originacao.pgto_loja = 'N' then FlPropostaAPNP else 0 end) as QtPropostaMercadoLojaDif
+	,sum(case when Originacao.pgto_loja = 'N' then VrPropostaAPNP else 0 end) as VrPropostaMercadoLojaDif
+
+	,sum(Originacao.VrPropostaOriginada) as VrPropostaOriginada
+	,sum(Originacao.FlIntegracaoPropostaFeI) AS QtIntegracaoPropostaFeI
+	,sum(Originacao.VrPropostaAprovada) as VrPropostaAprovada
+	,sum(Originacao.VrPropostaAPNP) as VrPropostaAPNP
+	,sum(Originacao.VrPropostaEfetivada) as VrPropostaEfetivada
+	,sum(Originacao.FlPropostaOriginada) as QtPropostaOriginada
+	,sum(Originacao.FlPropostaAprovada) as QtPropostaAprovada
+	,sum(Originacao.FlPropostaAPNP) as QtPropostaAPNP
+	,sum(Originacao.FlPropostaEfetivada) as QtPropostaEfetivada
+	,sum(Originacao.FlTxAlterada) as QtTxAlteradaProposta
+	,sum(Originacao.VpTxGerencial) as VpTxGerencialProposta
+	,sum(Originacao.VpScore) as VpScoreProposta
+
+from tmp.TbOriginacao Originacao
+
+	left join tmp.TbPotencialPDVs PotencialPDVs
+		on  Originacao.NuCnpjLoja = PotencialPDVs.NuCnpjLoja
+		and PotencialPDVs.FlPrioridade = 1
+
+	left join tmp.TbPotencialPDVs  PDVsParceiro
+		on  Originacao.CdParceiroComercial = PDVsParceiro.CdParceiroComercial
+		and PDVsParceiro.CdParceiroComercial > 0
+
+	LEFT JOIN tmp.tbextproposta tbextproposta
+		ON Originacao.NuProposta = tbextproposta.NuProposta
+
+where Originacao.NmGrupoProdutoMeta in ('Leves','Motos','Pesados','CVG Leves','CVG Pesados','Leves-BVO')
+	and Originacao.NuAnoMes >= 201901
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38
+;run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = BI);
+create table TbExtCetipAnalitco as
+select * from connection to dbcon
+(
+  WITH
+	 TbDataUltimoArquivo AS (
+		SELECT MAX(substr(NmArquivo,26,8)) AS DtUltimoArquivo
+		FROM DWBI_DTWH.TbAnalitico
+
+	 )
+
+	,TbCetipAnaliticoMesAtual AS (
+		SELECT
+			year(CAST(substr(Analitico.NmArquivo,26,8) AS DATE))*100+month(CAST(substr(Analitico.NmArquivo,26,8) AS DATE)) AS NuAnoMes
+			,Analitico.NuCnpjLoja
+			,Analitico.DsCategoriaVeiculo
+			,Analitico.DsSegmento
+			,Analitico.QtFinanciamentos
+			,Analitico.QtVolumeFinanciamentos
+
+		FROM DWBI_DTWH.TbAnalitico Analitico
+			INNER JOIN TbDataUltimoArquivo DataUltimoArquivo
+				ON substr(Analitico.NmArquivo,26,8) = DataUltimoArquivo.DtUltimoArquivo
+				AND substr(DataUltimoArquivo.DtUltimoArquivo,7,2) <> '01'
+
+		WHERE Analitico.CdConsorcio = 'N'
+			  AND Analitico.CdTipoRegistro = 'D'
+			  AND Analitico.DsCategoriaVeiculo in
+					('AUTOMOVEL'
+					,'UTILITARIO'
+					,'CAMINHONETE'
+					,'CAMIONETA'
+					,'MICROONIBUS'
+					,'CICLOMOTOR'
+					,'MOTONETA'
+					,'MOTOCICLETA'
+					,'TRICICLO'
+					,'QUADRICICLO'
+					,'REBOQUE'
+					,'SEMI-REBOQUE'
+					,'CAMINHAO'
+					,'CAMINHAO TRATOR'
+					,'ONIBUS'
+					,'MOTOR-CASA'
+					,'CHASSI/PLATAFORMA'
+					,'TRATOR DE RODAS'
+				)
+		)
+
+		,TbCetipAnaliticoMesFechado AS (
+			SELECT
+				year(CAST(substr(Analitico.NmArquivo,26,8) AS DATE)-1)*100+month(CAST(substr(Analitico.NmArquivo,26,8) AS DATE)-1) AS NuAnoMes
+				,Analitico.NuCnpjLoja
+				,Analitico.DsCategoriaVeiculo
+				,Analitico.DsSegmento
+				,Analitico.QtFinanciamentos
+				,Analitico.QtVolumeFinanciamentos
+
+			FROM DWBI_DTWH.TbAnalitico Analitico
+			WHERE substr(Analitico.NmArquivo,32,2) = '01'
+			  AND Analitico.CdConsorcio = 'N'
+			  AND Analitico.CdTipoRegistro = 'D'
+			  AND Analitico.DsCategoriaVeiculo in
+					('AUTOMOVEL'
+					,'UTILITARIO'
+					,'CAMINHONETE'
+					,'CAMIONETA'
+					,'MICROONIBUS'
+					,'CICLOMOTOR'
+					,'MOTONETA'
+					,'MOTOCICLETA'
+					,'TRICICLO'
+					,'QUADRICICLO'
+					,'REBOQUE'
+					,'SEMI-REBOQUE'
+					,'CAMINHAO'
+					,'CAMINHAO TRATOR'
+					,'ONIBUS'
+					,'MOTOR-CASA'
+					,'CHASSI/PLATAFORMA'
+					,'TRATOR DE RODAS')
+		)
+
+		,TbCetipAnaliticoFinal AS (
+			SELECT * FROM TbCetipAnaliticoMesAtual UNION ALL
+			SELECT * FROM TbCetipAnaliticoMesFechado
+		)
+
+	SELECT
+		 NuAnoMes
+		,NuCnpjLoja
+		,DsCategoriaVeiculo
+		,DsSegmento
+		,SUM(QtFinanciamentos) AS QtFinanciamentos
+		,SUM(QtVolumeFinanciamentos) AS VrFinanciamentos
+
+	FROM TbCetipAnaliticoFinal
+	WHERE NuAnoMes >= 201901
+	GROUP BY
+		 NuAnoMes
+		,NuCnpjLoja
+		,DsCategoriaVeiculo
+		,DsSegmento
+	)
+;run;
+
+PROC SQL;
+CREATE TABLE TbCetipMercado AS
+SELECT
+	 CetipAnalitico.NuAnoMes
+	,CASE
+		WHEN BVO.CdParceiroComercial <> . and CetipAnalitico.DsSegmento = 	'NOVO' THEN 'Leves-BVO'
+		WHEN CetipAnalitico.DsCategoriaVeiculo in ('AUTOMOVEL','UTILITARIO','CAMINHONETE','CAMIONETA','MICROONIBUS') 	THEN 'Leves'
+		WHEN CetipAnalitico.DsCategoriaVeiculo in ('CICLOMOTOR','MOTONETA','MOTOCICLETA','TRICICLO','QUADRICICLO') 		THEN 'Motos'
+		WHEN CetipAnalitico.DsCategoriaVeiculo in ('REBOQUE','SEMI-REBOQUE','CAMINHAO','CAMINHAO TRATOR','ONIBUS','MOTOR-CASA','CHASSI/PLATAFORMA','TRATOR DE RODAS') 		THEN 'Pesados'
+	 END AS NmGrupoProdutoMeta
+	,0 as FlRefin
+	,CASE
+		WHEN CetipAnalitico.DsSegmento = 	'NOVO'    		THEN 'ZeroKM'
+		WHEN CetipAnalitico.DsSegmento =  '> 15'    		THEN 'Acima de 10 anos'
+		WHEN CetipAnalitico.DsSegmento =  '11 a 15' 		THEN 'Acima de 10 anos'
+		WHEN CetipAnalitico.DsSegmento =  '8 a 10'  		THEN '8 a 10 anos'
+		WHEN CetipAnalitico.DsSegmento =  '5 a 7'  			THEN '3 a 7 anos'
+		WHEN CetipAnalitico.DsSegmento =  '3 a 4'   		THEN '3 a 7 anos'
+		WHEN CetipAnalitico.DsSegmento =  'ate 2 anos' 		THEN '0 a 2 anos'
+	 END AS FxIdade
+	,put(CetipAnalitico.NuCnpjLoja,z14.) AS NuCnpjLoja
+
+	,PotencialPDVs.CdParceiroComercial
+	,PotencialPDVs.FlAtivo
+	,case when CetipAnalitico.DsCategoriaVeiculo in ('AUTOMOVEL','UTILITARIO','CAMINHONETE','CAMIONETA','MICROONIBUS') then PotencialPDVs.FlPorteA end as FlPorteA
+	,case when CetipAnalitico.DsCategoriaVeiculo in ('CICLOMOTOR','MOTONETA','MOTOCICLETA','TRICICLO','QUADRICICLO') then PotencialPDVs.FlPorteMotos end as FlPorteMotos
+	,case when CetipAnalitico.DsCategoriaVeiculo in ('AUTOMOVEL','UTILITARIO','CAMINHONETE','CAMIONETA','MICROONIBUS') then PotencialPDVs.DsClassificacaoA end as DsClassificacaoA
+
+	,CetipAnalitico.DsCategoriaVeiculo
+
+	,PotencialPDVs.NmLoja
+	,PotencialPDVs.NmTipoParceiroComercial
+	,PotencialPDVs.FlIntegracaoParceiroFeI
+	,PotencialPDVs.NmLogradouro
+	,PotencialPDVs.NuEndereco
+	,PotencialPDVs.DsComplementoEndereco
+	,PotencialPDVs.NmBairro
+	,PotencialPDVs.CdCep
+	,PotencialPDVs.NmCidade
+	,PotencialPDVs.CdUf
+	,PotencialPDVs.CnaePrimario
+	,PotencialPDVs.TpCnae
+	,PotencialPDVs.CdColaboradorC
+	,PotencialPDVs.NmColaboradorC
+	,PotencialPDVs.CdFilialC
+	,PotencialPDVs.NmFilialC
+	,PotencialPDVs.NmAreaEstruturaComercialC
+	,PotencialPDVs.NmSubEstruturaComercialC
+	,PotencialPDVs.NmCanalEstruturaComercialC
+	,PotencialPDVs.DsLoginN1C
+	,PotencialPDVs.DsLoginN2C
+	,PotencialPDVs.DsLoginN3C
+	,PotencialPDVs.LstSubstituicaoC
+/*	,PotencialPDVs.NmAutoShopping*/
+/*	,PotencialPDVs.NmCorredor*/
+/*	,PotencialPDVs.NmGrupoConcessionaria*/
+/*	,PotencialPDVs.NmBandeiraGrupoConcessionaria*/
+	,1 AS  FlAtualizacaoMercado
+	,sum(CetipAnalitico.QtFinanciamentos) AS QtFinanciamentos
+	,sum(CetipAnalitico.VrFinanciamentos) AS VrFinanciamentos
+FROM TbExtCetipAnalitco CetipAnalitico
+
+	LEFT JOIN tmp.TbPotencialPDVs PotencialPDVs
+		ON 	put(CetipAnalitico.NuCnpjLoja,z14.) = PotencialPDVs.NuCnpjLoja
+		AND PotencialPDVs.FlPrioridade = 1
+
+	LEFT JOIN BASEGRC.TbLevesNovosBVO BVO
+    ON BVO.CdParceiroComercial = PotencialPDVs.CdParceiroComercial
+	and BVO.nuanomes = CetipAnalitico.nuanomes
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+;run;
+
+PROC SQL;
+CREATE TABLE TbPotencialPDVsMercado AS
+SELECT DISTINCT
+	CdParceiroComercial
+	,DtCadastro
+	,DtUltimaAtualizacao
+FROM tmp.TbPotencialPDVs
+WHERE CdParceiroComercial > 0
+;Run;
+
+PROC SQL;
+CREATE TABLE tmp.TbCetipMercado AS
+SELECT
+
+ TbCetipMercado.NuAnoMes
+,TbCetipMercado.NmGrupoProdutoMeta
+,TbCetipMercado.FlRefin
+,TbCetipMercado.FxIdade
+,TbCetipMercado.NuCnpjLoja
+,TbCetipMercado.CdParceiroComercial
+,TbCetipMercado.FlAtivo
+,TbCetipMercado.FlPorteA
+,TbCetipMercado.FlPorteMotos
+,TbCetipMercado.DsClassificacaoA
+,TbCetipMercado.DsCategoriaVeiculo
+,TbCetipMercado.NmLoja
+,TbCetipMercado.NmTipoParceiroComercial
+,TbCetipMercado.FlIntegracaoParceiroFeI
+,TbCetipMercado.NmLogradouro
+,TbCetipMercado.NuEndereco
+,TbCetipMercado.DsComplementoEndereco
+,TbCetipMercado.NmBairro
+,TbCetipMercado.CdCep
+,TbCetipMercado.NmCidade
+,TbCetipMercado.CdUf
+
+,TbPotencialPDVsMercado.DtCadastro
+,TbPotencialPDVsMercado.DtUltimaAtualizacao
+
+,TbCetipMercado.CnaePrimario
+,TbCetipMercado.TpCnae
+,TbCetipMercado.CdColaboradorC
+,TbCetipMercado.NmColaboradorC
+,TbCetipMercado.CdFilialC
+,TbCetipMercado.NmFilialC
+,TbCetipMercado.NmAreaEstruturaComercialC
+,TbCetipMercado.NmSubEstruturaComercialC
+,TbCetipMercado.NmCanalEstruturaComercialC
+,TbCetipMercado.DsLoginN1C
+,TbCetipMercado.DsLoginN2C
+,TbCetipMercado.DsLoginN3C
+,TbCetipMercado.LstSubstituicaoC
+,TbCetipMercado.FlAtualizacaoMercado
+,TbCetipMercado.QtFinanciamentos
+,TbCetipMercado.VrFinanciamentos
+
+FROM TbCetipMercado TbCetipMercado
+	LEFT JOIN TbPotencialPDVsMercado TbPotencialPDVsMercado
+		ON TbCetipMercado.CdParceiroComercial = TbPotencialPDVsMercado.CdParceiroComercial
+;RUN;
+
+data tmp.TbCetipConsolidado;
+set
+	tmp.TbCetipProducao
+	tmp.TbCetipOriginacao
+	tmp.TbCetipMercado
+;run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = BI);
+create table TbMunicipio as
+select * from connection to dbcon
+(
+	SELECT
+		*
+	FROM DWBI_DTWH.TbMunicipio Municipio
+)
+;run;
+
+proc sql;
+create table TbMunicipioParceiroSemCodigo as
+select
+	 CetipConsolidado.NmCidade
+	,CetipConsolidado.CdUf
+	,COUNT(*) as QtOcorrencias
+	,sum(CetipConsolidado.QtFinanciamentos) as QtGravamesMercado
+	,sum(CetipConsolidado.VrFinanciamentos) as VrGravamesMercado
+
+from tmp.TbCetipConsolidado CetipConsolidado
+
+	left join basegrc.TbMunicipioChave MunicipioChave
+		on  CetipConsolidado.NmCidade = MunicipioChave.NmMunicipio
+		and CetipConsolidado.CdUf = MunicipioChave.CdUf
+
+		left join TbMunicipio Municipio
+			on  MunicipioChave.CdMunicipio = Municipio.CdMunicipio
+
+where CetipConsolidado.FlAtivo = 'N'
+	and Municipio.CdMunicipio is null
+group by 1,2
+
+;run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = BI);
+create table TbRankingCetip as
+select * from connection to dbcon
+(
+WITH
+	 TbDataUltimoArquivo AS (
+		SELECT MAX(substr(NmArquivo,13,8)) AS DtUltimoArquivo
+		FROM DWBI_DTWH.TbRanking
+		where NmArquivo not in('00002350432..20250519001739.txt','C0004.050568.PRK.20250201162232.txt.txt','00002350432.PRK.20250224002219.txt')
+
+	 )
+
+	,TbCetipRankingMesAtual AS (
+		SELECT
+			year(CAST(substr(Ranking.NmArquivo,13,8) AS DATE))*100+month(CAST(substr(Ranking.NmArquivo,13,8) AS DATE)) AS NuAnoMes
+			,Ranking.NuCnpjLoja
+			,Ranking.QtBancos
+			,Ranking.NuRankingCliente
+
+		FROM DWBI_DTWH.TbRanking Ranking
+			INNER JOIN TbDataUltimoArquivo DataUltimoArquivo
+				ON substr(Ranking.NmArquivo,13,8) = DataUltimoArquivo.DtUltimoArquivo
+				AND substr(DataUltimoArquivo.DtUltimoArquivo,7,2) <> '01'
+		WHERE  Ranking.CdTipoRegistro = 'D'
+		AND  Ranking.NmArquivo not in('00002350432..20250519001739.txt','C0004.050568.PRK.20250201162232.txt.txt','00002350432.PRK.20250224002219.txt')
+
+	)
+
+	,TbCetipRankingMesFechado AS (
+		SELECT
+			year(CAST(substr(Ranking.NmArquivo,13,8) AS DATE)-1)*100+month(CAST(substr(Ranking.NmArquivo,13,8) AS DATE)-1) AS NuAnoMes
+			,Ranking.NuCnpjLoja
+			,Ranking.QtBancos
+			,Ranking.NuRankingCliente
+
+		FROM DWBI_DTWH.TbRanking Ranking
+		WHERE substr(Ranking.NmArquivo,19,2) = '01'
+		  AND Ranking.CdTipoRegistro = 'D'
+		  AND  Ranking.NmArquivo not in('00002350432..20250519001739.txt','C0004.050568.PRK.20250201162232.txt.txt','00002350432.PRK.20250224002219.txt')
+
+	)
+
+	,TbCetipRankingFinal AS (
+		SELECT * FROM TbCetipRankingMesAtual UNION ALL
+		SELECT * FROM TbCetipRankingMesFechado
+	)
+
+	SELECT * FROM TbCetipRankingFinal
+/*		WHERE NuAnoMes >= 201901*/
+	)
+;run;
+
+/*proc sort data=dscience.TbFidelidadeLojista out=TbFidelidadeLojista nodupkey; by Safra CdLoja;run;*/
+
+/* Realiza agrupamento por Raiz do CNPJ */
+PROC SQL;
+CREATE TABLE TbCnpjRaiz01 AS
+  SELECT
+	SUBSTR(NuCnpjLoja,1,8) AS RaizCnpjLoja,
+	NuCnpjLoja,
+	NmLoja,
+    SUM(QtContrato) AS QtdContratos,
+    SUM(QtFinanciamentos) AS Mercado
+  FROM tmp.TbCetipConsolidado
+  GROUP BY 1,2,3
+  ORDER BY
+    calculated QtdContratos DESC,
+    calculated Mercado DESC;
+RUN;
+
+PROC SQL;
+CREATE TABLE GruposCnpj AS
+  SELECT
+    RaizCnpjLoja,
+	COUNT(DISTINCT NuCnpjLoja) AS QtdLojas
+  FROM TbCnpjRaiz01
+  GROUP BY 1;
+RUN;
+
+PROC SORT DATA=TbCnpjRaiz01 OUT=TbCnpjRaiz02 NODUPKEY;
+BY RaizCnpjLoja;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbCnpjRaiz AS
+  SELECT
+    A.RaizCnpjLoja,
+	STRIP(CASE WHEN B.QtdLojas > 1 THEN 'GRUPO ' END || A.NmLoja) AS NmGrupo,
+	CASE WHEN B.QtdLojas <= 1 THEN '0. Individual'
+	     WHEN B.QtdLojas BETWEEN 2 AND 5 THEN '1. De 2 a 5 CNPJs'
+		 WHEN B.QtdLojas BETWEEN 6 AND 10 THEN '2. De 6 a 10 CNPJs'
+		 WHEN B.QtdLojas > 10 THEN '3. Mais de 10 lojas'
+	     END AS QtdLojas
+  FROM
+    TbCnpjRaiz02 A
+  LEFT JOIN
+    GruposCnpj B
+	ON A.RaizCnpjLoja = B.RaizCnpjLoja;
+RUN;
+
+/**********************************/
+/*MARCAÇÃO PDVS DECICADOS PARA PREDOMINANCIA*/
+/**********************************/
+
+DATA _NULL_;
+CALL SYMPUT ('Base_m6',INPUT(PUT(INTNX('MONTHS',TODAY(),-6,'END'),YYMMN6.),6.));
+CALL SYMPUT ('Base_m0',INPUT(PUT(INTNX('MONTHS',TODAY(),-1,'END'),YYMMN6.),6.));
+;RUN;
+
+%PUT &Base_m6 &Base_m0;
+
+PROC SQL;
+CREATE TABLE BASE_PDV_DEDICADO AS
+SELECT
+
+a.NuCnpjLoja,a.FlAtivo,
+
+sum(CASE WHEN A.NmGrupoProduto = 'Leves' then A.QtGravamesMercado ELSE 0 END) AS QtGravames_Leves format commax20.2,
+sum(CASE WHEN A.NmGrupoProduto = 'Motos' then A.QtGravamesMercado ELSE 0 END) AS QtGravames_Motos format commax20.2,
+sum(CASE WHEN A.NmGrupoProduto = 'Pesados' then A.QtGravamesMercado ELSE 0 END) AS QtGravames_Pesados format commax20.2,
+
+sum(QtGravamesMercado) as QtGravames_Total format commax20.2,
+
+calculated QtGravames_Leves / calculated QtGravames_Total as Perc_Leves format percent9.2,
+calculated QtGravames_Motos / calculated QtGravames_Total as Perc_Motos format percent9.2,
+calculated QtGravames_Pesados / calculated QtGravames_Total as Perc_Pesados format percent9.2,
+
+CASE WHEN FlAtivo = 'S' THEN CASE WHEN CALCULATED Perc_Motos >= 0.8 THEN 1 ELSE 0 END /*PDVs ativos*/
+	 WHEN FlAtivo <> 'S' THEN CASE WHEN CALCULATED Perc_Motos >= 0.5 THEN 1 ELSE 0 END /*PDVs inativos e nao cadastrados*/
+	 END AS PDV_MOTOS,
+
+CASE WHEN FlAtivo = 'S' THEN CASE WHEN CALCULATED Perc_Pesados >= 0.7 THEN 1 ELSE 0 END /*PDVs ativos*/
+	 WHEN FlAtivo <> 'S' THEN CASE WHEN CALCULATED Perc_Pesados >= 0.5 THEN 1 ELSE 0 END /*PDVs inativos e nao cadastrados*/
+	 END AS PDV_PESADOS
+
+FROM TMP.TBPOTENCIALRODAS A
+
+WHERE NUANOMES BETWEEN &Base_m6. AND &Base_m0.
+/*and NuCnpjLoja = '39611478000193'*/
+GROUP BY a.NuCnpjLoja,a.FlAtivo
+order by 2 desc
+;RUN;
+
+proc sort data=BASE_PDV_DEDICADO nodupkey dupout=dup_ out=BASE_PDV_DEDICADO;
+by NuCnpjLoja
+;run;
+
+/* Gera base final */
+proc sql;
+CREATE TABLE tmp.TbPotencialRodas AS
+SELECT
+	 CetipConsolidado.NuAnoMes
+	,CetipConsolidado.NmGrupoProdutoMeta AS NmGrupoProduto
+	,CetipConsolidado.FlRefin
+	,CetipConsolidado.FxIdade
+	,CetipConsolidado.CdParceiroComercial
+	,Raiz.RaizCnpjLoja
+	,Raiz.NmGrupo
+	,Raiz.QtdLojas
+	,CetipConsolidado.NuCnpjLoja
+	,CetipConsolidado.NmLoja
+	,CetipConsolidado.NmTipoParceiroComercial
+	,CetipConsolidado.FlIntegracaoParceiroFeI
+	,'' AS DsTendenciaMktShare
+	,'' AS DsGrupoControle
+/*	,FidelidadeLojista.Tendencia_MktShare AS DsTendenciaMktShare*/
+/*	,FidelidadeLojista.grupo AS DsGrupoControle*/
+
+	,CetipConsolidado.FlAtivo
+	,CetipConsolidado.DtCadastro
+	,CetipConsolidado.DtUltimaAtualizacao
+
+	,CetipConsolidado.FlPorteA
+	,CetipConsolidado.FlPorteMotos
+	,CetipConsolidado.DsClassificacaoA
+
+	,CetipConsolidado.DsCategoriaVeiculo
+
+	,CetipConsolidado.NmLogradouro
+	,CetipConsolidado.NuEndereco
+	,CetipConsolidado.DsComplementoEndereco
+	,CetipConsolidado.NmBairro
+	,CetipConsolidado.CdCep
+	,Municipio.NmMunicipio AS NmCidade
+	,Municipio.CdUf AS CdUf
+
+	,CetipConsolidado.CnaePrimario
+	,CetipConsolidado.TpCnae
+	,CetipConsolidado.CdColaboradorC
+	,CetipConsolidado.NmColaboradorC
+	,CetipConsolidado.CdFilialC
+	,CetipConsolidado.NmAreaEstruturaComercialC
+	,CetipConsolidado.NmSubEstruturaComercialC
+	,CetipConsolidado.NmCanalEstruturaComercialC
+	,CetipConsolidado.DsLoginN1C
+	,CetipConsolidado.DsLoginN2C
+	,CetipConsolidado.DsLoginN3C
+	,CetipConsolidado.LstSubstituicaoC
+/*	,CetipConsolidado.NmAutoShopping*/
+/*	,CetipConsolidado.NmCorredor*/
+/*	,CetipConsolidado.NmGrupoConcessionaria*/
+/*	,CetipConsolidado.NmBandeiraGrupoConcessionaria*/
+	,RankingCetip.QtBancos
+	,RankingCetip.NuRankingCliente AS RankingCliente
+/*	,CetipClassificacao.FlGravames6Meses*/
+	,TempoData.QtCorridosDiaUtilCetip
+	,CetipConsolidado.FlAtualizacaoMercado
+
+	,case when PdvDed.PDV_MOTOS 	= 1 then 'Motos'
+		  when PdvDed.PDV_PESADOS 	= 1 then 'Pesados'
+		   			else 'Demais' end as PredominanciaProduto
+
+	,&DtAtualizacaoDiario. AS DtAtualizacaoDiario format date9.
+	,&DtAtualizacaoCetip. AS DtAtualizacaoCetip format date9.
+	,&DtAtualizacao. AS DtAtualizacao format date9.
+
+	,sum(CetipConsolidado.QtPropostaOriginada) as QtPropostaOriginada
+	,sum(CetipConsolidado.VrPropostaOriginada) as VrPropostaOriginada
+	,sum(CetipConsolidado.QtIntegracaoPropostaFeI) AS QtIntegracaoPropostaFeI
+	,sum(CetipConsolidado.QtPropostaAprovada) as QtPropostaAprovada
+	,sum(CetipConsolidado.VrPropostaAprovada) as VrPropostaAprovada
+	,sum(CetipConsolidado.QtPropostaEfetivada) as QtPropostaEfetivada
+	,sum(CetipConsolidado.VrPropostaEfetivada) as VrPropostaEfetivada
+	,sum(CetipConsolidado.QtPropostaAPNP) as QtPropostaAPNP
+	,sum(CetipConsolidado.VrPropostaAPNP) as VrPropostaAPNP
+
+	,sum(CetipConsolidado.QtContrato) as QtContrato
+	,sum(CetipConsolidado.VrProducao) as VrProducao
+
+	,sum(CetipConsolidado.QtFinanciamentos) as QtGravamesMercado
+	,sum(CetipConsolidado.VrFinanciamentos) as VrGravamesMercado
+
+	,sum(CetipConsolidado.VrMargemContribuicao) as VrMargemContribuicao
+	,sum(CetipConsolidado.VrMargemContribuicaoFinal) as VrMargemContribuicaoFinal
+	,sum(CetipConsolidado.VrMargem) as VrMargem
+	,sum(CetipConsolidado.VrFinanciamento) as VrFinanciamento
+	,sum(CetipConsolidado.VrComissaoTotal) as VrComissaoTotal
+	,sum(CetipConsolidado.VrComissaoParcelada) as VrComissaoParcelada
+	,sum(CetipConsolidado.VrAcordoComercial) as VrAcordoComercial
+	,sum(CetipConsolidado.VrPerdaEstimada) as VrPerdaEstimada
+	,sum(CetipConsolidado.VpDuration) as VpDuration
+	,sum(CetipConsolidado.VpTirDivulgada) as VpTirDivulgada
+	,sum(CetipConsolidado.VpTirContabil) as VpTirContabil
+	,sum(CetipConsolidado.VpIdade) as VpIdade
+	,sum(CetipConsolidado.VpPrazo) as VpPrazo
+	,sum(CetipConsolidado.VpRoe) as VpRoe
+
+	,sum(CetipConsolidado.QtTxAlteradaProducao) as QtTxAlteradaProducao
+	,sum(CetipConsolidado.QtTxAlteradaProposta) as QtTxAlteradaProposta
+
+	,sum(CetipConsolidado.VpTxGerencialProducao) as VpTxGerencialProducao
+	,sum(CetipConsolidado.VpTxGerencialProposta) as VpTxGerencialProposta
+
+	,sum(CetipConsolidado.VpScoreProducao) as VpScoreProducao
+	,sum(CetipConsolidado.VpScoreProposta) as VpScoreProposta
+
+	,sum(CetipConsolidado.QtBvMais) as QtBvMais
+	,sum(CetipConsolidado.QtCap) as QtCap
+	,sum(CetipConsolidado.QtDemais) as QtDemais
+
+	,sum(CetipConsolidado.QtBVMaisEleg) as QtBVMaisEleg
+	,sum(CetipConsolidado.QtCapEleg) as QtCapEleg
+	,sum(CetipConsolidado.QtDemaisEleg) as QtDemaisEleg
+
+FROM tmp.TbCetipConsolidado CetipConsolidado
+
+/*	LEFT JOIN TbFidelidadeLojista FidelidadeLojista */
+/*		ON  CetipConsolidado.CdParceiroComercial = FidelidadeLojista.CdLoja*/
+/*		AND CetipConsolidado.NuAnoMes = FidelidadeLojista.Safra*/
+
+	LEFT JOIN TbTempoData TempoData
+		ON CetipConsolidado.NuAnoMes = TempoData.NuAnoMes
+
+	LEFT JOIN TbRankingCetip RankingCetip
+		ON  CetipConsolidado.NuCnpjLoja = put(RankingCetip.NuCnpjLoja,z14.)
+		AND CetipConsolidado.NuAnoMes = RankingCetip.NuAnoMes
+
+/*		Normalizar nome do Municipio*/
+	LEFT JOIN basegrc.TbMunicipioChave MunicipioChave
+		ON  CetipConsolidado.NmCidade = MunicipioChave.NmMunicipio
+		AND CetipConsolidado.CdUf = MunicipioChave.CdUf
+
+	LEFT JOIN TbMunicipio Municipio
+		ON  MunicipioChave.CdMunicipio = Municipio.CdMunicipio
+
+    LEFT JOIN TbCnpjRaiz Raiz
+	    ON  SUBSTR(CetipConsolidado.NuCnpjLoja,1,8) = Raiz.RaizCnpjLoja
+
+	left join BASE_PDV_DEDICADO PdvDed
+		on 	CetipConsolidado.NuCnpjLoja = PdvDed.NuCnpjLoja
+
+    GROUP BY
+      1,2,3,4,5,6,7,8,9,10,
+      11,12,13,14,15,16,17,18,19,20,
+      21,22,23,24,25,26,27,28,29,30,
+      31,32,33,34,35,36,37,38,39,40,
+	  41,42,43,44,45,46,47,48
+;quit;
+
+/*	Excluir bases temporarias 	*/
+proc datasets lib=tmp nolist;
+	delete
+	TbCetipProducao
+	TbCetipOriginacao
+	TbCetipMercado
+	TbCetipConsolidado;
+run;
+
+proc sql;
+create table tmp.TbRankingQtBancos as
+select distinct
+	 NuAnoMes
+	,NuCnpjLoja
+	,CdParceiroComercial
+	,QtBancos
+	,RankingCliente
+
+from tmp.TbPotencialRodas
+;run;

@@ -1,0 +1,200 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 19 - BvExper.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 136
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: EXP_BU = /infogrc/BvExper/BvExper_BaseUnica
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5, DtAtualizacao
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBESTRUTURACOMERCIAL [SAS/Local], EXP_BU.TBBASEUNICA_BVEXPER_GF_RESUMO [SAS/Local], EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: EXP_BU
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], EXP_BU.TBBASEUNICA_BVEXPER_GF_RESUMO [PROC SQL - FROM], EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): EXP_BU.TBBASEUNICA_BVEXPER_GF_RESUMO, EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_BVEXPER_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_BVEXPER_CANAL_TOTAL, BASE_BVEXPER_FILIAL_TOTAL, BASE_BVEXPER_GRS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+
+LIBNAME EXP_BU '/infogrc/BvExper/BvExper_BaseUnica';
+
+proc sql noprint;
+    select max(DtAtualizacao) into :DtAtualizacao
+    from tmp.TbProducao;
+quit;
+
+Proc Sql;
+Create Table Base_BVExper_Canal_Total as
+Select
+'BVExper' as Base
+,Exper.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,0 as QtCorridosDiaUtilMes
+,"" as Apto
+,"" as Cluster
+,Sum(Exper.PONTOS_TURBO) as Pontos
+,Sum(Case When TpNivel = "Filial" Then 1 Else 0 End) as Qt_Colaborador
+,Sum(Case When FAIXA_PONTOS_TURBO = "A" Then 1 Else 0 End) as BVExper_A
+,Sum(Case When FAIXA_PONTOS_TURBO = "B" Then 1 Else 0 End) as BVExper_B
+,Sum(Case When FAIXA_PONTOS_TURBO = "C" Then 1 Else 0 End) as BVExper_C
+,Sum(Case When FAIXA_PONTOS_TURBO = "D" Then 1 Else 0 End) as BVExper_D
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From EXP_BU.TBBASEUNICA_BVEXPER_GF_RESUMO as Exper
+Left Join
+	(Select Distinct NuAnomes, DsLoginN2A, NmAreaEstruturaComercial From Bases.TbEstruturaComercial) as TbEstrutura ON Exper.NuANomes = TbEstrutura.NuAnomes and Exper.DsLoginN2A = TbEstrutura.DsLoginN2A
+
+Where Exper.TpBase = 'Pontos' and Exper.NuANomes >= &Base_m5. and Exper.NmCanalEstruturaComercial = 'Canal Solar' and
+		Coalesce(TbEstrutura.NmAreaEstruturaComercial, Exper.NmAreaEstruturaComercial) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_BVExper_Filial_Total as
+Select
+'BVExper' as Base
+,Exper.NuAnoMes
+,'Filial' as Visao
+,"                         " as DsLoginN1C
+,Exper.DsLoginN2A as DsLoginN2C
+,Exper.DsLoginN3A as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Coalesce(Exper.NmAreaEstruturaComercial, TbEstrutura.NmAreaEstruturaComercial) as Dimensao2
+,Coalesce(Exper.NmAreaEstruturaComercial, TbEstrutura.NmAreaEstruturaComercial) as Dimensao3
+,'Mês Fechado' as Semana
+,0 as QtCorridosDiaUtilMes
+,Exper.NmElegAcelerador as Apto
+,Exper.FAIXA_PONTOS_TURBO as Cluster
+,Sum(Exper.PONTOS_TURBO) as Pontos
+,Sum(Exper_GR.Qt_GRs) as Qt_Colaborador
+,Sum(Exper_GR.BVExper_A) as BVExper_A
+,Sum(Exper_GR.BVExper_B) as BVExper_B
+,Sum(Exper_GR.BVExper_C) as BVExper_C
+,Sum(Exper_GR.BVExper_D) as BVExper_D
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From EXP_BU.TBBASEUNICA_BVEXPER_GF_RESUMO as Exper
+Left Join
+	(Select
+		NuAnomes,
+		DsLoginN2A
+		,Sum(Case When TpNivel = "GR" Then 1 Else 0 End) as Qt_GRs
+		,Sum(Case When FAIXA_PONTOS_TURBO = "A" Then 1 Else 0 End) as BVExper_A
+		,Sum(Case When FAIXA_PONTOS_TURBO = "B" Then 1 Else 0 End) as BVExper_B
+		,Sum(Case When FAIXA_PONTOS_TURBO = "C" Then 1 Else 0 End) as BVExper_C
+		,Sum(Case When FAIXA_PONTOS_TURBO = "D" Then 1 Else 0 End) as BVExper_D
+	From EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO
+		Group by 1,2) as Exper_GR ON Exper.NuANomes = Exper_GR.NuAnomes and Exper.DsLoginN2A = Exper_GR.DsLoginN2A
+
+Left Join
+	(Select Distinct NuAnomes, DsLoginN2A, NmAreaEstruturaComercial From Bases.TbEstruturaComercial) as TbEstrutura ON Exper.NuANomes = TbEstrutura.NuAnomes and Exper.DsLoginN2A = TbEstrutura.DsLoginN2A
+
+Where Exper.TpBase = 'Pontos' and Exper.NuANomes >= &Base_m5. and Exper.NmCanalEstruturaComercial = 'Canal Solar' and
+		Coalesce(TbEstrutura.NmAreaEstruturaComercial, Exper.NmAreaEstruturaComercial) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_BVExper_GRs_Total as
+Select
+'BVExper' as Base
+,Exper.NuAnoMes
+,'GRs' as Visao
+,Exper.DsLoginN1 as DsLoginN1C
+,Exper.DsLoginN2A as DsLoginN2C
+,Exper.DsLoginN3A as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Coalesce(Exper.NmAreaEstruturaComercial, TbEstrutura.NmAreaEstruturaComercial) as Dimensao2
+,Coalesce(Exper.NmColaborador, TbEstrutura.NmColaborador) as Dimensao3
+,'Mês Fechado' as Semana
+,0 as QtCorridosDiaUtilMes
+,Exper.NmElegAcelerador as Apto
+,Exper.FAIXA_PONTOS_TURBO as Cluster
+,Sum(Exper.PONTOS_TURBO) as Pontos
+,Sum(Case When TpNivel = "GR" Then 1 Else 0 End) as Qt_Colaborador
+,Sum(Case When FAIXA_PONTOS_TURBO = "A" Then 1 Else 0 End) as BVExper_A
+,Sum(Case When FAIXA_PONTOS_TURBO = "B" Then 1 Else 0 End) as BVExper_B
+,Sum(Case When FAIXA_PONTOS_TURBO = "C" Then 1 Else 0 End) as BVExper_C
+,Sum(Case When FAIXA_PONTOS_TURBO = "D" Then 1 Else 0 End) as BVExper_D
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO as Exper
+Left Join
+	(Select Distinct NuAnomes, DsLoginN1, NmAreaEstruturaComercial, NmColaborador From Bases.TbEstruturaComercial) as TbEstrutura ON Exper.NuANomes = TbEstrutura.NuAnomes and Exper.DsLoginN1 = TbEstrutura.DsLoginN1
+
+Where Exper.TpBase = 'Pontos' and Exper.NuANomes >= &Base_m5. and Exper.NmCanalEstruturaComercial = 'Canal Solar' and
+		Coalesce(TbEstrutura.NmAreaEstruturaComercial, Exper.NmAreaEstruturaComercial) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Data ritosol.Base_BVEXPER_Solar;
+Set Base_BVExper_Filial_Total
+	Base_BVExper_Grs_Total
+	Base_BVExper_Canal_Total
+;Run;

@@ -1,0 +1,820 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Entrada_em_Cob_VE
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:35 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 663
+CODE_TASKS_COUNT: 13
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: B_GERAL = /riscosbv/cobranca/malmeida; GRIMALDI = /riscosbv/cobranca/Grimaldi; HOMOLOG2 = /projetos/MISV/data/bases; KAUE = /riscosbv/cobranca/ksilvestre
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DATA, DATA_M1, DATA_M_1, REF, ref
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: DATA, DATA_M1, DATA_M_1, REF
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [BIGQUERY], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCOR.TBPESSOA [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [BIGQUERY], BV-PDBD-PRD.TRUSTED_STGTXT_FLEX.TBPESSOA [BIGQUERY], HOMOLOG2.TBORIGINACAO [SAS/Local], HOMOLOG2.TBPARCEIROCOMERCIAL [SAS/Local], HOMOLOG2.TBPRODUCAO [SAS/Local], KAUE.VALIDA_ENTRADA_NOVO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_PROPOSTA, WORK.CRUZA_CART_TBPARC, WORK.CUBO_ENTRADA_NOVO
+IMPORTED_LIBNAMES: HOMOLOG2, KAUE
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_INAD, WORK.BASE_PROPOSTA, WORK.CRUZA_CART_TBPARC, WORK.CUBO_ENTRADA_NOVO, WORK.QUERY_FOR_CUBO_ENTRADA_NOVO
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DBCOR.TBPESSOA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_STGTXT_FLEX.TBPESSOA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], HOMOLOG2.TBORIGINACAO [PROC SQL - FROM], HOMOLOG2.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], HOMOLOG2.TBPRODUCAO [PROC SQL - FROM], KAUE.VALIDA_ENTRADA_NOVO [PROC SQL - JOIN], WORK.BASE_INAD [PROC SQL - FROM], WORK.BASE_PROPOSTA [PROC SQL - FROM], WORK.CRUZA_CART_TBPARC [PROC SQL - FROM], WORK.CUBO_ENTRADA_NOVO [PROC SQL - FROM], WORK.QUERY_FOR_CUBO_ENTRADA_NOVO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_FPD, BASE_PROPOSTA, CARTEIRA_EMP, CARTEIRA_TOTAL_&REF, CRUZA_CART_TBPARC, CUBO_ENTRADA_NOVO, SOLAR_PRICING, TB_PROPOSTA, WORK.QUERY_FOR_BASE_INAD, WORK.QUERY_FOR_BASE_PROPOSTA, WORK.QUERY_FOR_CRUZA_CART_TBPARC, WORK.QUERY_FOR_CRUZA_CART_TBPARC1, WORK.QUERY_FOR_CUBO_ENTRADA_NOVO, WORK.QUERY_FOR_CUBO_ENTRADA_NOVO_0000, WORK.QUERY_FOR_TBORIGINACAO, WORK.QUERY_FOR_TBORIGINACAO_0000, WORK.QUERY_FOR_TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01.Carteira */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 59 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01.Carteira */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-zswG1FhjGI99ya1p/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME GRIMALDI '/riscosbv/cobranca/Grimaldi';
+LIBNAME B_GERAL '/riscosbv/cobranca/malmeida';
+LIBNAME Homolog2 "/projetos/MISV/data/bases";
+LIBNAME KAUE '/riscosbv/cobranca/ksilvestre';
+
+%MACRO CONNECT_GCP;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-sadi-dtm' CREDFILE='/projetos/acessos/bq/di/sadi-dtm.json'
+SCHEMA='bv-pdbd-prd' READ_MODE=STORAGE ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+%MEND CONNECT_GCP;
+
+%MACRO CARTEIRA (DATA,REF,DATA_M1,DATA_M_1);
+
+PROC SQL;
+%CONNECT_GCP;
+CREATE TABLE CARTEIRA_TOTAL_&REF. AS
+SELECT A.*
+,&ref. as safra
+,SALDO AS SALDO_2 FORMAT COMMAX17.2
+,day(datepart(dtprimeirovencimento)) as DIA_VENC
+
+FROM CONNECTION TO PERM (
+WITH QUERY_1 AS (
+
+SELECT DISTINCT
+    CAST(a.nucontrato AS INT64) AS NUCONTRATO,
+	c.cd_cpf_cnpj AS nucpfcnpj,
+    a.sqcontratofinanceiro AS SQCONTRATOFINANCEIRO,
+    a.nudiasatraso AS ATRASO_M0,
+	f.ATRASO_M1,
+	a.dtprimeirovencimento,
+	'GCON' AS SISTEMA,
+
+    CASE
+		WHEN a.nudiasatraso <= 0 THEN 'a. Em dia'
+		WHEN a.nudiasatraso BETWEEN 1 AND 4 THEN 'b. 1 a 4'
+		WHEN a.nudiasatraso BETWEEN 5 AND 30 THEN 'c. 5 a 30'
+		WHEN a.nudiasatraso BETWEEN 31 AND 60 THEN 'd. 31 a 60'
+		WHEN a.nudiasatraso BETWEEN 61 AND 90 THEN 'e. 61 a 90'
+		WHEN a.nudiasatraso BETWEEN 91 AND 150 THEN 'f. 91 a 150'
+        WHEN a.nudiasatraso BETWEEN 91 AND 150 THEN 'g. 91 a 150'
+        WHEN a.nudiasatraso BETWEEN 151 AND 180 THEN 'h. 151 a 180'
+        WHEN a.nudiasatraso BETWEEN 181 AND 210 THEN 'i. 181 a 210'
+        WHEN a.nudiasatraso BETWEEN 211 AND 270 THEN 'j. 211 a 270'
+		ELSE 'k. 271 a 540'
+    END AS FX_ATRASO_M0,
+	M.CDUF,
+    (CAST(a.vrpermanenciaapropriado AS FLOAT64) + CAST(a.vrtaxacontrato AS FLOAT64)) AS SALDO,
+	e.SALDO as SALDO_M1
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+LEFT JOIN
+    bv-pdbd-prd.dvry_core.tbcontrato AS C ON a.nucontrato = c.cd_contrato
+LEFT JOIN
+    bv-pdbd-prd.trusted_dbcred.tbproposta AS D ON a.nucontrato = d.nucontratogestao
+LEFT JOIN
+	(select a.CDPESSOA, a.CDUF, a.SQENDERECO from bv-pdbd-prd.trusted_dbcor.tbpessoaendereco a inner join (SELECT DISTINCT CDPESSOA, MAX(SQENDERECO) AS SQENDERECO FROM bv-pdbd-prd.trusted_dbcor.tbpessoaendereco group by CDPESSOA) b
+										   on a.CDPESSOA = b.CDPESSOA and a.SQENDERECO = b.SQENDERECO) M ON c.CD_PESSOA = M.CDPESSOA
+LEFT JOIN
+	(SELECT NUCONTRATO,
+	 		sqcontratofinanceiro AS SQCONTRATOFINANCEIRO,
+			nudiasatraso as ATRASO_M1,
+	 		(CAST(vrpermanenciaapropriado AS FLOAT64) + CAST(vrtaxacontrato AS FLOAT64)) AS SALDO
+	 FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+	 WHERE DTPROCESSAMENTO = &DATA_M1.) E ON a.NUCONTRATO = e.NUCONTRATO AND
+	 										 a.sqcontratofinanceiro = e.sqcontratofinanceiro
+
+LEFT JOIN
+	(SELECT NUCONTRATO,
+	 		sqcontratofinanceiro AS SQCONTRATOFINANCEIRO,
+			nudiasatraso as ATRASO_M1
+	 FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+	 WHERE DTPROCESSAMENTO = &DATA_M_1.) f ON a.NUCONTRATO = f.NUCONTRATO AND
+	 										 a.sqcontratofinanceiro = f.sqcontratofinanceiro
+
+WHERE
+    a.dtprocessamento = &DATA.
+    AND a.nudiasatraso <= 540
+    AND a.cdproduto IN (13)
+	AND a.dtprocessamentoliquidacao is null
+	AND a.dtprimeirovencimento <= &DATA_M1. 
+    AND (CAST(c.cd_modalidade_produto AS INT64) = 55 OR d.cdsubproduto = 70)
+
+UNION ALL
+
+SELECT DISTINCT
+    CAST(X.nucontrato AS INT64) AS NUCONTRATO,
+	y.cd_cpf_cnpj AS nucpfcnpj,
+    x.sqcontratofinanceiro AS SQCONTRATOFINANCEIRO,
+    x.nudiasatraso AS ATRASO_M0,
+	w.ATRASO_M1,
+	x.dtprimeirovencimento,
+	'FLEX' AS SISTEMA,
+
+    CASE
+		WHEN x.nudiasatraso <= 0 THEN 'a. Em dia'
+		WHEN x.nudiasatraso BETWEEN 1 AND 4 THEN 'b. 1 a 5'
+		WHEN x.nudiasatraso BETWEEN 5 AND 30 THEN 'c. 5 a 30'
+		WHEN x.nudiasatraso BETWEEN 31 AND 60 THEN 'd. 31 a 60'
+		WHEN x.nudiasatraso BETWEEN 61 AND 90 THEN 'e. 61 a 90'
+		WHEN x.nudiasatraso BETWEEN 91 AND 150 THEN 'f. 91 a 150'
+        WHEN x.nudiasatraso BETWEEN 91 AND 150 THEN 'g. 91 a 150'
+        WHEN x.nudiasatraso BETWEEN 151 AND 180 THEN 'h. 151 a 180'
+        WHEN x.nudiasatraso BETWEEN 181 AND 210 THEN 'i. 181 a 210'
+        WHEN x.nudiasatraso BETWEEN 211 AND 270 THEN 'j. 211 a 270'
+		ELSE 'k. 271 a 540'
+    END AS FX_ATRASO_M0,
+	V.CDUF,
+    (CAST(x.vrpermanenciaapropriado AS FLOAT64) + CAST(x.vrtaxacontrato AS FLOAT64)) AS SALDO,
+	z.SALDO as SALDO_M1
+FROM
+    bv-pdbd-prd.trusted_stgtxt_flex.tbcontratocontabil AS X
+LEFT JOIN
+    bv-pdbd-prd.dvry_core.tbcontrato AS y ON x.nucontrato = y.cd_contrato
+LEFT JOIN
+    bv-pdbd-prd.trusted_dbcred.tbproposta AS D ON x.nucontrato = d.nucontratogestao
+LEFT JOIN
+	(select distinct a.CDPESSOA, a.CDUF, a.dtinclusao from bv-pdbd-prd.trusted_stgtxt_flex.tbpessoaendereco a inner join (SELECT DISTINCT CDPESSOA, MAX(dtinclusao) AS dtinclusao FROM bv-pdbd-prd.trusted_stgtxt_flex.tbpessoaendereco group by CDPESSOA) b
+										   on a.CDPESSOA = b.CDPESSOA and a.dtinclusao = b.dtinclusao) v ON y.CD_PESSOA = v.CDPESSOA
+LEFT JOIN
+	(SELECT NUCONTRATO,
+	 		sqcontratofinanceiro AS SQCONTRATOFINANCEIRO,
+			nudiasatraso as ATRASO_M1,
+	 		(CAST(vrpermanenciaapropriado AS FLOAT64) + CAST(vrtaxacontrato AS FLOAT64)) AS SALDO
+	 FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+	 WHERE DTPROCESSAMENTO = &DATA_M1.) Z ON x.NUCONTRATO = z.NUCONTRATO AND
+	 										 x.sqcontratofinanceiro = z.sqcontratofinanceiro
+
+LEFT JOIN
+	(SELECT NUCONTRATO,
+	 		sqcontratofinanceiro AS SQCONTRATOFINANCEIRO,
+			nudiasatraso as ATRASO_M1
+	 FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+	 WHERE DTPROCESSAMENTO = &DATA_M_1.) w ON x.NUCONTRATO = w.NUCONTRATO AND
+	 										 x.sqcontratofinanceiro = w.sqcontratofinanceiro
+
+WHERE
+    x.dtprocessamento = &DATA.
+    AND x.nudiasatraso <= 540
+	AND x.dtprocessamentoliquidacao is null
+	AND x.dtprimeirovencimento <= &DATA_M1. 
+    AND CAST(x.cdproduto AS INT64) IN (13)
+    AND (CAST(y.cd_modalidade_produto AS INT64) = 55 OR d.cdsubproduto = 70)
+
+)
+SELECT * FROM QUERY_1
+
+) AS A;
+DISCONNECT FROM PERM;
+
+QUIT;
+
+%MEND;
+%CARTEIRA('2022-12-31',202301,'2023-01-31','2022-11-30');
+%CARTEIRA('2023-01-31',202302,'2023-02-28','2022-12-31');
+%CARTEIRA('2023-02-28',202303,'2023-03-31','2023-01-31');
+%CARTEIRA('2023-03-31',202304,'2023-04-30','2023-02-28');
+%CARTEIRA('2023-04-30',202305,'2023-05-31','2023-03-31');
+%CARTEIRA('2023-05-31',202306,'2023-06-30','2023-04-30');
+%CARTEIRA('2023-06-30',202307,'2023-07-31','2023-05-31');
+%CARTEIRA('2023-07-31',202308,'2023-08-31','2023-06-30');
+%CARTEIRA('2023-08-31',202309,'2023-09-30','2023-07-31');
+%CARTEIRA('2023-09-30',202310,'2023-10-31','2023-08-31');
+%CARTEIRA('2023-10-31',202311,'2023-11-30','2023-09-30');
+%CARTEIRA('2023-11-30',202312,'2023-12-31','2023-10-31');
+
+%CARTEIRA('2023-12-31',202401,'2024-01-31','2023-11-30');
+%CARTEIRA('2024-01-31',202402,'2024-02-29','2023-12-31');
+%CARTEIRA('2024-02-29',202403,'2024-03-31','2024-01-31');
+%CARTEIRA('2024-03-31',202404,'2024-04-30','2024-02-29');
+%CARTEIRA('2024-04-30',202405,'2024-05-31','2024-03-31');
+%CARTEIRA('2024-05-31',202406,'2024-06-30','2024-04-30');
+%CARTEIRA('2024-06-30',202407,'2024-07-31','2024-05-31');
+%CARTEIRA('2024-07-31',202408,'2024-08-31','2024-06-30');
+%CARTEIRA('2024-08-31',202409,'2024-09-30','2024-07-31');
+%CARTEIRA('2024-09-30',202410,'2024-10-31','2024-08-31');
+%CARTEIRA('2024-10-31',202411,'2024-11-30','2024-09-30');
+%CARTEIRA('2024-11-30',202412,'2024-12-31','2024-10-31');
+
+%CARTEIRA('2024-12-31',202501,'2025-01-31','2024-11-30');
+%CARTEIRA('2025-01-31',202502,'2025-02-28','2024-12-31');
+%CARTEIRA('2025-02-28',202503,'2025-03-31','2025-01-31');
+%CARTEIRA('2025-03-31',202504,'2025-04-30','2025-02-28');
+%CARTEIRA('2025-04-30',202505,'2025-05-31','2025-03-31');
+%CARTEIRA('2025-05-31',202506,'2025-06-30','2025-04-30');
+%CARTEIRA('2025-06-30',202507,'2025-07-31','2025-05-31');
+%CARTEIRA('2025-07-31',202508,'2025-08-31','2025-06-30');
+%CARTEIRA('2025-08-31',202509,'2025-09-30','2025-07-31');
+%CARTEIRA('2025-09-30',202510,'2025-10-31','2025-08-31');
+%CARTEIRA('2025-10-31',202511,'2025-11-30','2025-09-30');
+%CARTEIRA('2025-11-30',202512,'2025-12-31','2025-10-31');
+
+%CARTEIRA('2025-12-31',202601,'2026-01-31','2025-11-30');
+
+data carteira_emp;
+set CARTEIRA_TOTAL_:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01.Carteira */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02.Base_Parcelas */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 59 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02.Base_Parcelas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dXcRwmejKdXtaWcY/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+%CONNECT_GCP;
+CREATE TABLE BASE_FPD AS
+SELECT DISTINCT
+
+*
+,CASE WHEN DIAS_REG <= 0 THEN 0 ELSE DIAS_REG END AS DIAS_REG2
+
+,CASE WHEN DIAS_REG <= 0 THEN 0 ELSE 1 END AS FL_ATRASO
+
+,YEAR(dt_vencimento)*100+MONTH(dt_vencimento) AS safra_venc
+
+,YEAR(dt_vencimento+5)*100+MONTH(dt_vencimento+5) AS safra_competencia
+
+,CASE WHEN CALCULATED DIAS_REG2 >= 5 THEN 1 ELSE 0 END AS FL_ENTRADA_COB
+
+FROM CONNECTION TO PERM(
+
+SELECT DISTINCT
+    a.cd_contrato,
+    a.sq_contrato_financeiro,
+    a.dt_vencimento,
+    a.dt_ultimo_recebimento,
+    a.st_parcela,
+    a.vr_parcela,
+	a.nu_parcela,
+	c.saldo,
+	CASE
+        WHEN (a.st_parcela = 'Q' OR a.dt_ultimo_recebimento IS NOT NULL) THEN (DATE_DIFF(a.dt_ultimo_recebimento, a.dt_vencimento, DAY))
+		ELSE 9999 END AS DIAS_REG,
+
+	CASE
+		 WHEN (DATE_DIFF(CURRENT_DATE()-1, e.min_dt_vencimento, DAY))>=5 THEN 1
+	ELSE 0 END AS FL_MATUROU
+
+FROM
+    bv-pdbd-prd.dvry_core.tbparcela A
+
+LEFT JOIN
+	bv-pdbd-prd.dvry_core.tbcontrato AS B ON a.cd_contrato = b.cd_contrato
+LEFT JOIN
+    bv-pdbd-prd.trusted_dbcred.tbproposta AS D ON a.cd_contrato = d.nucontratogestao
+LEFT JOIN
+	(select cd_contrato, sq_contrato_financeiro, sum(vr_parcela) as saldo
+		from bv-pdbd-prd.dvry_core.tbparcela
+	 group by cd_contrato, sq_contrato_financeiro) AS C ON a.cd_contrato = c.cd_contrato and a.sq_contrato_financeiro = c.sq_contrato_financeiro
+LEFT JOIN
+	(select cd_contrato, sq_contrato_financeiro, min(dt_vencimento) as min_dt_vencimento
+		from bv-pdbd-prd.dvry_core.tbparcela
+		group by cd_contrato, sq_contrato_financeiro) AS E ON a.cd_contrato = e.cd_contrato and a.sq_contrato_financeiro = e.sq_contrato_financeiro
+
+WHERE (CAST(b.cd_produto AS INT64) IN (13)
+	  AND (CAST(b.cd_modalidade_produto AS INT64) = 55 OR d.cdsubproduto = 70))
+
+)
+group by
+	cd_contrato,
+    sq_contrato_financeiro
+
+;quit;
+
+PROC SORT DATA= BASE_FPD;
+BY cd_contrato sq_contrato_financeiro safra_competencia DESCENDING FL_ENTRADA_COB;
+RUN;
+
+PROC SORT DATA= BASE_FPD NODUPKEY;
+BY cd_contrato sq_contrato_financeiro safra_competencia;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02.Base_Parcelas */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03.Safras_Propostas */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 59 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03.Safras_Propostas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-HRTE2RKJqBjSR8hN/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+%CONNECT_GCP;
+create table tb_proposta as
+select distinct nucontrato,
+	   TPPESSOA,
+	   CD_CPF_CNPJ AS NUCPFCNPJ,
+
+	   datepart(dtentradaproposta) as dtproposta format date9.,
+	   YEAR(calculated dtproposta)*100+MONTH(calculated dtproposta) AS safra_proposta,
+	   qtdiascarencia
+
+
+from CONNECTION TO PERM (
+		SELECT DISTINCT
+			d.nucontratogestao as nucontrato,
+
+
+			b.CD_CPF_CNPJ,
+			d.dtentradaproposta,
+			g.TPPESSOA,
+			d.qtdiascarencia
+
+		FROM bv-pdbd-prd.trusted_dbcred.tbproposta d
+		LEFT JOIN
+		bv-pdbd-prd.dvry_core.tbcontrato AS B ON D.nucontratogestao = b.cd_contrato
+		LEFT JOIN
+		(select CDPESSOA, TPPESSOA from bv-pdbd-prd.trusted_dbcor.tbpessoa
+		 union all
+		 select CDPESSOA, TPPESSOA from bv-pdbd-prd.trusted_stgtxt_flex.tbpessoa) G ON B.CD_PESSOA = G.CDPESSOA
+
+		WHERE (CAST(b.cd_produto AS INT64) IN (13)
+		  AND (CAST(b.cd_modalidade_produto AS INT64) = 55 OR d.cdsubproduto = 70)) AND d.stproposta = 'AP'
+
+)
+;DISCONNECT FROM PERM;
+QUIT;
+
+PROC SQL;
+create table SOLAR_PRICING as select
+t1.NuContrato,
+t1.NmCanalEstruturaComercial,
+t1.NmAreaEstruturaComercial,
+t1.CdParceiroComercialCoban,
+t1.NmParceiroComercialCoban,
+t3.NmParceiroComercialFavorecido,
+t3.NmParceiroComercial,
+t3.NuCnpjLojaFavorecido,
+t1.dstipocanalproducao,
+		t1.CanalProducaoSolar
+FROM HOMOLOG2.TBPRODUCAO as t1
+left join
+HOMOLOG2.TBPARCEIROCOMERCIAL as t2
+on (t1.CdParceiroComercial = t2.CdParceiroComercial)
+left join
+(select * from HOMOLOG2.TBORIGINACAO where nmgrupoprodutometa = 'Solar') as t3
+on (t1.Nuproposta = t3.Nuproposta)
+WHERE t1.nmgrupoprodutometa = 'Solar'
+and t1.NuContrato is not null;
+RUN;
+
+proc sql;
+create table base_proposta as
+select distinct
+	   input(a.nucontrato, 14.) as nucontrato format 14.
+	  ,a.safra_proposta
+	  ,a.TPPESSOA
+	  ,c.CanalProducaoSolar
+
+
+
+from tb_proposta a
+
+left join SOLAR_PRICING c on input(a.nucontrato,14.) = c.nucontrato
+;quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03.Safras_Propostas */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 05.Consolida */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 59 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 05.Consolida */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-jWqfYyfm5ricBPhd/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE CRUZA_CART_TBPARC AS
+SELECT DISTINCT
+a.NUCONTRATO,
+a.nucpfcnpj,
+a.SQCONTRATOFINANCEIRO,
+a.ATRASO_M0,
+a.dtprimeirovencimento,
+a.SISTEMA,
+a.FX_ATRASO_M0,
+a.SALDO,
+a.SALDO_M1,
+a.safra,
+weekday(b.dt_vencimento) as cd_dia_da_semana,
+a.DIA_VENC,
+a.SALDO_2,
+
+CASE
+		WHEN ATRASO_M0 <= 0 THEN 0
+		WHEN ATRASO_M0 BETWEEN 1 AND 30 THEN 1
+		WHEN ATRASO_M0 BETWEEN 31 AND 60 THEN 2
+		WHEN ATRASO_M0 BETWEEN 61 AND 90 THEN 3
+		WHEN ATRASO_M0 BETWEEN 91 AND 150 THEN 4
+        WHEN ATRASO_M0 BETWEEN 91 AND 150 THEN 5
+        WHEN ATRASO_M0 BETWEEN 151 AND 180 THEN 6
+        WHEN ATRASO_M0 BETWEEN 181 AND 210 THEN 7
+        WHEN ATRASO_M0 BETWEEN 211 AND 270 THEN 8
+		ELSE 9
+    END AS cd_faixa_m0,
+
+CASE
+		WHEN ATRASO_M1 <= 0 THEN 0
+		WHEN ATRASO_M1 BETWEEN 1 AND 30 THEN 1
+		WHEN ATRASO_M1 BETWEEN 31 AND 60 THEN 2
+		WHEN ATRASO_M1 BETWEEN 61 AND 90 THEN 3
+		WHEN ATRASO_M1 BETWEEN 91 AND 150 THEN 4
+        WHEN ATRASO_M1 BETWEEN 91 AND 150 THEN 5
+        WHEN ATRASO_M1 BETWEEN 151 AND 180 THEN 6
+        WHEN ATRASO_M1 BETWEEN 181 AND 210 THEN 7
+        WHEN ATRASO_M1 BETWEEN 211 AND 270 THEN 8
+		ELSE 9
+    END AS cd_faixa_M1,
+
+CASE WHEN CALCULATED cd_faixa_M1 < CALCULATED cd_faixa_M0 THEN 'ROLAGEM'
+	 WHEN CALCULATED cd_faixa_M1 = CALCULATED cd_faixa_M0 THEN 'MANUTENÇÃO'
+	 WHEN CALCULATED cd_faixa_M1 > CALCULATED cd_faixa_M0 THEN 'RETROCESSO'
+	 ELSE 'AVERIGUAR' END AS TIPO_ROLAGEM,
+
+B.DIAS_REG2,
+
+CASE WHEN B.NU_PARCELA = 1 THEN 1 ELSE 0 END AS FL_1PMT,
+CASE WHEN B.DIAS_REG2 >= 5 THEN 1 ELSE 0 END AS FL_ENTRADA_COB,
+
+C.SAFRA_PROPOSTA,
+C.CanalProducaoSolar
+
+FROM carteira_emp A
+
+LEFT JOIN BASE_FPD B ON A.NUCONTRATO = INPUT(B.CD_CONTRATO,14.) AND
+						A.SQCONTRATOFINANCEIRO = B.SQ_CONTRATO_FINANCEIRO AND
+						A.SAFRA = B.safra_competencia
+
+LEFT JOIN base_proposta c on a.nucontrato = c.nucontrato
+
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE CUBO_ENTRADA_NOVO AS
+   SELECT
+		  t1.safra,
+          t1.safra_proposta,
+          t1.FX_ATRASO_M0,
+          t1.FL_ENTRADA_COB,
+          t1.FL_1PMT,
+          t1.cd_dia_da_semana,
+          t1.SISTEMA,
+          t1.CanalProducaoSolar,
+		  t1.TIPO_ROLAGEM,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO,
+          
+            (SUM(t1.SALDO)) AS SUM_of_SALDO,
+          
+            (SUM(t1.SALDO_M1)) AS SUM_of_SALDO_M1,
+			t1.DIA_VENC
+      FROM WORK.CRUZA_CART_TBPARC t1
+
+      GROUP BY
+			   t1.safra,
+               t1.safra_proposta,
+               t1.FX_ATRASO_M0,
+               t1.FL_ENTRADA_COB,
+               t1.FL_1PMT,
+               t1.cd_dia_da_semana,
+               t1.SISTEMA,
+			   t1.TIPO_ROLAGEM,
+               t1.CanalProducaoSolar,
+			   t1.DIA_VENC;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 05.Consolida */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CUBO_ENTRADA_NOVO_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CUBO_ENTRADA_NOVO_0000 AS
+   SELECT t1.safra AS safra_NOVO,
+          t1.NUCONTRATO AS NUCONTRATO_NOVO,
+          t1.FL_ENTRADA_COB AS FL_COB_NOVO,
+          t1.SUM_of_SUM_of_SALDO AS SALDO_NOVO,
+          t2.SAFRA_COB AS SAFRA_ANTIGO,
+          t2.Nucontrato AS Nucontrato_ANTIGO,
+          t2.ENTRADA_COBRANCA AS FL_COB_ANTIGO,
+          t2.SUM_of_SALDO AS SALDO_ANTIGO
+      FROM WORK.QUERY_FOR_CUBO_ENTRADA_NOVO t1
+           FULL JOIN KAUE.VALIDA_ENTRADA_NOVO t2 ON (t1.NUCONTRATO = t2.Nucontrato);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CRUZA_CART_TBPARC);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CRUZA_CART_TBPARC AS
+   SELECT t1.safra,
+          t1.safra_proposta,
+          t1.FX_ATRASO_M0,
+          t1.FL_ENTRADA_COB,
+          t1.FL_1PMT,
+          t1.cd_dia_da_semana,
+          t1.SISTEMA,
+          t1.CanalProducaoSolar,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO,
+          
+            (SUM(t1.SALDO)) AS SUM_of_SALDO,
+          
+            (SUM(t1.SALDO_M1)) AS SUM_of_SALDO_M1
+      FROM WORK.CRUZA_CART_TBPARC t1
+      GROUP BY t1.safra,
+               t1.safra_proposta,
+               t1.FX_ATRASO_M0,
+               t1.FL_ENTRADA_COB,
+               t1.FL_1PMT,
+               t1.cd_dia_da_semana,
+               t1.SISTEMA,
+               t1.CanalProducaoSolar;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_INAD);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_INAD AS
+   SELECT t1.safra_proposta,
+          t1.safra_venc,
+          t1.FL_MATUROU,
+          t1.DIAS_REG,
+          t1.FL_ATRASO,
+          t1.cd_dia_da_semana,
+          
+            (SUM(t1.saldo)) AS SALDO,
+          
+            (SUM(t1.vr_parcela)) AS VR_PARCELA,
+          
+            (COUNT(t1.nucontrato)) AS QTD
+      FROM WORK.BASE_INAD t1
+      GROUP BY t1.safra_proposta,
+               t1.safra_venc,
+               t1.FL_MATUROU,
+               t1.DIAS_REG,
+               t1.FL_ATRASO,
+               t1.cd_dia_da_semana;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPRODUCAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBPRODUCAO AS
+   SELECT DISTINCT t1.NmGrupoProdutoMeta
+      FROM HOMOLOG2.TBPRODUCAO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBORIGINACAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBORIGINACAO AS
+   SELECT t1.NuProposta,
+          
+            (COUNT(t1.NuProposta)) AS COUNT_of_NuProposta
+      FROM HOMOLOG2.TBORIGINACAO t1
+      GROUP BY t1.NuProposta;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBORIGINACAO_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBORIGINACAO_0000 AS
+   SELECT DISTINCT t1.NmGrupoProdutoMeta
+      FROM HOMOLOG2.TBORIGINACAO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_PROPOSTA);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_PROPOSTA AS
+   SELECT t1.safra_proposta,
+          t1.CanalProducaoSolar,
+          
+            (COUNT(t1.nucontrato)) AS COUNT_of_nucontrato
+      FROM WORK.BASE_PROPOSTA t1
+      WHERE t1.CanalProducaoSolar IS MISSING
+      GROUP BY t1.safra_proposta,
+               t1.CanalProducaoSolar;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 012 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CRUZA_CART_TBPARC1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CRUZA_CART_TBPARC1 AS
+   SELECT t1.safra,
+          t1.NUCONTRATO,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO
+      FROM WORK.CRUZA_CART_TBPARC t1
+      GROUP BY t1.safra,
+               t1.NUCONTRATO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 012 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 013 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CUBO_ENTRADA_NOVO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CUBO_ENTRADA_NOVO AS
+   SELECT t1.safra,
+          t1.NUCONTRATO,
+          t1.FL_ENTRADA_COB,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO,
+          
+            (SUM(t1.SUM_of_SALDO)) AS SUM_of_SUM_of_SALDO
+      FROM WORK.CUBO_ENTRADA_NOVO t1
+      WHERE t1.FX_ATRASO_M0 = 'a. Em dia'
+      GROUP BY t1.safra,
+               t1.NUCONTRATO,
+               t1.FL_ENTRADA_COB;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 013 */
+/* =========================FIM TASK=========================== */

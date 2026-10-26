@@ -1,0 +1,296 @@
+START_METADATA
+PROJECT: Rodas__cupons-solar
+FILE_SAS: 01-cupons-solar.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 226
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], DBCOR.DBO.TBFILIAL [DBCON], DBCOR.DBO.TBGRUPOCONDICAOPRECO [DBCON], DBCOR.DBO.TBGRUPOCONDICAOPRECOPRCROCMRCL [DBCON], DBCOR.DBO.TBGRUPOCONDICAOPRECOTBLAFNCMO [DBCON], DBCOR.DBO.TBREGIAO [DBCON], DBCOR.TBCAMPANHACUPOM [DBCON], DBCOR.TBCONTROLEUTILIZACAOCUPOM [DBCON], DBCOR.TBPARAMETROCAMPANHACUPOM [DBCON], DBCOR.TBPARCEIROCOMERCIAL [DBCON], DBCOR.TBTABELAFINANCIAMENTO [DBCON], DBCRED.TBPROPOSTA [DBCON], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBCONTROLEUTILIZACAOCUPOM [PROC EXPORT - DATA=], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], BASES.TBTABELASOLAR [PROC EXPORT - DATA=], DBCOR.DBO.TBFILIAL [Pass-Through Native (DBCON) - FROM], DBCOR.DBO.TBGRUPOCONDICAOPRECO [Pass-Through Native (DBCON) - FROM], DBCOR.DBO.TBGRUPOCONDICAOPRECOPRCROCMRCL [Pass-Through Native (DBCON) - FROM], DBCOR.DBO.TBGRUPOCONDICAOPRECOTBLAFNCMO [Pass-Through Native (DBCON) - FROM], DBCOR.DBO.TBREGIAO [Pass-Through Native (DBCON) - FROM], DBCOR.TBCAMPANHACUPOM [Pass-Through Native (DBCON) - FROM], DBCOR.TBCONTROLEUTILIZACAOCUPOM [Pass-Through Native (DBCON) - JOIN], DBCOR.TBPARAMETROCAMPANHACUPOM [Pass-Through Native (DBCON) - JOIN], DBCOR.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - FROM], DBCOR.TBTABELAFINANCIAMENTO [Pass-Through Native (DBCON) - FROM], DBCRED.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], TMP.TBORIGINACAO [PROC SQL - JOIN], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASES.TBCONTROLEUTILIZACAOCUPOM, BASES.TBTABELASOLAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBCONTROLEUTILIZACAOCUPOM, BASES.TBTABELASOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbControleUtilizacaoCupom.csv, /riscosbvf/BA/processos/output/TbTabelaSolar.csv
+TEMP/DISCARDED OUTPUTS: BASETBCONTROLECUPOM, BASETBTABELASOLAR, BASE_FILIAL_SOLAR, TBPRODUCAO_SOLAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/*Gera a base de Cupons utilizados e disponíveis no Canal Solar*/
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=CTR);
+CREATE TABLE BaseTbControleCupom AS
+SELECT * FROM connection to dbcon
+(
+SELECT Distinct
+D.CdParametroCampanhaCupom,
+D.NmParametroCampanhaCupom,
+D.CdSubProduto,
+D.DtInicioVigencia,
+D.DtFimVigencia,
+B.CdCampanhaCupom,
+B.NmCampanhaCupom,
+B.QtMaximaUtilizacaoCupom,
+B.QtCupomUtilizado,
+B.FlAtivo,
+A.NuProposta,
+C.DtEntradaProposta,
+C.CdTabelaFinanciamento,
+C.txFinanciamento,
+C.vrProposta
+FROM DBCOR..TbCampanhaCupom B
+Left JOIN DBCOR..TbControleUtilizacaoCupom A ON B.CdCampanhaCupom = A.CdCampanhaCupom
+Left JOIN DBCRED..TbProposta C ON A.NuProposta = C.NuProposta
+Left JOIN DBCOR..TbParametroCampanhaCupom D ON B.CdParametroCampanhaCupom = D.CdParametroCampanhaCupom
+)
+;Run;
+
+/*Código e nome das Filiais do Solar*/
+Proc Sql;
+Create Table Base_Filial_Solar as
+Select distinct CdFilialC, NmAreaEstruturaComercialC, NmSubEstruturaComercialC, DsLoginN2C, DsLoginN3C
+From Bases.TbParceiroComercial
+Where TpAtividade = 7 and NmCanalEstruturaComercialC = 'Canal Solar'
+;Quit;
+
+Proc Sql;
+Create Table BASES.TbControleUtilizacaoCupom as
+Select Distinct
+Cupom.CdParametroCampanhaCupom,
+Cupom.NmParametroCampanhaCupom,
+Cupom.CdSubProduto,
+((YEAR(DatePart(Cupom.DtInicioVigencia)) * 100) + MONTH(DatePart(Cupom.DtInicioVigencia))) AS NuAnoMes,
+Compress(put(today(),ddmmyy10.)) as DtAtualizacao,
+DatePart(Cupom.DtInicioVigencia) as DtInicioVigencia Format ddmmyy10.,
+DatePart(Cupom.DtFimVigencia) as DtFimVigencia Format ddmmyy10.,
+Cupom.CdCampanhaCupom,
+Cupom.NmCampanhaCupom,
+Case
+	When Orig.NmAreaEstruturaComercial NE '' Then Orig.CdFilialC
+	Else Input(substr(Cupom.NmCampanhaCupom, 1, 3),8.)
+End as CdFilial,
+Cupom.QtMaximaUtilizacaoCupom,
+Case
+	When Cupom.QtCupomUtilizado > Cupom.QtMaximaUtilizacaoCupom Then Cupom.QtMaximaUtilizacaoCupom
+	Else Cupom.QtCupomUtilizado
+End as QtCupomUtilizado,
+Cupom.NuProposta,
+DatePart(Cupom.DtEntradaProposta) as DtEntradaProposta Format ddmmyy10.,
+Cupom.CdTabelaFinanciamento,
+Cupom.txFinanciamento,
+Cupom.vrProposta format COMMAX.2,
+Orig.NuContratoGestao as NuContrato,
+Orig.DtStatusProposta as DtContrato,
+Orig.NmGrupoProdutoMeta,
+/*Orig.NmSubEstruturaComercialA,*/
+Case
+	When Orig.NmSubEstruturaComercialA Ne '' Then Orig.NmSubEstruturaComercialA
+	Else Filial.NmSubEstruturaComercialC
+End as NmSubEstruturaComercialA,
+Case
+	When Orig.NmAreaEstruturaComercial Ne '' Then Orig.NmAreaEstruturaComercial
+	Else Filial.NmAreaEstruturaComercialC
+End as NmAreaEstruturaComercial,
+/*Orig.NmAreaEstruturaComercial,*/
+Orig.NmColaborador,
+Orig.DsLoginN1,
+Orig.NmColaboradorC,
+Orig.DsLoginN1C,
+Case
+	When Orig.NmAreaEstruturaComercialC Ne '' Then Orig.NmAreaEstruturaComercialC
+	Else Filial.NmAreaEstruturaComercialC
+End as NmAreaEstruturaComercialC,
+/*Orig.NmAreaEstruturaComercialC,*/
+Orig.DsLoginN2C,
+/*Orig.NmSubEstruturaComercialC,*/
+Case
+	When Orig.NmSubEstruturaComercialC Ne '' Then Orig.NmSubEstruturaComercialC
+	Else Filial.NmSubEstruturaComercialC
+End as NmSubEstruturaComercialC,
+Orig.DsLoginN3C,
+Orig.LstSubstituicaoC,
+Orig.NuCnpjLojaFavorecido,
+Orig.NmParceiroComercialFavorecido,
+Orig.CanalProducaoSolar,
+Orig.NuCnpjLoja,
+Orig.CdParceiroComercial,
+Orig.NmParceiroComercial,
+Orig.NmPessoa,
+Orig.TpPessoa,
+Orig.CdUfPessoa,
+Orig.NmCidadePessoa,
+Orig.FxScoreFim,
+Case When Orig.StProposta = "AP" Then Orig.VrLiberado Else 0 End as VrProducao format COMMAX12.2,
+Orig.StProposta,
+1 as QtdCupons
+
+From BaseTbControleCupom as Cupom
+Left Join tmp.TbOriginacao as Orig on Cupom.NuProposta = Orig.NuProposta
+Left Join Base_Filial_Solar as Filial on Input(substr(Cupom.NmCampanhaCupom, 1, 3),8.) = Filial.CdFilialC
+;Quit;
+
+/*/riscosbvf/BA/processos/output*/
+
+proc export
+data=BASES.TbControleUtilizacaoCupom
+file='/riscosbvf/BA/processos/output/TbControleUtilizacaoCupom.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=CTR);
+CREATE TABLE BaseTbTabelaSolar AS
+SELECT * FROM connection to dbcon
+(
+SELECT
+a.CdParceiroComercial,
+e.NmFantasia,
+a.CdGrupoCondicaoPreco,
+c.NmGrupoCondicaoPreco,
+b.CdTabelaFinanciamento,
+d.DsTabela,
+g.CdFilial,
+g.DsFilial,
+d.DtInicioVigencia,
+d.DtExpiracao
+
+FROM
+DBCOR.dbo.TbGrupoCondicaoPrecoPrcroCmrcl a,
+DBCOR.dbo.TbGrupoCondicaoPrecoTblaFncmo b,
+DBCOR.dbo.TbGrupoCondicaoPreco c,
+DBCOR..TbTabelaFinanciamento d,
+DBCOR..TbParceiroComercial e,
+DBCOR.dbo.TbRegiao f,
+DBCOR.dbo.TbFilial g
+
+WHERE a.CdGrupoCondicaoPreco = b.CdGrupoCondicaoPreco
+AND a.CdGrupoCondicaoPreco = c.CdGrupoCondicaoPreco
+AND a.FlAtivo = 'S'
+AND b.CdTabelaFinanciamento = d.CdTabelaFinanciamento
+AND a.CdParceiroComercial = e.CdParceiroComercial
+/*AND a.CdParceiroComercial IN (399046)*/
+AND c.FlEmprestimo = 's'
+AND e.CdRegiao = f.CdRegiao
+AND f.CdFilial = g.CdFilial
+)
+;Run;
+
+Proc Sql;
+Create Table TbProducao_Solar as
+Select
+NuAnomes
+,NuProposta
+,NmSubEstruturaComercialC
+,NmAreaEstruturaComercialC
+,NmColaboradorC
+,DsLoginN1C
+,DsLoginN2C
+,DsLoginN3C
+,NmGrupoProdutoMeta
+,NuCnpjLojaFavorecido
+,NmParceiroComercialFavorecido
+,CanalProducaoSolar
+,CdParceiroComercial
+,NmParceiroComercial
+,CdTabelaFinanciamento
+,DtAtualizacao
+,Count(NuProposta) as Qtd_Proposta
+,Sum(VrProducao) as VrProducao
+,Sum(QtSeguros) as QtSeguros
+,Sum(FlBVMais) as FlBVMais
+,Sum(FlCap) as FlCap
+,Sum(VrSeguros) as VrSeguros
+,Sum(VrBVMais) as VrBVMais
+,Sum(VrCap) as VrCap
+
+From tmp.TbProducao Where NmGrupoProdutoMeta = 'Solar' and NuAnomes >= 202407
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+;Quit;
+
+Proc Sql;
+Create Table BASES.TbTabelaSolar as
+Select Distinct
+Prod.NuProposta
+,Prod.CdParceiroComercial
+,Prod.NmParceiroComercial
+,Prod.CdTabelaFinanciamento
+,Prod.NuCnpjLojaFavorecido
+,Prod.NmColaboradorC
+,Prod.NmAreaEstruturaComercialC
+,Prod.NmSubEstruturaComercialC
+,Prod.DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+
+,Tab.CdGrupoCondicaoPreco
+,Tab.NmGrupoCondicaoPreco
+,Tab.DsTabela
+,((YEAR(DatePart(Tab.DtInicioVigencia)) * 100) + MONTH(DatePart(Tab.DtInicioVigencia))) AS NuAnoMes
+,DatePart(Tab.DtInicioVigencia) as DtInicioVigencia Format ddmmyy10.
+,DatePart(Tab.DtExpiracao) as DtExpiracao Format ddmmyy10.
+
+,Case When Tab.CdTabelaFinanciamento = '' Then 'Não' Else 'Sim' End as Tabela_Campanha
+
+,Sum(Qtd_Proposta) as Qtd_Proposta
+,Sum(VrProducao) as VrProducao
+,Sum(QtSeguros) as QtSeguros
+,Sum(FlBVMais) as FlBVMais
+,Sum(FlCap) as FlCap
+,Sum(VrSeguros) as VrSeguros
+,Sum(VrBVMais) as VrBVMais
+,Sum(VrCap) as VrCap
+
+From TbProducao_Solar as Prod
+Left Join BaseTbTabelaSolar as Tab ON Prod.CdParceiroComercial = Tab.CdParceiroComercial and
+		  Prod.CdTabelaFinanciamento = Tab.CdTabelaFinanciamento
+
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
+;Quit;
+
+proc export
+data=BASES.TbTabelaSolar
+file='/riscosbvf/BA/processos/output/TbTabelaSolar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

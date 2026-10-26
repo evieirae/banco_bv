@@ -1,0 +1,194 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 010-consolidado-rito.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 121
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAtCetip, safraM0, safraM12
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBCLASSIFICACAORISCOSPDVS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], INPO.TBINSIGHTS [SAS/Local], TBAGGREGATED [DBCON], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBCLASSIFICACAORISCOSPDVS, WORK.TBDIASUTEIS, WORK.TBPORTE
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBCLASSIFICACAORISCOSPDVS, WORK.TBDIASUTEIS, WORK.TBPORTE
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCLASSIFICACAORISCOSPDVS [PROC SORT - DATA=], BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], INPO.TBINSIGHTS [PROC SORT - DATA=], TBAGGREGATED [Pass-Through Native (DBCON) - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPOTENCIALRODAS [PROC SQL - FROM], WORK.TBCLASSIFICACAORISCOSPDVS [PROC SQL - JOIN], WORK.TBDIASUTEIS [PROC SQL - JOIN], WORK.TBPORTE [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBCLASSIFICACAORISCOSPDVS, TBDIASUTEIS, TBINSIGHTS, TBPORTE, TBRITOFINAL, TBRITOUNION
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+  CREATE TABLE TbRitoUnion AS
+    SELECT * FROM TbRitoPDV_A001
+    OUTER UNION CORRESPONDING
+    SELECT * FROM TbRitoPDV_B002
+    OUTER UNION CORRESPONDING
+    SELECT * FROM TbRitoPDV_C001
+    OUTER UNION CORRESPONDING
+    SELECT * FROM TbRitoPDV_D001
+;
+RUN;
+
+/*Calcula dia uteis*/
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDiasUteis AS
+SELECT * FROM connection to dbcon
+(
+  WITH TbTempoData AS (
+    SELECT
+      NuAnoMes,
+      DtTempo,
+      CASE WHEN FlDiaUtil = 'S' AND FlFeriadoNacional = 'N' THEN 1 ELSE 0 END AS FlDiaUtil,
+      CASE WHEN SgDiaSemana = 'SAB' AND FlFeriadoNacional = 'N' THEN 0.4 ELSE 0 END AS FlSabUtil
+    FROM DWBI_DIME.TbDimTempoData
+  ),
+  TbAggregated AS (
+    SELECT
+      NuAnoMes,
+      SUM(FlDiaUtil) AS SumDiaUtil,
+      SUM(FlSabUtil) AS SumSabUtil,
+      SUM(CASE WHEN DtTempo < TODAY() THEN FlDiaUtil + FlSabUtil ELSE 0 END) AS SumDiaUtilPrd
+    FROM TbTempoData
+    WHERE
+      NuAnoMes >= &safraM12.
+      AND NuAnoMes <= &safraM0.
+    GROUP BY NuAnoMes
+  )
+  SELECT
+    NuAnoMes,
+    SumDiaUtil + SumSabUtil AS TotalDiaUtil,
+    SumDiaUtilPrd AS TotalDiaUtilPrd
+  FROM TbAggregated
+);
+RUN;
+
+/*Base de Porte*/
+
+PROC SQL;
+CREATE TABLE TbPorte AS
+  SELECT
+    CdParceiroComercial,
+    FlPorteA AS Porte,
+	NmTipoParceiroComercial as TipoParceiro
+  FROM TMP.TBPOTENCIALRODAS
+  WHERE
+    CdParceiroComercial <> .
+    AND FlPorteA IS NOT NULL
+  ORDER BY
+    CdParceiroComercial,
+    NuAnoMes DESC;
+RUN;
+
+PROC SORT DATA=TbPorte NODUPKEY;
+BY CdParceiroComercial;
+RUN;
+
+/*BAse de classificacao de riscos*/
+
+proc sort data=basegrc.TbClassificacaoRiscosPDVs  nodupkey out=TbClassificacaoRiscosPDVs (keep=CdLoja ClassFinal);
+    by CdLoja;
+run;
+
+/*BAse de Insight*/
+
+proc sort data=inpo.TBINSIGHTS out=TBINSIGHTS ;
+by descending Data
+;run;
+
+proc sort data=TBINSIGHTS nodupkey;
+by PDV
+;run;
+
+/*Base com join finais*/
+
+PROC SQL;
+CREATE TABLE TbRitoFinal AS
+  SELECT
+		A.*
+
+		,cats(B.CdParceiroComercial,'-',B.NmParceiroComercial) as NmParceiroComercial
+		,put(today(),date9.) 		as DtAtualizacao
+		,&DtAtCetip. format date9.	as DtAtualizacaoCetip
+		,Focal.LstColaboradorFocal
+		,Sub.LstSubstituicao
+		,B.NmColaboradorC
+		,B.NmAreaEstruturaComercialC
+		,B.NmSubEstruturaComercialC
+		,cat(strip(B.DsLoginN1C),'@bv.com.br') as EmailDsLoginN1C
+		,cat(strip(B.DsLoginN2C),'@bv.com.br') as EmailDsLoginN2C
+		,cat(strip(B.DsLoginN3C),'@bv.com.br') as EmailDsLoginN3C
+		,B.DsLoginN1C
+		,B.DsLoginN2C
+		,B.DsLoginN3C
+		,B.NmTipoParceiroComercial as TipoParceiro
+		,coalesce(C.Porte,'Sem Porte') as Porte
+		,D.TotalDiaUtil as TotalDiaUtil FORMAT=num8.2
+		,D.TotalDiaUtilPrd as TotalDiaUtilPrd FORMAT=num8.2
+		,coalesce(E.ClassFinal,'Sem Classificação')  as DsClassificacaoRiscos
+		,ins.Agrupamento as Insights
+
+FROM TbRitoUnion AS A
+  	left join tmp.TBPARCEIROCOMERCIAL as B
+		on b.CdParceiroComercial = a.CdParceiroComercial
+
+	LEFT JOIN WORK.TBPORTE C
+		ON A.CDPARCEIROCOMERCIAL = C.CDPARCEIROCOMERCIAL
+
+	LEFT JOIN WORK.TbDiasUteis D
+		ON A.NuAnoMes = D.NuAnoMes
+
+	LEFT JOIN WORK.TbClassificacaoRiscosPDVs E
+		ON A.CDPARCEIROCOMERCIAL = E.CdLoja
+
+	left join basegrc.TbColaboradorFocal as Focal
+/*		on B.NmAreaEstruturaComercialC = Focal.NmAreaEstruturaComercial*/
+		on B.CdfilialC = Focal.Cdfilial
+		and Focal.NmGrupoProdutoMeta = 'Leves'
+	/*	and Focal.NmCanalEstruturaComercial = 'Canal Veiculos' */
+
+	left join bases.TbEStruturaComercial as Sub
+		on B.NmAreaEstruturaComercialC = Sub.NmAreaEstruturaComercial
+		and B.NmColaboradorC = Sub.NmColaborador
+/*		and Sub.NmCanalEstruturaComercial = 'Canal Veiculos'*/
+		and Sub.NuAnoMes = &safraM0.
+
+	left join TBINSIGHTS as ins
+		on a.cdparceirocomercial = ins.PDV
+
+	Where b.NmSubEstruturaComercialC = 'Canal de Negócios'
+ ;RUN;

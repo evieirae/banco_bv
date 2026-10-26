@@ -1,0 +1,547 @@
+START_METADATA
+PROJECT: SAS_UC4__tbcetipconversao
+FILE_SAS: tbcetipconversao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:52 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -61
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (3x | +240), PROC FORMAT (1x | +25), %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 419
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: FORMAT, SORT, SQL
+HAS_DATA_STEP: Yes (9x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: AnoMesDia, W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], DADOSCONVERSAO [DBCON], DBA.TBLOJA [DBCON], DBA.TBPESSOASOBANALISE [DBCON], DBA.TBPROPOSTA [DBCON], DBA.TBSUBPRODUTO [DBCON], DWBI_DTWH.TBAGENTEMIS [DBCON], DWBI_DTWH.TBCONVERSAO [DBCON], TBNUCPFCNPJ [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBCETIPCONVERSAOENVIO [DATA Step - UPDATE; PROC SORT - DATA=; PROC SQL - FROM], BASES.TBCETIPCONVERSAORETORNO [DATA Step - UPDATE; PROC SQL - JOIN], DADOSCONVERSAO [Pass-Through Native (DBCON) - FROM], DBA.TBLOJA [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBA.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBAGENTEMIS [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBCONVERSAO [Pass-Through Native (DBCON) - FROM], TBNUCPFCNPJ [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/CarregamentoCNPJ_CETIP_&amp;AnoMesDia..TXT, /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/Carregamento_CETIP_&amp;AnoMesDia..TXT, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASES.TBCETIPCONVERSAOENVIO, BASES.TBCETIPCONVERSAORETORNO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBCETIPCONVERSAO, BASES.TBCETIPCONVERSAOENVIO, BASES.TBCETIPCONVERSAORETORNO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/CarregamentoCNPJ_CETIP_&AnoMesDia..TXT, /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/Carregamento_CETIP_&AnoMesDia..TXT
+TEMP/DISCARDED OUTPUTS: DTATUALIZACAOCETIP, TBAGENTE, TBARQUIVOS, TBCETIPCONVERSAOENVIO, TBCETIPCONVERSAOENVIOCNPJ, TBCETIPCONVERSAORETORNO
+DYNAMIC REFS (Ambiguous): {ANOMESDIA}.TXT
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (sas: 2, txt: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/Carregamento_CETIP_&amp;AnoMesDia..TXT
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/CarregamentoCNPJ_CETIP_&amp;AnoMesDia..TXT
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO TbCetipConversao.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	TbCetipConversao.sas												| */
+/* |	Descricao: 	Programa para extrair informacoes de propostas 'CA','N','A','PA'	| */
+/* |	para Conversão no site da Cetip	e encontrar as propostas pagas no mercado		| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableau utilizados pela		| */
+/* |				area comercial.														| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de MIS Varejo						| */
+/* |	Criador: 	Carlos Makoto - MIS Varejo											| */
+/* |	Data:		25/11/2020															| */
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* |	Atualização:	atualizado a base 'TbCetipConversaoRetorno'	e'TbArquivos'
+						para buscar data no nome do arquivoa apenas dos R_901			| */
+/* |	Resp: 		Gustavo Domingues													| */
+/* |	Data:		18/08/2022															| */
+/* ====================================================================================== */
+/* |	Atualização:	Incluido coluna do "c6" na bases.TbCetipConversao				| */
+/* |	Resp: 		Gustavo Domingues													| */
+/* |	Data:		18/10/2022															| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+option compress = binary;
+options validvarname=any  fullstimer notes  mprint mlogic symbolgen ;
+
+/***********************************************************/
+/* Caminho dos programas de libnames, conexões e parmetros */
+/***********************************************************/
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+DATA _NULL_;
+dt = today();
+call symput('AnoMesDia', put(dt, yymmddn8.));
+;run;
+
+proc format;
+picture hora
+other = '%0H%0M%0S' (datatype=time);
+run;
+
+/* ======================================================== */
+/* ================== Extracao IQPRDBI ==================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+CREATE TABLE  TbCetipConversaoRetorno AS
+SELECT * FROM connection to dbcon
+(
+    WITH DadosConversao AS (
+      SELECT
+        *,
+        CASE WHEN NmArquivo LIKE 'R_901%' THEN CAST(substring(replace(nmarquivo,' ',''),7,8) AS DATE) END AS DtArquivo
+      FROM DWBI_DTWH.TbConversao
+    )
+    SELECT DISTINCT
+         CdTipoRegistro as tp_registro
+        ,CdTipoDocumento as tp_documento
+        ,NuCpfCnpj as cpf_cliente
+        ,NuCnpjLoja as cnpj_loja
+        ,VrAprovado as vl_aprov
+        ,DtInclusaoGravame as dt_gravame
+        ,DtContrato as dt_contrato
+        ,DsMarcaModelo as marca_modelo
+        ,DtAnoModelo as anomodelo
+        ,DtAnoFabricacao as anofabricacao
+        ,NuPrazoOperacao as qt_parcela
+        ,CdFipe as cod_fipe
+        ,VrFipe as vlfipe
+        ,lpad(NufaixaVrAprovado,4,0) as fx_vl_aprovado
+        ,NuCnpjAgenteFinanceiro as cnpj_agfin
+        ,NmAgenteFinanceiro as nm_ag_fin
+        ,StPagoLoja as pgto_loja
+/*        ,CAST(trim(CdTipoRegistro)*/
+/*       ||trim(str(CdTipoDocumento,1,0))*/
+/*       ||trim(lpad(NuCpfCnpj,14,0))*/
+/*       ||trim(lpad(NuCnpjLoja,14,0))*/
+/*       ||trim(lpad(CAST(VrAprovado AS INTEGER),10,0)) AS VARCHAR(40)) AS chave*/
+/*       ,NmArquivo*/
+    FROM DadosConversao
+    WHERE NmAgenteFinanceiro IS NOT NULL
+      AND DtArquivo >= today()-30
+/*  ORDER BY chave,cnpj_agfin*/
+)
+;RUN;
+
+data TbCetipConversaoRetorno;
+set TbCetipConversaoRetorno;
+format chave $53. ;
+chave = compress(tp_registro||put(tp_documento,1.)||put(cpf_cliente,z14.)||put(cnpj_loja,z14.)||put(vl_aprov,z10.));
+run;
+
+proc sort data=TbCetipConversaoRetorno;
+by chave cnpj_agfin;
+run;
+
+data bases.TbCetipConversaoRetorno;
+   update
+		bases.TbCetipConversaoRetorno
+		TbCetipConversaoRetorno
+   ;by chave cnpj_agfin;
+run;
+
+/* ======================================================== */
+/* ================= Extracao PTAIQCOUNT ================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+CREATE TABLE TbCetipConversaoEnvio AS
+SELECT * FROM connection to dbcon
+(
+	WITH TbNuCpfCnpj AS
+	(
+		SELECT DISTINCT
+			 PessoaSobAnalise.NuCpfCnpj
+		FROM DBA.TbProposta Proposta
+
+			INNER JOIN DBA.TbPessoaSobAnalise PessoaSobAnalise
+				ON  Proposta.NuProposta = PessoaSobAnalise.NuProposta
+				AND PessoaSobAnalise.CdPapel = 1
+
+			INNER JOIN DBA.TbSubProduto SubProduto
+				ON  Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+		WHERE SubProduto.CdProduto = 12 /* CDCCG */
+		  AND Proposta.StProposta IN ('AP')
+		  AND DtStatusProposta >= dateadd(day,-30,today())
+		  AND DtStatusProposta  < today()
+	)
+
+	SELECT
+		 Proposta.NuProposta
+		,Proposta.CdTabelaFinanciamento
+		,Proposta.PcEntrada
+		,Proposta.QtParcelas
+		,PessoaSobAnalise.NuCpfCnpj
+		,coalesce(Loja.NuCpfCnpj,'00000000000000') AS NuCnpjLoja
+		,Proposta.VrFinanciamento
+		,Proposta.StProposta
+		,date(Proposta.DtEntradaProposta) as DtEntradaProposta
+		,today() as DtProcessamento
+	FROM DBA.TbProposta Proposta
+
+		INNER JOIN DBA.TbPessoaSobAnalise PessoaSobAnalise
+			ON  Proposta.NuProposta = PessoaSobAnalise.NuProposta
+			AND PessoaSobAnalise.CdPapel = 1
+
+			LEFT JOIN TbNuCpfCnpj NuCpfCnpj
+				ON PessoaSobAnalise.NuCpfCnpj = NuCpfCnpj.NuCpfCnpj
+
+		INNER JOIN DBA.TbSubProduto SubProduto
+			ON  Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+		LEFT JOIN DBA.TbLoja Loja
+			ON Proposta.CdLoja = Loja.CdLoja
+
+	WHERE SubProduto.CdProduto = 12 /* CDCCG */
+	  AND PessoaSobAnalise.TpPessoa = 'F'
+	  AND Proposta.StProposta IN ('CA','N','A','PA','C')
+	  AND DtStatusProposta >= dateadd(day,-30,today())
+	  AND NuCpfCnpj.NuCpfCnpj IS NULL
+
+)
+;RUN;
+
+/* Separa apenas as propostas mais recentes */
+proc sort data=TbCetipConversaoEnvio;by NuCpfCnpj descending DtEntradaProposta;run;
+proc sort data=TbCetipConversaoEnvio nodupkey;by NuCpfCnpj;run;
+
+proc sql;
+create table TbCetipConversaoEnvio as
+select *
+	,case when DtEntradaProposta >=  '14JUL2021'd and VrFinanciamento < 99999999 then VrFinanciamento*100
+		else VrFinanciamento end as VrFinanciamentoEnvio
+from TbCetipConversaoEnvio
+;run;
+
+/* Cria base para consulta */
+data TbCetipConversaoEnvio;
+set TbCetipConversaoEnvio;
+format chave $53. ;
+chave = compress('D'||'1000'||NuCpfCnpj||NuCnpjLoja||put(VrFinanciamentoEnvio,z10.));
+run;
+
+/* Retira registros já retornados pela CETIP nos últimos 30 dias*/
+proc sql;
+delete from TbCetipConversaoEnvio
+where NuCpfCnpj in
+	(
+		select distinct
+			put(cpf_cliente,z11.)
+		from TbCetipConversaoRetorno
+	)
+;quit;
+
+proc sort data=TbCetipConversaoEnvio;by chave;run;
+proc sort data=TbCetipConversaoEnvio nodupkey;by chave descending DtProcessamento;run;
+
+proc sort data=bases.TbCetipConversaoEnvio;by chave descending DtProcessamento;run;
+
+data bases.TbCetipConversaoEnvio;
+   update
+		bases.TbCetipConversaoEnvio
+		TbCetipConversaoEnvio
+   ;by chave;
+run;
+
+/* ======================================================== */
+/* ================= Extracao PTAIQCOUNT PJ ================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+CREATE TABLE TbCetipConversaoEnvioCNPJ AS
+SELECT * FROM connection to dbcon
+(
+	WITH TbNuCpfCnpj AS
+	(
+		SELECT DISTINCT
+			 PessoaSobAnalise.NuCpfCnpj
+		FROM DBA.TbProposta Proposta
+
+			INNER JOIN DBA.TbPessoaSobAnalise PessoaSobAnalise
+				ON  Proposta.NuProposta = PessoaSobAnalise.NuProposta
+				AND PessoaSobAnalise.CdPapel = 1
+
+			INNER JOIN DBA.TbSubProduto SubProduto
+				ON  Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+		WHERE SubProduto.CdProduto = 12 /* CDCCG */
+		  AND Proposta.StProposta IN ('AP')
+		  AND DtStatusProposta >= dateadd(day,-30,today())
+		  AND DtStatusProposta  < today()
+	)
+
+	SELECT
+		 Proposta.NuProposta
+		,Proposta.CdTabelaFinanciamento
+		,Proposta.PcEntrada
+		,Proposta.QtParcelas
+		,PessoaSobAnalise.NuCpfCnpj
+		,coalesce(Loja.NuCpfCnpj,'00000000000000') AS NuCnpjLoja
+		,Proposta.VrFinanciamento
+		,Proposta.StProposta
+		,date(Proposta.DtEntradaProposta) as DtEntradaProposta
+		,today() as DtProcessamento
+	FROM DBA.TbProposta Proposta
+
+		INNER JOIN DBA.TbPessoaSobAnalise PessoaSobAnalise
+			ON  Proposta.NuProposta = PessoaSobAnalise.NuProposta
+			AND PessoaSobAnalise.CdPapel = 1
+
+			LEFT JOIN TbNuCpfCnpj NuCpfCnpj
+				ON PessoaSobAnalise.NuCpfCnpj = NuCpfCnpj.NuCpfCnpj
+
+		INNER JOIN DBA.TbSubProduto SubProduto
+			ON  Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+		LEFT JOIN DBA.TbLoja Loja
+			ON Proposta.CdLoja = Loja.CdLoja
+
+	WHERE SubProduto.CdProduto = 12 /* CDCCG */
+	  AND PessoaSobAnalise.TpPessoa = 'J'
+	  AND Proposta.StProposta IN ('CA','N','A','PA','C')
+	  AND DtStatusProposta >= dateadd(day,-30,today())
+	  AND NuCpfCnpj.NuCpfCnpj IS NULL
+
+)
+;RUN;
+
+/* Separa apenas as propostas mais recentes */
+proc sort data=TbCetipConversaoEnvioCNPJ;by NuCpfCnpj descending DtEntradaProposta;run;
+proc sort data=TbCetipConversaoEnvioCNPJ nodupkey;by NuCpfCnpj;run;
+
+proc sql;
+create table TbCetipConversaoEnvioCNPJ as
+select *
+	,case when DtEntradaProposta >=  '14JUL2021'd and VrFinanciamento < 99999999 then VrFinanciamento*100
+		else VrFinanciamento end as VrFinanciamentoEnvio
+from TbCetipConversaoEnvioCNPJ
+;run;
+
+/* Cria base para consulta */
+data TbCetipConversaoEnvioCNPJ;
+set TbCetipConversaoEnvioCNPJ;
+format chave $53. ;
+chave = compress('D'||'2'||NuCpfCnpj||NuCnpjLoja||put(VrFinanciamentoEnvio,z10.));
+run;
+
+/* Retira registros já retornados pela CETIP nos últimos 30 dias*/
+proc sql;
+delete from TbCetipConversaoEnvioCNPJ
+where NuCpfCnpj in
+	(
+		select distinct
+			put(cpf_cliente,z14.)
+		from TbCetipConversaoRetorno
+	)
+;quit;
+
+proc sort data=TbCetipConversaoEnvioCNPJ;by chave;run;
+proc sort data=TbCetipConversaoEnvioCNPJ nodupkey;by chave descending DtProcessamento;run;
+
+proc sort data=bases.TbCetipConversaoEnvio;by chave descending DtProcessamento;run;
+
+data bases.TbCetipConversaoEnvio;
+   update
+		bases.TbCetipConversaoEnvio
+		TbCetipConversaoEnvioCNPJ
+   ;by chave;
+run;
+
+/* ======================================================== */
+/* ================= Resultado Conversão ================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table TbArquivos as
+SELECT * FROM connection to dbcon
+(
+    select distinct
+        CASE WHEN NmArquivo LIKE 'R_901%' THEN CAST(substring(replace(nmarquivo,' ',''),7,8) AS DATE) END AS DtArquivo
+        ,NmArquivo
+
+    from DWBI_DTWH.TbConversao
+    where nmarquivo like 'R_901%'
+)
+;RUN;
+
+proc sql;
+create table DtAtualizacaoCetip as
+select
+ 	 max(DtArquivo) as DtAtualizacao format date9.
+	,datetime() as TsProcessamento format datetime20.
+from TbArquivos
+;run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = BI);
+create table TbAgente as
+select * from connection to dbcon
+(
+	SELECT
+		*
+	FROM DWBI_DTWH.TbAgenteMIS
+	WHERE NuCnpjAgente <> 0
+)
+;run;
+
+proc sql;
+create table bases.TbCetipConversao as
+select
+	 CetipEnvio.NuProposta
+	,CetipEnvio.NuCpfCnpj
+	,max(case when Agente.NmSubgrupoAgenteMis = 'BANCO DO BRASIL' then 1 else 0 end) as FlBancoBrasil
+	,max(case when Agente.NmSubgrupoAgenteMis = 'BRADESCO' then 1  else 0 end) as FlBradesco
+	,max(case when Agente.NmSubgrupoAgenteMis = 'ITAU' then 1  else 0 end) as FlItau
+	,max(case when Agente.NmSubgrupoAgenteMis = 'PANAMERICANO' then 1  else 0 end) as FlPan
+	,max(case when Agente.NmSubgrupoAgenteMis = 'SAFRA' then 1  else 0 end) as FlSafra
+	,max(case when Agente.NmSubgrupoAgenteMis = 'SANTANDER' then 1  else 0 end) as FlSantander
+	,max(case when Agente.NmSubgrupoAgenteMis = 'C6' then 1  else 0 end) as FlC6
+	,max(case when Agente.NmGrupoAgenteMIS    = 'MONTADORAS' then 1  else 0 end) as FlMontadoras
+	,max(case when Agente.NmGrupoAgenteMIS   <> 'MONTADORAS' and Agente.NmSubGrupoAgenteMIS not in ('BV','C6','BANCO DO BRASIL','BRADESCO','ITAU','PANAMERICANO','SAFRA','SANTANDER') then 1  else 0 end) as FlOutros
+	,max(1) as FlConcorrente
+	,min(CetipRetorno.pgto_loja) as pgto_loja
+	,DtAtualizacao.DtAtualizacao
+	,DtAtualizacao.TsProcessamento
+
+from  bases.TbCetipConversaoEnvio CetipEnvio
+
+	left join DtAtualizacaoCetip DtAtualizacao
+		on  1=1
+
+	inner join bases.TbCetipConversaoRetorno CetipRetorno
+		on  CetipEnvio.chave = CetipRetorno.chave
+
+		inner join TbAgente Agente
+			on  CetipRetorno.cnpj_agfin = Agente.NuCNPJAgente
+
+where Agente.NmSubgrupoAgenteMis <> 'BV'
+group by
+	 CetipEnvio.NuProposta
+	,DtAtualizacao.DtAtualizacao
+	,DtAtualizacao.TsProcessamento
+	,CetipEnvio.NuCpfCnpj
+order by
+	 CetipEnvio.NuProposta
+;run;
+
+/* ======================================================== */
+/* ================== Exportação Arquivo ================== */
+/* ======================================================== */
+
+data _null_;
+set TbCetipConversaoEnvio end=eof nobs=QtRegistros;
+file "/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/Carregamento_CETIP_&AnoMesDia..TXT" lrecl=9999 termstr=crlf;
+
+DtArquivo = today();
+HrArquivo = put(time(), hora.);
+
+/* Header */
+if _n_ eq 1 then do;
+	put	@1 'H'
+		@2 'E'
+		@3 'GRME'
+		@8  '00001'
+		@13 '000000000000901'
+		@28 '0001'
+		@32 '2020GDDS'
+	    @40 DtArquivo yymmddn8.
+	    @48 HrArquivo;
+end;
+
+/* Detalhes */
+put
+	@1	'D'
+	@2	'1'
+	@3  '000'
+	@6  NuCpfCnpj
+	@17 NuCnpjLoja
+	@31 VrFinanciamentoEnvio z11.
+	@42 DtEntradaProposta yymmddn8.
+	@50 HrArquivo;
+
+/* Trailer */
+if eof eq 1 then do;
+	put @1   'T' /* TpRegistro */
+	   @2 QtRegistros z6.;
+end;
+
+run;
+
+/* ======================================================== */
+/* ================== Exportação Arquivo CNPJ ================== */
+/* ======================================================== */
+
+data _null_;
+set TbCetipConversaoEnvioCNPJ end=eof nobs=QtRegistros;
+file "/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/CarregamentoCNPJ_CETIP_&AnoMesDia..TXT" lrecl=9999 termstr=crlf;
+
+DtArquivo = today();
+HrArquivo = put(time(), hora.);
+
+/* Header */
+if _n_ eq 1 then do;
+	put	@1 'H'
+		@2 'E'
+		@3 'GRME'
+		@8 '00001'
+		@13 '000000000000901'
+		@28 '0001'
+		@32 '2020GDDS'
+	    @40 DtArquivo yymmddn8.
+	    @48 HrArquivo;
+end;
+
+/* Detalhes */
+put
+	@1	'D'
+	@2	'2'
+	@3  NuCpfCnpj
+	@17 NuCnpjLoja
+	@31 VrFinanciamentoEnvio z11.
+	@42 DtEntradaProposta yymmddn8.
+	@50 HrArquivo;
+
+/* Trailer */
+if eof eq 1 then do;
+	put @1   'T' /* TpRegistro */
+	   @2 QtRegistros z6.;
+end;
+
+run;
+
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* ====================================================================================== */
+%PUT #!# FIM TbCetipConversao.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%PUT #!# TEMPO PROCESSAMENTO:   %SYSFUNC(intck(SECOND, &W_ini, %SYSFUNC(datetime())), tod8.);

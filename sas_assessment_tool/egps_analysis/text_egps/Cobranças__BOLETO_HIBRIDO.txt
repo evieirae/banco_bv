@@ -1,0 +1,167 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__BOLETO_HIBRIDO
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:13 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 103
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_DBCONTENCIOSO.TBNEGOCIACAOCONTRATO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBGOPR_GOPRREGISTROPARCIAL.TBSOLICITACAOREGISTROPARCIAL [BIGQUERY], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_PROCESSO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_DBCONTENCIOSO.TBNEGOCIACAOCONTRATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DBGOPR_GOPRREGISTROPARCIAL.TBSOLICITACAOREGISTROPARCIAL [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_PROCESSO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.TAB_CARTEIRA_VF
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 1 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dZfBKYSNCOKFCoal/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm(
+  project='bv-sadi-dtm'
+  credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+  schema='bv-pdbd-prd'
+  READ_MODE=storage
+  MAX_CHAR_LEN=100
+);
+
+create table WORK.TAB_CARTEIRA_vf as
+select *
+from connection to perm
+(
+  SELECT
+
+    DATE(DtGeracao) AS DtGeracao,
+
+    b.cod_asses,
+
+    CASE
+      WHEN B.COD_ASSES IN (220,101,497,1497,1588,1618,1591,1584,1654,1660,204,1662,1581,14,1659,1590,1651,258,1575,270,186,2022,1657,133,1,1336,2041,2040,2021,1625,2005,2064,2065,1652,1656,2066,2067) THEN 'RODAS'
+      WHEN B.COD_ASSES IN (2031,1592,2033,1648,1649,1593) THEN 'SOLAR'
+      WHEN B.COD_ASSES IN (1528,1634,1639,1650,1666,2016,2048,2049) THEN 'CREDITO PESSOAL'
+      ELSE 'OUTRAS CARTEIRAS'
+    END AS Fase,
+
+    CASE
+      WHEN B.COD_ASSES IN (1625,2064,1652,2066,1618) THEN 'MENDES'
+      WHEN B.COD_ASSES IN (2005,2065,1656,2067,204,1657,1336,1581,2036,1599,2049,2048,2031,1592,1593) THEN 'PASCHOALOTTO'
+      WHEN B.COD_ASSES IN (220,1651,14,1590,2055,1650,1528,1639,2033,1551,1640,1491,1644,1641,1552) THEN 'BELLINATI'
+      WHEN B.COD_ASSES IN (258,1654,1588,1497) THEN 'LM ANGELIS'
+      WHEN B.COD_ASSES IN (270,133,1660,2038,1584) THEN 'SCHULZE'
+      WHEN B.COD_ASSES IN (186,1,1662,1591,1663,2054,1559,1634,1648,1649,1530,1645,1642,1524) THEN 'TOLEDO'
+      WHEN B.COD_ASSES IN (2021,2040,2022,2041) THEN 'CONCILIG'
+      WHEN B.COD_ASSES IN (1628) THEN 'REGUA DIGITAL'
+      WHEN B.COD_ASSES IN (1627) THEN 'BAIXADO'
+      WHEN B.COD_ASSES IN (2017,2006) THEN 'NO ACTION'
+      WHEN B.COD_ASSES IN (497,1659,1575,101,1583) THEN 'PASQUALI'
+      WHEN B.COD_ASSES IN (1666,2016,1532,739) THEN 'RAMOS'
+      ELSE 'VERIFICAR'
+    END AS Assessoria,
+
+    CASE
+      WHEN B.COD_ASSES IN (1625,2064,2005,2065) THEN 'ATIVA'
+      WHEN B.COD_ASSES IN (1652,1656,2066,2067) THEN 'ATIVA RENEG'
+      WHEN B.COD_ASSES IN (220,258,204,270,186,2021,497) THEN 'ADMINISTRATIVA'
+      WHEN B.COD_ASSES IN (1651,1654,1657,1660,1662,2040,1659) THEN 'ADMINISTRATIVA RENEG'
+      WHEN B.COD_ASSES IN (14,1497,1618,1336,133,1,2022,101) THEN 'CONT/WO'
+      WHEN B.COD_ASSES IN (1581,1584,1588,1590,1591,2041,1575) THEN 'BOM PAGADOR'
+      WHEN B.COD_ASSES IN (1663,2038,2036) THEN 'REVISIONAL'
+      WHEN B.COD_ASSES IN (2054,2055) THEN 'PRE CONTENCIOSO'
+      WHEN B.COD_ASSES IN (1599,1559) THEN 'SALDO REMANESCENTE'
+      WHEN B.COD_ASSES IN (1628) THEN 'FAIXA 5 A 30 DIAS'
+      WHEN B.COD_ASSES IN (1627) THEN 'SEM ATRASO'
+      WHEN B.COD_ASSES IN (2017,2006) THEN 'NO ACTION'
+      WHEN B.COD_ASSES IN (2049,1650) THEN 'CP NEON'
+      WHEN B.COD_ASSES IN (2048,1528,1639,1634,1666,2016) THEN 'CP'
+      WHEN B.COD_ASSES IN (2031,1592,1648,2033,1593,1649) THEN 'SOLAR'
+      WHEN B.COD_ASSES IN (1551,1640,1530,1532) THEN 'RENEG CONSIGNADO'
+      WHEN B.COD_ASSES IN (1491) THEN 'CONSIGNADO PF'
+      WHEN B.COD_ASSES IN (1645,1644) THEN 'ADMINISTRATIVA VU'
+      WHEN B.COD_ASSES IN (1641,1642) THEN 'CONTENCIOSO VU'
+      WHEN B.COD_ASSES IN (1552,1524,739) THEN 'DESAVERBADOS'
+      WHEN B.COD_ASSES IN (1583) THEN 'RECORRENTE'
+      ELSE 'VERIFICAR'
+    END AS Carteira,
+
+    CASE
+      WHEN a.StNegociacao = 'C' THEN 'Cancelado'
+      ELSE 'Negociado'
+    END AS StatusNegociacao,
+
+    COUNT(1) AS totalAssessoria,
+
+    SUM(CASE WHEN c.flbolepix IS NULL OR c.flbolepix = '0' OR c.flbolepix = 'N' THEN 1 ELSE 0 END) AS totalBoletoLegado,
+    SUM(CASE WHEN c.flbolepix = 'S' THEN 1 ELSE 0 END) AS totalBoletoHibrido
+
+  FROM
+    `bv-pdbd-prd.trusted_dbcontencioso.tbnegociacaocontrato` a
+
+  INNER JOIN
+    `bv-pdbd-prd.trusted_scc_fin.saj_processo` b
+    ON SAFE_CAST(a.NuContratoGestao AS INT64) = SAFE_CAST(b.NuContratoGestao AS INT64)
+    AND a.SqContratoFinanceiro = b.SqContratoFinanceiro
+    AND b.num_processo = SAFE_CAST(a.nuprocesso AS INT64)
+
+  LEFT JOIN
+    `bv-pdbd-prd.trusted_dbgopr_goprregistroparcial.tbsolicitacaoregistroparcial` c
+    ON SAFE_CAST(a.NuContratoGestao AS INT64) = SAFE_CAST(c.nucontrato AS INT64)
+    AND a.SqContratoFinanceiro = c.sqcontratofinanceiro
+    AND a.cdnossonumero = c.cdnossonumero
+
+  WHERE
+    StNegociacao NOT IN ('PA','R')
+
+    AND DATE(DtGeracao) BETWEEN '2025-01-01' AND '2026-01-05'
+
+  GROUP BY
+    DATE(DtGeracao),
+    b.cod_asses,
+    Fase,
+    Assessoria,
+    StatusNegociacao
+
+);
+
+disconnect from perm;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

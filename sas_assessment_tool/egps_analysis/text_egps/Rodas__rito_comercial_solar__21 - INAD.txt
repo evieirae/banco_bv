@@ -1,0 +1,225 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 21 - INAD.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 164
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBINAD30_DASHMETACOMERCIAL [SAS/Local], RITOSOL.BASE_COBANS_SOLAR_SAIDA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBINAD30_DASHMETACOMERCIAL [PROC SQL - FROM], RITOSOL.BASE_COBANS_SOLAR_SAIDA [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_INAD_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_INAD_CANAL_TOTAL, BASE_INAD_FILIAL_TOTAL, BASE_INAD_GRS_TOTAL, BASE_INAD_PDVS_TOTAL, TBPDVINAD30
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+
+PROC SQL;
+CREATE TABLE TbPDVInad30 AS
+SELECT
+	Inad.NuAnoMes
+	,Cobans.CdParceiroComercial
+	,Inad.NmParceiroComercialFavorecido as NmParceiroComercial
+	,Inad.NmAreaEstruturaComercial
+	,Inad.NmColaborador
+	,Inad.DsLoginN1 as DsLoginN1C
+	,Inad.DsLoginN2A as DsLoginN2C
+	,Inad.DsLoginN3A as DsLoginN3C
+	,Porte.Porte
+	,Porte.TipoParceiro
+	,Max(DatePart(Cobans.DtCadastro)) as DtCadastro Format ddmmyy10.
+	,coalesce(sum(Case when Inad.TpValor = 'Inad30' then Coalesce(Inad.VrMedida,0) else 0 End),0) as MedidaInad30 FORMAT numx18.
+	,coalesce(sum(Case when Inad.TpValor = 'Inad30' then Coalesce(Inad.VrDenominador,0) else 0 End),0) as DenominadorInad30 FORMAT numx18.
+	,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+From BASES.TbInad30_DashMetaComercial as INAD
+	Left join ritosol.Base_Cobans_Solar_Saida as Cobans On Inad.NuCnpjLojaFavorecido = Cobans.NuCnpjLoja
+	Left Join Base_Porte_Cobans_CNPJ as Porte On Inad.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Inad.NuAnomes = Porte.NuAnomes
+where
+	Inad.NmGrupoProdutoMeta = 'Solar'
+	and Inad.NuAnoMes >= &Base_m5.
+	and Inad.DsTipoCanalProducao in  ('CANAL SOLAR')
+	and Inad.NmCanalEstruturaComercial = 'Canal Solar'
+	and Inad.TpValor = 'Inad30'
+group by 1,2,3,4,5,6,7,8,9,10
+;RUN;
+
+Proc Sql;
+Create Table Base_INAD_Canal_Total as
+Select
+'INAD' as Base
+,Inad.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,Inad.Porte
+,Inad.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+,Sum(MedidaInad30) as MedidaInad30
+,Sum(DenominadorInad30) as DenominadorInad30
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From TbPDVInad30 as Inad
+	Where Inad.NuAnoMes >= &Base_m5. and
+		Inad.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_INAD_Filial_Total as
+Select
+'INAD' as Base
+,Inad.NuAnoMes
+,'Filial' as Visao
+,"" as DsLoginN1C
+,Inad.DsLoginN2C
+,Inad.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Inad.NmAreaEstruturaComercial as Dimensao2
+,Inad.NmAreaEstruturaComercial as Dimensao3
+,'Mês Fechado' as Semana
+,Inad.Porte
+,Inad.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+,Sum(MedidaInad30) as MedidaInad30
+,Sum(DenominadorInad30) as DenominadorInad30
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From TbPDVInad30 as Inad
+	Where Inad.NuAnoMes >= &Base_m5. and
+		Inad.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_INAD_GRs_Total as
+Select
+'INAD' as Base
+,Inad.NuAnoMes
+,'GRs' as Visao
+,Inad.DsLoginN1C
+,Inad.DsLoginN2C
+,Inad.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Inad.NmAreaEstruturaComercial as Dimensao2
+,Inad.NmColaborador as Dimensao3
+,'Mês Fechado' as Semana
+,Inad.Porte
+,Inad.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+,Sum(MedidaInad30) as MedidaInad30
+,Sum(DenominadorInad30) as DenominadorInad30
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From TbPDVInad30 as Inad
+	Where Inad.NuAnoMes >= &Base_m5. and
+		Inad.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_INAD_PDVs_Total as
+Select
+'INAD' as Base
+,Inad.NuAnoMes
+,'Cobans' as Visao
+,Inad.DsLoginN1C
+,Inad.DsLoginN2C
+,Inad.DsLoginN3C
+,Inad.NmAreaEstruturaComercial as Dimensao1
+,Inad.NmColaborador as Dimensao2
+,put(Inad.CdParceiroComercial, 8.) || '-' || Inad.NmParceiroComercial  as Dimensao3
+,'Mês Fechado' as Semana
+,Inad.Porte
+,Inad.TipoParceiro
+,Inad.DtCadastro Format DDMMYY10.
+,0 as QtCorridosDiaUtilMes
+,Sum(MedidaInad30) as MedidaInad30
+,Sum(DenominadorInad30) as DenominadorInad30
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From TbPDVInad30 as Inad
+	Where Inad.NuAnoMes >= &Base_m5. and
+		Inad.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Data ritosol.Base_Inad_Solar;
+Set Base_INAD_PDVs_Total
+	Base_INAD_Grs_Total
+	Base_INAD_Filial_Total
+	Base_INAD_Canal_Total
+;Run;

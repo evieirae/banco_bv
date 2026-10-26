@@ -1,0 +1,211 @@
+START_METADATA
+PROJECT: Rodas__tbpropostas-hh
+FILE_SAS: 202506 - 03-cubo.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 144
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], AQUISIC.MSG_D0_D1 [SAS/Local], INFOGRC.TBPROPOSTA_ONLINE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+TABLE_READ_PROVENANCE (Flow): AQUISIC.MSG_D0_D1 [DATA Step - SET], INFOGRC.TBPROPOSTA_ONLINE [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/output/CUBO_PROP.csv, /riscosbvf/BA/processos/tmp/CUBO_PROP.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/CUBO_PROP.csv
+TEMP/DISCARDED OUTPUTS: CUBO_PROP, MENSAGERIA, TBPROPOSTA_ONLINE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 2, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /riscosbvf/BA/processos/output/CUBO_PROP.csv
+[CODE REF] /riscosbvf/BA/processos/tmp/CUBO_PROP.csv
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Atualizacao:	06/10/2023														| */
+/* |	Responsavel: 	Ramon Sales - Infomacoes gerenciais estrategicas    		 	| */
+/* |	Alt. Realizada:	- Agrega infos de Mengaseria em D0						        | */
+/* ====================================================================================== */
+/* |	Atualizacao:	06/10/2024														| */
+/* |	Responsavel: 	Ramon Sales - Infomacoes gerenciais estrategicas    		 	| */
+/* |	Alt. Realizada:	- Agrega infos de Mengaseria em D0						        | */
+/* ====================================================================================== */
+
+/* Conhecendo a base */
+
+%include '/infogrc/utils/libname.sas';
+%include '/infogrc/utils/IQ.sas';
+
+DATA TBPROPOSTA_ONLINE;
+SET infogrc.TBPROPOSTA_ONLINE;
+;RUN;
+PROC SORT DATA=TBPROPOSTA_ONLINE DUPOUT=DUPLI OUT=TBPROPOSTA_ONLINE NODUPKEY;
+BY
+NUPROPOSTA
+DTENTRADAPROPOSTA
+;RUN;
+
+/* Filtra somente última simulação da proposta */
+data mensageria;
+	set aquisic.msg_d0_d1 (where=(flag_ult_simu=1));
+run;
+
+/*CRIANDO BASE SUMARIZADA PARA CUBO NO TABLEAU*/
+PROC SQL;
+CREATE TABLE CUBO_PROP AS SELECT
+
+DATAGERACAO FORMAT=MMDDYY10.
+,HORAGERACAO
+,NUANOMES
+,DTENTRADAPROPOSTA
+,DTENTRADAPROPOSTA as DTENTRADAPROPOSTA_ajustada format mmddyy10.
+,NUPROPOSTA
+,STPROPOSTA
+,DTSTATUSPROPOSTA FORMAT=MMDDYY10.
+,DTSTATUSPROPOSTA_AJUSTADA
+,DSTIPOCANALPRODUCAO
+,DSTIPOSUBCANALPRODUCAO
+,NMCANALESTRUTURACOMERCIAL
+/*,CDCOLABORADOR*/
+/*,NMCOLABORADOR*/
+/*,CDCOLABORADORC*/
+/*,NMCOLABORADORC*/
+,CDFILIAL
+,DSFILIAL
+,CDAREAESTRUTURACOMERCIAL
+,NMAREAESTRUTURACOMERCIAL
+/*,CDFILIALC*/
+/*,NMFILIALC*/
+/*,CDAREAESTRUTURACOMERCIALC*/
+/*,NMAREAESTRUTURACOMERCIALC*/
+,NMSUBESTRUTURACOMERCIALA
+/*,NMSUBESTRUTURACOMERCIALH*/
+/*,NMSUBESTRUTURACOMERCIALC*/
+,NMGRUPOPRODUTOMETA
+,NUCNPJLOJA
+,CDPARCEIROCOMERCIAL
+,NMPARCEIROCOMERCIAL
+,FLINTEGRACAOPROPOSTAFEI
+,FLINTEGRACAOPARCEIROFEI
+,TPPESSOA
+,CDUFPESSOA
+,CDTABELAFINANCIAMENTO
+,FXIDADE
+,FXPARCELA
+,FXENTRADA
+,NUSCOREFIM
+,FXSCOREFIM
+,FLTXALTERADA
+,QTDIASCARENCIA
+,msg_dash
+,FiltroCVG
+
+,SUM(VRPROPOSTA)                                                           AS VRPROPOSTA                 FORMAT=NUM14.2
+,SUM(VRLIBERADO)                                                           AS VRLIBERADO                 FORMAT=NUM14.2
+,SUM(VRENTRADA)                                                            AS VRENTRADA                  FORMAT=NUM14.2
+,SUM(VRFINANCIAMENTO)                                                      AS VRFINANCIAMENTO            FORMAT=NUM14.2
+,SUM(VRPRESTACAO)                                                          AS VRPRESTACAO                FORMAT=NUM14.2
+,SUM(VRTAC)                                                                AS VRTAC                      FORMAT=NUM14.2
+,SUM(VRIOFCPMFISS)                                                         AS VRIOFCPMFISS               FORMAT=NUM14.2
+,SUM(FLPROPOSTAORIGINADA)                                                  AS FLPROPOSTAORIGINADA        FORMAT=NUM14.2
+,SUM(FLPROPOSTANEGADA)                                                     AS FLPROPOSTANEGADA           FORMAT=NUM14.2
+,SUM(FLPROPOSTAAPROVADA)                                                   AS FLPROPOSTAAPROVADA         FORMAT=NUM14.2
+,SUM(FLPROPOSTAAPNP)                                                       AS FLPROPOSTAAPNP             FORMAT=NUM14.2
+,SUM(FLPROPOSTAEFETIVADA)                                                  AS FLPROPOSTAEFETIVADA        FORMAT=NUM14.2
+,SUM(VRPROPOSTAORIGINADA)                                                  AS VRPROPOSTAORIGINADA        FORMAT=NUM14.2
+,SUM(VRPROPOSTANEGADA)                                                     AS VRPROPOSTANEGADA           FORMAT=NUM14.2
+,SUM(VRPROPOSTAAPROVADA)                                                   AS VRPROPOSTAAPROVADA         FORMAT=NUM14.2
+,SUM(VRPROPOSTAAPNP)                                                       AS VRPROPOSTAAPNP             FORMAT=NUM14.2
+,SUM(VRPROPOSTAEFETIVADA)                                                  AS VRPROPOSTAEFETIVADA        FORMAT=NUM14.2
+,SUM(FLBANCOBRASIL)                                                        AS FLBANCOBRASIL              FORMAT=NUM14.2
+,SUM(FLBRADESCO)                                                           AS FLBRADESCO                 FORMAT=NUM14.2
+,SUM(FLITAU)                                                               AS FLITAU                     FORMAT=NUM14.2
+,SUM(FLPAN)                                                                AS FLPAN                      FORMAT=NUM14.2
+,SUM(FLSAFRA)                                                              AS FLSAFRA                    FORMAT=NUM14.2
+,SUM(FLSANTANDER)                                                          AS FLSANTANDER                FORMAT=NUM14.2
+,SUM(FLMONTADORAS)                                                         AS FLMONTADORAS               FORMAT=NUM14.2
+,SUM(FLOUTROS)                                                             AS FLOUTROS                   FORMAT=NUM14.2
+,SUM(FLCONCORRENTE)                                                        AS FLCONCORRENTE              FORMAT=NUM14.2
+,SUM(FLPROPOSTABIPARTIDA)                                                  AS FLPROPOSTABIPARTIDA        FORMAT=NUM14.2
+,SUM(FLPROPOSTAUTILIZACAOFGTS)                                             AS FLPROPOSTAUTILIZACAOFGTS   FORMAT=NUM14.2
+,SUM(TXRETORNO)                                                            AS TXRETORNO                  FORMAT=NUM14.2
+,SUM(PCMARGEMLIQUIDA)                                                      AS PCMARGEMLIQUIDA            FORMAT=NUM14.2
+,SUM(VRMARGEMLIQUIDA)                                                      AS VRMARGEMLIQUIDA            FORMAT=NUM14.2
+,SUM(TXPACTUADA)                                                           AS TXPACTUADA                 FORMAT=NUM14.2
+,SUM(VPTXPACTUADA)                                                         AS VPTXPACTUADA               FORMAT=NUM14.2
+,SUM(TXFINANCIAMENTO)                                                      AS TXFINANCIAMENTO            FORMAT=NUM14.2
+,SUM(VPTXFINANCIAMENTO)                                                    AS VPTXFINANCIAMENTO          FORMAT=NUM14.2
+,SUM(TXGERENCIAL)                                                          AS TXGERENCIAL                FORMAT=NUM14.2
+,SUM(VPTXGERENCIAL)                                                        AS VPTXGERENCIAL              FORMAT=NUM14.2
+,SUM(VPTXGERENCIALREBATE)                                                  AS VPTXGERENCIALREBATE        FORMAT=NUM14.2
+,SUM(TXTIRDIVULGADA)                                                       AS TXTIRDIVULGADA             FORMAT=NUM14.2
+,SUM(VPTIRDIVULGADA)                                                       AS VPTIRDIVULGADA             FORMAT=NUM14.2
+,SUM(TXTIRCONTABIL)                                                        AS TXTIRCONTABIL              FORMAT=NUM14.2
+,SUM(VPTIRCONTABIL)                                                        AS VPTIRCONTABIL              FORMAT=NUM14.2
+,SUM(NOT MISSING (VPTIRCONTABIL))                                             AS VPTIRCONTABIL_NOTNULL      FORMAT=NUM14.2
+,SUM(VPSPREAD)                                                             AS VPSPREAD                   FORMAT=NUM14.2
+,SUM(VPSPREADREBATE)                                                       AS VPSPREADREBATE             FORMAT=NUM14.2
+,SUM(VRLIBERADODIAUTIL)                                                    AS VRLIBERADODIAUTIL          FORMAT=NUM14.2
+,SUM(VRLIBERADOPROJETADO)                                                  AS VRLIBERADOPROJETADO        FORMAT=NUM14.2
+,SUM(VRPDD)                                                                AS VRPDD                      FORMAT=NUM14.2
+,SUM(VPENTRADA)                                                            AS VPENTRADA                  FORMAT=NUM14.2
+,SUM(VPSCORE)                                                              AS VPSCORE                    FORMAT=NUM14.2
+,SUM(VPIDADE)                                                              AS VPIDADE                    FORMAT=NUM14.2
+,SUM(VPPRAZO)                                                              AS VPPRAZO                    FORMAT=NUM14.2
+,SUM(QTTOTALDIAUTILMES)                                                    AS QTTOTALDIAUTILMES          FORMAT=NUM14.2
+,SUM(QTCORRIDOSDIAUTILMES)                                                 AS QTCORRIDOSDIAUTILMES       FORMAT=NUM14.2
+,SUM(QTDIASUTEISMATURACAO)                                                 AS QTDIASUTEISMATURACAO       FORMAT=NUM14.2
+,SUM(FLDIASUTEISMATURACAO)                                                 AS FLDIASUTEISMATURACAO       FORMAT=NUM14.2
+
+FROM TBPROPOSTA_ONLINE t1 left join mensageria t2
+						    on t1.nuproposta = t2.nu_proposta
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32
+/*,32,33,34,35,36,37,38,39,40*/
+
+;RUN;
+
+PROC SORT DATA=CUBO_PROP DUPOUT=DUPLI OUT=CUBO_PROP NODUPKEY;
+BY
+NUPROPOSTA
+DTENTRADAPROPOSTA;RUN;
+
+proc export
+data=CUBO_PROP
+file='/riscosbvf/BA/processos/output/CUBO_PROP.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv /riscosbvf/BA/processos/tmp/CUBO_PROP.csv /riscosbvf/BA/processos/output/CUBO_PROP.csv";

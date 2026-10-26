@@ -1,0 +1,584 @@
+START_METADATA
+PROJECT: Rodas__marketshare
+FILE_SAS: run-visibilidade.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), PROC TRANSPOSE (2x | +20)
+----------------------------------------
+LINES_OF_CODE: 502
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAtApnp, DtAtSimu, MaxDtShr, SafraM12, safra13M
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], CONVPROP.BASEAPNP [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], DWBI_DIME.TBDIMTEMPODATA [DBCON], RELEXC.TBMARKETSHAREDIARIAABERTA [SAS/Local], SEMANAINICIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], CONVPROP.BASEAPNP [PROC SQL - FROM], CONVSIMU.TBSIMULACOES [DATA Step - SET], DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], RELEXC.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM], SEMANAINICIAL [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASECONVPROPOSTA, BASECONVPROPOSTA_SEMANA, BASESIMULACOES, BASESIMULACOES_SEMANA, CONVERSAOTOTAL, CONVERSAOTOTAL_SEMANA, CONVERSAO_01, CONVERSAO_SEMANA_01, GRAVAMESBV, GRAVAMESBV_SEMANA, MARKETSHARE, MARKETSHARE_SEMANA, TBSEMANA, TBSIMULACOES, TBSIMULACOES_00, TBSIMULACOES_001, UF, VISIBILIDADEBV, VISIBILIDADEBV_001, VISIBILIDADEBV_FINAL, VISIBILIDADEBV_SEMANA, VISIBILIDADEBV_SEMANA_001, VISIBILIDADE_EMPILHADA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/convsimu/tbsimulacoes.sas7bdat
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* Declara libs, funções e dados de conexão */
+%include '/infogrc/utils/all-includes.sas';
+options compress=binary;
+
+/* Declara parâmetros de data */
+DATA _NULL_;
+  hoje = TODAY();
+  ano13M = YEAR(hoje) - 1;
+  anohoje = YEAR(hoje);
+  safra13M = ((YEAR(hoje) - 1) * 100) + MONTH(hoje);
+
+  CALL SYMPUT('ano13M', PUT(ano13M,4.));
+  CALL SYMPUT('anoHoje', PUT(anoHoje,4.));
+  CALL SYMPUT('safra13M', safra13M);
+RUN;
+
+PROC SQL; SELECT MAX(DtAtualizacao) INTO :MaxDtShr FROM RELEXC.TBMARKETSHAREDIARIAABERTA; RUN;
+
+/* Busca UF para bases de Simulação */
+PROC SQL;
+  CREATE TABLE UF AS
+    SELECT DISTINCT CdParceiroComercial, NmParceiroComercial, CdUf FROM BASES.TBPARCEIROCOMERCIAL;
+RUN;
+
+%VerificaAtualizacao(/infogrc/convsimu/tbsimulacoes.sas7bdat,300,150);
+
+data TBSIMULACOES_00 ;
+    set Convsimu.tbsimulacoes (where=(NuAnoMes >= &SafraM12.))
+;run;
+
+data TBSIMULACOES_001 ;
+    set TBSIMULACOES_00 (where=(	Produto in('Motos','Leves','Pesados','CVG Leves','CVG Pesados')
+    							AND Banco NOT IN ('N/A','BV')))
+;run;
+
+/* Gera dados para a base de mês fechado */
+PROC SQL;
+CREATE TABLE TBSIMULACOES AS
+  SELECT
+    *,
+    CASE WHEN LOWER(Produto) LIKE '%leves' THEN 'Leves'
+         WHEN LOWER(Produto) LIKE '%pesados' THEN 'Pesados'
+		 WHEN LOWER(Produto) LIKE '%motos' THEN 'Motos'
+         ELSE Produto
+    END AS ProdutoAjuste,
+    CASE WHEN FxIdade = 'Acima 10 anos' THEN 'Acima de 10 anos' ELSE FxIdade END AS FxIdadeAjuste
+  FROM TBSIMULACOES_001
+ ;
+RUN;
+
+PROC SQL;
+  CREATE TABLE BaseSimulacoes AS
+    SELECT
+      (YEAR(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))*100) + MONTH(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial)) AS Safra,
+      SMU.ProdutoAjuste AS Produto,
+      CASE WHEN FxIdadeAjuste = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(FxIdadeAjuste,'Desconhecido') AS FxIdade,
+      CASE WHEN QtParcela <= 12 THEN '12'
+           WHEN QtParcela > 12 AND QtParcela <= 24 THEN '24'
+           WHEN QtParcela > 24 AND QtParcela <= 36 THEN '36'
+           WHEN QtParcela > 48 THEN '60'
+           WHEN QtParcela > 60 THEN '60 +'
+           ELSE 'Desconhecido'
+      END AS FxPrazo,
+      CASE WHEN SMU.Banco = 'Panamericano' THEN 'PAN' ELSE UPPER(SMU.Banco) END AS Bancos,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      Regional,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao = 'Card sem proposta originada' THEN NuCpfCnpj END),0) AS Card,
+	  COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao = 'Simulação sem card' or SMU.StatusSimulacao = 'Simulacao sem card' THEN NuCpfCnpj END),0) AS Pre_Analise
+    FROM TBSIMULACOES SMU
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = SMU.CdParceiroComercial
+    WHERE SMU.ProdutoAjuste IN ('Motos','Leves','Pesados')
+      AND UF.NmParceiroComercial NOT LIKE 'SIMULADOR%'
+      AND SMU.Banco <> 'N/A'
+      AND SMU.FlSimuValida = 1
+      AND SMU.DtInclusaoGravame < &MaxDtShr.
+    GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+PROC SQL;
+  CREATE TABLE BaseConvProposta AS
+    SELECT
+      COALESCE(((YEAR(APNP.DtRetornoCetip) * 100) + MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada) AS Safra,
+      APNP.ProdutoAjuste AS Produto,
+      CASE WHEN APNP.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      CASE WHEN APNP.FxIdade = 'Acima 10 anos' THEN 'Acima de 10 anos' ELSE FxIdade END AS FxIdade,
+      APNP.FxParcela AS FxPrazo,
+      CASE WHEN APNP.Banco = 'BANCO DO BRASIL' THEN 'BB'
+           WHEN APNP.Banco = 'BRADESCO' THEN 'BRADESCO'
+           WHEN APNP.Banco = 'ITAU' THEN 'ITAU'
+           WHEN APNP.Banco = 'MONTADORAS' THEN 'MONTADORAS'
+           WHEN APNP.Banco = 'PANAMERICANO' THEN 'PAN'
+           WHEN APNP.Banco = 'SAFRA' THEN 'SAFRA'
+           WHEN APNP.Banco = 'SANTANDER' THEN 'SANTANDER'
+      ELSE 'OUTROS' END AS Bancos,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      Regional,
+      SUM(0) AS ContratoBV,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' THEN QtdPropostas END),0) AS Negada,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' THEN QtdPropostas END),0) AS Cancelada,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' THEN QtdPropostas END),0) AS APNP
+    FROM CONVPROP.BASEAPNP APNP
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = APNP.CdParceiroComercial
+    WHERE SafraEntrada >= &safra13M. /*AND SafraEntrada < &SafraSimu.*/
+      AND NmGrupoProdutoMeta IN ('Motos','Leves','Pesados')
+      AND Banco <> 'NÃO CONVERTIDO'
+      AND FlPropostaValida = 1
+      AND DtRetornoCetip < &MaxDtShr.
+    GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+PROC SQL;
+  CREATE TABLE GravamesBV AS
+    SELECT
+      NuAnoMes AS Safra,
+      TpVeiculo AS Produto,
+      StVeiculo AS StatusVeiculo,
+      CASE WHEN FxIdade IN ('11 a 14 anos','15 a 19 anos','20 anos e acima') THEN 'Acima de 10 anos'
+           ELSE FxIdade
+      END AS FxIdade,
+      FxPrazo,
+      'BV' AS Bancos,
+      COALESCE(UF,'Desconhecido') AS CdUf,
+      Regional,
+      COALESCE(SUM(GravTotal),0) AS ContratoBV,
+      SUM(0) AS Negada,
+      SUM(0) AS Cancelada,
+      SUM(0) AS APNP
+    FROM RELEXC.TBMARKETSHAREDIARIAABERTA
+    WHERE TpVeiculo IN ('Leves','Motos','Pesados')
+      AND TpArquivo = 'mf'
+      AND Bancos = 'BV'
+      AND NuAnoMes >= &safra13M.
+      AND AjusteManual = 'N'
+      AND TpAgenteProdutoMIS <> '3'
+	  AND StatusGravame = 'Ativo'
+    GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+DATA Conversao_01;
+SET BaseConvProposta GravamesBV;
+RUN;
+
+PROC SQL;
+  CREATE TABLE ConversaoTotal AS
+    SELECT
+      COALESCE(A.Safra,B.Safra) AS Safra,
+      COALESCE(A.Produto,B.Produto) AS Produto,
+      COALESCE(A.StatusVeiculo,B.StatusVeiculo) AS StatusVeiculo,
+      COALESCE(A.FxIdade,B.FxIdade) AS FxIdade,
+      COALESCE(A.FxPrazo,B.FxPrazo) AS FxPrazo,
+      COALESCE(A.Bancos,B.Bancos) AS Bancos,
+      COALESCE(A.CdUf,B.CdUf) AS CdUf,
+      COALESCE(A.Regional,B.Regional) AS Regional,
+      SUM(COALESCE(A.ContratoBV,0)) AS ContratoBV,
+      SUM(COALESCE(A.Negada,0)) AS Negada,
+      SUM(COALESCE(A.Cancelada,0)) AS Cancelada,
+      SUM(COALESCE(A.APNP,0)) AS APNP,
+      SUM(COALESCE(B.Card,0)) AS Card,
+	  SUM(COALESCE(B.Pre_Analise,0)) AS Pre_Analise
+    FROM Conversao_01 A
+    FULL OUTER JOIN BaseSimulacoes B
+      ON A.Safra = B.Safra
+     AND A.Produto = B.Produto
+     AND A.StatusVeiculo = B.StatusVeiculo
+     AND A.Bancos = B.Bancos
+     AND A.CdUF = B.CdUF
+     AND A.FxIdade = B.FxIdade
+     AND A.FxPrazo = B.FxPrazo
+     AND A.Regional = B.Regional
+   GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+PROC SQL;
+  CREATE TABLE MarketShare AS
+    SELECT
+      NuAnoMes AS Safra,
+      TpVeiculo AS Produto,
+      StVeiculo AS StatusVeiculo,
+      FxPrazo,
+      CASE WHEN FxIdade IN ('11 a 14 anos','15 a 19 anos','20 anos e acima') THEN 'Acima de 10 anos'
+           ELSE FxIdade
+      END AS FxIdade,
+      CASE WHEN Bancos = 'BANCO DO BRASIL' THEN 'BB'
+           WHEN Bancos = 'BRADESCO' THEN 'BRADESCO'
+           WHEN Bancos = 'BV' THEN 'BV'
+           WHEN Bancos = 'ITAU' THEN 'ITAU'
+           WHEN Bancos = 'MONTADORAS' THEN 'MONTADORAS'
+           WHEN Bancos = 'PANAMERICANO' THEN 'PAN'
+           WHEN Bancos = 'SAFRA' THEN 'SAFRA'
+           WHEN Bancos = 'SANTANDER' THEN 'SANTANDER'
+      ELSE 'OUTROS' END AS Bancos,
+      UF AS CdUF,
+      Regional,
+      COALESCE(SUM(GravTotal),0) AS Gravames
+    FROM RELEXC.TBMARKETSHAREDIARIAABERTA
+    WHERE NuAnoMes >= &safra13M.
+      AND TpVeiculo IN ('Leves','Motos','Pesados')
+      AND TpArquivo = 'mf'
+      AND AjusteManual = 'N'
+      AND TpAgenteProdutoMIS <> '3'
+	  AND StatusGravame = 'Ativo'
+    GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+PROC SQL;
+  CREATE TABLE VisibilidadeBV_001 AS
+    SELECT
+      COALESCE(B.Safra,A.Safra) AS Safra,
+      COALESCE(B.Produto,A.Produto) AS Produto,
+      COALESCE(B.StatusVeiculo,A.StatusVeiculo) AS StatusVeiculo,
+      COALESCE(B.FxIdade,A.FxIdade) AS FxIdade,
+      COALESCE(B.FxPrazo,A.FxPrazo) AS FxPrazo,
+      COALESCE(B.Bancos,A.Bancos) AS Bancos,
+      COALESCE(B.CdUF,A.CdUF) AS CdUF,
+      COALESCE(B.Regional,A.Regional) AS Regional,
+      COALESCE(SUM(B.Gravames),0) - COALESCE(SUM(A.ContratoBV + A.Negada + A.Cancelada + A.APNP + A.Card/* + A.Simulacao*/),0) AS NaoPassouBV,
+      SUM(COALESCE(A.ContratoBV,0)) AS ContratoBV,
+      SUM(COALESCE(A.Negada,0)) AS Negada,
+      SUM(COALESCE(A.Cancelada,0)) AS Cancelada,
+      SUM(COALESCE(A.APNP,0)) AS APNP,
+      SUM(COALESCE(A.Card,0)) AS Card,
+	  SUM(COALESCE(A.Pre_Analise,0)) AS Pre_Analise
+    FROM MarketShare B
+    FULL OUTER JOIN ConversaoTotal A
+      ON A.Safra = B.Safra
+     AND A.Produto = B.Produto
+     AND A.StatusVeiculo = B.StatusVeiculo
+     AND A.Bancos = B.Bancos
+     AND A.CdUF = B.CdUF
+     AND A.FxIdade = B.FxIdade
+     AND A.FxPrazo = B.FxPrazo
+     AND A.Regional = B.Regional
+    GROUP BY 1,2,3,4,5,6,7,8
+    ORDER BY 1,2,3,4,5,6,7,8;
+RUN;
+
+PROC TRANSPOSE DATA=VisibilidadeBV_001 OUT=VisibilidadeBV NAME=Status PREFIX=Quantidade;
+  BY Safra
+     Produto
+     StatusVeiculo
+     FxIdade
+     FxPrazo
+     Bancos
+     CdUF
+     Regional;
+ VAR NaoPassouBV
+     ContratoBV
+     Negada
+     Cancelada
+     APNP
+     Card
+	 Pre_Analise;
+RUN;
+
+/* Gera dados para base aberta por semana */
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbSemana AS SELECT * FROM connection to dbcon
+(
+  WITH SemanaInicial AS (
+    SELECT DISTINCT
+      NuAnoMes,
+      MIN(NuSemanaAno) AS PrimeiraSemanaMes,
+      MAX(CASE WHEN DdData = 1 AND NuDiaSemana = 1 THEN 1 ELSE 0 END) AS InicioDomingo
+    FROM DWBI_DIME.TbDimTempoData
+    WHERE
+      NuAnoMes >= &safra13M.
+      AND DtTempo <= today()
+    GROUP BY NuAnoMes
+)
+  SELECT
+    's' + TRIM(STR((((CASE WHEN DATEPART(weekday, A.DtTempo) <> 1 THEN A.NuSemanaAno ELSE A.NuSemanaAno - 1 END) - B.PrimeiraSemanaMes) +  1) + (CASE WHEN InicioDomingo = 1 THEN 1 ELSE 0 END))) AS NuSemana,
+    DATE(DtTempo) AS DtReferencia
+  FROM DWBI_DIME.TbDimTempoData A
+  LEFT JOIN SemanaInicial B
+    ON A.NuAnoMes = B.NuAnoMes
+  WHERE
+    A.NuAnoMes >= &safra13M.
+    AND A.DtTempo <= today());
+RUN;
+
+PROC SQL;
+  CREATE TABLE BaseSimulacoes_Semana AS
+    SELECT
+      (YEAR(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))*100) + MONTH(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial)) AS Safra,
+      Semana.NuSemana AS TpArquivo,
+      SMU.Produto,
+      CASE WHEN FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(FxIdade,'Desconhecido') AS FxIdade,
+      CASE WHEN QtParcela <= 12 THEN '12'
+           WHEN QtParcela > 12 AND QtParcela <= 24 THEN '24'
+           WHEN QtParcela > 24 AND QtParcela <= 36 THEN '36'
+           WHEN QtParcela > 48 THEN '60'
+           WHEN QtParcela > 60 THEN '60 +'
+           ELSE 'Desconhecido'
+      END AS FxPrazo,
+      CASE WHEN SMU.Banco = 'Panamericano' THEN 'PAN' ELSE UPPER(SMU.Banco) END AS Bancos,
+      SMU.Regional,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao = 'Card sem proposta originada' THEN NuCpfCnpj END),0) AS Card,
+	  COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao = 'Simulação sem card' or SMU.StatusSimulacao = 'Simulacao sem card' THEN NuCpfCnpj END),0) AS Pre_Analise
+    FROM TBSIMULACOES SMU
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = SMU.CdParceiroComercial
+    LEFT JOIN TbSemana Semana
+      ON Semana.DtReferencia = COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial)
+    WHERE SMU.Produto IN ('Motos','Leves','Pesados')
+      AND UF.NmParceiroComercial NOT LIKE 'SIMULADOR%'
+      AND SMU.Banco <> 'N/A'
+      AND SMU.FlSimuValidaSemana = 1
+      AND SMU.DtInclusaoGravame < &MaxDtShr.
+    GROUP BY 1,2,3,4,5,6,7,8,9;
+RUN;
+
+PROC SQL;
+  CREATE TABLE BaseConvProposta_Semana AS
+    SELECT
+      COALESCE(((YEAR(APNP.DtRetornoCetip) * 100) + MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada) AS Safra,
+      Semana.NuSemana AS TpArquivo,
+      APNP.NmGrupoProdutoMeta AS Produto,
+      CASE WHEN APNP.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      CASE WHEN APNP.FxIdade = 'Acima 10 anos' THEN 'Acima de 10 anos' ELSE FxIdade END AS FxIdade,
+      APNP.FxParcela AS FxPrazo,
+      CASE WHEN APNP.Banco = 'BANCO DO BRASIL' THEN 'BB'
+           WHEN APNP.Banco = 'BRADESCO' THEN 'BRADESCO'
+           WHEN APNP.Banco = 'ITAU' THEN 'ITAU'
+           WHEN APNP.Banco = 'MONTADORAS' THEN 'MONTADORAS'
+           WHEN APNP.Banco = 'PANAMERICANO' THEN 'PAN'
+           WHEN APNP.Banco = 'SAFRA' THEN 'SAFRA'
+           WHEN APNP.Banco = 'SANTANDER' THEN 'SANTANDER'
+      ELSE 'OUTROS' END AS Bancos,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      APNP.Regional,
+      SUM(0) AS ContratoBV,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' THEN QtdPropostas END),0) AS Negada,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' THEN QtdPropostas END),0) AS Cancelada,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' THEN QtdPropostas END),0) AS APNP
+    FROM CONVPROP.BASEAPNP APNP
+    LEFT JOIN TbSemana Semana
+      ON Semana.DtReferencia = COALESCE(APNP.DtRetornoCetip, APNP.DtEntradaProposta)
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = APNP.CdParceiroComercial
+    WHERE SafraEntrada >= &safra13M. /*AND SafraEntrada < &SafraSimu.*/
+      AND NmGrupoProdutoMeta IN ('Motos','Leves','Pesados')
+      AND Banco <> 'NÃO CONVERTIDO'
+      AND FlPropostaValida = 1
+      AND DtRetornoCetip < &MaxDtShr.
+    GROUP BY 1,2,3,4,5,6,7,8,9;
+RUN;
+
+PROC SQL;
+  CREATE TABLE GravamesBV_Semana AS
+    SELECT
+      NuAnoMes AS Safra,
+      TpArquivo,
+      TpVeiculo AS Produto,
+      StVeiculo AS StatusVeiculo,
+      CASE WHEN FxIdade IN ('11 a 14 anos','15 a 19 anos','20 anos e acima') THEN 'Acima de 10 anos'
+           ELSE FxIdade
+      END AS FxIdade,
+      FxPrazo,
+      'BV' AS Bancos,
+      COALESCE(UF,'Desconhecido') AS CdUf,
+      Regional,
+      COALESCE(SUM(GravTotal),0) AS ContratoBV,
+      SUM(0) AS Negada,
+      SUM(0) AS Cancelada,
+      SUM(0) AS APNP
+    FROM RELEXC.TBMARKETSHAREDIARIAABERTA
+    WHERE TpVeiculo IN ('Leves','Motos','Pesados')
+      AND SUBSTR(TpArquivo,1,1) not in ('m','d')
+      AND Bancos = 'BV'
+      AND NuAnoMes >= &safra13M.
+      AND AjusteManual = 'N'
+      AND TpAgenteProdutoMIS <> '3'
+    GROUP BY 1,2,3,4,5,6,7,8,9;
+RUN;
+
+DATA Conversao_Semana_01;
+SET BaseConvProposta_Semana GravamesBV_Semana;
+RUN;
+
+PROC SQL;
+  CREATE TABLE ConversaoTotal_Semana AS
+    SELECT
+      COALESCE(A.Safra,B.Safra) AS Safra,
+      COALESCE(A.TpArquivo,B.TpArquivo) AS TpArquivo,
+      COALESCE(A.Produto,B.Produto) AS Produto,
+      COALESCE(A.StatusVeiculo,B.StatusVeiculo) AS StatusVeiculo,
+      COALESCE(A.FxIdade,B.FxIdade) AS FxIdade,
+      COALESCE(A.FxPrazo,B.FxPrazo) AS FxPrazo,
+      COALESCE(A.Bancos,B.Bancos) AS Bancos,
+      COALESCE(A.CdUf,B.CdUf) AS CdUf,
+      COALESCE(A.Regional,B.Regional) AS Regional,
+      SUM(COALESCE(A.ContratoBV,0)) AS ContratoBV,
+      SUM(COALESCE(A.Negada,0)) AS Negada,
+      SUM(COALESCE(A.Cancelada,0)) AS Cancelada,
+      SUM(COALESCE(A.APNP,0)) AS APNP,
+      SUM(COALESCE(B.Card,0)) AS Card,
+	  SUM(COALESCE(B.Pre_Analise,0)) AS Pre_Analise
+    FROM Conversao_Semana_01 A
+    FULL OUTER JOIN BaseSimulacoes_Semana B
+      ON A.Safra = B.Safra
+     AND A.TpArquivo = B.TpArquivo
+     AND A.Produto = B.Produto
+     AND A.StatusVeiculo = B.StatusVeiculo
+     AND A.Bancos = B.Bancos
+     AND A.CdUF = B.CdUF
+     AND A.FxIdade = B.FxIdade
+     AND A.FxPrazo = B.FxPrazo
+     AND A.Regional = B.Regional
+   GROUP BY 1,2,3,4,5,6,7,8,9;
+RUN;
+
+PROC SQL;
+  CREATE TABLE MarketShare_Semana AS
+    SELECT
+      NuAnoMes AS Safra,
+      TpArquivo,
+      TpVeiculo AS Produto,
+      StVeiculo AS StatusVeiculo,
+      FxPrazo,
+      CASE WHEN FxIdade IN ('11 a 14 anos','15 a 19 anos','20 anos e acima') THEN 'Acima de 10 anos'
+           ELSE FxIdade
+      END AS FxIdade,
+      CASE WHEN Bancos = 'BANCO DO BRASIL' THEN 'BB'
+           WHEN Bancos = 'BRADESCO' THEN 'BRADESCO'
+           WHEN Bancos = 'BV' THEN 'BV'
+           WHEN Bancos = 'ITAU' THEN 'ITAU'
+           WHEN Bancos = 'MONTADORAS' THEN 'MONTADORAS'
+           WHEN Bancos = 'PANAMERICANO' THEN 'PAN'
+           WHEN Bancos = 'SAFRA' THEN 'SAFRA'
+           WHEN Bancos = 'SANTANDER' THEN 'SANTANDER'
+      ELSE 'OUTROS' END AS Bancos,
+      UF AS CdUF,
+      Regional,
+      COALESCE(SUM(GravTotal),0) AS Gravames
+    FROM RELEXC.TBMARKETSHAREDIARIAABERTA
+    WHERE NuAnoMes >= &safra13M.
+      AND TpVeiculo IN ('Leves','Motos','Pesados')
+      AND SUBSTR(TpArquivo,1,1) not in ('m','d')
+      AND AjusteManual = 'N'
+      AND TpAgenteProdutoMIS <> '3'
+    GROUP BY 1,2,3,4,5,6,7,8,9
+    HAVING(calculated Gravames > 0);
+RUN;
+
+PROC SQL;
+  CREATE TABLE VisibilidadeBV_Semana_001 AS
+    SELECT
+      COALESCE(B.Safra,A.Safra) AS Safra,
+      COALESCE(B.TpArquivo,A.TpArquivo) AS TpArquivo,
+      COALESCE(B.Produto,A.Produto) AS Produto,
+      COALESCE(B.StatusVeiculo,A.StatusVeiculo) AS StatusVeiculo,
+      COALESCE(B.FxIdade,A.FxIdade) AS FxIdade,
+      COALESCE(B.FxPrazo,A.FxPrazo) AS FxPrazo,
+      COALESCE(B.Bancos,A.Bancos) AS Bancos,
+      COALESCE(B.CdUF,A.CdUF) AS CdUF,
+      COALESCE(B.Regional,A.Regional) AS Regional,
+      COALESCE(SUM(B.Gravames),0) - COALESCE(SUM(A.ContratoBV + A.Negada + A.Cancelada + A.APNP + A.Card/* + A.Simulacao*/),0) AS NaoPassouBV,
+      SUM(COALESCE(A.ContratoBV,0)) AS ContratoBV,
+      SUM(COALESCE(A.Negada,0)) AS Negada,
+      SUM(COALESCE(A.Cancelada,0)) AS Cancelada,
+      SUM(COALESCE(A.APNP,0)) AS APNP,
+      SUM(COALESCE(A.Card,0)) AS Card,
+	  SUM(COALESCE(A.Pre_Analise,0)) AS Pre_Analise
+    FROM MarketShare_Semana B
+    FULL OUTER JOIN ConversaoTotal_Semana A
+      ON A.Safra = B.Safra
+     AND A.TpArquivo = B.TpArquivo
+     AND A.Produto = B.Produto
+     AND A.StatusVeiculo = B.StatusVeiculo
+     AND A.Bancos = B.Bancos
+     AND A.CdUF = B.CdUF
+     AND A.FxIdade = B.FxIdade
+     AND A.FxPrazo = B.FxPrazo
+     AND A.Regional = B.Regional
+    GROUP BY 1,2,3,4,5,6,7,8,9
+    ORDER BY 1,2,3,4,5,6,7,8,9;
+RUN;
+
+PROC TRANSPOSE DATA=VisibilidadeBV_Semana_001 OUT=VisibilidadeBV_Semana NAME=Status PREFIX=Quantidade;
+  BY Safra
+     TpArquivo
+     Produto
+     StatusVeiculo
+     FxIdade
+     FxPrazo
+     Bancos
+     CdUF
+     Regional;
+ VAR NaoPassouBV
+     ContratoBV
+     Negada
+     Cancelada
+     APNP
+     Card
+	 Pre_Analise;
+RUN;
+
+/* Data de atualização */
+PROC SQL;
+  SELECT MAX(DtAtualizacao) INTO :DtAtApnp FROM CONVPROP.BASEAPNP;
+RUN;
+
+PROC SQL;
+  SELECT MAX(DtAtualizacao) INTO :DtAtSimu FROM TBSIMULACOES;
+RUN;
+
+/* Empilhar bases */
+PROC SQL;
+CREATE TABLE Visibilidade_Empilhada AS
+  SELECT 'mf' AS TpArquivo, * FROM VisibilidadeBV
+  OUTER UNION CORRESPONDING
+  SELECT * FROM VisibilidadeBV_Semana;
+RUN;
+
+PROC SQL;
+  CREATE TABLE VisibilidadeBV_Final AS
+    SELECT
+    PUT(&MaxDtShr.,ddmmyy10.) AS DtAtualizacao,
+    "&DtAtApnp." AS DtAtualizacaoProp,
+    PUT(&DtAtSimu.,ddmmyy10.) AS DtAtualizacaoSimu,
+    *
+    FROM Visibilidade_Empilhada
+    WHERE Safra >= &safra13M.;
+RUN;
+
+%ExportaCSV(visibilidade_bv,VisibilidadeBV_Final);

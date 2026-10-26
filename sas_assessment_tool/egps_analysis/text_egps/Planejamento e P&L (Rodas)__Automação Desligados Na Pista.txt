@@ -1,0 +1,404 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Automação Desligados Na Pista
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:38 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (4x | +80), PROC DATASETS (2x | +40), PROC APPEND (1x | +15), INFILE  (3x | +30), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 284
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: APPEND, DATASETS, SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: id
+DETECTED_MACROS_USED: Arquivo, DIRETORIO, DIRETORIO_SAIDA, Delimitador, Diretorio, anomes, id
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): &DIRETORIO. [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], DWBI_DTWH.TBCARGOCOLABORADOR [DBCON], DWBI_DTWH.TBCOLABORADOR [DBCON], DWBI_DTWH.TBESTADOCOLABORADOR [DBCON], DWBI_DTWH.TBPESSOA [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): &amp;Diretorio., /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, C:\Users\vitoria.ribeiro1\Downloads\BaseFinal.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.BaseFinal <- C:\Users\vitoria.ribeiro1\Downloads\BaseFinal.csv
+TABLE_READ_PROVENANCE (Flow): BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN], DWBI_DTWH.TBCARGOCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBCOLABORADOR [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBESTADOCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBPESSOA [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): &amp;Diretorio., /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ARQUIVOS, BASEFINAL, BASEFINAL1, ESTRUTURACOMERCIAL, TMP, XX
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|&Diretorio.||#|DIRETORIO|suspeito
+IN|/infogrc/utils/all-includes.sas|/INFOGRC/UTILS|ALL-INCLUDES.SAS||ok
+IN|/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas|/PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS|CONECTADB.SAS||ok
+IN|/projetos/MISV/sas-misv-base-lib/scripts/libname.sas|/PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS|LIBNAME.SAS||ok
+IN|C:\Users\vitoria.ribeiro1\Downloads\BaseFinal.csv|C:/USERS/VITORIA.RIBEIRO1/DOWNLOADS|BASEFINAL.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: ImportMIS - NaPista */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: ImportMIS - NaPista */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-BzaqDwziZdsayNGp/code.sas */
+/* =========================INÍCIO TASK========================= */
+options fullstimer notes  mprint mlogic symbolgen source source2  ;
+
+
+
+
+option compress = binary;
+options validvarname=any  fullstimer notes  mprint mlogic symbolgen ;
+
+
+
+
+
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+
+
+
+
+
+
+%macro Importar;
+ %let id = %sysfunc(open(Arquivos));
+  %syscall set(id);
+  %do %while(%sysfunc(fetch(&id.)) eq 0);
+   
+   data _null_;
+    infile "&Diretorio." dsd missover obs=1;
+    input Cabecalho :$255.;
+    Cabecalho = translate(Cabecalho, '_', ' ');
+    call symputx('Delimitador', put(substr(Cabecalho, prxmatch('/[^\w]/',Cabecalho), 1), $hex.));
+   run;
+
+   
+   data tmp;
+    infile "&Diretorio." dsd missover firstobs=2 dlm="&Delimitador."x;
+    format NmArquivo $50.;
+    format DtArquivo yymmdd10.;
+
+    NmArquivo = "&Arquivo";
+    DtArquivo = today();
+
+   INPUT
+    CdColaborador       :   BEST10.
+    NuAnoMes            :   BEST6.
+    VrProducao          :   COMMAX10.
+       CdParceiroComercial :   BEST6.
+    Produto             :   $CHAR10.;
+
+   ;run;
+
+   
+   proc append base=BaseFinal data=tmp force;run;
+
+   
+   proc datasets lib=work nolist;
+    delete tmp;
+   run;
+  %end;
+ %let id = %sysfunc(close(&id.));
+%mend;
+
+data  _null_;
+     call symput('AnoMes',compress(put(today(),yymmdd10.),"-")|| '_' ||compress(put(time(),B8601TM6.0),":"));
+run;
+
+
+data Arquivos;
+     format Arquivo $50. Diretorio $255.
+           ARQUIVO_SAIDA $50. ARQUIVO_INICIO $50.
+             DIRETORIO_SAIDA $255.  DIRETORIO_DESTINO $255.;
+     
+
+ Pasta = '/infogrc/MisVarejo/NaPista/TbMetaNaoIsonomica_NaPista';
+    DIRETORIO_DESTINO = '/infogrc/MisVarejo/NaPista/TbMetaNaoIsonomica_NaPista/processado';
+
+     rc = filename('pasta', Pasta);
+          id = dopen('pasta');
+                do i = 1 to dnum(id);
+                     Arquivo = dread(id, i);
+
+                     var1= prxmatch('/\.csv/i', Arquivo);
+                     arquivo_inicio = scan (Arquivo,1);
+                     ARQUIVO_SAIDA= catx('.',   catx('_', arquivo_inicio, "&anomes."), 'csv');
+                     if prxmatch('/\.csv/i', Arquivo) then do;
+                          Diretorio = catx('/', Pasta, Arquivo);
+                    DIRETORIO_SAIDA =  catx('/', DIRETORIO_DESTINO, ARQUIVO_SAIDA);
+                          output;
+                     end;
+
+                end;
+          id = dclose(id);
+     rc = filename('pasta');
+
+run;
+
+
+proc datasets lib=work nolist;
+ delete BaseFinal;
+run;
+%Importar;
+
+%macro Mover;
+     %let id = %sysfunc(open(Arquivos));
+          %syscall set(id);
+          %do %while(%sysfunc(fetch(&id.)) eq 0);
+                X "mv &DIRETORIO. &DIRETORIO_SAIDA.";
+
+          %end;
+     %let id = %sysfunc(close(&id.));
+%mend  Mover;
+
+%MOVER;
+
+
+
+proc sql;
+CREATE TABLE BaseFinal1 AS
+SELECT
+         NaPista.NmArquivo
+  ,NaPista.NuAnoMes
+  ,NaPista.Produto
+  ,NaPista.CdColaborador
+  ,NaPista.CdParceiroComercial
+  ,NaPista.VrProducao
+
+  ,EstruturaComercial.CdFilial
+  ,EstruturaComercial.NmAreaEstruturaComercial
+  ,TbEstruturaComercial.NmFilial
+     ,TbEstruturaComercial.NmSubEstruturaComercialA
+  ,EstruturaComercial.NmColaborador
+  ,EstruturaComercial.DsLoginN1
+  ,EstruturaComercial.DsLoginN2A
+  ,EstruturaComercial.DsLoginN3A
+  ,EstruturaComercial.LstSubstituicao
+  ,put(today(), yymmddn8.) AS data_atualizacao
+
+FROM BaseFinal NaPista
+ LEFT JOIN bases.TbEstruturaComercial EstruturaComercial
+   ON  EstruturaComercial.CdColaboradorAtivo  = NaPista.CdColaborador
+    AND EstruturaComercial.NuAnoMes  = NaPista.NuAnoMes
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: ImportMIS - NaPista */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: ValidaçãoGRsInativos */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: ValidaçãoGRsInativos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-EQCmdZg58QIgyivt/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+CREATE TABLE BaseFinal1 AS
+SELECT
+  BaseFinal.NuAnoMes
+  ,BaseFinal.Produto
+  ,BaseFinal.CdColaborador
+  ,BaseFinal.CdParceiroComercial
+  ,BaseFinal.VrProducao
+
+  ,EstruturaComercial.CdFilial
+  ,EstruturaComercial.NmAreaEstruturaComercial
+  ,TbEstruturaComercial.NmFilial
+     ,TbEstruturaComercial.NmSubEstruturaComercialA
+  ,EstruturaComercial.NmColaborador
+  ,EstruturaComercial.DsLoginN1
+  ,EstruturaComercial.DsLoginN2A
+  ,EstruturaComercial.DsLoginN3A
+  ,EstruturaComercial.LstSubstituicao
+  ,put(today(), yymmddn8.) AS data_atualizacao
+
+FROM BaseFinal BaseFinal
+
+ LEFT JOIN bases.TbEstruturaComercial EstruturaComercial
+   ON  EstruturaComercial.CdColaboradorAtivo  = BaseFinal.CdColaborador
+    AND EstruturaComercial.NuAnoMes  = BaseFinal.NuAnoMes
+
+	WHERE DsLoginN1 IS NULL
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: ValidaçãoGRsInativos */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Consulta EstruturaComercial */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Consulta EstruturaComercial */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1MMXCz2ahceLYBQv/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table estruturacomercial as
+select *
+from bases.TbEstruturaComercial
+where nuanomes >= 202507
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Consulta EstruturaComercial */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Consulta TbColaborador */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Consulta TbColaborador */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-nV1Gz1Mxuje2ZrLp/code.sas */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/all-includes.sas';
+
+%criavardb;
+proc sql;
+%CONECTADB(server=BI);
+CREATE TABLE xx AS
+SELECT * FROM connection to dbcon
+(
+
+SELECT
+
+A.CDPessoa,
+A.cdcolaboradorrh AS IdMatriculaRH,
+A.CdColaboradorSistemaOrigem AS CdColaborador,
+a.cdoperadorrh AS CdOperador,
+a.dslogin AS DsLogin,
+B.NMPESSOA,
+b.FlAtivo,
+A.DtInicioVigencia,
+A.DtFimVigencia,
+A.DtAdmissaoColaborador,
+A.DtDesligamentoColaborador,
+c.CdEstadoColaborador,
+c.NmEstadoColaborador,
+a.CdCargoColaborador,
+d.NmCargoColaborador,
+a.cdnivelcargocolaborador
+
+FROM DWBI_DTWH.TbColaborador A
+
+INNER JOIN DWBI_DTWH.TbPessoa B ON a.cdpessoa = b.cdpessoa
+INNER JOIN DWBI_DTWH.TbEstadoColaborador c ON c.CdEstadoColaborador = a.CdEstadoColaborador
+INNER JOIN DWBI_DTWH.TbCargoColaborador D ON D.CdCargoColaborador = a.CdCargoColaborador
+
+WHERE
+a.dslogin in ('amalia.rocha',
+'ricardo.cardoso',
+'evandir.barbosa',
+'ricardo.antonio',
+'andrei.hech',
+'elisangela.gomes',
+'ricardo.santos',
+'thais.domingues',
+'kamila.hirata',
+'camila.goncalves',
+'reiff.freire',
+'mariana.poly',
+'iolanda.gomes',
+'juarez.barbalho',
+'maico.zanin',
+'emanuel.cardoso',
+'jefferson.correa',
+'eliana.cortes',
+'laisa.leite',
+'osmar.silva',
+'antonio.freitas',
+'esli.reis',
+'suzana.vasconcelos',
+'leandro.andrade',
+'jessica.anete')
+
+ORDER BY B.NMPESSOA, A.DtInicioVigencia, A.DtFimVigencia
+
+)
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Consulta TbColaborador */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA WORK.BaseFinal;
+    LENGTH
+        CdColaborador      8
+        NuAnoMes           8
+        VrProducao         8
+        CdParceiroComercial   8
+        Produto          $ 7 ;
+    FORMAT
+        CdColaborador    BEST7.
+        NuAnoMes         BEST6.
+        VrProducao       BEST11.
+        CdParceiroComercial BEST6.
+        Produto          $CHAR7. ;
+    INFORMAT
+        CdColaborador    BEST7.
+        NuAnoMes         BEST6.
+        VrProducao       BEST11.
+        CdParceiroComercial BEST6.
+        Produto          $CHAR7. ;
+    INFILE '/saswork/SAS_work8328002DD0B1_srv-sasprd04n1/#LN00017'
+        LRECL=41
+        ENCODING="LATIN1"
+        TERMSTR=CRLF
+        DLM='7F'x
+        MISSOVER
+        DSD ;
+    INPUT
+        CdColaborador    : ?? BEST7.
+        NuAnoMes         : ?? BEST6.
+        VrProducao       : ?? COMMAX11.
+        CdParceiroComercial : ?? BEST6.
+        Produto          : $CHAR7. ;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

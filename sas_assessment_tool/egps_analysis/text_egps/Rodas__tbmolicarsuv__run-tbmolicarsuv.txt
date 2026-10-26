@@ -1,0 +1,117 @@
+START_METADATA
+PROJECT: Rodas__tbmolicarsuv
+FILE_SAS: run-tbmolicarsuv.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 80)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (4x | +80)
+----------------------------------------
+LINES_OF_CODE: 49
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: a0, a3
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /INFOGRC/UTILS/FUNCOES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], DBA.TBMOLICAR [DBCON], DBA.TBPROPGARANTIAMAQEQUIP [DBCON], DBA.TBPROPOSTA [DBCON], TMP.TBORIGINACAO&A0 [SAS/Local], TMP.TBORIGINACAO&A3 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: AUXL
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas
+TABLE_READ_PROVENANCE (Flow): DBA.TBMOLICAR [Pass-Through Native (DBCON) - FROM], DBA.TBPROPGARANTIAMAQEQUIP [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], TMP.TBORIGINACAO&A0 [DATA Step - SET], TMP.TBORIGINACAO&A3 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUXL.TBMOLICAR_SUV
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ORIGINACAO, TBMOLICAR_SUV
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{A0}, TMP.TBORIGINACAO{A3}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (sas: 4)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /infogrc/utils/funcoes.sas
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/libname.sas';
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/funcoes.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+create table TbMolicar_SUV as
+select * from connection to dbcon
+(
+SELECT DISTINCT
+B.NUPROPOSTA
+,A.CDMOLICAR
+,A.CDMARCA
+,B.CdModelo
+,B.AaFabricacao
+,B.AaModelo
+,A.DSCATEGORIA
+,A.DSMOLICARCONFIGURACAO
+
+FROM DBA.TbMolicar AS A
+
+LEFT JOIN DBA.TbPropGarantiaMaqEquip AS B
+ON A.CDMOLICAR = B.CDMOLICAR
+
+INNER JOIN DBA.TbProposta AS C
+ON B.NUPROPOSTA = C.NUPROPOSTA
+
+WHERE dsmolicarconfiguracao LIKE '%SUV%'
+)
+;RUN;
+
+PROC SORT DATA=TbMolicar_SUV OUT=TbMolicar_SUV NODUPKEY; BY NUPROPOSTA;RUN;
+
+/*%include '/infogrc/utils/verifica/verifica-originacao.sas';*/
+
+DATA Originacao;
+SET tmp.TbOriginacao&a3. - tmp.TbOriginacao&a0.;
+RUN;
+
+PROC SQL;
+CREATE TABLE AUXL.TbMolicar_SUV AS
+SELECT
+
+A.NUPROPOSTA,
+B.NuContratoGestao,
+A.CDMOLICAR,
+A.CDMARCA,
+A.CdModelo,
+A.AaFabricacao,
+A.AaModelo,
+A.DSCATEGORIA,
+A.DSMOLICARCONFIGURACAO,
+B.NmGrupoProdutoMeta
+
+FROM TbMolicar_SUV A
+
+LEFT JOIN Originacao B ON B.NUPROPOSTA = A.NUPROPOSTA
+
+where B.NmGrupoProdutoMeta NOT IN ('CVG Pesados','Pesados')
+
+;RUN;

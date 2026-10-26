@@ -1,0 +1,129 @@
+START_METADATA
+PROJECT: Rodas__Incentivo_Comercial
+FILE_SAS: 02 - Comissao MC Direta.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 62
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBGRINCENTIVO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_PRODUCAO, WORK.BASE_PRODUCAO_01, WORK.BASE_PRODUCAO_1, WORK.BASE_PRODUCAO_2
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: ICOM
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_PRODUCAO, WORK.BASE_PRODUCAO_01, WORK.BASE_PRODUCAO_1, WORK.BASE_PRODUCAO_2
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRINCENTIVO [PROC SQL - JOIN], TMP.TBPRODUCAO [DATA Step - SET], WORK.BASE_PRODUCAO [PROC SQL - FROM], WORK.BASE_PRODUCAO_01 [DATA Step - SET], WORK.BASE_PRODUCAO_1 [DATA Step - SET], WORK.BASE_PRODUCAO_2 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ICOM.TBGRCOMISSAODIRETA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PRODUCAO, BASE_PRODUCAO_01, BASE_PRODUCAO_1, BASE_PRODUCAO_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+DATA BASE_PRODUCAO_1;
+SET TMP.TBPRODUCAO;
+WHERE
+NUANOMES >= 202412
+/*AND NmCanalEstruturaComercial in ('Canal Veiculos','Negocios Centralizados')*//*Comissão Direta é independente do Canal, exemplo em caso de transferencia ou erro de cadastro do PDV no PTA*/
+and NmGrupoCargoColaborador IN ('Gerente Relacionamento Veiculos')
+/*and NmSubEstruturaComercialA NOT IN ('Canal Motos', 'Canal Pesados')*//*Comissão Direta é independente da Regional, exemplo em caso de transferencia ou erro de cadastro do PDV no PTA*/
+AND NmGrupoProdutoMeta <> "Leves-BVO" /*COMISSAO DE LEVES BVO SERÁ OUTRO PERCENTUAL*/
+;run;
+
+DATA BASE_PRODUCAO_2;
+SET TMP.TBPRODUCAO;
+WHERE
+NUANOMES >= 202601
+/*AND NmCanalEstruturaComercial in ('Canal Veiculos','Negocios Centralizados')*//*Comissão Direta é independente do Canal, exemplo em caso de transferencia ou erro de cadastro do PDV no PTA*/
+and NmGrupoCargoColaborador IN ('Gerente Relacionamento Motos', 'Gerente Relacionamento Pesados')
+/*and NmSubEstruturaComercialA NOT IN ('Canal Motos', 'Canal Pesados')*//*Comissão Direta é independente da Regional, exemplo em caso de transferencia ou erro de cadastro do PDV no PTA*/
+AND NmGrupoProdutoMeta <> "Leves-BVO" /*COMISSAO DE LEVES BVO SERÁ OUTRO PERCENTUAL*/
+;run;
+
+DATA BASE_PRODUCAO;
+SET WORK.BASE_PRODUCAO_1
+	WORK.BASE_PRODUCAO_2;
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_PRODUCAO_01 AS
+SELECT
+
+A.NuAnoMes,
+
+B.NmCanalEstruturaComercial,
+B.NmEstruturaComercialA,
+B.NmSubEstruturaComercialA,
+B.NmAreaEstruturaComercial,
+B.LstSubstituicao,
+B.LstColaboradorFocal,
+B.DsLoginN3A,
+CASE WHEN B.DsLoginN2A = '' THEN 'cadeira.vazia' ELSE B.DsLoginN2A END AS DsLoginN2A,
+
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+
+/*a.nmgrupoprodutometa,*/
+
+SUM(CASE WHEN A.nmgrupoprodutometa IN ('Leves', 'Motos', 'Pesados') THEN a.VrMargemContribuicao ELSE 0 END) as VrMargemContribuicao_Rodas format commax20.2,
+SUM(CASE WHEN A.nmgrupoprodutometa IN ('CVG Leves', 'CVG Pesados') THEN a.VrMargemContribuicao ELSE 0 END) as VrMargemContribuicao_EGV format commax20.2,
+SUM(a.VrMargemContribuicao) as VrMargemContribuicao format commax20.2,
+
+(0.02) AS PcComissaoDiretaMC format percent9.0,
+calculated VrMargemContribuicao * calculated PcComissaoDiretaMC as VrComissaoDiretaGR format commax20.2
+
+FROM WORK.BASE_PRODUCAO A
+
+LEFT JOIN BASEGRC.TBGRINCENTIVO B ON B.DsLoginN1 = A.DsLoginN1 AND B.NUANOMES = A.NUANOMES
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12
+order by 1,5,12
+
+;run;
+
+/*******************************/
+/*FAZ BKP DA ÚLTIMA BASE VALIDA*/
+/*******************************/
+/*
+DATA ICOM_BKP.TBGRCOMISSAODIRETA_BKP_&AnoMes.;
+SET ICOM.TBGRCOMISSAODIRETA;
+;RUN;
+*/
+/******************/
+/*SALVA BASE FINAL*/
+/******************/
+
+DATA ICOM.TBGRCOMISSAODIRETA;
+SET WORK.BASE_PRODUCAO_01;
+;RUN;

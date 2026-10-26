@@ -1,0 +1,218 @@
+START_METADATA
+PROJECT: Rodas__fenabrave
+FILE_SAS: 03-consolidar.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -30
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 143
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: AUTOMATI = /riscosbvf/CRM/SAS/AddIn; MIS = /riscosbvf/CRM/SAS/DM_MIS
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUTOMATI.TB_INTEGMKTSHARE_FENABRAVE [SAS/Local], BASEGRC.CILINDRADA_COMPLEMENTO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBGRUPOMODELOVEICULO
+IMPORTED_LIBNAMES: AUTOMATI
+EXPORTED_LIBNAMES: AUTOMATI, BASEGRC, MIS, MKTM
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBGRUPOMODELOVEICULO
+TABLE_READ_PROVENANCE (Flow): AUTOMATI.TB_INTEGMKTSHARE_FENABRAVE [PROC SQL - FROM], BASEGRC.CILINDRADA_COMPLEMENTO [PROC SQL - JOIN], MIS.TB_FENABRAVE_MKTSHARE_00 [PROC SQL - FROM], MKTM.TBGRUPOMODELOVEICULO [PROC SQL - JOIN], WORK.TBGRUPOMODELOVEICULO [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): MIS.TB_FENABRAVE_MKTSHARE_00, MKTM.TBGRUPOMODELOVEICULO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): AUTOMATI.TB_INTEGMKTSHARE_FENABRAVE, MIS.TB_FENABRAVE_MKTSHARE_00
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUTOMATI.TBDIMMODELOCOMBUSTIVEL, BASEGRC.TBGRUPOMODELOVEICULO, MIS.TB_FENABRAVE_MKTSHARE_00, MKTM.TBGRUPOMODELOVEICULO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBFENABRAVE, TBGRUPOMODELOVEICULO, TBMODELOCOMBUSTIVEL, TB_MKTSHARE_CNPJ_FENABRAVE, VALIDACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+option compress = binary;
+
+libname mis '/riscosbvf/CRM/SAS/DM_MIS';
+LIBNAME automati '/riscosbvf/CRM/SAS/AddIn';
+
+proc sql;
+create table mis.tb_fenabrave_mktshare_00 as
+select
+
+	 input(compress(TRANWRD(TRANWRD(TRANWRD(nmarquivo,'Emplacamentos_',''),'.txt',''),'_','')),6.) as base
+	,Estado as CdUf
+	,'Novo' as StVeiculo
+	,case
+		when Segmento_Codigo = 1 then 'Leves'
+		when Segmento_Codigo = 2 then 'Leves'
+		when Segmento_Codigo = 6 then 'Motos'
+		when Segmento_Codigo = 3 then 'Pesados'
+		when Segmento_Codigo = 4 then 'Pesados'
+	 end as TpVeiculo
+	,count(*) as Qtd
+from tb_fenabrave_emplacamentos
+where Segmento_Codigo in (1,2,3,4,6)
+  and Estado is not null
+group by 1,2,3,4
+
+union all
+
+select
+	 input(compress(TRANWRD(TRANWRD(TRANWRD(nmarquivo,'Transacoes',''),'.txt',''),'_','')),6.)
+	,Estado as CdUf
+	,'Usado' as StVeiculo
+	,case
+		when Segmento_Codigo = 1 then 'Leves'
+		when Segmento_Codigo = 2 then 'Leves'
+		when Segmento_Codigo = 6 then 'Motos'
+		when Segmento_Codigo = 3 then 'Pesados'
+		when Segmento_Codigo = 4 then 'Pesados'
+	 end as TpVeiculo
+	,count(*) as Qtd
+from tb_fenabrave_transacoes
+where Segmento_Codigo in (1,2,3,4,6)
+  and Estado is not null
+group by 1,2,3,4
+
+;run;
+
+proc sql;
+insert into mis.tb_fenabrave_mktshare_00
+select
+	 year(base)*100+month(base)
+	,CdUF
+	,case
+		when StVeiculo = 1 then 'Novo'
+		when StVeiculo = 2 then 'Usado'
+	 end as StVeiculo
+	,case
+		when TpVeiculo = 1 then 'Leves'
+		when TpVeiculo = 1 then 'Leves'
+		when TpVeiculo = 3 then 'Motos'
+		when TpVeiculo = 4 then 'Pesados'
+		when TpVeiculo = 4 then 'Pesados'
+	 end as TpVeiculo
+	,Qtd
+from automati.tb_integmktshare_fenabrave
+;run;
+
+/*validacao*/
+
+proc sql;
+create table validacao as
+select
+	 base
+	,sum(Qtd) as Qtd
+from mis.tb_fenabrave_mktshare_00
+group by
+	 base
+;run;
+
+/*base fenabrave-ibm*/
+proc sql;
+create table tb_mktshare_cnpj_fenabrave as
+select distinct
+	cnpj
+from tb_fenabrave_emplacamentos
+where cnpj > 0
+;run;
+
+data TbFenabrave;
+set
+	TB_FENABRAVE_EMPLACAMENTOS
+	TB_FENABRAVE_TRANSACOES
+;run;
+
+;proc sql;
+create table TbModeloCombustivel as
+select distinct
+	 Modelo_Codigo
+	,coalesce(Combustivel_Codigo,0) as Combustivel_Codigo
+	,coalesce(Combustivel,'Indeterminado') as Combustivel
+from TbFenabrave
+where Modelo_Codigo > 0
+order by
+	case
+		when Combustivel_Codigo = 99 then 1
+		when Combustivel_Codigo is null then 1
+		when Combustivel_Codigo > 0  then 0
+	else 1 end
+;run;
+
+proc sort data=TbModeloCombustivel out=automati.TbDimModeloCombustivel nodupkey;by Modelo_Codigo;run;
+
+/******************************************************************************************/
+/*GFM - Tabela com os dados do Fabricante de Motos para atualizar o Mkt Share do COmercial*/
+/******************************************************************************************/
+proc sql;
+create table tbGrupoModeloVeiculo as
+select
+	 Fenabrave.Fabricante
+	,Fenabrave.Fabricante_Codigo
+	,Fenabrave.GrupoModeloVeiculo
+	,Fenabrave.GrupoModeloVeiculo_Codigo
+	,Fenabrave.Modelo
+	,Fenabrave.Modelo_Codigo
+	,Fenabrave.Segmento
+	,Fenabrave.Segmento_Codigo
+	,Fenabrave.SubSegmento
+	,Fenabrave.SubSegmento_Codigo
+	,count(*) as QtOcorrencias
+	,coalesce(Cilindrada_Complemento.Cilindrada,MotoCilindrada.Cilindrada) as Cilindrada
+	,Cilindrada_Complemento.FxCilindrada
+from TbFenabrave Fenabrave
+
+	left join MKTM.tbGrupoModeloVeiculo MotoCilindrada
+			on Fenabrave.Modelo_Codigo = MotoCilindrada.modelo_codigo
+
+	left join basegrc.Cilindrada_Complemento as Cilindrada_Complemento
+			on Fenabrave.Modelo_Codigo = Cilindrada_Complemento.modelo_codigo
+
+where Fenabrave.Segmento_Codigo = 6
+
+group by 	 Fenabrave.Fabricante
+	,Fenabrave.Fabricante_Codigo
+	,Fenabrave.GrupoModeloVeiculo
+	,Fenabrave.GrupoModeloVeiculo_Codigo
+	,Fenabrave.Modelo
+	,Fenabrave.Modelo_Codigo
+	,Fenabrave.Segmento
+	,Fenabrave.Segmento_Codigo
+	,Fenabrave.SubSegmento
+	,Fenabrave.SubSegmento_Codigo
+	,coalesce(Cilindrada_Complemento.Cilindrada,MotoCilindrada.Cilindrada)
+	,Cilindrada_Complemento.FxCilindrada
+
+order by QtOcorrencias desc
+
+;run;
+
+proc sort data=tbGrupoModeloVeiculo nodupkey; by modelo_codigo;run;
+
+DATA MKTM.tbGrupoModeloVeiculo;
+SET WORK.tbGrupoModeloVeiculo;
+;RUN;
+
+DATA BASEGRC.tbGrupoModeloVeiculo;
+SET WORK.tbGrupoModeloVeiculo;
+;RUN;

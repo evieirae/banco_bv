@@ -1,0 +1,388 @@
+START_METADATA
+PROJECT: Rodas__visibilidade-potencial
+FILE_SAS: dashboard-visibilidade-executivo.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 311
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: LstGrav, safraM12
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], QTDMES [DBCON], RELEXC.TBMARKETSHAREDIARIAABERTA [SAS/Local], SOLITMP.CONVERSAOMENSAGERIA [SAS/Local], SOLITMP.TBVISIBILIDADEPOTENCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/solicitacaopontual/tmp/conversaomensageria.sas7bdat, /infogrc/solicitacaopontual/tmp/tbvisibilidadepotencial.sas7bdat, /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): CONVSIMU.TBSIMULACOES [DATA Step - SET], QTDMES [Pass-Through Native (DBCON) - FROM], RELEXC.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM], SOLITMP.CONVERSAOMENSAGERIA [PROC SQL - FROM], SOLITMP.TBVISIBILIDADEPOTENCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/solicitacaopontual/tmp/conversaomensageria.sas7bdat, /infogrc/solicitacaopontual/tmp/tbvisibilidadepotencial.sas7bdat, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBCONVERSAOMENSAGERIA, TBCONVERSAOMENSAGERIA001, TBCONVSIMU, TBDIASUTEIS, TBPASSOUBV, TBSHAREMERCADO, TBSIMULACOES, TBSIMULACOES_00, TBVISIBILIDADE, TBVISIBILIDADEMERCADO, TBVISIBILIDADEMERCADO2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (sas: 1, sas7bdat: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/convsimu/tbsimulacoes.sas7bdat
+[CODE REF] /infogrc/solicitacaopontual/tmp/conversaomensageria.sas7bdat
+[CODE REF] /infogrc/solicitacaopontual/tmp/tbvisibilidadepotencial.sas7bdat
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Criacao:	07/01/2026															| */
+/* |	Responsavel: 	GUstavo Domingues - MIS IGE										| */
+/* |	Alt. Realizada:	- Retirado filtro de ZeroKM| */
+/* ====================================================================================== */
+/* |	Criacao:	09/02/2026													| */
+/* |	Responsavel: 	GUstavo Domingues - MIS IGE										| */
+/* |	Alt. Realizada:	- Reorganizado a ordem dos processsamentos para otimizar| */
+/* ====================================================================================== */
+
+%include '/infogrc/utils/all-includes.sas';
+
+%VerificaAtualizacao(/infogrc/solicitacaopontual/tmp/tbvisibilidadepotencial.sas7bdat,300,150);
+
+/* Busca dados de visibilidade */
+PROC SQL;
+CREATE TABLE TbVisibilidade AS
+  SELECT
+    Safra AS NuAnoMes,
+	'Visibilidade' as Tipo,
+	INPUT(COMPRESS(DtAtualizacao, ,'kad'), DDMMYY10.) FORMAT DATE9. AS DtAtualizacao,
+    TRANSTRN(FxIdade,'de ',TRIMN('')) AS FxIdade,
+    CASE WHEN Regional LIKE 'Canal Rodas%' THEN Regional ELSE 'Outros' END AS Regional,
+	Filial,
+	FlCarteira,
+	Produto,
+    SUM(Quantidade) AS Mercado,
+    SUM(CASE WHEN Status = 'NaoPassouBV' THEN Quantidade END) AS QtdForaBV,
+    SUM(CASE WHEN Status = 'ContratoBV' THEN Quantidade END) AS QtdContratoBV,
+    SUM(CASE WHEN Status LIKE 'APNP%' THEN Quantidade END) AS QtdAPNP,
+    SUM(CASE WHEN Status LIKE 'Negada%' THEN Quantidade END) AS QtdNegada,
+    SUM(CASE WHEN Status LIKE 'Cancelada%' THEN Quantidade END) AS QtdCancelada,
+    SUM(CASE WHEN Status LIKE 'CardP' THEN Quantidade END) AS QtdCardP,
+    SUM(CASE WHEN Status LIKE 'CardR' THEN Quantidade END) AS QtdCardR,
+    SUM(CASE WHEN Status LIKE 'CardD' THEN Quantidade END) AS QtdCardD,
+	SUM(CASE WHEN Status LIKE 'CardPA' THEN Quantidade END) AS QtdCardPA,
+	SUM(CASE WHEN Status LIKE 'CardPR' THEN Quantidade END) AS QtdCardPR
+  FROM
+    SOLITMP.TbVisibilidadePotencial
+  WHERE
+    Produto in ('Leves','Motos','Pesados')
+    AND Safra >= &safraM12.
+    AND FlCadastroBV = 'S'
+    AND FlAtivo = 'S'
+    AND FxIdade <> 'Desconhecido'
+  GROUP BY
+    1,2,3,4,5,6,7,8;
+RUN;
+
+/* Busca dados de Share */
+PROC SQL;
+CREATE TABLE TbShareMercado AS
+  SELECT
+    NuAnoMes,
+	DtAtualizacao,
+	'Share' as Tipo,
+    CASE WHEN StVeiculo = 'Novos' THEN 'ZeroKM'
+         WHEN FxIdade IN ('11 a 14 anos','15 a 19 anos', '20 anos e acima') THEN 'Acima 10 anos'
+         ELSE FxIdade
+         END AS FxIdade,
+    CASE WHEN Regional LIKE 'Canal Rodas%' THEN Regional ELSE 'Outros' END AS Regional,
+	Filial,
+	'N/A' AS FlCarteira,
+	TpVeiculo as Produto,
+    SUM(CASE WHEN Bancos = 'BV' THEN GravTotal END) as QtdGravamesBV,
+    SUM(CASE WHEN Bancos = 'SANTANDER' THEN GravTotal END) as QtdGravamesStd,
+    SUM(CASE WHEN Bancos = 'BRADESCO' THEN GravTotal END) as QtdGravamesBrad,
+    SUM(CASE WHEN Bancos = 'ITAU' THEN GravTotal END) as QtdGravamesItau,
+    SUM(CASE WHEN Bancos = 'PANAMERICANO' THEN GravTotal END) as QtdGravamesPan,
+    SUM(CASE WHEN Bancos = 'C6' THEN GravTotal END) as QtdGravamesC6,
+    SUM(CASE WHEN Bancos = 'SAFRA' THEN GravTotal END) as QtdGravamesSafra,
+    SUM(GravTotal) AS GravTotal
+  FROM
+    RELEXC.TbMarketShareDiariaAberta
+  WHERE
+    NuAnoMes >= &safraM12.
+    AND TpVeiculo in ('Leves','Motos','Pesados')
+    AND TpArquivo = 'mf'
+    AND AjusteManual = 'N'
+    AND TpAgenteProdutoMIS <> '3'
+	AND StatusGravame = 'Ativo'
+  GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+proc sort data=TbShareMercado ;
+	by NuAnoMes DtAtualizacao Tipo FxIdade Regional Filial Produto;
+run;
+
+%VerificaAtualizacao(/infogrc/convsimu/tbsimulacoes.sas7bdat,300,150);
+
+data TBSIMULACOES_00 ;
+    set Convsimu.tbsimulacoes (where=(NuAnoMes >= &safraM12.))
+;run;
+
+data TBSIMULACOES ;
+    set TBSIMULACOES_00 (where=(	Produto in ('Leves','Motos','Pesados')
+    							AND FlSimuValida = 1))
+;run;
+
+/* Dados de simulação */
+PROC SQL;
+CREATE TABLE TbConvsimu AS
+  SELECT DISTINCT
+    TRANSTRN(COALESCE(FxIdade,'Desconhecido'),"de ",TRIMN('')) AS FxIdade,
+  CASE WHEN Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+							 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+              AND Mensageria2 NOT IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              THEN 'P'
+         WHEN Mensageria in ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              OR (Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+								 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+                  AND Mensageria2 IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')) THEN 'R'
+		WHEN Mensageria IN ('7. Plano Aprovado') THEN 'PA'
+		WHEN Mensageria IN ('6. Plano Recusado') THEN 'PR'
+         ELSE 'D'
+         END AS GrupoMensageria,
+		 'N/A' AS FlCarteira,
+    *
+  FROM
+    TBSIMULACOES
+
+;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbPassouBV AS
+  SELECT
+    NuAnoMes,
+    FxIdade,
+	DtAtualizacao,
+	'Simu' as Tipo,
+    CASE WHEN Regional LIKE 'Canal Rodas%' THEN Regional ELSE 'Outros' END AS Regional,
+	Filial,
+	'N/A' AS FlCarteira,
+	Produto,
+    COUNT(DISTINCT CASE WHEN FlCard = 1 AND GrupoMensageria = 'P' THEN NuCpfCnpj END) AS QtdSimulacoesMsgP,
+    COUNT(DISTINCT CASE WHEN FlCard = 1 AND GrupoMensageria = 'R' THEN NuCpfCnpj END) AS QtdSimulacoesMsgR,
+    COUNT(DISTINCT CASE WHEN FlCard = 1 AND GrupoMensageria = 'D' THEN NuCpfCnpj END) AS QtdSimulacoesMsgD,
+	    COUNT(DISTINCT CASE WHEN FlCard = 1 AND GrupoMensageria = 'PA' THEN NuCpfCnpj END) AS QtdSimulacoesMsgPA,
+		COUNT(DISTINCT CASE WHEN FlCard = 1 AND GrupoMensageria = 'PR' THEN NuCpfCnpj END) AS QtdSimulacoesMsgPR,
+    SUM(CASE WHEN GrupoMensageria = 'P' THEN FlPropostaOriginada END) AS QtdPropostasMsgP,
+    SUM(CASE WHEN GrupoMensageria = 'R' THEN FlPropostaOriginada END) AS QtdPropostasMsgR,
+    SUM(CASE WHEN GrupoMensageria = 'D' THEN FlPropostaOriginada END) AS QtdPropostasMsgD,
+	SUM(CASE WHEN GrupoMensageria = 'PA' THEN FlPropostaOriginada END) AS QtdPropostasMsgPA,
+	SUM(CASE WHEN GrupoMensageria = 'PR' THEN FlPropostaOriginada END) AS QtdPropostasMsgPR
+  FROM TbConvsimu
+  GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+%VerificaAtualizacao(/infogrc/solicitacaopontual/tmp/conversaomensageria.sas7bdat,300,150);
+
+/* Dados de conversão mercado */
+PROC SQL;
+CREATE TABLE TbConversaoMensageria001 AS
+  SELECT
+    Safra AS NuAnoMes,
+    Status,
+    TRANSTRN(FxIdade,'de ',TRIMN('')) AS FxIdade,
+    CASE WHEN Regional LIKE 'Canal Rodas%' THEN Regional ELSE 'Outros' END AS Regional,
+	Filial,
+	'N/A' AS FlCarteira,
+	produto,
+    CASE WHEN Bancos IN ('BRADESCO','SANTANDER','ITAU','PAN','PANAMERICANO','C6','SAFRA') THEN PROPCASE(Bancos) ELSE 'Demais bancos' END AS Bancos,
+  CASE WHEN Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+							 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+              AND Mensageria2 NOT IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              THEN 'P'
+         WHEN Mensageria in ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              OR (Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+								 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+                  AND Mensageria2 IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')) THEN 'R'
+		WHEN Mensageria IN ('7. Plano Aprovado') THEN 'PA'
+		WHEN Mensageria IN ('6. Plano Recusado') THEN 'PR'
+         ELSE 'D'
+         END AS GrupoMensageria,
+    SUM(Qtd) AS QtdConvertida
+  FROM
+    SOLITMP.ConversaoMensageria
+  WHERE
+    Safra >= &safraM12.
+    AND produto in ('Leves','Motos','Pesados')
+    AND FlCadastroBV = 'S'
+    AND FlAtivo = 'S'
+    AND FxIdade <> 'Desconhecido'
+  GROUP BY
+    1,2,3,4,5,6,7,8,9;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbConversaoMensageria AS
+  SELECT
+    NuAnoMes,
+    FxIdade,
+    Regional,
+	Filial,
+	today() AS DtAtualizacao,
+	'Conversao' as Tipo,
+	'N/A' AS FlCarteira,
+	produto,
+    /* Santander */
+    SUM(CASE WHEN Status = 'APNP' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdAPNPStd,
+    SUM(CASE WHEN Status = 'Cancelada' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdCanceladaStd,
+    SUM(CASE WHEN Status = 'Negada' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdNegadaStd,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'P' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdCardMsgPStd,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'R' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdCardMsgRStd,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'D' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdCardMsgDStd,
+	 SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PA' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdCardMsgPAStd,
+	 SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PR' AND Bancos = 'Santander' THEN QtdConvertida END) AS QtdCardMsgPRStd,
+	/* Bradesco */
+    SUM(CASE WHEN Status = 'APNP' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdAPNPBrad,
+    SUM(CASE WHEN Status = 'Cancelada' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdCanceladaBrad,
+    SUM(CASE WHEN Status = 'Negada' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdNegadaBrad,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'P' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdCardMsgPBrad,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'R' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdCardMsgRBrad,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'D' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdCardMsgDBrad,
+	SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PA' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdCardMsgPABrad,
+	SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PR' AND Bancos = 'Bradesco' THEN QtdConvertida END) AS QtdCardMsgPRBrad,
+	/* Itaú */
+    SUM(CASE WHEN Status = 'APNP' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdAPNPItau,
+    SUM(CASE WHEN Status = 'Cancelada' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdCanceladaItau,
+    SUM(CASE WHEN Status = 'Negada' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdNegadaItau,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'P' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdCardMsgPItau,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'R' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdCardMsgRItau,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'D' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdCardMsgDItau,
+   SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PA' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdCardMsgPAItau,
+	SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PR' AND Bancos = 'Itau' THEN QtdConvertida END) AS QtdCardMsgPRItau,
+	/* Safra */
+    SUM(CASE WHEN Status = 'APNP' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdAPNPSafra,
+    SUM(CASE WHEN Status = 'Cancelada' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdCanceladaSafra,
+    SUM(CASE WHEN Status = 'Negada' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdNegadaSafra,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'P' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdCardMsgPSafra,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'R' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdCardMsgRSafra,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'D' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdCardMsgDSafra,
+  SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PA' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdCardMsgPASafra,
+	SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PR' AND Bancos = 'Safra' THEN QtdConvertida END) AS QtdCardMsgPRSafra,
+	/* C6 */
+    SUM(CASE WHEN Status = 'APNP' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdAPNPC6,
+    SUM(CASE WHEN Status = 'Cancelada' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdCanceladaC6,
+    SUM(CASE WHEN Status = 'Negada' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdNegadaC6,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'P' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdCardMsgPC6,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'R' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdCardMsgRC6,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'D' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdCardMsgDC6,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PA' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdCardMsgPAC6,
+	SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PR' AND Bancos = 'C6' THEN QtdConvertida END) AS QtdCardMsgPRC6,
+	/* Pan */
+    SUM(CASE WHEN Status = 'APNP' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdAPNPPan,
+    SUM(CASE WHEN Status = 'Cancelada' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdCanceladaPan,
+    SUM(CASE WHEN Status = 'Negada' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdNegadaPan,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'P' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdCardMsgPPan,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'R' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdCardMsgRPan,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'D' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdCardMsgDPan,
+	SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PA' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdCardMsgPAPan,
+	SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PR' AND Bancos IN ('Pan','Panamericano') THEN QtdConvertida END) AS QtdCardMsgPRPan,
+
+	/* Demais bancos */
+    SUM(CASE WHEN Status = 'APNP' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdAPNPOth,
+    SUM(CASE WHEN Status = 'Cancelada' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdCanceladaOth,
+    SUM(CASE WHEN Status = 'Negada' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdNegadaOth,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'P' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdCardMsgPOth,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'R' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdCardMsgROth,
+    SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'D' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdCardMsgDOth,
+	 SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PA' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdCardMsgPAOth,
+	 SUM(CASE WHEN Status = 'Simulação sem proposta' AND GrupoMensageria = 'PR' AND Bancos = 'Demais bancos' THEN QtdConvertida END) AS QtdCardMsgPROth
+
+FROM
+    TbConversaoMensageria001
+  GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+/* Unifica base de visibilidade e share */
+DATA TbVisibilidadeMercado;
+  MERGE TbShareMercado TbVisibilidade TbPassouBV TbConversaoMensageria;
+  BY NuAnoMes FxIdade Regional Filial FlCarteira DtAtualizacao Tipo ;
+  /*WHERE FxIdade NOT IN ('Desconhecido','ZeroKM');*/
+  WHERE FxIdade NOT IN ('Desconhecido');
+RUN;
+
+PROC SORT DATA=TbVisibilidadeMercado;
+  BY Tipo;
+RUN;
+
+/*InCLUI DU NA BASE*/
+
+PROC SQL;
+  SELECT "'" ||PUT(MAX(DtAtualizacao), YYMMDD10.)||"'" INTO :LstGrav
+  FROM TbVisibilidadeMercado
+  WHERE Tipo = 'Share';
+RUN;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDiasUteis AS SELECT * FROM connection to dbcon
+(
+WITH
+TbTempoData AS (
+  SELECT
+    NuAnoMes,
+    CASE WHEN DtTempo BETWEEN '20211227' AND '20211230' THEN NuDiaUtilMes - 1
+         WHEN DtTempo IN ('20211224','20211231') THEN -3
+         ELSE NuDiaUtilMes END AS NuDiaUtilMes,
+    NuSemanaAno,
+    DtTempo,
+	DdData,
+	NuDiaSemana
+  FROM DWBI_DIME.TbDimTempoData
+),
+QtdMes AS (
+  SELECT
+    NuAnoMes,
+    MAX(NuDiaUtilMes) AS NuDiaUtilMes
+  FROM TbTempoData
+  WHERE
+    NuAnoMes >= 202401
+    AND DtTempo < &LstGrav.
+  GROUP BY NuAnoMes
+)
+SELECT DISTINCT
+  A.NuAnoMes,
+  A.NuDiaUtilMes
+  FROM QtdMes A
+);
+RUN;
+
+proc sql;
+create table TbVisibilidadeMercado2 as
+select
+A.*,
+B.NuDiaUtilMes
+from TbVisibilidadeMercado as A
+	left join  TbDiasUteis as B
+	on A.NuAnoMes = B.NuAnoMes
+;run;
+
+%ExportaCSV(TbVisibilidadeExecutivo,TbVisibilidadeMercado2);

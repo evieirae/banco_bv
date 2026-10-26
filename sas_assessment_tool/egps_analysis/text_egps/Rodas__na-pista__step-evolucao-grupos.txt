@@ -1,0 +1,210 @@
+START_METADATA
+PROJECT: Rodas__na-pista
+FILE_SAS: step-evolucao-grupos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -127
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), CALL EXECUTE (1x | +45), PROC DATASETS (1x | +20), PROC APPEND (1x | +15), RETAIN (2x | +20), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 142
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, DATASETS, SORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: GR, GR2, MaxGrp, MaxGrpN, MinGR, MinGrp, grupos
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: GR, GR2
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DWBI_DIME.TBDIMTEMPODATA [DBCON], NAPISTA.TBGRUPOS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: DIAS_&GR
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): DIAS_&GR._02 [PROC APPEND - DATA=], DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], NAPISTA.TBGRUPOS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): DIAS_&GR._02
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): DIAS_&GR._02
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: &GR, DIAS_&GR, FILTRODATAS, GRS, GRUPOSD_01, GRUPOSD_02, GRUPOS_DIARIO, TBDIAS, TBDIASGR, TBESTRUTURAGR, TBPARCEIROSGR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE GRUPOSD_01 AS
+  SELECT
+    GR_Vendedor AS LoginGR,
+    COMPRESS(GR_Vendedor,".","") AS LoginGRTxt,
+    DtCriacaoGrupo AS Data,
+    COUNT(DISTINCT NuCnpjLojaFilial) AS QtdLojas
+  FROM
+    NAPISTA.TBGRUPOS
+  WHERE
+    DtAtualizacao = &grupos.
+   AND GR_Vendedor IS NOT NULL
+   AND GR_Vendedor LIKE "%.%"
+  GROUP BY 1,2,3;
+RUN;
+
+DATA GRUPOSD_02;
+SET GRUPOSD_01;
+  RETAIN QtdLojasCadastradas;
+  IF FIRST.LoginGR THEN QtdLojasCadastradas = QtdLojas;
+  ELSE QtdLojasCadastradas = QtdLojasCadastradas + QtdLojas;
+  BY LoginGR;
+RUN;
+
+PROC SQL; SELECT "'"||PUT(MIN(Data),yymmddn8.)||"'", "'"||PUT(MAX(Data),yymmddn8.)||"'", MAX(Data) INTO :MinGrp, :MaxGrp, :MaxGrpN FROM GRUPOSD_02;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDias AS SELECT * FROM connection to dbcon (
+  SELECT DtTempo FROM DWBI_DIME.TbDimTempoData WHERE DtTempo BETWEEN &MinGrp. AND &MaxGrp.
+);
+RUN;
+
+DATA TbDiasGR;
+SET GRUPOSD_02 (DROP=LoginGRTxt QtdLojas);
+  STOP;
+RUN;
+
+PROC SQL; CREATE TABLE GRS AS SELECT DISTINCT LoginGR,LoginGRTxt FROM GRUPOSD_02;
+
+%Macro TbDiasGR (GR,GR2);
+DATA &GR.;
+SET GRUPOSD_02;
+  WHERE LoginGR = "&GR2.";
+RUN;
+
+PROC SQL; SELECT MIN(Data) INTO :MinGR FROM &GR.; RUN;
+
+PROC SQL;
+CREATE TABLE Dias_&GR. AS
+  SELECT
+    "&GR2." AS LoginGR,
+    A.DtTempo AS Data,
+    B.QtdLojasCadastradas AS QtdLojas
+  FROM
+    TbDias A
+  LEFT JOIN
+    &GR. B
+   ON A.DtTempo = B.Data
+  WHERE
+    A.DtTempo >= &MinGR.
+  ORDER BY 1,2;
+RUN;
+
+DATA Dias_&GR._02 (DROP=QtdLojas);
+SET Dias_&GR.;
+  RETAIN QtdLojasCadastradas;
+  IF FIRST.LoginGR THEN QtdLojasCadastradas = QtdLojas;
+  ELSE IF QtdLojas = . THEN QtdLojasCadastradas = QtdLojasCadastradas;
+     ELSE QtdLojasCadastradas = QtdLojas;
+RUN;
+
+PROC APPEND DATA=Dias_&GR._02 BASE=TbDiasGR;run;
+
+PROC DATASETS LIBRARY=WORK;
+  DELETE
+    &GR.
+    Dias_&GR.
+    Dias_&GR._02;
+RUN;
+%Mend;
+
+DATA _null_;
+SET GRS;
+  CALL EXECUTE('%TbDiasGR('||LoginGRTxt||','||LoginGR||')');
+RUN;
+
+PROC SQL;
+CREATE TABLE TbParceirosGR AS
+  SELECT
+    DsLoginN1C AS LoginGR,
+	CdTipoParceiroComercial,
+	NmCanalEstruturaComercialC,
+	COUNT(DISTINCT NuCnpjLoja) AS QtdLojas
+  FROM
+    TbParceiroComercial
+  WHERE DsLoginN1C IS NOT NULL
+    AND FlAtivo = 1
+    AND CdTipoParceiroComercial in (5,2)
+    AND NmCanalEstruturaComercialC = 'Canal Veiculos'
+  GROUP BY 1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbEstruturaGR AS
+  SELECT DISTINCT
+    NmSubEstruturaComercialC AS Regional,
+    NmAreaEstruturaComercialC AS Filial,
+    DsLoginN1C AS LoginGR,
+    DsLoginN2C AS LoginGF,
+    DsLoginN3C,
+    LstSubstituicaoC
+  FROM
+    TbParceiroComercial
+  WHERE DsLoginN1C IS NOT NULL
+    AND DsLoginN1C LIKE "%.%";
+RUN;
+
+PROC SORT DATA=TbEstruturaGR NODUPKEY;
+BY LoginGR;
+RUN;
+
+PROC SQL;
+CREATE TABLE FiltroDatas AS
+  SELECT DISTINCT
+    CASE WHEN Data >= INTNX('DAY',&MaxGrpN.,-30) THEN Data
+        ELSE INTNX('MONTH',Data,0,'END')
+         END AS DtFiltro FORMAT=DATE9.
+  FROM
+    TbDiasGR;
+RUN;
+
+PROC SQL;
+CREATE TABLE GRUPOS_DIARIO AS
+  SELECT
+    A.LoginGR,
+    CASE WHEN Data >= INTNX('DAY',&MaxGrpN.,-30) THEN Data
+        ELSE INTNX('MONTH',Data,0,'BEG')
+        END AS Data FORMAT=DATE9.,
+    A.QtdLojasCadastradas,
+    C.QtdLojas AS QtdLojasTotal,
+    D.Regional,
+    D.Filial,
+    D.LoginGF,
+    D.DsLoginN3C,
+    D.LstSubstituicaoC
+  FROM
+    TbDiasGR A
+  INNER JOIN
+    FiltroDatas B
+   ON A.Data = B.DtFiltro
+  LEFT JOIN
+    TbParceirosGR C
+   ON A.LoginGR = C.LoginGR
+  LEFT JOIN
+    TbEstruturaGR D
+   ON A.LoginGR = D.LoginGR
+  ORDER BY 1,2;
+RUN;

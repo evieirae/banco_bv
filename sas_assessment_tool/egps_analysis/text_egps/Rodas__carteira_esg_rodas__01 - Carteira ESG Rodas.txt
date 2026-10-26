@@ -1,0 +1,243 @@
+START_METADATA
+PROJECT: Rodas__carteira_esg_rodas
+FILE_SAS: 01 - Carteira ESG Rodas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (4x | +80)
+----------------------------------------
+LINES_OF_CODE: 159
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: AUTOMATI = /riscosbvf/CRM/SAS/AddIn
+DETECTED_MACROS_DEFINED: qtMeses
+DETECTED_MACROS_USED: DtIniPta, SafraESG, qtMeses
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/FUNCOES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /INFOGRC/UTILS/PWD.SAS [SAS/Local], AUXL.BASE_MODELOS_ESG_&SAFRAESG [SAS/Local], DBA.TBMOLICAR [DBCON], DBA.TBPROPGARANTIAMAQEQUIP [DBCON], DBA.TBPROPOSTA [DBCON], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_ESG_DRE, WORK.BASE_FINAL, WORK.PROPOSTAS_ESG, WORK.TBMODELOMOLICAR
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: AUTOMATI
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ESG_DRE, WORK.BASE_FINAL, WORK.PROPOSTAS_ESG, WORK.TBMODELOMOLICAR
+TABLE_READ_PROVENANCE (Flow): AUTOMATI.CONTRATOS_ESG [PROC SQL - FROM], AUXL.BASE_MODELOS_ESG_&SAFRAESG [PROC SQL - FROM], DBA.TBMOLICAR [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPGARANTIAMAQEQUIP [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], TMP.TBPRODUCAO [PROC SQL - FROM], WORK.BASE_ESG_DRE [PROC SQL - FROM], WORK.BASE_FINAL [DATA Step - SET], WORK.PROPOSTAS_ESG [PROC SQL - FROM], WORK.TBMODELOMOLICAR [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+INTERNAL READS (Temp/Local): AUTOMATI.CONTRATOS_ESG
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): AUTOMATI.CONTRATOS_ESG
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUTOMATI.CONTRATOS_ESG
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEESG, BASE_ESG_ANALITICA, BASE_ESG_DRE, BASE_FINAL, BASE_SUMARIZADA, PROPOSTASESG, PROPOSTAS_ESG, TBMODELOMOLICAR
+DYNAMIC REFS (Ambiguous): AUXL.BASE_MODELOS_ESG_{SAFRAESG}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (sas: 4)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/funcoes.sas
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /infogrc/utils/pwd.sas
+
+END_METADATA
+================================================================================
+/* Declarar libnames e strings de conexão com Sybase */
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/pwd.sas';
+%include '/infogrc/utils/libname.sas';
+%include '/infogrc/utils/funcoes.sas';
+LIBNAME AUTOMATI '/riscosbvf/CRM/SAS/AddIn';
+
+/* Chamar macros principais */
+%CRIAVARDB;
+%SAFRAESG();
+
+options compress=yes;
+
+/* INFORMAR QTD MESES PARA O DASH */
+%let qtMeses = 90;
+
+DATA _NULL_;
+  /* Define parâmetros com base no dia atual */
+  hoje = TODAY();
+  hojeXM = INTNX('MONTH', hoje, ((&qtMeses. - 1) * -1), 'BEGINNING');
+
+  /* Calcula variáveis */
+  safraXM = (YEAR(hojeXM) * 100) + MONTH(hojeXM);
+  anoXM = YEAR(hojeXM);
+  anoAtual = YEAR(hoje);
+  dtIniPta = (safraXM * 100) + 1;
+
+  /* Declarar macro variáveis */
+  CALL SYMPUT('safraXM', safraXM);
+  CALL SYMPUT('anoXM', PUT(anoXM,4.));
+  CALL SYMPUT('anoAtual', PUT(anoAtual,4.));
+  CALL SYMPUT('dtIniPta', "'"||PUT(dtIniPta,8.)||"'");
+RUN;
+
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE PropostasESG AS
+  SELECT * FROM connection TO dbcon
+  (
+    SELECT
+      PRP.NuProposta,
+      PRP.DtEntradaProposta,
+      PRP.StProposta,
+      PRP.NuContrato,
+	  PRP.NuContratoGestao,
+      GRE.CdModelo,
+      GRE.CdMolicar,
+      GRE.CdMarca,
+      GRE.AAModelo,
+      GRE.AAFabricacao,
+      GRE.DsCategoria,
+      MLC.CdModelo AS CdModelo_Molicar,
+      MLC.DsCombustivel
+    FROM
+      DBA.TbProposta PRP
+    INNER JOIN
+      DBA.TbPropGarantiaMaqEquip GRE
+      ON PRP.NuProposta = GRE.NuProposta
+    LEFT JOIN
+      DBA.TbMolicar MLC
+      ON GRE.CdMolicar = MLC.CdMolicar
+    WHERE /*nucontratogestao = 12014000311726 and*/
+      (
+        MLC.DsCombustivel LIKE '%(EE)%' /*ELETRICO*/
+        OR MLC.DsCombustivel LIKE '%(GE)%' /*HIBRIDO*/
+        OR MLC.DsCombustivel LIKE '%(DE)%'/*HIBRIDO*/
+		OR MLC.DsCombustivel LIKE '%Gas./Eta./E%'/*HIBRIDO*/
+      )
+      AND PRP.DtEntradaProposta >= &DtIniPta.
+    ORDER BY PRP.DtEntradaProposta);
+RUN;
+
+%put &DtIniPta;
+
+PROC SORT DATA=PropostasESG DUPOUT=DUPLI OUT=PROPOSTAS_ESG NODUPKEY;
+BY NUPROPOSTA
+   DTENTRADAPROPOSTA
+;
+RUN;
+
+PROC SQL;
+CREATE TABLE BaseESG AS
+  SELECT DISTINCT
+    UPCASE(CdMarca) AS CdMarca,
+    UPCASE(CdModelo) AS CdModelo,
+    UPCASE(combustivel) AS Combustivel
+  FROM AUXL.BASE_MODELOS_ESG_&SafraESG.;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbModeloMolicar AS
+  SELECT
+    PRP.*,
+    ESG.combustivel
+  FROM
+    work.PROPOSTAS_ESG PRP
+  LEFT JOIN
+    BaseESG ESG
+    ON ESG.CdModelo = UPCASE(PRP.CdModelo_Molicar)
+  WHERE
+    PRP.StProposta NOT IN ('C','CE')
+  ORDER BY 2,1;
+RUN;
+
+PROC SQL; CREATE INDEX NuProposta ON TbModeloMolicar; QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_ESG_ANALITICA AS
+SELECT
+A.*,
+
+ CASE
+ WHEN A.DsCombustivel IN ('(EE)')                        THEN 'Elétrico'
+ WHEN A.DsCombustivel IN ('(GE)','(DE)','Gas./Eta./E') THEN 'Híbrido'
+ WHEN A.DsCombustivel IN ('(AA)')                        THEN 'Etanol'
+ WHEN A.DsCombustivel IN ('(GG)')                        THEN 'Gasolina'
+ WHEN A.DsCombustivel IN ('(DD)')                       THEN 'Diesel'
+ WHEN A.DsCombustivel IN ('Bio/Diesel')                   THEN 'Biodiesel'
+ WHEN A.DsCombustivel IN ('(GN)')                       THEN 'Gás Natural'
+ WHEN A.DsCombustivel IN ('(AGX)','(GX)','(AG)')       THEN 'FLEX'
+ ELSE 'N/D' END AS TpCombustivel,
+
+B.NuAnoMes as NuAnoMes_Prod,
+B.DtContrato,
+B.NmGrupoProdutoMeta,
+B.NUCONTRATO as NUCONTRATO_PROD,
+B.VRPRODUCAO
+FROM tmp.TBPRODUCAO B
+
+LEFT JOIN work.TbModeloMolicar A ON B.NUPROPOSTA = A.NUPROPOSTA
+
+WHERE B.NUANOMES between 202101 and 202512 AND B.NmGrupoProdutoMeta in ('Leves', 'Motos', 'Pesados') AND A.DsCombustivel <> ''
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_ESG_DRE AS
+SELECT
+
+A.NuAnoMes_Prod,
+A.DtContrato,
+A.NmGrupoProdutoMeta,
+A.TpCombustivel,
+A.DsCombustivel,
+A.NUCONTRATO_PROD,
+A.VRPRODUCAO
+
+FROM BASE_ESG_ANALITICA A
+
+order by
+A.NuAnoMes_Prod,
+A.DtContrato,
+A.NmGrupoProdutoMeta,
+a.DsCombustivel,
+A.TpCombustivel
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_FINAL AS
+SELECT
+A.NUCONTRATO_PROD AS NuContrato format BEST20.,
+A.DtContrato format date9.,
+a.NuAnoMes_Prod AS NuAnoMes,
+a.NmGrupoProdutoMeta,
+A.TpCombustivel,
+A.DsCombustivel
+FROM WORK.BASE_ESG_DRE A
+
+;RUN;
+
+DATA AUTOMATI.CONTRATOS_ESG;
+SET WORK.BASE_FINAL;
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_SUMARIZADA AS
+SELECT
+NuAnoMes,
+NmGrupoProdutoMeta,
+TpCombustivel,
+
+COUNT(A.NuContrato) AS QTD FORMAT COMMAX20.
+FROM AUTOMATI.CONTRATOS_ESG A
+
+GROUP BY 1,2,3
+ORDER BY 1,2,3
+;RUN;

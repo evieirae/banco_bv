@@ -1,0 +1,87 @@
+START_METADATA
+PROJECT: Rodas__base_planejamento
+FILE_SAS: leves__04 - Ticket.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 25
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.POTENCIAL_RODAS_03
+TABLE_READ_PROVENANCE (Flow): WORK.POTENCIAL_RODAS_03 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_TICKET_0
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE BASE_TICKET_0 AS
+SELECT
+
+ChaveCdParceiro_FxIdade,
+CdParceiroComercial,
+FxIdade,
+NmAreaEstruturaComercialC,
+
+SUM(QtdContratos_Proj) AS QtdContratos_Proj FORMAT COMMAX20.6,
+SUM(VrProducao_Proj) AS VrProducao_Proj FORMAT COMMAX20.2,
+COALESCE(CALCULATED VrProducao_Proj / CALCULATED QtdContratos_Proj,0) AS Ticket_BV_Proj FORMAT COMMAX20.2,
+
+SUM(QtdContratos_ProjSab) AS QtdContratos_ProjSab FORMAT COMMAX20.6,
+SUM(VrProducao_ProjSab) AS VrProducao_ProjSab FORMAT COMMAX20.2,
+COALESCE(CALCULATED VrProducao_ProjSab / CALCULATED QtdContratos_ProjSab,0) AS Ticket_BV_ProjSab FORMAT COMMAX20.2,
+
+SUM(qtgravamesplayers_Proj) AS qtgravamesplayers_Proj FORMAT COMMAX20.6,
+SUM(Vrgravamesplayers_Proj) AS Vrgravamesplayers_Proj FORMAT COMMAX20.2,
+COALESCE(CALCULATED Vrgravamesplayers_Proj / CALCULATED qtgravamesplayers_Proj,0) AS Ticket_Mercado_Proj FORMAT COMMAX20.2,
+
+SUM(qtgravamesplayers_ProjSab) AS qtgravamesplayers_ProjSab FORMAT COMMAX20.6,
+SUM(Vrgravamesplayers_ProjSab) AS Vrgravamesplayers_ProjSab FORMAT COMMAX20.2,
+COALESCE(CALCULATED Vrgravamesplayers_ProjSab / CALCULATED qtgravamesplayers_ProjSab,0) AS Ticket_Mercado_ProjSab FORMAT COMMAX20.2,
+
+case when CALCULATED Ticket_BV_ProjSab <= 0  then CALCULATED Ticket_Mercado_ProjSab else
+	CALCULATED Ticket_BV_ProjSab end as TicketFinal
+
+FROM WORK.POTENCIAL_RODAS_03 A
+
+/*WHERE ChaveCdParceiro_FxIdade = '1000093 a 7 anos'*/
+
+GROUP BY 1,2,3,4
+
+;RUN;

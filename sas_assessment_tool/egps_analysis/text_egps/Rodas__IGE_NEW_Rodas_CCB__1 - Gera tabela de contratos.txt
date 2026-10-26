@@ -1,0 +1,109 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_CCB
+FILE_SAS: 1 - Gera tabela de contratos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 50
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+COMMENT-ONLY QUALIFIED READS (SAS comments only, not executable scan): TRIBO.CUBOSIMULACAORODASCCB_ANALISE
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TMPPRD
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Gera tabela de contratos.sas														| */
+/* | Descricao: Programa para gerar tabela de contratos para apuração.					| */
+/* | Objetivo: 	Apuração do fluxo CCB rodas					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera tabela de contratos=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+
+CREATE TABLE TMPPRD AS
+SELECT
+DTENTRADAPROPOSTA,
+YEAR(DTENTRADAPROPOSTA)*100+MONTH(DTENTRADAPROPOSTA) AS MESANOPROPOSTA,
+DTCONTRATO,
+YEAR(DTCONTRATO)*100+MONTH(DTCONTRATO) AS MESANOCONTRATO,
+NUPROPOSTA,
+NUCONTRATO,
+CDPARCEIROCOMERCIAL,
+NMGRUPOPRODUTOMETA
+from BASES.TBPRODUCAO
+WHERE 1=1
+AND YEAR(DTCONTRATO)*100+MONTH(DTCONTRATO) >= 202501
+AND NmGrupoProdutoMeta in
+(
+'CVG Leves',
+'CVG Pesados',
+'Leves',
+'Leves-BVO',
+'Motos',
+'Pesados'
+)
+;QUIT;
+
+/**/
+/**/
+/*%let dir_csv = /riscosbvf/BA/processos/output;*/
+/**/
+/*PROC EXPORT*/
+/*	DATA= TRIBO.CuboSimulacaoRODASCCB_Analise*/
+/*	FILE="&dir_csv./RODASCCB_PDEC.csv" REPLACE */
+/*	DBMS=DLM;*/
+/*	DELIMITER=';';*/
+/*RUN;*/

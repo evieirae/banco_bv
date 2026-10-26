@@ -1,0 +1,436 @@
+START_METADATA
+PROJECT: SAS_UC4__tbgrupoparceiroveiculos
+FILE_SAS: tbgrupoparceiroveiculos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:05 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 60)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 316
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraA1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], BASEGRC.TBPARCEIROAUTOSHOPPING [SAS/Local], BASEGRC.TBPARCEIROGRANDESGRUPOS [SAS/Local], BASEGRC.TBPORTEPDV [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - FROM], BASEGRC.TBPARCEIROAUTOSHOPPING [PROC SQL - JOIN], BASEGRC.TBPARCEIROGRANDESGRUPOS [PROC SQL - JOIN], BASEGRC.TBPORTEPDV [PROC SQL - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbGrupoParceiroVeiculos.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbGrupoParceiroVeiculos.csv
+TEMP/DISCARDED OUTPUTS: PARCEIROCOMERCIAL, TBAUTOSHOPPING, TBCONSOLIDADO, TBCORREDORES, TBGRANDESGRUPOS, TBGRUPOPARCEIROVEICULOS, TBLEVESNOVOSBVO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 1, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbGrupoParceiroVeiculos.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+/* ====================REGISTRO DE ALTERAÇÕES=================
+ 	13/07/2022 - Gustavo Dom. - Incluido Login e TB Focal
+
+   =========================================================== */
+
+/* ======================================================== */
+/* ================ ParceiroComercial ================== */
+/* ======================================================== */
+
+PROC SQL;
+CREATE TABLE ParceiroComercial AS
+SELECT
+	TbParceiroComercial.CdParceiroComercial
+	,TbParceiroComercial.NmParceiroComercial
+	,TbParceiroComercial.NmGrupoConcessionaria
+	,TbParceiroComercial.NmBandeiraGrupoConcessionaria
+	,coalesce(PortePDV.FlPorteA,'Sem porte informado') as FlPorteA
+	,TbParceiroComercial.PredominanciaProduto
+FROM tmp.TbParceiroComercial TbParceiroComercial
+	left join basegrc.TbPortepdv PortePDV
+		on TbParceiroComercial.NuCnpjLoja = PortePDV.NuCnpjLoja
+		AND PortePDV.NuAno = year(today())
+WHERE FlAtivo = 'S'
+;run;
+
+PROC SQL;
+CREATE TABLE TbLevesNovosBVO AS
+SELECT
+	CdParceiroComercial
+	,NuAnoMes
+	,'SIM' AS FlagBVO
+FROM BASEGRC.TbLevesNovosBVO
+;run;
+
+PROC SQL;
+CREATE TABLE TbAutoShopping AS
+	SELECT
+		 PotencialRodas.NuAnoMes
+		,'Auto Shopping' AS TpRelatorio
+		,'Não Disponível' AS NmBandeira
+		,PotencialRodas.CdParceiroComercial
+		,PotencialRodas.NmLoja AS NmParceiroComercial
+		,PotencialRodas.NuCnpjLoja
+		,AutoShopping.NmAutoShopping  AS NmGrupo
+		,PotencialRodas.NmTipoParceiroComercial
+
+		,ParceiroComercial.NmGrupoConcessionaria
+		,ParceiroComercial.PredominanciaProduto
+		,ParceiroComercial.FlPorteA
+
+		,TbLevesNovosBVO.FlagBVO
+
+		,PotencialRodas.NmCidade
+		,PotencialRodas.CdUf
+		,PotencialRodas.NmColaboradorC
+		,PotencialRodas.NmAreaEstruturaComercialC
+		,PotencialRodas.NmSubEstruturaComercialC
+		,PotencialRodas.NmCanalEstruturaComercialC
+		,PotencialRodas.NmGrupoProduto
+
+		,PotencialRodas.FxIdade
+		,PotencialRodas.QtBancos
+		,PotencialRodas.RankingCliente
+
+		,PotencialRodas.DtAtualizacao
+		,PotencialRodas.DtAtualizacaoCetip
+
+		,PotencialRodas.DsLoginN1C
+		,PotencialRodas.DsLoginN2C
+		,PotencialRodas.DsLoginN3C
+		,PotencialRodas.LstSubstituicaoC
+		,CFO.LstColaboradorFocal
+
+		,SUM(PotencialRodas.QtPropostaOriginada) AS QtPropostaOriginada
+		,SUM(PotencialRodas.VrPropostaOriginada) AS VrPropostaOriginada
+		,SUM(PotencialRodas.QtPropostaAprovada) AS QtPropostaAprovada
+		,SUM(PotencialRodas.VrPropostaAprovada) AS VrPropostaAprovada
+		,SUM(PotencialRodas.QtPropostaAPNP) AS QtPropostaAPNP
+		,SUM(PotencialRodas.VrPropostaAPNP) AS VrPropostaAPNP
+		,SUM(PotencialRodas.QtPropostaEfetivada) AS QtPropostaEfetivada
+		,SUM(PotencialRodas.VrPropostaEfetivada) AS VrPropostaEfetivada
+
+		,sum(PotencialRodas.QtContrato) AS QtContrato
+		,sum(PotencialRodas.VrProducao) AS VrProducao
+		,sum(PotencialRodas.VrGravamesMercado) AS VrGravamesMercado
+		,sum(PotencialRodas.QtGravamesMercado) AS QtGravamesMercado
+		,sum(PotencialRodas.VrMargem) AS VrMargem
+		,sum(PotencialRodas.VpIdade) AS VpIdade
+		,sum(PotencialRodas.VpPrazo) AS VpPrazo
+		,sum(PotencialRodas.QtBVMais) as QtBVMais
+		,sum(PotencialRodas.QtCap) as QtCap
+		,sum(PotencialRodas.QtDemais) as QtDemais
+		,sum(PotencialRodas.VpTxGerencialProducao) as VpTxGerencial
+		,sum(PotencialRodas.QtBVMaisEleg) as QtBVMaisEleg
+		,sum(PotencialRodas.QtCapEleg) as QtCapEleg
+		,sum(PotencialRodas.QtDemaisEleg) as QtDemaisEleg
+
+	FROM tmp.TbPotencialRodas PotencialRodas
+
+		INNER JOIN basegrc.TbParceiroAutoshopping AutoShopping
+			ON PotencialRodas.CdParceiroComercial = AutoShopping.CdParceiroComercial
+			AND AutoShopping.TpBase = 'AUTO SHOPPING'
+
+		LEFT JOIN basegrc.TbColaboradorFocal AS CFO ON CFO.CdFilial = PotencialRodas.CdFilialC
+			AND CFO.NmGrupoProdutoMeta = PotencialRodas.NmGrupoProduto
+
+		LEFT JOIN ParceiroComercial ParceiroComercial
+			ON PotencialRodas.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+		LEFT JOIN TbLevesNovosBVO TbLevesNovosBVO
+			ON PotencialRodas.CdParceiroComercial = TbLevesNovosBVO.CdParceiroComercial
+			AND PotencialRodas.NuAnoMes = TbLevesNovosBVO.NuAnoMes
+
+	WHERE PotencialRodas.NuAnoMes >= &safraA1.
+	  AND PotencialRodas.FlAtualizacaoMercado = 1
+
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
+	ORDER BY AutoShopping.NmAutoShopping, PotencialRodas.NuAnoMes
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbCorredores AS
+	SELECT
+		PotencialRodas.NuAnoMes
+		,'Corredores' AS TpRelatorio
+		,'Não Disponível' AS NmBandeira
+		,PotencialRodas.CdParceiroComercial
+		,PotencialRodas.NmLoja AS NmParceiroComercial
+		,PotencialRodas.NuCnpjLoja
+		,Corredores.NmAutoShopping AS NmGrupo
+		,PotencialRodas.NmTipoParceiroComercial
+
+		,ParceiroComercial.NmGrupoConcessionaria
+		,ParceiroComercial.PredominanciaProduto
+		,ParceiroComercial.FlPorteA
+
+		,TbLevesNovosBVO.FlagBVO
+
+		,PotencialRodas.NmCidade
+		,PotencialRodas.CdUf
+		,PotencialRodas.NmColaboradorC
+		,PotencialRodas.NmAreaEstruturaComercialC
+		,PotencialRodas.NmSubEstruturaComercialC
+		,PotencialRodas.NmCanalEstruturaComercialC
+		,PotencialRodas.NmGrupoProduto
+
+		,PotencialRodas.FxIdade
+		,PotencialRodas.QtBancos
+		,PotencialRodas.RankingCliente
+
+		,PotencialRodas.DtAtualizacao
+		,PotencialRodas.DtAtualizacaoCetip
+
+		,PotencialRodas.DsLoginN1C
+		,PotencialRodas.DsLoginN2C
+		,PotencialRodas.DsLoginN3C
+		,PotencialRodas.LstSubstituicaoC
+		,CFO.LstColaboradorFocal
+
+		,SUM(PotencialRodas.QtPropostaOriginada) AS QtPropostaOriginada
+		,SUM(PotencialRodas.VrPropostaOriginada) AS VrPropostaOriginada
+		,SUM(PotencialRodas.QtPropostaAprovada) AS QtPropostaAprovada
+		,SUM(PotencialRodas.VrPropostaAprovada) AS VrPropostaAprovada
+		,SUM(PotencialRodas.QtPropostaAPNP) AS QtPropostaAPNP
+		,SUM(PotencialRodas.VrPropostaAPNP) AS VrPropostaAPNP
+		,SUM(PotencialRodas.QtPropostaEfetivada) AS QtPropostaEfetivada
+		,SUM(PotencialRodas.VrPropostaEfetivada) AS VrPropostaEfetivada
+
+		,sum(PotencialRodas.QtContrato) AS QtContrato
+		,sum(PotencialRodas.VrProducao) AS VrProducao
+		,sum(PotencialRodas.VrGravamesMercado) AS VrGravamesMercado
+		,sum(PotencialRodas.QtGravamesMercado) AS QtGravamesMercado
+		,sum(PotencialRodas.VrMargem) AS VrMargem
+		,sum(PotencialRodas.VpIdade) AS VpIdade
+		,sum(PotencialRodas.VpPrazo) AS VpPrazo
+		,sum(PotencialRodas.QtBVMais) as QtBVMais
+		,sum(PotencialRodas.QtCap) as QtCap
+		,sum(PotencialRodas.QtDemais) as QtDemais
+		,sum(PotencialRodas.VpTxGerencialProducao) as VpTxGerencial
+		,sum(PotencialRodas.QtBVMaisEleg) as QtBVMaisEleg
+		,sum(PotencialRodas.QtCapEleg) as QtCapEleg
+		,sum(PotencialRodas.QtDemaisEleg) as QtDemaisEleg
+
+	FROM tmp.TbPotencialRodas PotencialRodas
+
+		INNER JOIN basegrc.TbParceiroAutoshopping Corredores
+			ON PotencialRodas.CdParceiroComercial = Corredores.CdParceiroComercial
+			AND Corredores.TpBase = 'CORREDORES'
+
+		LEFT JOIN basegrc.TbColaboradorFocal AS CFO ON CFO.CdFilial = PotencialRodas.CdFilialC
+			AND CFO.NmGrupoProdutoMeta = PotencialRodas.NmGrupoProduto
+
+		LEFT JOIN ParceiroComercial ParceiroComercial
+			ON PotencialRodas.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+		LEFT JOIN TbLevesNovosBVO TbLevesNovosBVO
+			ON PotencialRodas.CdParceiroComercial = TbLevesNovosBVO.CdParceiroComercial
+			AND PotencialRodas.NuAnoMes = TbLevesNovosBVO.NuAnoMes
+
+	WHERE PotencialRodas.NuAnoMes >= &safraA1.
+	  AND PotencialRodas.FlAtualizacaoMercado = 1
+
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
+	ORDER BY Corredores.NmAutoShopping, PotencialRodas.NuAnoMes
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbGrandesGrupos AS
+	SELECT
+		 PotencialRodas.NuAnoMes
+		,'Grandes Grupos' AS TpRelatorio
+		,ParceiroGrandesGrupos.NmBandeira
+		,PotencialRodas.CdParceiroComercial
+		,PotencialRodas.NmLoja AS NmParceiroComercial
+		,PotencialRodas.NuCnpjLoja
+		,ParceiroGrandesGrupos.NmGrupoConcessionaria  AS NmGrupo
+		,PotencialRodas.NmTipoParceiroComercial
+
+		,ParceiroComercial.NmGrupoConcessionaria
+		,ParceiroComercial.PredominanciaProduto
+		,ParceiroComercial.FlPorteA
+
+		,TbLevesNovosBVO.FlagBVO
+
+		,PotencialRodas.NmCidade
+		,PotencialRodas.CdUf
+		,PotencialRodas.NmColaboradorC
+		,PotencialRodas.NmAreaEstruturaComercialC
+		,PotencialRodas.NmSubEstruturaComercialC
+		,PotencialRodas.NmCanalEstruturaComercialC
+		,PotencialRodas.NmGrupoProduto
+
+		,PotencialRodas.FxIdade
+
+		,PotencialRodas.RankingCliente
+		,PotencialRodas.QtBancos
+
+		,PotencialRodas.DtAtualizacao
+		,PotencialRodas.DtAtualizacaoCetip
+
+		,PotencialRodas.DsLoginN1C
+		,PotencialRodas.DsLoginN2C
+		,PotencialRodas.DsLoginN3C
+		,PotencialRodas.LstSubstituicaoC
+		,CFO.LstColaboradorFocal
+
+		,SUM(PotencialRodas.QtPropostaOriginada) AS QtPropostaOriginada
+		,SUM(PotencialRodas.VrPropostaOriginada) AS VrPropostaOriginada
+		,SUM(PotencialRodas.QtPropostaAprovada) AS QtPropostaAprovada
+		,SUM(PotencialRodas.VrPropostaAprovada) AS VrPropostaAprovada
+		,SUM(PotencialRodas.QtPropostaAPNP) AS QtPropostaAPNP
+		,SUM(PotencialRodas.VrPropostaAPNP) AS VrPropostaAPNP
+		,SUM(PotencialRodas.QtPropostaEfetivada) AS QtPropostaEfetivada
+		,SUM(PotencialRodas.VrPropostaEfetivada) AS VrPropostaEfetivada
+
+		,sum(PotencialRodas.QtContrato) AS QtContrato
+		,sum(PotencialRodas.VrProducao) AS VrProducao
+		,sum(PotencialRodas.VrGravamesMercado) AS VrGravamesMercado
+		,sum(PotencialRodas.QtGravamesMercado) AS QtGravamesMercado
+		,sum(PotencialRodas.VrMargem) AS VrMargem
+		,sum(PotencialRodas.VpIdade) AS VpIdade
+		,sum(PotencialRodas.VpPrazo) AS VpPrazo
+		,sum(PotencialRodas.QtBVMais) as QtBVMais
+		,sum(PotencialRodas.QtCap) as QtCap
+		,sum(PotencialRodas.QtDemais) as QtDemais
+		,sum(PotencialRodas.VpTxGerencialProducao) as VpTxGerencial
+		,sum(PotencialRodas.QtBVMaisEleg) as QtBVMaisEleg
+		,sum(PotencialRodas.QtCapEleg) as QtCapEleg
+		,sum(PotencialRodas.QtDemaisEleg) as QtDemaisEleg
+
+	FROM tmp.TbPotencialRodas PotencialRodas
+
+		INNER JOIN basegrc.TbParceiroGrandesGrupos ParceiroGrandesGrupos
+			ON  PotencialRodas.CdParceiroComercial = ParceiroGrandesGrupos.CdParceiroComercial
+			AND ParceiroGrandesGrupos.CdParceiroComercial is not null
+
+		LEFT JOIN basegrc.TbColaboradorFocal AS CFO ON CFO.CdFilial = PotencialRodas.CdFilialC
+			AND CFO.NmGrupoProdutoMeta = PotencialRodas.NmGrupoProduto
+
+		LEFT JOIN ParceiroComercial ParceiroComercial
+			ON PotencialRodas.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+		LEFT JOIN TbLevesNovosBVO TbLevesNovosBVO
+			ON PotencialRodas.CdParceiroComercial = TbLevesNovosBVO.CdParceiroComercial
+			AND PotencialRodas.NuAnoMes = TbLevesNovosBVO.NuAnoMes
+
+	WHERE PotencialRodas.NuAnoMes >= &safraA1.
+	  AND PotencialRodas.FlAtualizacaoMercado = 1
+
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
+	ORDER BY ParceiroGrandesGrupos.NmGrupoConcessionaria, PotencialRodas.NuAnoMes
+;RUN;
+
+DATA TbConsolidado;
+	SET TbGrandesGrupos  TbAutoShopping  TbCorredores
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbGrupoParceiroVeiculos AS
+SELECT
+	Consolidado.NuAnoMes
+	,Consolidado.TpRelatorio
+	,Consolidado.NmBandeira
+	,Consolidado.CdParceiroComercial
+	,Consolidado.NmParceiroComercial
+	,Consolidado.NuCnpjLoja
+	,Consolidado.NmGrupo
+	,Consolidado.NmTipoParceiroComercial
+
+	,Consolidado.NmGrupoConcessionaria
+	,Consolidado.PredominanciaProduto
+	,Consolidado.FlPorteA
+
+	,Consolidado.FlagBVO
+
+	,Consolidado.NmCidade
+	,Consolidado.CdUf
+	,Consolidado.NmColaboradorC
+	,Consolidado.NmAreaEstruturaComercialC
+	,Consolidado.NmSubEstruturaComercialC
+	,Consolidado.NmCanalEstruturaComercialC
+	,Consolidado.NmGrupoProduto
+	,Consolidado.FxIdade
+	,Consolidado.QtBancos AS Bancos
+	,Consolidado.RankingCliente
+	,Consolidado.QtBancos
+	,Consolidado.RankingCliente AS QtRankingCliente
+
+	,Consolidado.DtAtualizacao
+	,Consolidado.DtAtualizacaoCetip
+
+	,Consolidado.DsLoginN1C
+	,Consolidado.DsLoginN2C
+	,Consolidado.DsLoginN3C
+	,Consolidado.LstSubstituicaoC
+	,Consolidado.LstColaboradorFocal
+
+	,SUM(Consolidado.QtPropostaOriginada) AS QtPropostaOriginada format 18.
+	,SUM(Consolidado.VrPropostaOriginada) AS VrPropostaOriginada format 18.2
+	,SUM(Consolidado.QtPropostaAprovada) AS QtPropostaAprovada format 18.
+	,SUM(Consolidado.VrPropostaAprovada) AS VrPropostaAprovada format 18.2
+	,SUM(Consolidado.QtPropostaAPNP) AS QtPropostaAPNP format 18.
+	,SUM(Consolidado.VrPropostaAPNP) AS VrPropostaAPNP format 18.2
+	,SUM(Consolidado.QtPropostaEfetivada) AS QtPropostaEfetivada format 18.
+	,SUM(Consolidado.VrPropostaEfetivada) AS VrPropostaEfetivada format 18.2
+	,SUM(Consolidado.QtContrato) AS QtContrato format 18.
+	,SUM(Consolidado.VrProducao) AS VrProducao format 18.2
+	,sum(Consolidado.VrGravamesMercado) AS VrGravamesMercado  format 18.2
+	,sum(Consolidado.QtGravamesMercado) AS QtGravamesMercado  format 18.
+	,SUM(Consolidado.VrMargem) AS VrMargem format 18.2
+	,SUM(Consolidado.VpIdade) AS VpIdade format 18.2
+	,SUM(Consolidado.VpPrazo) AS VpPrazo format 18.2
+	,SUM(Consolidado.QtBVMais) AS QtBVMais format 18.
+	,SUM(Consolidado.QtCap) AS QtCap format 18.
+	,SUM(Consolidado.QtDemais) AS QtDemais format 18.
+	,SUM(Consolidado.VpTxGerencial) AS VpTxGerencial format 18.2
+	,SUM(Consolidado.QtBVMaisEleg) AS QtBVMaisEleg format 18.
+	,SUM(Consolidado.QtCapEleg) AS QtCapEleg format 18.
+	,SUM(Consolidado.QtDemaisEleg) AS QtDemaisEleg format 18.
+
+FROM TbConsolidado Consolidado
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
+ORDER BY Consolidado.TpRelatorio, Consolidado.NmGrupo, Consolidado.NuAnoMes
+;RUN;
+
+proc export
+data=TbGrupoParceiroVeiculos
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbGrupoParceiroVeiculos.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbGrupoParceiroVeiculos.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";

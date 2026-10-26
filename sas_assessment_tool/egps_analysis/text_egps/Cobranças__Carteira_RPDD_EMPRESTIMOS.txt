@@ -1,0 +1,831 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Carteira_RPDD_EMPRESTIMOS
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:12 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 648
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (17x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ARTHUR = /riscosbv/cobranca/aesteves; BA3040 = /riscosbv/cobranca/est_cartoes/3040; B_GERAL = /riscosbv/cobranca/malmeida; CARD_ACR = /riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/; CARD_CS = /riscosbv/cobranca/ranapole/Cartoes/Modelagem; CARNEIRO = /riscosbv/cobranca/jcarneiro; CREDITO = /riscosbvf/pol_empcr/fatigatte/MIS; CUBO = /riscosbv/cobranca/dpompei/cartao/CA; EQUIPE3 = /riscosbvf/analytics/narciso/lucas/HACKATON_EQP3; ESTUDOS2 = /riscosbvf/indicadores/Estudos_2; EST_CART = /riscosbv/cobranca/jcarneiro/estrategia_cartoes; GH16 = /riscosbv/cobranca/dpompei/cartao/GH16; JOAO = /riscosbv/cobranca/bsilva/; MOVTO = /riscosbv/cobranca/erocha/CARTAO/MOVTO; PAGOSCBR = /riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber; PERF_CL = /riscosbv/cobranca/erocha/CARTAO/CL/MIS; PG_CYBER = /riscosbv/cobranca/jcarneiro/pagos_cyber; PRETER = /riscosbv/cobranca/preter
+DETECTED_MACROS_DEFINED: DT_REF, base, libname, path, work
+DETECTED_MACROS_USED: DT_REF, base, libname, path, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: BASE, LIBNAME
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_COBRANCA.FECHAMENTO_CARTEIRARISCO_MENSAL_AGGR [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3 [BIGQUERY/GCP], PRETER.BASE_COBRANCA_202512 [SAS/Local], PRETER.EMP_2024_BASE_COBRANCA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: PRETER
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_COBRANCA.FECHAMENTO_CARTEIRARISCO_MENSAL_AGGR [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3 [PROC SQL - FROM], PRETER.BASE_COBRANCA_202512 [DATA Step - SET], PRETER.EMP_2024_BASE_COBRANCA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, BASE_CARTOES, BASE_CARTOES_1, BASE_CARTOES_2, BASE_CARTOES_LEVES, BASE_CARTOES_LEVES_1, BASE_CARTOES_LEVES_CL, BASE_CARTOES_LEVES_CL_B, BASE_CARTOES_LEVES_CL_C, BASE_CARTOES_SOLAR, BASE_CARTOES_SOLAR_1, BASE_CARTOES_SOLAR_CL, BASE_CARTOES_SOLAR_CL_B, BASE_CARTOES_SOLAR_CL_C, BASE_COBRANCA, BASE_COBRANCA_2024, BASE_COBRANCA_2025, BASE_COBRANCA_AGRR, BASE_COBRANCA_CUBO, BASE_COBRANCA_GCP_CUBO, BASE_LEVES, BASE_SOLAR, CARTEIRA_CL, CARTEIRA_CL_B
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET DT_REF='202601';
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: LIBNAME */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-UhnolyEwYrllQx95/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MOVTO 		BASE '/riscosbv/cobranca/erocha/CARTAO/MOVTO';
+LIBNAME ARTHUR 		BASE '/riscosbv/cobranca/aesteves';
+LIBNAME JOAO 		BASE '/riscosbv/cobranca/bsilva/';
+libname CARD_ACR 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/';
+LIBNAME CUBO 		BASE '/riscosbv/cobranca/dpompei/cartao/CA';
+LIBNAME CARD_BC 	BASE'/riscosbv/cobranca/ranapole/Cartoes/3040';
+LIBNAME CREDITO 	BASE '/riscosbvf/pol_empcr/fatigatte/MIS';
+LIBNAME CARD_CS 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Modelagem';
+
+LIBNAME PERF_CL 	BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+
+
+LIBNAME GH16 		BASE '/riscosbv/cobranca/dpompei/cartao/GH16';
+
+LIBNAME CARNEIRO 	BASE '/riscosbv/cobranca/jcarneiro';
+
+
+
+LIbname equipe3 '/riscosbvf/analytics/narciso/lucas/HACKATON_EQP3';
+
+
+
+
+
+
+LIBNAME PERF_CL 	BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+
+LIBNAME EST_CART '/riscosbv/cobranca/jcarneiro/estrategia_cartoes';
+
+LIBNAME PG_CYBER	BASE '/riscosbv/cobranca/jcarneiro/pagos_cyber';
+
+LIBNAME BA3040 BASE '/riscosbv/cobranca/est_cartoes/3040';
+
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+Libname estudos2 '/riscosbvf/indicadores/Estudos_2';
+
+LIBNAME PAGOSCBR 	BASE '/riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber';
+
+LIBNAME B_GERAL 	BASE '/riscosbv/cobranca/malmeida';
+
+/* =========================FIM TASK=========================== */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BASE_COBRANCA_GCP */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BASE_COBRANCA_GCP */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-v5labHqCDgq3TT6q/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET DT_REF = '202601';
+
+%MACRO CONNECT_GCP;
+
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-sadi-dtm' CREDFILE='/projetos/acessos/bq/di/sadi-dtm.json'
+
+SCHEMA='bv-pdbd-prd' READ_MODE=STORAGE ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+
+%MEND CONNECT_GCP;
+
+PROC SQL;
+%CONNECT_GCP;
+create table base_cobranca_agrr as select *
+from connection to perm (SELECT *
+FROM bv-pdbd-prd.dvry_corp_cobranca.fechamento_carteirarisco_mensal_aggr
+WHERE cd_safra = &DT_REF.)
+;disconnect from perm;
+quit;
+
+PROC SQL;
+CREATE TABLE BASE_COBRANCA_GCP_CUBO AS SELECT
+ds_produto		AS NmProdutoRisco,
+st_operacao 	AS StOperacao,
+cd_safra 		AS SAFRA,
+ds_faixa_atraso AS FAIXA_ATRASO,
+COUNT(*) AS Quantidade,
+SUM(vr_saldo_carteira) AS Carteira,
+SUM(vr_pdd) AS PDD
+
+FROM base_cobranca_agrr GROUP BY
+NmProdutoRisco,StOperacao, SAFRA, FAIXA_ATRASO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BASE_COBRANCA_GCP */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BASE_COBRANCA */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BASE_COBRANCA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-6rJDVxLPVsbKtPoy/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET DT_REF = 2025;
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%DESCOMPACTA(PRETER, EMP_2024_BASE_COBRANCA);
+
+PROC SQL;
+CREATE TABLE BASE_COBRANCA_2024 AS SELECT
+*,
+CASE WHEN QtDiaAtraso in (., 0) THEN 'EM DIA'
+	WHEN QtDiaAtraso > 0 AND QtDiaAtraso <= 30 THEN '0001 A 0030'
+	WHEN QtDiaAtraso > 30 AND QtDiaAtraso <= 60 THEN '0031 A 0060'
+	WHEN QtDiaAtraso > 60 AND QtDiaAtraso <= 90 THEN '0061 A 0090'
+	WHEN QtDiaAtraso > 90 AND QtDiaAtraso <=120 THEN '0091 A 0120'
+	WHEN QtDiaAtraso > 120 AND QtDiaAtraso <=150 THEN '0121 A 0150'
+	WHEN QtDiaAtraso > 150 AND QtDiaAtraso <=180 THEN '0151 A 0180'
+	WHEN QtDiaAtraso > 180 AND QtDiaAtraso <=210 THEN '0181 A 0211'
+	WHEN QtDiaAtraso > 210 AND QtDiaAtraso <=240 THEN '0211 A 0240'
+	WHEN QtDiaAtraso > 240 AND QtDiaAtraso <=270 THEN '0241 A 0270'
+	WHEN QtDiaAtraso > 270 AND QtDiaAtraso <=300 THEN '0271 A 0300'
+	WHEN QtDiaAtraso > 300 AND QtDiaAtraso <=330 THEN '0301 A 0330'
+	WHEN QtDiaAtraso > 330 AND QtDiaAtraso <=360 THEN '0331 A 0360'
+	WHEN QtDiaAtraso > 360 AND QtDiaAtraso <=390 THEN '0361 A 0390'
+	WHEN QtDiaAtraso > 390 AND QtDiaAtraso <=420 THEN '0391 A 0420'
+	WHEN QtDiaAtraso > 420 AND QtDiaAtraso <=450 THEN '0421 A 0450'
+	WHEN QtDiaAtraso > 450 AND QtDiaAtraso <=480 THEN '0451 A 0480'
+	WHEN QtDiaAtraso > 480 AND QtDiaAtraso <=510 THEN '0481 A 0510'
+	WHEN QtDiaAtraso > 510 AND QtDiaAtraso <=540 THEN '0511 A 0540'
+	WHEN QtDiaAtraso > 540 AND QtDiaAtraso <=570 THEN '0541 A 0570'
+	WHEN QtDiaAtraso > 570 AND QtDiaAtraso <=600 THEN '0571 A 0600'
+	WHEN QtDiaAtraso > 600 AND QtDiaAtraso <=630 THEN '0601 A 0630'
+	WHEN QtDiaAtraso > 630 AND QtDiaAtraso <=660 THEN '0631 A 0660'
+	WHEN QtDiaAtraso > 660 AND QtDiaAtraso <=690 THEN '0661 A 0690'
+	WHEN QtDiaAtraso > 690 AND QtDiaAtraso <=720 THEN '0691 A 0720'
+	WHEN QtDiaAtraso > 720 THEN '0721 A 9999'
+END AS FAIXA_ATRASO
+FROM EMP_2024_BASE_COBRANCA
+
+;
+QUIT;
+
+DATA BASE_COBRANCA_2025;
+SET
+PRETER.BASE_COBRANCA_202512;
+
+FAIXA_ATRASO = FX_ATRASO;
+RUN;
+
+DATA BASE_COBRANCA;
+SET
+
+BASE_COBRANCA_2025;
+
+
+
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_COBRANCA_CUBO AS SELECT
+NmProdutoRisco,StOperacao, SAFRA, FAIXA_ATRASO,
+COUNT(*) AS Quantidade,
+SUM(Carteira) AS Carteira,
+SUM(PDD) AS PDD
+
+FROM BASE_COBRANCA GROUP BY
+NmProdutoRisco,StOperacao, SAFRA, FAIXA_ATRASO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BASE_COBRANCA */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Cartao_Solar */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Cartao_Solar */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hHWbOMGuS5ZKtYby/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA BASE_CARTOES;
+SET BASE_COBRANCA;
+WHERE SAFRA  = 202509 AND NmProdutoRisco = 'CARTOES';
+RUN;
+
+DATA BASE_CARTOES_1;
+SET BASE_CARTOES
+(KEEP = SAFRA	StOperacao	NuCpfCnpj	NuContrato	Carteira	PDD	QtDiaAtraso);
+CdProdutoCartao = SUBSTR(NuContrato, 1,2)*1;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_2 AS SELECT
+SAFRA,	StOperacao,	NuCpfCnpj,	CdProdutoCartao,
+MAX(QtDiaAtraso) AS Atraso,
+SUM(Carteira) AS Carteira,
+SUM(PDD) AS PDD
+FROM BASE_CARTOES_1
+GROUP BY
+SAFRA,	StOperacao,	NuCpfCnpj,	CdProdutoCartao;
+QUIT;
+
+
+
+DATA BASE_SOLAR;
+SET BASE_COBRANCA;
+WHERE SAFRA  = 202509 AND NmProdutoRisco = 'SOLAR';
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_SOLAR AS SELECT
+A.*,
+B.NuContrato AS NuContrato_Solar,
+B.NmSistemaOrigem AS NmSistemaOrigem_Solar,
+B.StOperacao AS StOperacao_Solar,
+B.QtDiaAtraso AS Atraso_Solar,
+B.Carteira AS Carteira_Solar,
+B.PDD AS PDD_Solar
+FROM BASE_CARTOES_2 A LEFT JOIN BASE_SOLAR B
+ON
+A.NuCpfCnpj = B.NuCpfCnpj;
+QUIT;
+
+
+
+DATA BASE_CARTOES_SOLAR_1;
+SET BASE_CARTOES_SOLAR;
+WHERE NuContrato_Solar <> "" AND Atraso > 0;
+RUN;
+
+
+
+
+
+proc sql;
+connect to bigquery as perm (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS = must MAX_CHAR_LEN = 30);
+
+create table CARTEIRA_CL as
+    select distinct
+	 input(a.dmacct,BEST22.) 				as CONTRATO
+	,input(substr(a.dmacct,4),BEST22.) 		as NUCONTA
+	,input(substr(a.dmacct,1,3),BEST22.) 	as PRODUTO
+	,input(a.dmssnum,BEST11.) 				as NUCPFCNPJ
+	,c.u3dtpriatr 							as DT_PRI_ATRASO format DATETIME.
+	,c.u3dtenqcont 							as DT_ENQUAD format DATETIME.
+	,input(a.dmdays,BEST4.) 				as DIAS_AT
+	,input(a.dmcurbal,BEST9.) 				as SALDO_RISCO
+	,input(a.dmamtdlq,BEST9.) 				as SALDO_DEVEDOR_VENC
+	,input(c.u3score2,BEST4.) 				as SCORE_2
+	,a.dmque3 								as FAIXA_CS
+	,a.dmagnref 							as DT_ENVIO format DATETIME.
+	,input(a.dmagency,BEST4.) 				as COD_ASSESS
+	,case when a.dmagency = '4021' then 'RN ADV'
+		  when a.dmagency = '4022' then 'VILELA IBANEZ'
+		  when a.dmagency = '4023' then 'REALE'
+		  when a.dmagency = '4024' then 'BELLINATI'
+		  when a.dmagency = '4025' then 'LM ANGELIS'
+		  when a.dmagency = '4027' then 'TOLEDO'
+		  when a.dmagency = '4032' then 'TOLEDO II'
+		  when a.dmagency = '4033' then 'AVAL_CL'
+		  when a.dmagency = '4034' then 'FLEX_CL'
+		  when a.dmagency = '4035' then 'PASCHOALOTTO_CL'
+		  when a.dmagency = '4036' then 'BELLINATI 2_CL'
+		  when a.dmagency = '4037' then 'NOVA_QUEST_CL'
+		  when a.dmagency = '4039' then 'SERVICES'
+		  when a.dmagency = '4061' then 'CONCILIG'
+		  when a.dmagency = '4041' then 'TOLEDO_CE'
+										end as ASSESSORIA
+	,e.ahstatus 							as STATUS_ACORDO
+	,e.ahdt 								as DATA_ACORDO format DATETIME.
+
+from connection to perm (
+	select distinct
+	dmacct
+	,dmssnum
+	,dmdays
+	,dmcurbal
+	,dmamtdlq
+	,dmque3
+	,dmagnref
+	,dmagency
+	,dmacctg
+	,dmque
+	,dmstatus
+	,dmqchgdt
+	from bv-pdbd-prd.trusted_rcvry.delqmst) as a
+
+left join connection to perm (
+	select distinct
+	u3acct
+	,u3dtpriatr
+	,u3dtenqcont
+	,u3score2
+	,u3cdleg
+	from bv-pdbd-prd.trusted_rcvry.uda3) as c on a.dmacct = c.u3acct
+
+left join connection to perm (
+
+select distinct * from (
+	select distinct *
+    	from (
+		select distinct
+		ahid
+    	,ahdt
+    	,ahacct
+    	,ahstatus
+		from bv-pdbd-prd.trusted_rcvry.agrhdr where ahstatus = 'A') as x
+
+		left join (
+		select distinct
+		apahid
+    	,apdetid 
+    	,apflag
+		from bv-pdbd-prd.trusted_rcvry.agpmtdet) as z on x.ahid = z.apahid)
+
+where apdetid = '0' and apflag = 'C'
+
+) as e on a.dmacct = e.ahacct
+
+where a.dmacctg = '3' 
+and a.dmque = 'CL'
+and calculated SALDO_DEVEDOR_VENC > 10
+and a.dmstatus is null
+and a.dmagency in ('4021','4022','4023','4024','4025','4026','4027',
+				   '4032','4033','4034','4035','4036','4037','4039',
+				   '4061','4041')
+and c.u3cdleg not in ('2')
+
+;disconnect from perm;
+quit;
+
+DATA CARTEIRA_CL_B;
+SET CARTEIRA_CL;
+CPF = PUT(NUCPFCNPJ,Z11.);
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_SOLAR_CL AS SELECT
+A.*,
+B.DIAS_AT AS AtrasoCL,
+B.SALDO_DEVEDOR_VENC AS SaldoCL,
+B.ASSESSORIA AS AssessoriaCL,
+B.SCORE_2 AS Politica,
+B.STATUS_ACORDO AS StatusAcordo,
+B.DATA_ACORDO AS DataAcordo
+FROM BASE_CARTOES_SOLAR_1 A LEFT JOIN
+CARTEIRA_CL_B B
+ON
+A.NuCpfCnpj = B.CPF
+AND
+A.CdProdutoCartao = B.PRODUTO
+;
+QUIT;
+
+
+
+DATA BASE_CARTOES_SOLAR_CL_B;
+SET BASE_CARTOES_SOLAR_CL;
+WHERE AtrasoCL > 0 AND StatusAcordo = "" AND Atraso_Solar = 0;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_SOLAR_CL_C AS SELECT
+A.*,
+CASE WHEN A.Atraso IN (.,0) THEN 'EM DIA'
+	WHEN A.Atraso > 15 AND A.Atraso <= 30 THEN '0001 A 0030'
+	WHEN A.Atraso > 30 AND A.Atraso <= 60 THEN '0031 A 0060'
+	WHEN A.Atraso > 60 AND A.Atraso <= 90 THEN '0076 A 0090'
+	WHEN A.Atraso > 90 AND A.Atraso <=120 THEN '0091 A 0120'
+	WHEN A.Atraso > 120 AND A.Atraso <=150 THEN '0121 A 0150'
+	WHEN A.Atraso > 150 AND A.Atraso <=180 THEN '0151 A 0180'
+	WHEN A.Atraso > 180 AND A.Atraso <=210 THEN '0181 A 0210'
+	WHEN A.Atraso > 210 AND A.Atraso <=240 THEN '0211 A 0240'
+	WHEN A.Atraso > 240 AND A.Atraso <=270 THEN '0241 A 0270'
+	WHEN A.Atraso > 270 AND A.Atraso <=300 THEN '0271 A 0300'
+	WHEN A.Atraso > 300 AND A.Atraso <=330 THEN '0301 A 0330'
+	WHEN A.Atraso > 330 AND A.Atraso <=360 THEN '0331 A 0360'
+	WHEN A.Atraso > 360 AND A.Atraso <=390 THEN '0361 A 0390'
+	WHEN A.Atraso > 390 AND A.Atraso <=420 THEN '0391 A 0420'
+	WHEN A.Atraso > 420 AND A.Atraso <=450 THEN '0421 A 0450'
+	WHEN A.Atraso > 450 AND A.Atraso <=480 THEN '0451 A 0480'
+	WHEN A.Atraso > 480 AND A.Atraso <=510 THEN '0481 A 0510'
+	WHEN A.Atraso > 510 AND A.Atraso <=540 THEN '0511 A 0540'
+	WHEN A.Atraso > 540 THEN '0541 A 9999'
+END AS FAIXA_ATRASO,
+
+B.CONTADOR
+FROM BASE_CARTOES_SOLAR_CL_B A LEFT JOIN
+(SELECT NUCONTA, PRODUTO, COUNT(*) AS CONTADOR
+FROM BASE_CARTOES_SOLAR_CL_B
+GROUP BY
+NUCONTA, PRODUTO) B
+ON
+A.NUCONTA = B.NUCONTA
+AND
+A.PRODUTO = B.PRODUTO
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Cartao_Solar */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Cartao_Leves */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Cartao_Leves */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-HxXrDTtcSSMb9t6F/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA BASE_CARTOES;
+SET BASE_COBRANCA;
+WHERE SAFRA  = 202509 AND NmProdutoRisco = 'CARTOES';
+RUN;
+
+DATA BASE_CARTOES_1;
+SET BASE_CARTOES
+(KEEP = SAFRA	StOperacao	NuCpfCnpj	NuContrato	Carteira	PDD	QtDiaAtraso);
+CdProdutoCartao = SUBSTR(NuContrato, 1,2)*1;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_2 AS SELECT
+SAFRA,	StOperacao,	NuCpfCnpj,	CdProdutoCartao,
+MAX(QtDiaAtraso) AS Atraso,
+SUM(Carteira) AS Carteira,
+SUM(PDD) AS PDD
+FROM BASE_CARTOES_1
+GROUP BY
+SAFRA,	StOperacao,	NuCpfCnpj,	CdProdutoCartao;
+QUIT;
+
+
+
+DATA BASE_LEVES;
+SET BASE_COBRANCA;
+WHERE SAFRA  = 202509 AND NmProdutoRisco = 'LEVES';
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_LEVES AS SELECT
+A.*,
+B.NuContrato AS NuContrato_LEVES,
+B.NmSistemaOrigem AS NmSistemaOrigem_LEVES,
+B.StOperacao AS StOperacao_LEVES,
+B.QtDiaAtraso AS Atraso_LEVES,
+B.Carteira AS Carteira_LEVES,
+B.PDD AS PDD_LEVES
+FROM BASE_CARTOES_2 A LEFT JOIN BASE_LEVES B
+ON
+A.NuCpfCnpj = B.NuCpfCnpj;
+QUIT;
+
+
+
+DATA BASE_CARTOES_LEVES_1;
+SET BASE_CARTOES_LEVES;
+WHERE NuContrato_LEVES <> "" AND Atraso > 0;
+RUN;
+
+
+
+
+
+proc sql;
+connect to bigquery as perm (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS = must MAX_CHAR_LEN = 30);
+
+create table CARTEIRA_CL as
+    select distinct
+	 input(a.dmacct,BEST22.) 				as CONTRATO
+	,input(substr(a.dmacct,4),BEST22.) 		as NUCONTA
+	,input(substr(a.dmacct,1,3),BEST22.) 	as PRODUTO
+	,input(a.dmssnum,BEST11.) 				as NUCPFCNPJ
+	,c.u3dtpriatr 							as DT_PRI_ATRASO format DATETIME.
+	,c.u3dtenqcont 							as DT_ENQUAD format DATETIME.
+	,input(a.dmdays,BEST4.) 				as DIAS_AT
+	,input(a.dmcurbal,BEST9.) 				as SALDO_RISCO
+	,input(a.dmamtdlq,BEST9.) 				as SALDO_DEVEDOR_VENC
+	,input(c.u3score2,BEST4.) 				as SCORE_2
+	,a.dmque3 								as FAIXA_CS
+	,a.dmagnref 							as DT_ENVIO format DATETIME.
+	,input(a.dmagency,BEST4.) 				as COD_ASSESS
+	,case when a.dmagency = '4021' then 'RN ADV'
+		  when a.dmagency = '4022' then 'VILELA IBANEZ'
+		  when a.dmagency = '4023' then 'REALE'
+		  when a.dmagency = '4024' then 'BELLINATI'
+		  when a.dmagency = '4025' then 'LM ANGELIS'
+		  when a.dmagency = '4027' then 'TOLEDO'
+		  when a.dmagency = '4032' then 'TOLEDO II'
+		  when a.dmagency = '4033' then 'AVAL_CL'
+		  when a.dmagency = '4034' then 'FLEX_CL'
+		  when a.dmagency = '4035' then 'PASCHOALOTTO_CL'
+		  when a.dmagency = '4036' then 'BELLINATI 2_CL'
+		  when a.dmagency = '4037' then 'NOVA_QUEST_CL'
+		  when a.dmagency = '4039' then 'SERVICES'
+		  when a.dmagency = '4061' then 'CONCILIG'
+		  when a.dmagency = '4041' then 'TOLEDO_CE'
+										end as ASSESSORIA
+	,e.ahstatus 							as STATUS_ACORDO
+	,e.ahdt 								as DATA_ACORDO format DATETIME.
+
+from connection to perm (
+	select distinct
+	dmacct
+	,dmssnum
+	,dmdays
+	,dmcurbal
+	,dmamtdlq
+	,dmque3
+	,dmagnref
+	,dmagency
+	,dmacctg
+	,dmque
+	,dmstatus
+	,dmqchgdt
+	from bv-pdbd-prd.trusted_rcvry.delqmst) as a
+
+left join connection to perm (
+	select distinct
+	u3acct
+	,u3dtpriatr
+	,u3dtenqcont
+	,u3score2
+	,u3cdleg
+	from bv-pdbd-prd.trusted_rcvry.uda3) as c on a.dmacct = c.u3acct
+
+left join connection to perm (
+
+select distinct * from (
+	select distinct *
+    	from (
+		select distinct
+		ahid
+    	,ahdt
+    	,ahacct
+    	,ahstatus
+		from bv-pdbd-prd.trusted_rcvry.agrhdr where ahstatus = 'A') as x
+
+		left join (
+		select distinct
+		apahid
+    	,apdetid 
+    	,apflag
+		from bv-pdbd-prd.trusted_rcvry.agpmtdet) as z on x.ahid = z.apahid)
+
+where apdetid = '0' and apflag = 'C'
+
+) as e on a.dmacct = e.ahacct
+
+where a.dmacctg = '3' 
+and a.dmque = 'CL'
+and calculated SALDO_DEVEDOR_VENC > 10
+and a.dmstatus is null
+and a.dmagency in ('4021','4022','4023','4024','4025','4026','4027',
+				   '4032','4033','4034','4035','4036','4037','4039',
+				   '4061','4041')
+and c.u3cdleg not in ('2')
+
+;disconnect from perm;
+quit;
+
+DATA CARTEIRA_CL_B;
+SET CARTEIRA_CL;
+CPF = PUT(NUCPFCNPJ,Z11.);
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_LEVES_CL AS SELECT
+A.*,
+B.NUCONTA, B.PRODUTO,
+B.DIAS_AT AS AtrasoCL,
+B.SALDO_DEVEDOR_VENC AS SaldoCL,
+B.ASSESSORIA AS AssessoriaCL,
+B.SCORE_2 AS Politica,
+B.STATUS_ACORDO AS StatusAcordo,
+B.DATA_ACORDO AS DataAcordo
+FROM BASE_CARTOES_LEVES_1 A LEFT JOIN
+CARTEIRA_CL_B B
+ON
+A.NuCpfCnpj = B.CPF
+AND
+A.CdProdutoCartao = B.PRODUTO
+;
+QUIT;
+
+
+
+DATA BASE_CARTOES_LEVES_CL_B;
+SET BASE_CARTOES_LEVES_CL;
+WHERE AtrasoCL > 0 AND StatusAcordo = "" AND Atraso_LEVES = 0;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_CARTOES_LEVES_CL_C AS SELECT
+A.*,
+CASE WHEN A.Atraso IN (.,0) THEN 'EM DIA'
+	WHEN A.Atraso > 0 AND A.Atraso <= 30 THEN '0001 A 0030'
+	WHEN A.Atraso > 30 AND A.Atraso <= 60 THEN '0031 A 0060'
+	WHEN A.Atraso > 60 AND A.Atraso <= 90 THEN '0076 A 0090'
+	WHEN A.Atraso > 90 AND A.Atraso <=120 THEN '0091 A 0120'
+	WHEN A.Atraso > 120 AND A.Atraso <=150 THEN '0121 A 0150'
+	WHEN A.Atraso > 150 AND A.Atraso <=180 THEN '0151 A 0180'
+	WHEN A.Atraso > 180 AND A.Atraso <=210 THEN '0181 A 0210'
+	WHEN A.Atraso > 210 AND A.Atraso <=240 THEN '0211 A 0240'
+	WHEN A.Atraso > 240 AND A.Atraso <=270 THEN '0241 A 0270'
+	WHEN A.Atraso > 270 AND A.Atraso <=300 THEN '0271 A 0300'
+	WHEN A.Atraso > 300 AND A.Atraso <=330 THEN '0301 A 0330'
+	WHEN A.Atraso > 330 AND A.Atraso <=360 THEN '0331 A 0360'
+	WHEN A.Atraso > 360 AND A.Atraso <=390 THEN '0361 A 0390'
+	WHEN A.Atraso > 390 AND A.Atraso <=420 THEN '0391 A 0420'
+	WHEN A.Atraso > 420 AND A.Atraso <=450 THEN '0421 A 0450'
+	WHEN A.Atraso > 450 AND A.Atraso <=480 THEN '0451 A 0480'
+	WHEN A.Atraso > 480 AND A.Atraso <=510 THEN '0481 A 0510'
+	WHEN A.Atraso > 510 AND A.Atraso <=540 THEN '0511 A 0540'
+	WHEN A.Atraso > 540 THEN '0541 A 9999'
+END AS FAIXA_ATRASO,
+
+B.CONTADOR
+FROM BASE_CARTOES_LEVES_CL_B A LEFT JOIN
+(SELECT NUCONTA, PRODUTO, COUNT(*) AS CONTADOR
+FROM BASE_CARTOES_LEVES_CL_B
+GROUP BY
+NUCONTA, PRODUTO) B
+ON
+A.NUCONTA = B.NUCONTA
+AND
+A.PRODUTO = B.PRODUTO
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Cartao_Leves */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA BASE_COBRANCA_2025;
+SET
+PRETER.BASE_COBRANCA_202512;
+
+FAIXA_ATRASO = FX_ATRASO;
+RUN;
+
+DATA BASE_COBRANCA;
+SET
+
+BASE_COBRANCA_2025;
+
+
+
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_COBRANCA_CUBO AS SELECT
+NmProdutoRisco,StOperacao, SAFRA, FAIXA_ATRASO,
+COUNT(*) AS Quantidade,
+SUM(Carteira) AS Carteira,
+SUM(PDD) AS PDD
+
+FROM BASE_COBRANCA GROUP BY
+NmProdutoRisco,StOperacao, SAFRA, FAIXA_ATRASO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA BASE_CARTOES_SOLAR_CL_B;
+SET BASE_CARTOES_SOLAR_CL;
+WHERE AtrasoCL > 0 AND StatusAcordo = "" AND Atraso_Solar = 0;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE BASE_CARTOES_LEVES_CL_C AS SELECT
+A.*,
+CASE WHEN A.Atraso IN (.,0) THEN 'EM DIA'
+	WHEN A.Atraso > 0 AND A.Atraso <= 30 THEN '0001 A 0030'
+	WHEN A.Atraso > 30 AND A.Atraso <= 60 THEN '0031 A 0060'
+	WHEN A.Atraso > 60 AND A.Atraso <= 90 THEN '0076 A 0090'
+	WHEN A.Atraso > 90 AND A.Atraso <=120 THEN '0091 A 0120'
+	WHEN A.Atraso > 120 AND A.Atraso <=150 THEN '0121 A 0150'
+	WHEN A.Atraso > 150 AND A.Atraso <=180 THEN '0151 A 0180'
+	WHEN A.Atraso > 180 AND A.Atraso <=210 THEN '0181 A 0210'
+	WHEN A.Atraso > 210 AND A.Atraso <=240 THEN '0211 A 0240'
+	WHEN A.Atraso > 240 AND A.Atraso <=270 THEN '0241 A 0270'
+	WHEN A.Atraso > 270 AND A.Atraso <=300 THEN '0271 A 0300'
+	WHEN A.Atraso > 300 AND A.Atraso <=330 THEN '0301 A 0330'
+	WHEN A.Atraso > 330 AND A.Atraso <=360 THEN '0331 A 0360'
+	WHEN A.Atraso > 360 AND A.Atraso <=390 THEN '0361 A 0390'
+	WHEN A.Atraso > 390 AND A.Atraso <=420 THEN '0391 A 0420'
+	WHEN A.Atraso > 420 AND A.Atraso <=450 THEN '0421 A 0450'
+	WHEN A.Atraso > 450 AND A.Atraso <=480 THEN '0451 A 0480'
+	WHEN A.Atraso > 480 AND A.Atraso <=510 THEN '0481 A 0510'
+	WHEN A.Atraso > 510 AND A.Atraso <=540 THEN '0511 A 0540'
+	WHEN A.Atraso > 540 THEN '0541 A 9999'
+END AS FAIXA_ATRASO,
+
+B.CONTADOR
+FROM BASE_CARTOES_LEVES_CL_B A LEFT JOIN
+(SELECT NUCONTA, PRODUTO, COUNT(*) AS CONTADOR
+FROM BASE_CARTOES_LEVES_CL_B
+GROUP BY
+NUCONTA, PRODUTO) B
+ON
+A.NUCONTA = B.NUCONTA
+AND
+A.PRODUTO = B.PRODUTO
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

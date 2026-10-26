@@ -1,0 +1,136 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 8 - Leads Raw.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -237
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 75
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: PRIVADO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): PRIVADO.DGT_CTA_LEADS_RAW2 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): PRIVADO.DGT_CTA_LEADS_RAW2
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): PRIVADO.DGT_CTA_LEADS_RAW2
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): PRIVADO.DGT_CTA_LEADS_RAW
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PRIVADO.DGT_CTA_LEADS_RAW2
+APPEND_ONLY_OUTPUTS: PRIVADO.DGT_CTA_LEADS_RAW2
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): PRIVADO.DGT_CTA_LEADS_RAW2
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: KEY, WORK.DGT_CTA_LEADS_RAW_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	6 - Leads Raw.sas														| */
+/* | Descricao: Programa para tratar o arquivo de leads do salesforce canal de négocios egv.					| */
+/* |		Arquivo extraído manualmente de:						| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de Leads Raw atualizada=========================*/
+/* ======================================================================================*/
+
+/*proc sql;*/
+/*delete * from PRIVADO.DGT_CTA_LEADS_RAW2*/
+/*where input('Engagement Date Time'n,ddmmyy10.)>= input('01/02/2025',ddmmyy10.);quit;*/
+
+proc sql;
+CREATE TABLE KEY AS
+select DISTINCT COMPRESS('Send Time Phone Number'n)||"-"||COMPRESS(PUT(INPUT('Engagement Date Time'n,DDMMYY10.),DDMMYY10.)) AS KEY
+FROM PRIVADO.DGT_CTA_LEADS_RAW2;quit;
+
+PROC SQL;
+   CREATE TABLE WORK.DGT_CTA_LEADS_RAW_2 AS
+   SELECT t1.'Bulk Message'n,
+          t1.'Data Source'n,
+          t1.'Data Source Object'n,
+          t1.'Engagement Action Reason'n,
+          t1.'Engagement Channel Action'n,
+          t1.'Engagement Channel Type'n,
+          t1.'Engagement Date Time'n,
+          t1.'Engagement Notes'n,
+          t1.'External Source Id'n,
+          t1.Individual,
+          t1.'Key Qualifier Message Engagement'n,
+          t1.Message,
+          t1.'Message Engagement Id'n,
+          t1.'Message Recipient Send Status'n,
+          t1.'Recipient Message Id'n,
+          t1.'Send Classification'n,
+          t1.'Sender Code'n,
+          t1.'Sender Display Name'n,
+          PUT(INPUT(t1.'Send Time Phone Number'n,20.),20.) AS 'Send Time Phone Number'n,
+		  COMPRESS( PUT(INPUT(t1.'Send Time Phone Number'n,20.),20.))||"-"||COMPRESS(PUT(INPUT(t1.'Engagement Date Time'n,DDMMYY10.),DDMMYY10.)) as key
+      FROM DGT_CTA_LEADS_RAW t1
+WHERE COMPRESS( PUT(INPUT(t1.'Send Time Phone Number'n,20.),20.))||"-"||COMPRESS(PUT(INPUT(t1.'Engagement Date Time'n,DDMMYY10.),DDMMYY10.)) not IN (SELECT KEY FROM KEY)
+;
+QUIT;
+
+proc sql;
+/*CREATE TABLE teste AS*/
+
+insert into PRIVADO.DGT_CTA_LEADS_RAW2
+/*CREATE TABLE PRIVADO.DGT_CTA_LEADS_RAW AS*/
+select 	  t1.'Bulk Message'n,
+          t1.'Data Source'n,
+          t1.'Data Source Object'n,
+          t1.'Engagement Action Reason'n,
+          t1.'Engagement Channel Action'n,
+          t1.'Engagement Channel Type'n,
+          t1.'Engagement Date Time'n,
+          t1.'Engagement Notes'n,
+          t1.'External Source Id'n,
+          t1.Individual,
+          t1.'Key Qualifier Message Engagement'n,
+          t1.Message,
+          t1.'Message Engagement Id'n,
+          t1.'Message Recipient Send Status'n,
+          t1.'Recipient Message Id'n,
+          t1.'Send Classification'n,
+          t1.'Sender Code'n,
+          t1.'Sender Display Name'n,
+          t1.'Send Time Phone Number'n
+from DGT_CTA_LEADS_RAW_2 t1;quit;

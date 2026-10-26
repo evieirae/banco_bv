@@ -1,0 +1,252 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Rodas__Campanha Solar - Jan-26
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:20 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 176
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: EXPORT, IMPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: SOL = /infogrc/campanhas/CampanhaSolar/Jan26
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/CAMPANHAS/CAMPANHASOLAR/JAN26/PARCEIROS_CAMPANHA.XLSX [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/campanhas/CampanhaSolar/Jan26/Parceiros_Campanha.xlsx[SHEET='Parceiros_Campanha']
+TEMP/DISCARDED_TABLE_INPUT: WORK.IMPORT_CAMPANHAS, WORK.IMPORT_CAMPANHAS_SAIDA
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - JOIN], WORK.IMPORT_CAMPANHAS [PROC SQL - FROM], WORK.IMPORT_CAMPANHAS_SAIDA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /infogrc/campanhas/CampanhaSolar/Jan26/Parceiros_Campanha.xlsx
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/Base_Camp_Solar_2026.csv, /riscosbvf/BA/processos/output/Parceiros_Campanha_Solar.csv
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_CAMP_SOLAR_2026, BASE_REAL_SOLAR, IMPORT_CAMPANHAS_2, PARCEIROS_CAMPANHA_SOLAR, PDVS_SOLAR_PROSPECCAO, TOTAL_CTRS, WORK.IMPORT_CAMPANHAS, WORK.QUERY_FOR_IMPORT_CAMPANHAS_SAIDA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+OUT|/riscosbvf/BA/processos/output/Base_Camp_Solar_2026.csv|/RISCOSBVF/BA/PROCESSOS/OUTPUT|BASE_CAMP_SOLAR_2026.CSV||ok
+OUT|/riscosbvf/BA/processos/output/Parceiros_Campanha_Solar.csv|/RISCOSBVF/BA/PROCESSOS/OUTPUT|PARCEIROS_CAMPANHA_SOLAR.CSV||ok
+IN|/infogrc/campanhas/CampanhaSolar/Jan26/Parceiros_Campanha.xlsx|/INFOGRC/CAMPANHAS/CAMPANHASOLAR/JAN26|PARCEIROS_CAMPANHA.XLSX||ok
+IN|/infogrc/campanhas/CampanhaSolar/Jan26/Parceiros_Campanha.xlsx[SHEET='Parceiros_Campanha']|/INFOGRC/CAMPANHAS/CAMPANHASOLAR/JAN26|PARCEIROS_CAMPANHA.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Realizado Jan-26 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Realizado Jan-26 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-YiGbTzZNWzzzllOK/code.sas */
+/* =========================INÍCIO TASK========================= */
+Proc Sql;
+Create Table Base_Real_Solar as
+Select
+Parc.CdParceiroComercial
+,Parc.NmParceiroComercial
+,Parc.NuCnpjLoja
+,Parc.DtCadastro
+,Parc.FaixaProducao
+
+,Prod.NuAnomes
+,Prod.NuProposta
+,Prod.DtContrato
+,Prod.NmCanalEstruturaComercial
+,Prod.NmAreaEstruturaComercialC
+,Prod.DsLoginN3C
+,Prod.DsLoginN2C
+,Prod.DsLoginN1C
+,Prod.NmColaboradorC
+,Prod.DsLoginN1
+,Prod.NmColaborador
+,Prod.NmGrupoProdutoMeta
+
+,Count(Prod.NuProposta) as Qtd_Ctrs
+,Sum(VrProducao) as VrProducao
+,Max(Prod.QtTotalDiaUtilMes) as QtTotalDiaUtilMes
+,Max(Prod.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Max(Prod.DtAtualizacao) as DataBase Format DDMMYY10.
+From Parceiros_Campanha_Solar as Parc
+Left Join tmp.TbProducao as Prod
+	On Parc.NuCnpjLoja = Prod.NuCnpjLojaFavorecido and Parc.NuAnomes = Prod.NuAnomes
+Where Prod.DtContrato >= '12Jan2026'd and Prod.NmGrupoprodutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17
+;Quit;
+
+Proc Sql;
+Create Table Total_Ctrs as
+Select
+NuCnpjLoja
+,Sum(Qtd_Ctrs) as Qtd_Ctrs
+From Base_Real_Solar
+Group by 1
+;Quit;
+
+Proc Sql;
+Create Table Base_Camp_Solar_2026 (Where =(FaixaProducao NE 'Faixa 1: 3 meses ou menos sem efetivar')) as
+Select Distinct
+Camp.CdParceiroComercial
+,Camp.NmParceiroComercial
+,Camp.NuCnpjLoja
+,Camp.DtCadastro
+,Camp.FaixaProducao
+
+,Camp.NmCanalEstruturaComercial
+,Camp.NmAreaEstruturaComercialC
+,Camp.DsLoginN3C
+,Camp.DsLoginN2C
+,Camp.DsLoginN1C
+,Camp.NmColaboradorC
+,Camp.NmGrupoProdutoMeta
+
+,Sum(Coalesce(Camp.Qtd_Ctrs,0)) as Qtd_Ctrs
+,Sum(Camp.VrProducao) as VrProducao Format COMMAX10.2
+
+,Case
+	When Ctrs.Qtd_Ctrs <= 5 and Camp.FaixaProducao = 'Faixa 2: mais de 3 meses sem efetivar' Then Calculated Qtd_Ctrs * 100
+	When Ctrs.Qtd_Ctrs >  5 and Camp.FaixaProducao = 'Faixa 2: mais de 3 meses sem efetivar' Then Calculated Qtd_Ctrs * 200
+
+	When Ctrs.Qtd_Ctrs <= 5 and Camp.FaixaProducao = 'Faixa 3: nunca efetivou' Then Calculated Qtd_Ctrs * 100
+	When Ctrs.Qtd_Ctrs >  5 and Camp.FaixaProducao = 'Faixa 3: nunca efetivou' Then Calculated Qtd_Ctrs * 200
+
+	When Ctrs.Qtd_Ctrs <= 5 and Camp.FaixaProducao = 'Faixa 4 - Prospecção' Then Calculated Qtd_Ctrs * 200
+	When Ctrs.Qtd_Ctrs >  5 and Camp.FaixaProducao = 'Faixa 4 - Prospecção' Then Calculated Qtd_Ctrs * 300
+
+	When Camp.FaixaProducao = 'Faixa 1: 3 meses ou menos sem efetivar' Then 0
+	Else 0
+End as Premio
+,Max(Camp.DataBase) as DataBase Format DDMMYY10.
+From Base_Real_Solar as Camp
+	Left join Total_Ctrs as Ctrs
+		On Camp.NuCnpjLoja = Ctrs.NuCnpjLoja
+Group by 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+proc export
+data=Base_Camp_Solar_2026
+file='/riscosbvf/BA/processos/output/Base_Camp_Solar_2026.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Realizado Jan-26 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Parceiros Campanha */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Parceiros Campanha */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-bu6NDV8vEaJWOk5S/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname Sol '/infogrc/campanhas/CampanhaSolar/Jan26';
+
+PROC IMPORT DATAFILE= "/infogrc/campanhas/CampanhaSolar/Jan26/Parceiros_Campanha.xlsx"
+OUT= WORK.IMPORT_CAMPANHAS
+DBMS=XLSX
+REPLACE;
+SHEET="Parceiros_Campanha";
+GETNAMES=YES;
+RUN;
+
+Proc Sql;
+Create Table Import_Campanhas_2 as
+Select
+NuAnomes
+,DsLoginN1
+,Filial	as NmAreaEstruturaComercial
+,Colaborador as NmColaborador
+,CdParceiroComercial
+,NmParceiroComercial
+,NuCpfCnpj as NuCnpjLoja
+,DtCadastro Format DDMMYY10.
+,DtUltEfetivacao Format DDMMYY10.
+,FaixaProducao
+From WORK.IMPORT_CAMPANHAS
+;Quit;
+
+
+Proc Sql;
+Create Table PDVs_Solar_Prospeccao (Where = (Filtro = "OK")) as
+Select Distinct
+year(Parc.DtCadastro) *100 + month(Parc.DtCadastro) as NuAnomes
+,Parc.DsLoginN1C as DsLoginN1
+,Parc.NmAreaEstruturaComercialC as NmAreaEstruturaComercial
+,Parc.NmColaboradorC as NmColaborador
+,Parc.CdParceiroComercial
+,Parc.NmParceiroComercial
+,Parc.NuCnpjLoja
+,Parc.DtCadastro Format DDMMYY10.
+,. as DtUltEfetivacao
+,"Faixa 4 - Prospecção" as FaixaProducao
+,Case When Camp.NuCnpjLoja = "" Then "OK" Else "NOK" End as Filtro
+From Bases.TbParceiroComercial as Parc
+Left Join Import_Campanhas_Saida as camp
+	On Parc.NuCnpjLoja = Camp.NuCnpjLoja
+Where Parc.NmCanalEstruturaComercialC = 'Canal Solar' and Parc.DtCadastro >= '01Jan2026'd
+;Quit;
+
+Data Parceiros_Campanha_Solar;
+Set Import_Campanhas_2
+	PDVs_Solar_Prospeccao (Drop=Filtro)
+;Run;
+
+proc export
+data=Parceiros_Campanha_Solar
+file='/riscosbvf/BA/processos/output/Parceiros_Campanha_Solar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Parceiros Campanha */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_IMPORT_CAMPANHAS_SAIDA);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_IMPORT_CAMPANHAS_SAIDA AS
+   SELECT DISTINCT t1.FaixaProducao
+      FROM WORK.IMPORT_CAMPANHAS_SAIDA t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

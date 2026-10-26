@@ -1,0 +1,175 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 11 - Producao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 111
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: safraM13
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BASEGRC.TBFILTROCVG [SAS/Local], BASEGRC.TBPORTEPDV [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALPDVS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBFILTROCVG [PROC SQL - JOIN], BASEGRC.TBPORTEPDV [PROC SQL - JOIN], TMP.TBORIGINACAO [PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM], TMP.TBPOTENCIALPDVS [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PARCEIROCOMERCIAL, TBCNAE, TBORIGINACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	8 - Leads Stage.sas														| */
+/* | Descricao: Programa finalização do tratametno de leadas do salesforce canal de négocios egv.					| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de Leads Stage atualizada=========================*/
+/* ======================================================================================*/
+
+options datestyle=dmy;
+
+PROC SQL;
+CREATE TABLE TbCnae AS
+SELECT DISTINCT
+	CdParceiroComercial
+	,CnaePrimario
+	,TpCnae
+
+FROM tmp.TbPotencialPDVs
+WHERE CdParceiroComercial <> .
+AND CnaePrimario <> ''
+;RUN;
+
+PROC SQL;
+CREATE TABLE ParceiroComercial AS
+SELECT
+	TbParceiroComercial.CdParceiroComercial
+	,TbParceiroComercial.NuCnpjLoja
+	,TbParceiroComercial.NmParceiroComercial
+	,TbCnae.CnaePrimario AS Cnae
+	,TbParceiroComercial.NmGrupoConcessionaria
+	,TbParceiroComercial.NmBandeiraGrupoConcessionaria
+	,CASE WHEN TbParceiroComercial.PredominanciaProduto = 'Motos' THEN  FlPorteNovoMotos ELSE FlPorteA END as FlPorteA
+	,TbParceiroComercial.PredominanciaProduto
+	,TbParceiroComercial.DsGrupoParceiroLocadoras AS Locadora
+	,TbParceiroComercial.NmAutoShopping
+	,NmCidade
+	,CdUf
+FROM tmp.TbParceiroComercial TbParceiroComercial
+	left join basegrc.TbPortepdv PortePDV
+		on TbParceiroComercial.NuCnpjLoja = PortePDV.NuCnpjLoja
+		AND PortePDV.NuAno = year(today())
+	LEFT JOIN TbCnae TbCnae
+		ON TbParceiroComercial.CdParceiroComercial = TbCnae.CdParceiroComercial
+WHERE FlAtivo = 'S'
+;run;
+
+/* ========= TbOriginacao ========= */
+
+proc sql;
+create table TbOriginacao as
+select
+	Originacao.NuAnoMes AS NuAnoMes_PROP
+	,Producao.NuAnoMes AS NuAnoMes_Ctt
+	,Originacao.DtEntradaProposta
+	,Originacao.DtStatusProposta
+	,Originacao.StProposta
+	,Originacao.NucpfCnpj
+	,Originacao.NuProposta
+	,Producao.NuContrato
+	,Originacao.NmGrupoProdutoMeta
+	,Originacao.CdParceiroComercial
+	,ParceiroComercial.NuCnpjLoja
+	,Originacao.NmParceiroComercial
+	,Originacao.NmTipoParceiroComercial
+	,Originacao.NmSubEstruturaComercialC
+	,Originacao.NmAreaEstruturaComercialC
+	,Originacao.CdFilialC
+	,Originacao.NmColaborador
+	,Originacao.NmColaboradorC
+	,Originacao.DsLoginN1
+	,Originacao.DsloginN2A
+	,Originacao.DsloginN3A
+	,Originacao.DsLoginN1C
+	,Originacao.DsloginN2C
+	,Originacao.DsloginN3C
+	,Originacao.DsLoginN1Cart
+	,Originacao.DsLoginOriginador
+	,Originacao.LstSubstituicaoC
+	,Originacao.TpPessoa
+	,tbfiltrocvg.FiltroCVG
+	,sum((Originacao.VrPropostaOriginada/Originacao.QtCorridosDiaUtilMes)) as VrPropostaOriginadaDiaUtil
+	,sum(Originacao.FlPropostaOriginada) as FlPropostaOriginada
+	,sum(coalesce(Originacao.VrPropostaOriginada,Producao.VrProducao)) as VrProposta
+	,sum(Originacao.FlPropostaAprovada) as FlPropostaAprovada
+	,sum(Originacao.VrPropostaAprovada) as VrPropostaAprovada
+	,sum(Originacao.FlPropostaEfetivada) as FlPropostaEfetivada
+	,sum(Originacao.VrPropostaEfetivada) as VrPropostaEfetivada
+	,sum((Originacao.FlPropostaOriginada/Originacao.QtCorridosDiaUtilMes)) as QtPropostaOriginadaDiaUtil
+
+from tmp.TbOriginacao Originacao
+	left join tmp.TbProducao Producao
+		on originacao.NuProposta = Producao.NuProposta
+
+		LEFT JOIN ParceiroComercial ParceiroComercial
+			ON Originacao.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+	left join basegrc.tbfiltrocvg tbfiltrocvg
+	on Originacao.nuproposta = tbfiltrocvg.nuproposta
+
+where Originacao.NuAnoMes >= &safraM13. and Originacao.NuProposta <> .
+  and Originacao.StProposta IN ('A','AP','PA','CA','N')
+/*   and Originacao.NmGrupoProdutoMeta CONTAINS 'CVG' */
+AND Originacao.CdParceiroComercial IN
+           (
+          	select distinct cdparceirocomercial from depara_parceiros
+           )
+AND Originacao.NmColaborador in (
+			select distinct GR from depara_GR
+			)
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25
+;run;

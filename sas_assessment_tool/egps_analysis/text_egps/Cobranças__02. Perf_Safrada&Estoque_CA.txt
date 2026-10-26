@@ -1,0 +1,928 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__02. Perf_Safrada&Estoque_CA
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:05 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -49
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 745
+CODE_TASKS_COUNT: 11
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (11x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ARTHUR = /riscosbv/cobranca/aesteves; BA3040 = /riscosbv/cobranca/est_cartoes/3040; B_GERAL = /riscosbv/cobranca/malmeida; CARD_ACR = /riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/; CARD_BC = /riscosbv/cobranca/ranapole/Cartoes/3040; CARD_CS = /riscosbv/cobranca/ranapole/Cartoes/Modelagem; CARNEIRO = /riscosbv/cobranca/jcarneiro; CUBO = /riscosbv/cobranca/dpompei/cartao/CA; ELESSON = /riscosbv/cobranca/esantos; EQUIPE3 = /riscosbvf/analytics/narciso/lucas/HACKATON_EQP3; ESTUDOS2 = /riscosbvf/indicadores/Estudos_2; EST_CART = /riscosbv/cobranca/jcarneiro/estrategia_cartoes; GH16 = /riscosbv/cobranca/dpompei/cartao/GH16; JOAO = /riscosbv/cobranca/bsilva/; MOVTO = /riscosbv/cobranca/erocha/CARTAO/MOVTO; PAGOSCBR = /riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber; PERF_CL = /riscosbv/cobranca/erocha/CARTAO/CL/MIS; PG_CYBER = /riscosbv/cobranca/jcarneiro/pagos_cyber; PRETER = /riscosbv/cobranca/preter; RAFAEL = /riscosbv/cobranca/ranapole; RENDA = /riscosbvf/plan_mesas/shared/PROJETO_RENDA; SATIE = /riscosbv/cobranca/satie
+DETECTED_MACROS_DEFINED: DtFim, DtInicio, ONTEM
+DETECTED_MACROS_USED: DT_FECHAMENTO, DT_FIM, DT_INICIO, DtFim, DtInicio, ONTEM, SAFRA
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: DT_FECHAMENTO, DT_FIM, DT_INICIO, SAFRA
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_RCVRY.TB_HISTORICO_DISPONIBILIZACAO [BIGQUERY], B_GERAL.DIAS_UTEIS [SAS/Local], CARNEIRO.CARTEIRA_CA [SAS/Local], SATIE.CARTEIRA_CA_PISMO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ATRASOS_CA_BV_B, WORK.ATRASOS_CA_BV_C, WORK.PERF_ESTOQUE_A
+IMPORTED_LIBNAMES: B_GERAL, CARNEIRO, SATIE
+EXPORTED_LIBNAMES: SATIE
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.ATRASOS_CA_BV_B, WORK.ATRASOS_CA_BV_C, WORK.PERF_ESTOQUE_A
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.TB_HISTORICO_DISPONIBILIZACAO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], B_GERAL.DIAS_UTEIS [PROC SQL - JOIN], CARNEIRO.CARTEIRA_CA [DATA Step - SET], SATIE.CARTEIRA_CA_PISMO [PROC SQL - FROM], SATIE.ENQUADRADOS_PISMO [DATA Step - SET; PROC SQL - JOIN], WORK.ATRASOS_CA_BV_B [PROC SQL - FROM], WORK.ATRASOS_CA_BV_C [PROC SQL - FROM], WORK.PERF_ESTOQUE_A [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): SATIE.ENQUADRADOS_PISMO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SATIE.ENQUADRADOS_PISMO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ATRASOS_CA, ATRASOS_CA_A, ATRASOS_CA_B, ATRASOS_CA_BV, ATRASOS_CA_BV_B, ATRASOS_CA_BV_C, ATRASOS_CA_C, BASE_&SAFRA, CARTEIRA_ENQUAD, CARTEIRA_ENQUAD2, CUBO, CUBO_BV, CUBO_FINAL, CUBO_REC_CHUVEIRINHO_BV, CUBO_REC_CHUVEIRINHO_PISMO, CUBO_TOTAL, ENQUADRADOS_PISMO_EMP, ENQUADRADOS_PISMO_EMP_1, PERF_ESTOQUE, PERF_ESTOQUE_A, VALIDA, VALIDA2, WORK.QUERY_FOR_ATRASOS_CA_BV_B, WORK.QUERY_FOR_ATRASOS_CA_BV_C
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET ONTEM=TODAY()-1;
+%LET DtInicio='2026-01-31T00:00:00Z';
+%LET DtFim='2026-01-31T00:00:00Z';
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Libnames */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Libnames */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-WXiJhhIUHfHQQQtW/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME ARTHUR 		BASE '/riscosbv/cobranca/aesteves';
+LIBNAME JOAO 		BASE '/riscosbv/cobranca/bsilva/';
+LIBNAME CUBO 		BASE '/riscosbv/cobranca/dpompei/cartao/CA';
+LIBNAME MOVTO 		BASE '/riscosbv/cobranca/erocha/CARTAO/MOVTO';
+LIBNAME CARD_ACR 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/';
+LIBNAME CARD_BC 	BASE '/riscosbv/cobranca/ranapole/Cartoes/3040';
+LIBNAME CARD_CS 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Modelagem';
+LIBNAME PERF_CL 	BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+LIBNAME GH16 		BASE '/riscosbv/cobranca/dpompei/cartao/GH16';
+LIBNAME EQUIPE3 	BASE '/riscosbvf/analytics/narciso/lucas/HACKATON_EQP3';
+LIBNAME CARNEIRO 	BASE '/riscosbv/cobranca/jcarneiro';
+LIBNAME EST_CART 	BASE '/riscosbv/cobranca/jcarneiro/estrategia_cartoes';
+LIBNAME PG_CYBER	BASE '/riscosbv/cobranca/jcarneiro/pagos_cyber';
+LIBNAME BA3040 		BASE '/riscosbv/cobranca/est_cartoes/3040';
+LIBNAME PRETER 		BASE '/riscosbv/cobranca/preter';
+LIBNAME PAGOSCBR 	BASE '/riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber';
+LIBNAME B_GERAL 	BASE '/riscosbv/cobranca/malmeida';
+LIBNAME RAFAEL 		BASE '/riscosbv/cobranca/ranapole';
+LIBNAME ELESSON 	BASE '/riscosbv/cobranca/esantos';
+LIBNAME SATIE 		BASE '/riscosbv/cobranca/satie';
+LIBNAME RAFAEL		BASE '/riscosbv/cobranca/ranapole';
+LIBNAME RENDA 		BASE '/riscosbvf/plan_mesas/shared/PROJETO_RENDA';
+LIBNAME ESTUDOS2 	BASE '/riscosbvf/indicadores/Estudos_2';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Libnames */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Parametros */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Parametros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-P1sCBrsqTG3l9SUK/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET ONTEM = TODAY()-1;
+%LET DtInicio ='2026-01-31T00:00:00Z'; 
+%LET DtFim ='2026-01-31T00:00:00Z';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Parametros */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. Enquad */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. Enquad */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-qAExUNx2foms6X1O/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS = must MAX_CHAR_LEN = 30);
+
+create table CARTEIRA_ENQUAD as
+    select distinct
+	datepart(a.dt_disponibilizacao) format date9.	as DT_ENVIO
+	,datepart(a.dt_nova_disponib) format date9.		as CD_DT_NOVA_DISPONIB
+    ,input(a.cd_nova_assessoria,BEST4.)				as CD_NOVA_ASSESSORIA
+    ,a.cd_novo_status								as CD_NOVO_STATUS
+	,a.nr_contrato			 						as CHAVE_AUX
+	,input(a.nr_cpfcnpj,BEST22.) 					as NR_CPFCNPJ
+	,input(substr(a.nr_contrato,6),BEST22.) 		as NUCONTA
+	,input(substr(a.nr_contrato,11),BEST22.) 		as CONTRT
+	,input(substr(a.nr_contrato,4,2),BEST22.) 		as PRODUTO
+	,input(a.nr_dias_atraso,BEST11.) 				as DIAS_AT
+	,input(d.dmdays,BEST11.) 						as ATRASO_ATU
+    ,input(a.Score1,BEST4.)  						as CS
+	,input(d.dmsubset,BEST4.) 						as DIG_RAND
+    ,a.dmque2 										as FAIXA_CS
+	,input(a.cd_assessoria,BEST11.) 				as COD_ASSESS
+	,case when a.cd_assessoria = '4001' then 'TOLEDO'
+		  when a.cd_assessoria = '4002' then 'REALE'
+		  when a.cd_assessoria = '4003' then 'ZANC'
+		  when a.cd_assessoria = '4005' then 'PASCHOALOTTO'
+		  when a.cd_assessoria = '4006' then 'BELLINATI_CA'
+		  when a.cd_assessoria = '4007' then 'CRC'
+		  when a.cd_assessoria = '4008' then 'TOLEDO_2'
+		  when a.cd_assessoria = '4009' then 'BELLINATI_CA_2'
+		  when a.cd_assessoria = '4010' then 'PILOTO_BOM'
+		  when a.cd_assessoria = '4036' then 'BELLINATI_2'
+		  when a.cd_assessoria = '1018' then 'CONTROLE_CYBER_CONSIGNADO'
+		  when a.cd_assessoria = '1020' then 'SUSPENSAO_CYBER'
+												end as ASSESSORIA
+    ,a.dmque 										as STATUS_CONTA
+	,input(a.vl_divida,BEST9.) 						as SALDO_DEVEDOR_VENC 
+
+	,mdy(input(SUBSTR(a.dtenquad,5,2),best8.),input(SUBSTR(a.dtenquad,7,2),best8.),input(SUBSTR(a.dtenquad,1,4),best8.)) format date9. as DT_ENQUAD
+	,input(a.vl_nova_divida,BEST9.) 				as VL_NOVA_DIVIDA
+
+from connection to perm (
+	select distinct
+	dt_disponibilizacao
+	,dt_nova_disponib
+	,cd_nova_assessoria
+	,cd_novo_status
+	,nr_contrato
+	,nr_cpfcnpj
+	,nr_dias_atraso
+	,Score1
+	,dmque2
+	,cd_assessoria
+	,dmque
+	,vl_divida
+	,vl_nova_divida
+	,nr_grupo
+	,dtenquad
+
+	from bv-pdbd-prd.trusted_rcvry.tb_historico_disponibilizacao
+	where nr_grupo = '3'
+	and dmque in ('CL','CLVU','CL1','CL2','CL3','CL4','CL5','CL6')
+
+	and length(nr_contrato) = 17
+	and ((dt_disponibilizacao >= &DtInicio. and dt_disponibilizacao < &DtFim.) OR
+	 	 (dt_disponibilizacao < &DtInicio. and (dt_nova_disponib IS NULL OR dt_nova_disponib > &DtInicio.)))
+	and dt_disponibilizacao >= '2019-01-01T23:59:59Z'
+
+) as a
+
+
+
+left join connection to perm (
+	select distinct
+	dmacct
+	,dmdays
+	,dmcurbal
+	,dmsubset
+
+	from bv-pdbd-prd.trusted_rcvry.delqmst) as d on a.nr_contrato = d.dmacct
+
+;disconnect from perm;
+quit;
+
+data CARTEIRA_ENQUAD2 (KEEP= NUCONTA PRODUTO NR_CPFCNPJ CHAVE_AUX DT_INICIO_ATRASO DT_ENVIO DT_ENQUAD STATUS_CONTA);
+set CARTEIRA_ENQUAD;
+format DT_INICIO_ATRASO DATE9.;
+DT_INICIO_ATRASO = DT_ENVIO - DIAS_AT;
+;run;
+
+
+
+
+
+DATA ENQUADRADOS_PISMO_EMP;
+SET SATIE.ENQUADRADOS_PISMO
+	CARTEIRA_ENQUAD2
+;RUN;
+
+proc sort data=ENQUADRADOS_PISMO_EMP nodupkey out=ENQUADRADOS_PISMO_EMP_1;
+by NUCONTA PRODUTO NR_CPFCNPJ CHAVE_AUX DT_INICIO_ATRASO DT_ENVIO DT_ENQUAD STATUS_CONTA;
+run;
+
+DATA SATIE.ENQUADRADOS_PISMO;
+SET ENQUADRADOS_PISMO_EMP_1
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. Enquad */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03. Perf_Safrada_Pismo */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03. Perf_Safrada_Pismo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-4zpOxjS9Amyt5f6j/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE ATRASOS_CA AS
+SELECT DISTINCT
+A.*
+
+,CASE WHEN E.DT_ENQUAD NE . THEN 1 ELSE 0 END AS FL_ENQUADRADO
+,E.DT_ENQUAD AS DT_ENQUAD_CL
+
+FROM SATIE.CARTEIRA_CA_PISMO AS A
+LEFT JOIN SATIE.ENQUADRADOS_PISMO AS E ON A.NUCONTA = E.NUCONTA AND A.PRODUTO = E.PRODUTO AND A.DT_INICIO_ATRASO = E.DT_INICIO_ATRASO AND A.DT_RETIRADA = E.DT_ENVIO
+;QUIT;
+
+DATA ATRASOS_CA_A (DROP=DT_ENQUAD);
+SET ATRASOS_CA;
+FORMAT DT_REG DATE9.;
+
+WHERE DT_INICIO_ATRASO >= MDY(10,01,2024);
+
+IF DT_RETIRADA - DT_INICIO_ATRASO >= 6 OR (DT_RETIRADA = . AND &ONTEM. - DT_INICIO_ATRASO >=5) THEN FLAG_5 = 1; ELSE FLAG_5 = 0; 
+
+IF DT_ENQUAD_CL = . OR DT_ENQUAD_CL > DT_RETIRADA + 5 THEN DT_REG = DT_RETIRADA;
+ELSE IF DT_ENQUAD_CL >= DT_RETIRADA - 5 AND DT_ENQUAD_CL <= DT_RETIRADA + 5 THEN DT_REG = .;
+
+IF DT_ENQUAD_CL = . OR DT_ENQUAD_CL > DT_RETIRADA + 5 THEN DO;
+	DIAS_REG = DT_RETIRADA - DT_INICIO_ATRASO;
+	SAFRA_RETIRADA = 100*YEAR(DT_RETIRADA)+MONTH(DT_RETIRADA); END;
+ELSE DO; DIAS_REG = .;
+		 SAFRA_RETIRADA = .;END; 
+
+VCTO = DAY(DT_INICIO_ATRASO);
+SAFRA_ATR = 100*YEAR(DT_INICIO_ATRASO)+MONTH(DT_INICIO_ATRASO);
+SAFRA_ENVIO = 100*YEAR(DT_ENVIO)+MONTH(DT_ENVIO);
+ATRASO_ENVIO = DT_ENVIO - DT_INICIO_ATRASO;
+IF DT_RETIRADA = . THEN ATRASO_ATUAL = &ONTEM. - DT_INICIO_ATRASO; ELSE ATRASO_ATUAL = .;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE ATRASOS_CA_B AS
+SELECT DISTINCT
+A.*
+,C.DU AS DU_ATRASO
+,D.DU AS DU_ENVIO
+
+,CASE WHEN A.ATRASO_ENVIO IN (.,0)	  THEN '000. EM DIA'
+	  WHEN A.ATRASO_ENVIO <= 5		  THEN '001. 01 A 05 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 10 	  THEN '002. 06 A 10 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 15 	  THEN '003. 11 A 15 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 20 	  THEN '004. 16 A 20 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 30 	  THEN '005. 21 A 30 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 45 	  THEN '006. 31 A 45 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 60 	  THEN '007. 46 A 60 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 75 	  THEN '008. 61 A 75 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 95 	  THEN '009. 76 A 95 DIAS' ELSE '010. ACIMA DE 95 DIAS' END AS FX_ATRASO_ENVIO
+
+,CASE WHEN A.ATRASO_ATUAL IN (.,0)	  THEN '000. EM DIA'
+	  WHEN A.ATRASO_ATUAL <= 5		  THEN '001. 01 A 05 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 10 	  THEN '002. 06 A 10 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 15 	  THEN '003. 11 A 15 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 20		  THEN '004. 16 A 20 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 30 	  THEN '005. 21 A 30 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 45 	  THEN '006. 31 A 45 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 60 	  THEN '007. 46 A 60 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 75 	  THEN '008. 61 A 75 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 95 	  THEN '009. 76 A 95 DIAS' ELSE '010. ACIMA DE 95 DIAS' END AS FX_ATRASO_ATU
+
+,CASE WHEN A.PRODUTO =10 THEN 'CARTÃO BV PISMO'
+	  WHEN A.PRODUTO =20 THEN 'CARTÃO MÉLIUZ' ELSE '' END AS TP_CARTAO
+
+,CASE WHEN A.DIAS_REG > 91 THEN 91 ELSE A.DIAS_REG END AS DIA_REG
+
+FROM ATRASOS_CA_A AS A
+LEFT JOIN B_GERAL.DIAS_UTEIS AS C ON A.DT_INICIO_ATRASO = C.Data
+LEFT JOIN B_GERAL.DIAS_UTEIS AS D ON A.DT_ENVIO = D.Data
+;QUIT;
+
+DATA ATRASOS_CA_C;
+SET ATRASOS_CA_B;
+WHERE FLAG_5 =1;
+RUN;
+
+PROC SORT DATA=ATRASOS_CA_C;
+BY DT_INICIO_ATRASO;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_REC_CHUVEIRINHO_PISMO AS
+SELECT DISTINCT
+SAFRA_ATR
+,SAFRA_ENVIO
+,FLAG_5
+,DU_ATRASO
+,DU_ENVIO
+,DIA_REG
+,TP_CARTAO
+,VCTO
+,FL_ENQUADRADO
+,COD_ASSESS
+,FX_ATRASO_ENVIO
+,FX_ATRASO_ATU
+,COUNT(*) AS QUANTIDADE
+,SUM(VLR_COB_INI) AS VALOR
+FROM ATRASOS_CA_C
+GROUP BY
+SAFRA_ATR
+,SAFRA_ENVIO
+,FLAG_5
+,DU_ATRASO
+,DU_ENVIO
+,DIA_REG
+,TP_CARTAO
+,VCTO
+,FL_ENQUADRADO
+,COD_ASSESS
+,FX_ATRASO_ENVIO
+,FX_ATRASO_ATU
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03. Perf_Safrada_Pismo */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 04. Perf_Safrada_BV */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 04. Perf_Safrada_BV */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vxYY4URPHsjPbNRd/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA ATRASOS_CA_BV;
+SET CARNEIRO.CARTEIRA_CA;
+FORMAT DT_REG DATE9.;
+
+IF DT_RETIRADA - DT_INICIO_ATRASO >= 6 OR (DT_RETIRADA = . AND &ONTEM. - DT_INICIO_ATRASO >=5) THEN FLAG_5 = 1; ELSE FLAG_5 = 0; 
+
+IF DT_ENQUAD = . OR DT_ENQUAD > DT_RETIRADA + 5 THEN DT_REG = DT_RETIRADA;
+ELSE IF DT_ENQUAD >= DT_RETIRADA - 5 AND DT_ENQUAD <= DT_RETIRADA + 5 THEN DT_REG = .;
+
+IF DT_ENQUAD = . OR DT_ENQUAD > DT_RETIRADA + 5 THEN DO;
+	DIAS_REG = DT_RETIRADA - DT_INICIO_ATRASO;
+	SAFRA_RETIRADA = 100*YEAR(DT_RETIRADA)+MONTH(DT_RETIRADA); END;
+ELSE DO; DIAS_REG = .;
+		 SAFRA_RETIRADA = .;END; 
+
+VCTO = DAY(DT_INICIO_ATRASO);
+SAFRA_ATR = 100*YEAR(DT_INICIO_ATRASO)+MONTH(DT_INICIO_ATRASO);
+SAFRA_ENVIO = 100*YEAR(DT_ENVIO)+MONTH(DT_ENVIO);
+ATRASO_ENVIO = DT_ENVIO - DT_INICIO_ATRASO;
+IF DT_RETIRADA = . THEN ATRASO_ATUAL = &ONTEM. - DT_INICIO_ATRASO; ELSE ATRASO_ATUAL = .;
+
+WHERE DT_INICIO_ATRASO >= MDY(10,01,2024) AND PRODUTO NE 0; 
+;RUN;
+
+PROC SQL;
+CREATE TABLE ATRASOS_CA_BV_B AS
+SELECT DISTINCT
+A.*
+,C.DU AS DU_ATRASO
+,D.DU AS DU_ENVIO
+
+,CASE WHEN A.ATRASO_ENVIO IN (.,0)	  THEN '001. EM DIA'
+	  WHEN A.ATRASO_ENVIO <= 5		  THEN '002. 01 A 05 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 10 	  THEN '003. 06 A 10 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 15 	  THEN '004. 11 A 15 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 20 	  THEN '005. 16 A 20 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 30 	  THEN '006. 21 A 30 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 45 	  THEN '007. 31 A 45 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 60 	  THEN '008. 46 A 60 DIAS'
+	  WHEN A.ATRASO_ENVIO <= 75 	  THEN '009. 61 A 75 DIAS' ELSE '010. ACIMA DE 75 DIAS' END AS FX_ATRASO_ENVIO
+
+,CASE WHEN A.ATRASO_ATUAL IN (.,0)	  THEN '000. EM DIA'
+	  WHEN A.ATRASO_ATUAL <= 5		  THEN '001. 01 A 05 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 10 	  THEN '002. 06 A 10 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 15 	  THEN '003. 11 A 15 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 20		  THEN '004. 16 A 20 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 30 	  THEN '005. 21 A 30 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 45 	  THEN '006. 31 A 45 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 60 	  THEN '007. 46 A 60 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 75 	  THEN '008. 61 A 75 DIAS'
+	  WHEN A.ATRASO_ATUAL <= 95 	  THEN '009. 76 A 95 DIAS' ELSE '010. ACIMA DE 95 DIAS' END AS FX_ATRASO_ATU
+
+,CASE WHEN A.PRODUTO =10 THEN 'CARTÃO BV PISMO'
+	  WHEN A.PRODUTO =20 THEN 'CARTÃO MÉLIUZ' ELSE '' END AS TP_CARTAO
+
+,CASE WHEN A.DT_ENQUAD NE . THEN 1 ELSE 0 END AS FL_ENQUADRADO
+
+,CASE WHEN A.DIAS_REG > 91 THEN 91 ELSE A.DIAS_REG END AS DIA_REG
+
+
+
+FROM ATRASOS_CA_BV A
+LEFT JOIN B_GERAL.DIAS_UTEIS AS C ON A.DT_INICIO_ATRASO = C.Data
+LEFT JOIN B_GERAL.DIAS_UTEIS AS D ON A.DT_ENVIO = D.Data
+
+;QUIT;
+
+DATA ATRASOS_CA_BV_C;
+SET ATRASOS_CA_BV_B;
+WHERE FLAG_5 =1;
+RUN;
+
+PROC SORT DATA=ATRASOS_CA_BV_C;
+BY DT_INICIO_ATRASO;
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE CUBO_REC_CHUVEIRINHO_BV AS
+SELECT DISTINCT
+SAFRA_ATR
+,SAFRA_ENVIO
+,FLAG_5
+,DU_ATRASO
+,DU_ENVIO
+,DIA_REG
+,'CARTÃO BV' AS TP_CARTAO
+,VCTO
+,FL_ENQUADRADO
+,COD_ASSESS
+,FX_ATRASO_ENVIO
+,FX_ATRASO_ATU
+,COUNT(*) AS QUANTIDADE
+,SUM(VLR_COB_INI) AS VALOR
+FROM ATRASOS_CA_BV_C
+GROUP BY
+SAFRA_ATR
+,SAFRA_ENVIO
+,FLAG_5
+,DU_ATRASO
+,DU_ENVIO
+,DIA_REG
+,TP_CARTAO
+,VCTO
+,FL_ENQUADRADO
+,COD_ASSESS
+,FX_ATRASO_ENVIO
+,FX_ATRASO_ATU
+;QUIT;
+
+DATA CUBO_TOTAL;
+SET CUBO_REC_CHUVEIRINHO_PISMO
+	CUBO_REC_CHUVEIRINHO_BV
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 04. Perf_Safrada_BV */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Valida */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Valida */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Lspnd5HtVDn6O7wI/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET DtInicio ='2023-12-31T00:00:00Z'; 
+%LET DtFim ='2026-01-31T00:00:00Z'; 
+
+proc sql;
+connect to bigquery as perm (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS = must MAX_CHAR_LEN = 30);
+
+create table VALIDA as
+    select distinct
+	datepart(a.dt_disponibilizacao) format date9.	as DT_ENVIO
+	,datepart(a.dt_nova_disponib) format date9.		as CD_DT_NOVA_DISPONIB
+    ,input(a.cd_nova_assessoria,BEST4.)				as CD_NOVA_ASSESSORIA
+    ,a.cd_novo_status								as CD_NOVO_STATUS
+	,a.nr_contrato			 						as CHAVE_AUX
+	,input(a.nr_cpfcnpj,BEST22.) 					as NR_CPFCNPJ
+	,input(substr(a.nr_contrato,6),BEST22.) 		as NUCONTA
+	,input(substr(a.nr_contrato,11),BEST22.) 		as CONTRT
+	,input(substr(a.nr_contrato,4,2),BEST22.) 		as PRODUTO
+	,input(a.nr_dias_atraso,BEST11.) 				as DIAS_AT
+	,input(d.dmdays,BEST11.) 						as ATRASO_ATU
+    ,input(a.Score1,BEST4.)  						as CS
+	,input(d.dmsubset,BEST4.) 						as DIG_RAND
+    ,a.dmque2 										as FAIXA_CS
+	,input(a.cd_assessoria,BEST11.) 				as COD_ASSESS
+	,case when a.cd_assessoria = '4001' then 'TOLEDO'
+		  when a.cd_assessoria = '4002' then 'REALE'
+		  when a.cd_assessoria = '4003' then 'ZANC'
+		  when a.cd_assessoria = '4005' then 'PASCHOALOTTO'
+		  when a.cd_assessoria = '4006' then 'BELLINATI_CA'
+		  when a.cd_assessoria = '4007' then 'CRC'
+		  when a.cd_assessoria = '4008' then 'TOLEDO_2'
+		  when a.cd_assessoria = '4009' then 'BELLINATI_CA_2'
+		  when a.cd_assessoria = '4010' then 'PILOTO_BOM'
+		  when a.cd_assessoria = '4036' then 'BELLINATI_2'
+		  when a.cd_assessoria = '1018' then 'CONTROLE_CYBER_CONSIGNADO'
+		  when a.cd_assessoria = '1020' then 'SUSPENSAO_CYBER'
+												end as ASSESSORIA
+    ,a.dmque 										as STATUS_CONTA
+	,input(a.vl_divida,BEST9.) 						as SALDO_DEVEDOR_VENC 
+
+	,mdy(input(SUBSTR(a.dtenquad,5,2),best8.),input(SUBSTR(a.dtenquad,7,2),best8.),input(SUBSTR(a.dtenquad,1,4),best8.)) format date9. as DT_ENQUAD
+	,input(a.vl_nova_divida,BEST9.) 				as VL_NOVA_DIVIDA
+
+from connection to perm (
+	select distinct
+	dt_disponibilizacao
+	,dt_nova_disponib
+	,cd_nova_assessoria
+	,cd_novo_status
+	,nr_contrato
+	,nr_cpfcnpj
+	,nr_dias_atraso
+	,Score1
+	,dmque2
+	,cd_assessoria
+	,dmque
+	,vl_divida
+	,vl_nova_divida
+	,nr_grupo
+	,dtenquad
+
+	from bv-pdbd-prd.trusted_rcvry.tb_historico_disponibilizacao
+	where nr_grupo = '3'
+
+	and nr_contrato= '0020002559456'
+	and length(nr_contrato) < 17
+	and ((dt_disponibilizacao >= &DtInicio. and dt_disponibilizacao < &DtFim.) OR
+	 	 (dt_disponibilizacao < &DtInicio. and (dt_nova_disponib IS NULL OR dt_nova_disponib > &DtInicio.)))
+	and dt_disponibilizacao >= '2019-01-01T23:59:59Z'
+
+) as a
+
+
+
+left join connection to perm (
+	select distinct
+	dmacct
+	,dmdays
+	,dmcurbal
+	,dmsubset
+
+	from bv-pdbd-prd.trusted_rcvry.delqmst) as d on a.nr_contrato = d.dmacct
+
+;disconnect from perm;
+quit;
+
+data VALIDA2 ;
+set VALIDA;
+format DT_PRI_ATRASO DATE9.;
+DT_PRI_ATRASO = DT_ENVIO - DIAS_AT;
+;run;
+
+
+
+NUCONTA	PRODUTO
+694968	1
+1060009	2
+
+/* =========================FIM TASK=========================== */
+/* TASK: Valida */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 99. Perf Estoque Pismo */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 99. Perf Estoque Pismo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Otscpz85AEy4AEeK/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO ESTOQUE(DT_FECHAMENTO,SAFRA,DT_INICIO,DT_FIM);
+
+PROC SQL;
+CREATE TABLE BASE_&SAFRA. AS
+SELECT DISTINCT
+&SAFRA. AS DATA_BASE
+,A.*
+,INTCK('DAY', A.DT_INICIO_ATRASO, &DT_FECHAMENTO.) AS ATRASO_FECHAMENTO
+,CASE WHEN B.NUCONTA NE . THEN 1 ELSE 0 END AS FL_REGULARIZACAO
+
+FROM ATRASOS_CA_C AS A
+LEFT JOIN ATRASOS_CA_C AS B ON A.NUCONTA = B.NUCONTA AND A.PRODUTO = B.PRODUTO AND A.DT_INICIO_ATRASO = B.DT_INICIO_ATRASO AND B.DT_REG >= &DT_INICIO. AND B.DT_REG <= &DT_FIM. 
+WHERE A.DT_INICIO_ATRASO <= &DT_FECHAMENTO. AND (A.DT_REG >= &DT_FECHAMENTO. OR A.DT_REG = .) 
+
+;QUIT;
+
+%MEND;
+
+
+%ESTOQUE('31MAY2025'D,202506,'01JUN2025'D,'30JUN2025'D);
+%ESTOQUE('30JUN2025'D,202507,'01JUL2025'D,'31JUL2025'D);
+%ESTOQUE('31JUL2025'D,202508,'01AUG2025'D,'31AUG2025'D);
+%ESTOQUE('31AUG2025'D,202509,'01SEP2025'D,'30SEP2025'D);
+%ESTOQUE('30SEP2025'D,202510,'01OCT2025'D,'31OCT2025'D);
+%ESTOQUE('31OCT2025'D,202511,'01NOV2025'D,'30NOV2025'D);
+%ESTOQUE('30NOV2025'D,202512,'01DEC2025'D,'31DEC2025'D);
+%ESTOQUE('31DEC2025'D,202601,'01JAN2026'D,'31JAN2026'D);
+%ESTOQUE('31JAN2026'D,202602,'01FEB2026'D,'28FEB2026'D);
+%ESTOQUE('28FEB2026'D,202603,'01MAR2026'D,'31MAR2026'D);
+
+DATA PERF_ESTOQUE;
+SET BASE_202506
+	BASE_202507
+	BASE_202508
+	BASE_202509
+	BASE_202510
+	BASE_202511
+	BASE_202512
+	BASE_202601
+	BASE_202602
+	BASE_202603
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE PERF_ESTOQUE_A AS
+SELECT DISTINCT
+*
+,CASE WHEN ATRASO_FECHAMENTO <= 5   THEN '00. 001 A 005 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 10  THEN '01. 006 A 010 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 15  THEN '02. 011 A 015 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 20  THEN '03. 016 A 020 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 25  THEN '04. 021 A 025 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 30  THEN '05. 026 A 030 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 45  THEN '06. 031 A 045 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 60  THEN '07. 046 A 060 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 75  THEN '08. 061 A 075 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 95  THEN '09. 076 A 095 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 120 THEN '10. 096 A 120 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 150 THEN '11. 121 A 150 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 180 THEN '12. 151 A 180 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 210 THEN '13. 181 A 210 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 240 THEN '14. 211 A 240 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 270 THEN '15. 241 A 270 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 300 THEN '16. 271 A 300 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 330 THEN '17. 301 A 330 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 360 THEN '18. 331 A 360 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 390 THEN '19. 361 A 390 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 420 THEN '20. 391 A 420 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 450 THEN '21. 421 A 450 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 480 THEN '22. 451 A 480 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 510 THEN '23. 481 A 510 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 540 THEN '24. 511 A 540 DIAS' ELSE '25. 541 A 9999 DIAS' END AS FX_ATRASO_FECHAMENTO
+
+FROM PERF_ESTOQUE
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE CUBO AS
+   SELECT DISTINCT t1.DATA_BASE,
+          t1.SAFRA_ATR,
+          t1.SAFRA_ENVIO,
+          t1.DU_ATRASO,
+          t1.FX_ATRASO_ENVIO,
+          t1.FX_ATRASO_ATU,
+          t1.TP_CARTAO,
+          t1.FL_ENQUADRADO,
+          t1.DIA_REG,
+          t1.FL_REGULARIZACAO,
+		  t1.FX_ATRASO_FECHAMENTO,
+          
+            (COUNT(t1.NUCONTA)) AS COUNT_of_NUCONTA,
+          
+            (SUM(t1.VLR_COB_INI)) AS SUM_of_VLR_COB_INI
+      FROM WORK.PERF_ESTOQUE_A t1
+      GROUP BY t1.DATA_BASE,
+               t1.SAFRA_ATR,
+               t1.SAFRA_ENVIO,
+               t1.DU_ATRASO,
+               t1.FX_ATRASO_ENVIO,
+               t1.FX_ATRASO_ATU,
+               t1.TP_CARTAO,
+               t1.FL_ENQUADRADO,
+               t1.DIA_REG,
+               t1.FL_REGULARIZACAO,
+			   t1.FX_ATRASO_FECHAMENTO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 99. Perf Estoque Pismo */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 98. Perf Estoque BV */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 37 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 98. Perf Estoque BV */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-c5VDj9i1weY73gQg/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO ESTOQUE(DT_FECHAMENTO,SAFRA,DT_INICIO,DT_FIM);
+
+PROC SQL;
+CREATE TABLE BASE_&SAFRA. AS
+SELECT DISTINCT
+&SAFRA. AS DATA_BASE
+,A.*
+,INTCK('DAY', A.DT_INICIO_ATRASO, &DT_FECHAMENTO.) AS ATRASO_FECHAMENTO
+,CASE WHEN B.NUCONTA NE . THEN 1 ELSE 0 END AS FL_REGULARIZACAO
+
+FROM ATRASOS_CA_BV_C AS A
+LEFT JOIN ATRASOS_CA_BV_C AS B ON A.NUCONTA = B.NUCONTA AND A.PRODUTO = B.PRODUTO AND A.DT_INICIO_ATRASO = B.DT_INICIO_ATRASO AND B.DT_REG >= &DT_INICIO. AND B.DT_REG <= &DT_FIM. 
+WHERE A.DT_INICIO_ATRASO <= &DT_FECHAMENTO. AND (A.DT_REG > &DT_FECHAMENTO. OR A.DT_REG = .) 
+
+;QUIT;
+
+%MEND;
+
+
+%ESTOQUE('31MAY2025'D,202506,'01JUN2025'D,'30JUN2025'D);
+%ESTOQUE('30JUN2025'D,202507,'01JUL2025'D,'31JUL2025'D);
+%ESTOQUE('31JUL2025'D,202508,'01AUG2025'D,'31AUG2025'D);
+%ESTOQUE('31AUG2025'D,202509,'01SEP2025'D,'30SEP2025'D);
+%ESTOQUE('30SEP2025'D,202510,'01OCT2025'D,'31OCT2025'D);
+%ESTOQUE('31OCT2025'D,202511,'01NOV2025'D,'30NOV2025'D);
+%ESTOQUE('30NOV2025'D,202512,'01DEC2025'D,'31DEC2025'D);
+%ESTOQUE('31DEC2025'D,202601,'01JAN2026'D,'31JAN2026'D);
+%ESTOQUE('31JAN2026'D,202602,'01FEB2026'D,'28FEB2026'D);
+%ESTOQUE('28FEB2026'D,202603,'01MAR2026'D,'31MAR2026'D);
+
+
+
+
+
+DATA PERF_ESTOQUE;
+SET BASE_202506
+	BASE_202507
+	BASE_202508
+	BASE_202509
+	BASE_202510
+	BASE_202511
+	BASE_202512
+	BASE_202601
+	BASE_202602
+	BASE_202603
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE PERF_ESTOQUE_A AS
+SELECT DISTINCT
+*
+,CASE WHEN ATRASO_FECHAMENTO <= 5   THEN '00. 001 A 005 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 10  THEN '01. 006 A 010 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 15  THEN '02. 011 A 015 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 20  THEN '03. 016 A 020 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 25  THEN '04. 021 A 025 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 30  THEN '05. 026 A 030 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 45  THEN '06. 031 A 045 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 60  THEN '07. 046 A 060 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 75  THEN '08. 061 A 075 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 95  THEN '09. 076 A 095 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 120 THEN '10. 096 A 120 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 150 THEN '11. 121 A 150 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 180 THEN '12. 151 A 180 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 210 THEN '13. 181 A 210 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 240 THEN '14. 211 A 240 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 270 THEN '15. 241 A 270 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 300 THEN '16. 271 A 300 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 330 THEN '17. 301 A 330 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 360 THEN '18. 331 A 360 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 390 THEN '19. 361 A 390 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 420 THEN '20. 391 A 420 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 450 THEN '21. 421 A 450 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 480 THEN '22. 451 A 480 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 510 THEN '23. 481 A 510 DIAS'
+	  WHEN ATRASO_FECHAMENTO <= 540 THEN '24. 511 A 540 DIAS' ELSE '25. 541 A 9999 DIAS' END AS FX_ATRASO_FECHAMENTO
+
+FROM PERF_ESTOQUE
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE CUBO_BV AS
+   SELECT DISTINCT t1.DATA_BASE,
+          t1.SAFRA_ATR,
+          t1.SAFRA_ENVIO,
+          t1.DU_ATRASO,
+          t1.FX_ATRASO_ENVIO,
+          t1.FX_ATRASO_ATU,
+          'CARTÃO BV' AS TP_CARTAO,
+          t1.FL_ENQUADRADO,
+          t1.DIA_REG,
+          t1.FL_REGULARIZACAO,
+		  t1.FX_ATRASO_FECHAMENTO,
+          
+            (COUNT(t1.NUCONTA)) AS COUNT_of_NUCONTA,
+          
+            (SUM(t1.VLR_COB_INI)) AS SUM_of_VLR_COB_INI
+      FROM WORK.PERF_ESTOQUE_A t1
+      GROUP BY t1.DATA_BASE,
+               t1.SAFRA_ATR,
+               t1.SAFRA_ENVIO,
+               t1.DU_ATRASO,
+               t1.FX_ATRASO_ENVIO,
+               t1.FX_ATRASO_ATU,
+               t1.TP_CARTAO,
+               t1.FL_ENQUADRADO,
+               t1.DIA_REG,
+               t1.FL_REGULARIZACAO,
+			   t1.FX_ATRASO_FECHAMENTO;
+QUIT;
+
+DATA CUBO_FINAL;
+SET CUBO
+	CUBO_BV;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 98. Perf Estoque BV */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data VALIDA2 ;
+set VALIDA;
+format DT_PRI_ATRASO DATE9.;
+DT_PRI_ATRASO = DT_ENVIO - DIAS_AT;
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATRASOS_CA_BV_C);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATRASOS_CA_BV_C AS
+   SELECT DISTINCT t1.DT_ENVIO,
+          
+            (COUNT(t1.NUCONTA)) AS COUNT_of_NUCONTA
+      FROM WORK.ATRASOS_CA_BV_C t1
+      GROUP BY t1.DT_ENVIO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATRASOS_CA_BV_B);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATRASOS_CA_BV_B AS
+   SELECT DISTINCT t1.DT_ENVIO,
+          
+            (COUNT(t1.NUCONTA)) AS COUNT_of_NUCONTA
+      FROM WORK.ATRASOS_CA_BV_B t1
+      GROUP BY t1.DT_ENVIO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */

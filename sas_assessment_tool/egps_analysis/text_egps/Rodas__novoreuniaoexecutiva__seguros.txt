@@ -1,0 +1,594 @@
+START_METADATA
+PROJECT: Rodas__novoreuniaoexecutiva
+FILE_SAS: seguros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -18
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (3x | +240), CALL EXECUTE (2x | +90), %INCLUDE (3x | +60), PROC DATASETS (1x | +20), FILENAME  (1x | +12), PROC APPEND (1x | +15), PROC TRANSPOSE (1x | +10), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 497
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, DATASETS, EXPORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safra13M, safraat
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: SAFRAAT
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /RISCOSBVF/BA/PROCESSOS/TMP/SEGUROS-PRODUCAO.CSV [SAS/Local], BASES.TBSEGUROSPRODUCAOCANCELADOS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: AUXL
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/seguros-producao.csv
+TABLE_READ_PROVENANCE (Flow): AUXL.MINIMO_SEGUROS_GERAL [DATA Step - SET], BASES.TBSEGUROSPRODUCAOCANCELADOS [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/seguros-producao.csv
+INTERNAL READS (Temp/Local): AUXL.MINIMO_SEGUROS_GERAL
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUXL.MINIMO_SEGUROS_GERAL
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: DATASX, MINIMO_SEGUROS, MINIMO_SEGUROS_GERAL, PRODUCAO_SEGUROS, PRODUCAO_SEGUROS2, PRODUCAO_SEGUROS3, PRODUCAO_SEGUROS_01, PRODUCAO_SEGUROS_FINAL, SAFRAATUAL, SEGUROS, SEGUROSPAINELEXECUTIVO, SEGUROSPAINELEXECUTIVO001, SEGUROSPAINELEXECUTIVO002, SEGUROSPAINELEXECUTIVO003, SEGUROSPAINELEXECUTIVO004, SEGUROS_CANCELADOS, TBPRODUCAO, TBPRODUCAO001, TBPRODUCAO002
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 1, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/seguros-producao.csv
+
+END_METADATA
+================================================================================
+/* |	Atualizacao:	07/06/2023  													| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Incluido FGTS e criado tab AUXL.MINIMO_SEGUROS_2023    		| */
+/* ====================================================================================== */
+/* |	Atualizacao:	14/04/2025  													| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Excluido join com    	MINIMO_SEGUROS	| */
+/* ====================================================================================== */
+
+/* Parâmetros iniciais */
+option compress = binary;
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/libname.sas';
+
+DATA _NULL_;
+  hoje = Today();
+
+  anoHoje = YEAR(hoje);
+  ano13M = YEAR(hoje) - 1;
+  safra13M = (ano13M * 100) + MONTH(hoje);
+
+  CALL SYMPUT('safra13M', PUT(safra13M,6.));
+  CALL SYMPUT('anoHoje', PUT(anoHoje,4.));
+  CALL SYMPUT('ano13M', PUT(ano13M,4.));
+RUN;
+
+/* Buscar dados de produção */
+PROC SQL;
+  CREATE TABLE PRODUCAO_SEGUROS_01 AS
+    SELECT
+      DtAtualizacao AS DtBaseProducao FORMAT=mmddyy10.,
+	  QtTotalDiaUtilMesSab,
+	  QtCorridosDiaUtilMesSab,
+      SUBSTR(PUT(NuAnoMes,6.),5,2)||"/01/"||SUBSTR(PUT(NuAnoMes,6.),1,4) AS Safra,
+      NmGrupoProdutoMeta AS Produto,
+      CASE WHEN NuAnoMes >= 202201 THEN
+        CASE WHEN NmGrupoProdutoMeta IN ('Leves','Motos','Pesados') THEN CASE WHEN FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END END
+      END AS StVeiculo,
+	  CASE WHEN NuAnoMes >= 202201 THEN
+	    CASE WHEN NmGrupoProdutoMeta = 'Leves' THEN FxIdade END
+      END AS FxIdade,
+      NmSubEstruturaComercialA AS Regional,
+      CASE WHEN DsTipoCanalProducao = 'NEGOCIOS CENTRALIZADOS' AND NuAnoMes < 202201 THEN 'MULTIMARCAS' ELSE DsTipoCanalProducao END AS Canal,
+      SUM(VrBVMais) AS VrSPFPrd FORMAT=num18.2,
+      SUM(VrCap) AS VrCapPrd FORMAT=num18.2,
+      SUM(VrGap + VrRCF + VrGarantiaMecanica + VrCasco) AS VrDemaisPrd FORMAT=num18.2,
+	  SUM(VrCompleto) AS VrCompletoPrd FORMAT=num18.2,
+	  SUM(VrPlacaSolar) AS VrPlacaSolarPrd FORMAT=num18.2,
+      SUM(VrBVMaisProjetado) AS VrSPFPrdProjetado FORMAT=num18.2,
+      SUM(VrCapProjetado) AS VrCapPrdProjetado FORMAT=num18.2,
+      SUM(VrCompletoProjetado) AS VrCompletoPrdProjetado FORMAT=num18.2,
+	  SUM(VrPlacaSolarProjetado) AS VrPlacaSolarPrdProjetado FORMAT=num18.2,
+      SUM(CASE WHEN StData = 1 THEN VrBVMais ELSE 0 END) AS VrSPFPrdDia FORMAT=num18.2,
+      SUM(CASE WHEN StData = 1 THEN VrCap ELSE 0 END) AS VrCapPrdDia FORMAT=num18.2,
+      SUM(CASE WHEN StData = 1 THEN VrDemais ELSE 0 END) AS VrDemaisPrdDia FORMAT=num18.2,
+	  SUM(CASE WHEN StData = 1 THEN VrDemaisSemCompletoMax ELSE 0 END) AS VrCompletoPrdDia FORMAT=num18.2,
+	  SUM(CASE WHEN StData = 1 THEN VrPlacaSolar ELSE 0 END) AS VrPlacaSolarPrdDia FORMAT=num18.2,
+      SUM(FlBVMais) AS QtSPFPrd,
+      SUM(FlCap) AS QtCapPrd,
+      SUM(FlGap + FlRCF + FlGarantiaMecanica + FlCasco) AS QtDemaisPrd,
+      SUM(FlCompleto) AS QtCompletoPrd,
+	  SUM(FlPlacaSolar) AS QtPlacaSolarPrd,
+      SUM(CASE WHEN FlBVMais = 1
+            OR FlCap = 1
+            OR FlDemaisSemCompleto = 1
+            OR FlCompleto = 1
+			OR FlPlacaSolar = 1
+          THEN 1 ELSE 0 END) AS QtContratosSeguros,
+      SUM(FlBVMaisEleg) AS QtSPFPrdEleg,
+      SUM(FlCapEleg) AS QtCapPrdEleg,
+      SUM(FlDemaisEleg) AS QtDemaisPrdEleg,
+      SUM(FlDemaisEleg) AS QtCompletoPrdEleg,
+	  SUM(FlPlacaSolarEleg) AS QtPlacaSolarPrdEleg
+    FROM TMP.TBPRODUCAO
+    WHERE NuAnoMes >= &safra13M.
+      AND NmGrupoProdutoMeta IN ('Leves','Motos','Pesados','CVG Leves','CVG Pesados','Solar','Leves-BVO')
+/*	  AND NmGrupoProdutoMeta IN ('FGTS','Leves','Motos','Pesados','CVG Leves', 'CVG Pesados','CP','Privado','Solar','CIG','Leves-BVO')*/
+
+	  /*AND DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS','MULTIMARCAS','CONCESSIONARIAS','NEGOCIOS CENTRALIZADOS')*/
+    GROUP BY 1,2,3,4,5,6,7,8,9
+    ORDER BY 1,2,3,4,5,6,7,8,9;
+RUN;
+
+PROC SQL;
+  CREATE TABLE PRODUCAO_SEGUROS AS
+    SELECT
+      DtBaseProducao,
+      Safra,
+      Produto,
+	  StVeiculo,
+	  FxIdade,
+      Regional,
+      Canal,
+      VrSPFPrd,
+      VrCapPrd,
+      VrDemaisPrd,
+	  VrCompletoPrd,
+	  VrPlacaSolarPrd,
+      VrSPFPrdProjetado,
+      VrCapPrdProjetado,
+      (VrDemaisPrd / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS VrDemaisPrdProjetado FORMAT=num18.2,
+      VrCompletoPrdProjetado,
+	  VrPlacaSolarPrdProjetado,
+      VrSPFPrdDia,
+      VrCapPrdDia,
+      VrDemaisPrdDia,
+	  VrCompletoPrdDia,
+	  VrPlacaSolarPrdDia,
+      QtSPFPrd,
+      QtCapPrd,
+      QtDemaisPrd,
+      QtCompletoPrd,
+	  QtPlacaSolarPrd,
+	  (QtContratosSeguros / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtContratosSegurosProjetado FORMAT=num18.2,
+      (QtSPFPrd / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtSPFPrdProjetado FORMAT=num18.2,
+      (QtCapPrd / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtCapPrdProjetado FORMAT=num18.2,
+      (QtDemaisPrd / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtDemaisPrdProjetado FORMAT=num18.2,
+      (QtCompletoPrd / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtCompletoPrdProjetado FORMAT=num18.2,
+	  (QtPlacaSolarPrd / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtPlacaSolarPrdProjetado FORMAT=num18.2,
+      QtContratosSeguros,
+      QtSPFPrdEleg,
+      QtCapPrdEleg,
+      QtDemaisPrdEleg,
+      QtCompletoPrdEleg,
+	  QtPlacaSolarPrdEleg,
+	  (QtSPFPrdEleg / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtSPFPrdElegProjetado FORMAT=num18.2,
+	  (QtCapPrdEleg / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtCapPrdElegProjetado FORMAT=num18.2,
+	  (QtDemaisPrdEleg / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtDemaisPrdElegProjetado FORMAT=num18.2,
+	  (QtCompletoPrdEleg / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtCompletoPrdElegProjetado FORMAT=num18.2,
+	  (QtPlacaSolarPrdEleg / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS QtPlacaSolarPrdElegProjetado FORMAT=num18.2
+    FROM PRODUCAO_SEGUROS_01;
+RUN;
+
+PROC SQL;
+  CREATE TABLE SEGUROS_CANCELADOS AS
+	SELECT
+      SUBSTR(PUT(NuAnoMes,6.),5,2)||"/01/"||SUBSTR(PUT(NuAnoMes,6.),1,4) AS Safra,
+      NmGrupoProdutoMeta AS Produto,
+      CASE WHEN NuAnoMes >= 202201 THEN
+        CASE WHEN NmGrupoProdutoMeta IN ('Leves','Motos','Pesados') THEN CASE WHEN FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END END
+      END AS StVeiculo,
+	  CASE WHEN NuAnoMes >= 202201 THEN
+	    CASE WHEN NmGrupoProdutoMeta = 'Leves' THEN FxIdade END
+      END AS FxIdade,
+      NmSubEstruturaComercialA AS Regional,
+      CASE WHEN DsTipoCanalProducao = 'NEGOCIOS CENTRALIZADOS' AND NuAnoMes < 202201 THEN 'MULTIMARCAS' ELSE DsTipoCanalProducao END AS Canal,
+      SUM(VrBVMais) as VrSPFCanc,
+	  SUM(VrCap) as VrCapCanc,
+	  SUM(VrDemais) as VrDemaisCanc,
+	  SUM(VrPlacaSolar) as VrPlacaSolarCanc,
+	  SUM(FlBVMais) as QtSPFCanc,
+	  SUM(FlCap) as QtCapCanc,
+	  SUM(FlDemais) as QtDemaisCanc,
+	  SUM(FlPlacaSolar) as QtPlacaSolarCanc
+    FROM BASES.TBSEGUROSPRODUCAOCANCELADOS
+    GROUP BY 1,2,3,4,5,6;
+RUN;
+
+PROC SQL;
+  CREATE TABLE SEGUROS AS
+    SELECT
+	  A.*,
+	  B.VrSPFCanc,
+	  B.VrCapCanc,
+	  B.VrDemaisCanc,
+	  B.VrPlacaSolarCanc,
+	  B.QtSPFCanc,
+	  B.QtCapCanc,
+	  B.QtDemaisCanc,
+	  B.QtPlacaSolarCanc
+	FROM PRODUCAO_SEGUROS A
+	LEFT JOIN SEGUROS_CANCELADOS B
+	  ON A.Safra = B.Safra
+	 AND A.Produto = B.Produto
+	 AND A.StVeiculo = B.StVeiculo
+	 AND A.FxIdade = B.FxIdade
+	 AND A.Regional = B.Regional
+	 AND A.Canal = B.Canal;
+RUN;
+
+/* Transpor Base */
+PROC TRANSPOSE DATA=SEGUROS OUT=PRODUCAO_SEGUROS2 NAME=Variavel PREFIX=Valor;
+  BY DtBaseProducao
+     Safra
+	 Produto
+	 StVeiculo
+	 FxIdade
+	 Regional
+	 Canal;
+ VAR VrSPFPrd
+     VrCapPrd
+	 VrDemaisPrd
+	 VrCompletoPrd
+	 VrPlacaSolarPrd
+     VrSPFPrdProjetado
+	 VrCapPrdProjetado
+	 VrDemaisPrdProjetado
+	 VrCompletoPrdProjetado
+	 VrPlacaSolarPrdProjetado
+	 VrSPFPrdDia
+	 VrCapPrdDia
+	 VrDemaisPrdDia
+	 VrCompletoPrdDia
+	 VrPlacaSolarPrdDia
+	 QtSPFPrd
+	 QtCapPrd
+	 QtDemaisPrd
+	 QtCompletoPrd
+	 QtPlacaSolarPrd
+	 QtSPFPrdProjetado
+	 QtCapPrdProjetado
+	 QtDemaisPrdProjetado
+	 QtCompletoPrdProjetado
+	 QtPlacaSolarPrdProjetado
+	 QtContratosSeguros
+	 QtContratosSegurosProjetado
+	 QtSPFPrdEleg
+	 QtCapPrdEleg
+	 QtDemaisPrdEleg
+	 QtCompletoPrdEleg
+	 QtPlacaSolarPrdEleg
+	 QtSPFPrdElegProjetado
+	 QtCapPrdElegProjetado
+	 QtDemaisPrdElegProjetado
+	 QtCompletoPrdElegProjetado
+	 QtPlacaSolarPrdElegProjetado
+     VrSPFCanc
+     VrCapCanc
+     VrDemaisCanc
+	 VrPlacaSolarCanc
+     QtSPFCanc
+     QtCapCanc
+     QtDemaisCanc
+	 QtPlacaSolarCanc;
+RUN;
+
+PROC SQL;
+  CREATE TABLE PRODUCAO_SEGUROS3 AS
+    SELECT
+	  DtBaseProducao,
+	  Safra,
+	  Produto,
+	  StVeiculo,
+	  FxIdade,
+	  Regional,
+	  CASE WHEN Canal NOT IN ('CONCESSIONARIAS','LOJA CANAL NEGOCIOS','MULTIMARCAS', 'NEGOCIOS CENTRALIZADOS') THEN 'OUTROS' ELSE Canal END AS Canal,
+	  CASE WHEN UPPER(Variavel) LIKE '%SPF%' THEN 'SPF'
+	       WHEN UPPER(Variavel) LIKE '%CAP%' THEN 'CAP/Ap'
+		   WHEN UPPER(Variavel) LIKE '%DEMAIS%' THEN 'Auto'
+		   WHEN UPPER(Variavel) LIKE '%COMPLETO%' THEN 'Completo'
+		   WHEN UPPER(Variavel) LIKE '%PLACASOLAR%' THEN 'PlacaSolar'
+		   ELSE 'Não selecionado'
+	  END AS TpSeguro,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%qt%' AND LOWER(Variavel) LIKE '%eleg%' AND LOWER(Variavel) LIKE '%prd%' AND LOWER(Variavel) NOT LIKE '%projetado%' THEN Valor1 END),0) FORMAT=num12. AS QtdeElegivel,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%qt%' AND LOWER(Variavel) LIKE '%eleg%' AND LOWER(Variavel) LIKE '%prd%' AND LOWER(Variavel) LIKE '%projetado%' THEN Valor1 END),0) FORMAT=num12. AS QtdeElegivelProjetado,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%qt%' AND LOWER(Variavel) NOT LIKE '%eleg%' AND LOWER(Variavel) NOT LIKE '%projetado%' AND LOWER(Variavel) LIKE '%prd%' THEN Valor1 END),0) FORMAT=num12. AS QtdeContratos,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%qt%' AND LOWER(Variavel) NOT LIKE '%eleg%' AND LOWER(Variavel) LIKE '%projetado%' AND LOWER(Variavel) LIKE '%prd%' THEN Valor1 END),0) FORMAT=num12. AS QtdeContratosProjetado,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%qt%' AND LOWER(Variavel) LIKE '%canc%' THEN Valor1 END),0) FORMAT=num12. AS QtSegurosCancelados,
+      COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vr%' AND LOWER(Variavel) NOT LIKE '%dia%' AND LOWER(Variavel) LIKE '%prd%' AND LOWER(Variavel) NOT LIKE '%projetado%' THEN Valor1 END),0) FORMAT=num12.2 AS VrPremio,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vr%' AND LOWER(Variavel) LIKE '%projetado%' AND LOWER(Variavel) LIKE '%prd%' THEN Valor1 END),0) FORMAT=num12.2 AS VrPremioProjetado,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vr%' AND LOWER(Variavel) LIKE '%canc%' THEN Valor1 END),0) FORMAT=num12.2 AS VrPremioCancelados,
+	  COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vr%' AND LOWER(Variavel) LIKE '%dia%' AND LOWER(Variavel) LIKE '%prd%' THEN Valor1 END),0) FORMAT=num12.2 AS VrPremioDia
+	FROM PRODUCAO_SEGUROS2
+	WHERE calculated TpSeguro <> 'Não selecionado'
+	GROUP BY 1,2,3,4,5,6,7,8;
+RUN;
+
+/*data _null_;*/
+/* if exist ("WORK.MINIMO_SEGUROS_2021") then call execute("proc datasets library=work; delete MINIMO_SEGUROS_2021;run;quit;") ;*/
+/*run;*/
+
+/*data _null_;*/
+/* if exist ("WORK.MINIMO_SEGUROS_2022") then call execute("proc datasets library=work; delete MINIMO_SEGUROS_2022;run;quit;") ;*/
+/*run;*/
+
+PROC SQL;
+  CREATE TABLE AUXL.MINIMO_SEGUROS_GERAL AS
+    SELECT DISTINCT
+      A.Safra,
+	  A.Produto,
+	  A.StVeiculo,
+	  A.FxIdade,
+	  A.Canal,
+	  A.TpSeguro
+	FROM PRODUCAO_SEGUROS3 A;
+RUN;
+
+data _null_;
+ if exist ("WORK.MINIMO_SEGUROS") then call execute("proc datasets library=work; delete MINIMO_SEGUROS;run;quit;") ;
+run;
+
+/*PROC SQL;*/
+/*  CREATE TABLE Datas2021 AS*/
+/*    SELECT DISTINCT Safra FROM PRODUCAO_SEGUROS3 WHERE INPUT(SUBSTR(Safra,7,4),4.) <= 2021;*/
+/*RUN;*/
+
+/*PROC SQL;*/
+/*  CREATE TABLE Datas2022 AS*/
+/*    SELECT DISTINCT Safra FROM PRODUCAO_SEGUROS3 WHERE INPUT(SUBSTR(Safra,7,4),4.) >= 2022;*/
+/*RUN;*/
+
+PROC SQL;
+  CREATE TABLE DatasX AS
+    SELECT DISTINCT Safra FROM PRODUCAO_SEGUROS3 WHERE INPUT(SUBSTR(Safra,7,4),4.) >= 2022;
+RUN;
+
+/*%macro ApendaData2021(safraat);*/
+/*  DATA SafraAtual;*/
+/*  SET AUXL.MINIMO_SEGUROS_2021;*/
+/*    Safra = &safraat.;*/
+/*  RUN;*/
+/**/
+/*  proc append data=SafraAtual BASE=MINIMO_SEGUROS_2021;run;*/
+/*%mend;*/
+
+/*%macro ApendaData2022(safraat);*/
+/*  DATA SafraAtual;*/
+/*  SET AUXL.MINIMO_SEGUROS_2022;*/
+/*    Safra = &safraat.;*/
+/*  RUN;*/
+/**/
+/*  proc append data=SafraAtual BASE=MINIMO_SEGUROS_2022;run;*/
+/*%mend;*/
+
+%macro ApendaDataX(safraat);
+  DATA SafraAtual;
+  SET AUXL.MINIMO_SEGUROS_GERAL;
+    Safra = &safraat.;
+  RUN;
+
+  proc append data=SafraAtual BASE=MINIMO_SEGUROS_GERAL;run;
+%mend;
+
+/*DATA _null_;*/
+/*SET Datas2021;*/
+/*call execute ('%ApendaData2021("'||Safra||'")');*/
+/*RUN;*/
+
+/*DATA _null_;*/
+/*SET Datas2022;*/
+/*call execute ('%ApendaData2022("'||Safra||'")');*/
+/*RUN;*/
+
+DATA _null_;
+SET DatasX;
+call execute ('%ApendaDataX("'||Safra||'")');
+RUN;
+
+/*PROC SQL;*/
+/*CREATE TABLE MINIMO_SEGUROS AS*/
+/*  SELECT * FROM MINIMO_SEGUROS_2022*/
+/*  OUTER UNION CORRESPONDING */
+/*  SELECT * FROM MINIMO_SEGUROS_2021;*/
+/*RUN;*/
+
+/*PROC SQL;*/
+/*CREATE TABLE MINIMO_SEGUROS AS*/
+/*  SELECT * FROM MINIMO_SEGUROS_2022;*/
+/*RUN;*/
+
+PROC SQL;
+CREATE TABLE MINIMO_SEGUROS AS
+  SELECT * FROM MINIMO_SEGUROS_GERAL;
+RUN;
+
+PROC SQL;
+  CREATE TABLE PRODUCAO_SEGUROS_FINAL AS
+    SELECT
+	  MAX(B.DtBaseProducao) AS DtBaseProducao FORMAT=mmddyy10.,
+      B.Safra,
+	  B.Produto,
+	  B.StVeiculo,
+	  B.FxIdade,
+	  B.Canal,
+	  B.Regional,
+	  B.TpSeguro,
+	  COALESCE(B.QtdeElegivel,0) AS QtdeElegivel,
+	  COALESCE(B.QtdeElegivelProjetado,0) AS QtdeElegivelProjetado FORMAT=num12.,
+	  COALESCE(B.QtdeContratos,0) AS QtdeContratos,
+	  COALESCE(B.QtdeContratosProjetado,0) AS QtdeContratosProjetado FORMAT=num12.,
+	  COALESCE(B.QtSegurosCancelados,0) AS QtSegurosCancelados,
+      COALESCE(B.VrPremio,0) AS VrPremio,
+	  COALESCE(B.VrPremioProjetado,0) AS VrPremioProjetado,
+	  COALESCE(B.VrPremioCancelados,0) AS VrPremioCancelados,
+	  COALESCE(B.VrPremioDia,0) AS VrPremioDia
+FROM PRODUCAO_SEGUROS3 B
+
+/*	FROM MINIMO_SEGUROS A*/
+/*	LEFT JOIN PRODUCAO_SEGUROS3 B*/
+/*	  ON A.Safra = B.Safra*/
+/*	 AND A.Produto = B.Produto*/
+/*	 AND A.StVeiculo = B.StVeiculo*/
+/*	 AND A.FxIdade = B.FxIdade*/
+/*	 AND A.Canal = B.Canal*/
+/*	 AND A.TpSeguro = B.TpSeguro*/
+/*JOIN ACIMA RETIRADO POIS ESTACA DUPLICANDO O PREMIO DE SEGUROS - Gustavo D 14/04/2025*/
+
+;
+RUN;
+
+/* Exportar base de dados */
+FILENAME rsvprds '/riscosbvf/BA/processos/tmp/seguros-producao.csv' encoding="utf-8";
+
+PROC EXPORT DATA=PRODUCAO_SEGUROS_FINAL OUTFILE=rsvprds REPLACE DBMS=dlm;
+  DELIMITER=';';
+RUN;
+
+X 'mv /riscosbvf/BA/processos/tmp/seguros-producao.csv /riscosbvf/BA/processos/output';
+
+/* Nova base: adicionada em 13-10-2022 */
+PROC SQL;
+CREATE TABLE SegurosPainelExecutivo001 AS
+  SELECT
+    INPUT(SUBSTR(Safra,7,4) || SUBSTR(Safra,1,2),6.) AS NuAnoMes,
+    CASE WHEN Produto IN ('Leves','Motos','Pesados') THEN 'Rodas'
+		 WHEN Produto IN ('Leves-BVO') THEN 'Leves-BVO'
+         WHEN Produto IN ('CVG Pesados','CVG Leves') THEN 'EVG'
+         WHEN Produto IN ('CP') THEN 'CP'
+		 WHEN Produto IN ('Privado') THEN 'Privado'
+         WHEN Produto = 'Solar' THEN 'Solar'
+		 WHEN Produto = 'FGTS' THEN 'FGTS'
+    END AS Produto,
+    CASE WHEN TpSeguro = 'CAP/Ap' THEN 'AP'
+         WHEN TpSeguro IN ('Completo','Auto') THEN 'Auto'
+         WHEN TpSeguro = 'SPF' THEN 'SPF'
+		 WHEN TpSeguro = 'PlacaSolar' THEN 'PlacaSolar'
+    END AS TpSeguro,
+    SUM(VrPremio) AS VrPremio,
+	SUM(VrPremioProjetado) AS VrPremioProjetado
+  FROM
+    PRODUCAO_SEGUROS_FINAL
+  WHERE
+    (calculated Produto = 'Rodas' AND calculated TpSeguro IN ('AP','Auto','SPF'))
+	OR (calculated Produto = 'Leves-BVO' AND calculated TpSeguro IN ('AP','Auto','SPF'))
+	OR (calculated Produto = 'EVG' AND calculated TpSeguro IN ('AP','Auto','SPF'))
+	OR (calculated Produto = 'Privado' AND calculated TpSeguro IN ('AP','SPF'))
+	OR (calculated Produto = 'CP' AND calculated TpSeguro IN ('AP','SPF'))
+	OR (calculated Produto = 'Solar' AND calculated TpSeguro IN ('AP','SPF','PlacaSolar'))
+	OR (calculated Produto = 'FGTS' AND calculated TpSeguro IN ('AP','SPF'))
+  GROUP BY
+    1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE SegurosPainelExecutivo002 AS
+  SELECT
+    NuAnoMes,
+    Produto,
+	'Sub-Total' AS TpSeguro,
+    SUM(VrPremio) AS VrPremio,
+	SUM(VrPremioProjetado) AS VrPremioProjetado
+  FROM
+    SegurosPainelExecutivo001
+  GROUP BY
+    1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE SegurosPainelExecutivo003 AS
+  SELECT
+    NuAnoMes,
+    'Total' AS Produto,
+    SUM(VrPremio) AS VrPremio,
+	SUM(VrPremioProjetado) AS VrPremioProjetado
+  FROM
+    SegurosPainelExecutivo001
+  GROUP BY
+    1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE SegurosPainelExecutivo004 AS
+  SELECT * FROM SegurosPainelExecutivo001
+  OUTER UNION CORRESPONDING
+  SELECT * FROM SegurosPainelExecutivo002
+  OUTER UNION CORRESPONDING
+  SELECT * FROM SegurosPainelExecutivo003;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbProducao001 AS
+  SELECT
+    NuAnoMes,
+    CASE WHEN NmGrupoProdutoMeta IN ('Leves','Motos','Pesados') THEN 'Rodas'
+		 WHEN NmGrupoProdutoMeta = 'Leves-BVO' THEN 'Leves-BVO'
+         WHEN NmGrupoProdutoMeta IN ('CVG Pesados','CVG Leves') THEN 'EVG'
+         WHEN NmGrupoProdutoMeta IN ('Privado') THEN 'Privado'
+		 WHEN NmGrupoProdutoMeta IN ('CP') THEN 'CP'
+         WHEN NmGrupoProdutoMeta = 'Solar' THEN 'Solar'
+		 WHEN NmGrupoProdutoMeta = 'FGTS' THEN 'FGTS'
+    END AS Produto,
+    SUM(VrProducao) AS VrProducao
+  FROM
+    TMP.TbProducao
+  WHERE
+    NuAnoMes >= &safra13M.
+	AND NmGrupoProdutoMeta IN ('Leves','Motos','Pesados','CVG Pesados','CVG Leves','Solar','Leves-BVO')
+	/*	AND NmGrupoProdutoMeta IN ('FGTS','Leves','Motos','Pesados','CVG Pesados','CVG Leves','CP','Privado','Solar','Leves-BVO')*/
+  GROUP BY
+    1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbProducao002 AS
+  SELECT
+    NuAnoMes,
+    'Total' AS Produto,
+    SUM(VrProducao) AS VrProducao
+  FROM
+    TbProducao001
+  GROUP BY
+    1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbProducao AS
+  SELECT * FROM TbProducao001
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbProducao002;
+RUN;
+
+PROC SQL;
+CREATE TABLE SegurosPainelExecutivo AS
+  SELECT
+    A.NuAnoMes,
+	A.Produto,
+	A.TpSeguro,
+    A.VrPremio,
+	A.VrPremioProjetado,
+	B.VrProducao
+  FROM
+    SegurosPainelExecutivo004 A
+  LEFT JOIN
+    TbProducao B
+	ON A.NuAnoMes = B.NuAnoMes
+	AND A.Produto = B.Produto;
+RUN;
+
+%include '/infogrc/utils/all-includes.sas';
+%ExportaCSV(TbSegurosPainelExecutivo, SegurosPainelExecutivo);

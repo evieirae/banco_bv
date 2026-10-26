@@ -1,0 +1,163 @@
+START_METADATA
+PROJECT: Rodas__BvExper
+FILE_SAS: 02_01 - BvExper - Resumo GR - Ajuste GR Backup.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -9
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 82
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBGRBACKUP [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_EXCLUSAO, WORK.BASE_GR_BACKUP_APPEND, WORK.BASE_GR_BACKUP_APPEND_1, WORK.TBBVEXPER_RESUMO_GR_SEM_GR_BKP
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BKP_BU, EXP_BU
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_EXCLUSAO, WORK.BASE_GR_BACKUP_APPEND, WORK.BASE_GR_BACKUP_APPEND_1, WORK.TBBVEXPER_RESUMO_GR, WORK.TBBVEXPER_RESUMO_GR_1, WORK.TBBVEXPER_RESUMO_GR_FINAL, WORK.TBBVEXPER_RESUMO_GR_SEM_GR_BKP
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRBACKUP [PROC SQL - JOIN], EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO [DATA Step - SET; PROC EXPORT - DATA=], WORK.BASE_EXCLUSAO [DATA Step - MERGE], WORK.BASE_GR_BACKUP_APPEND [DATA Step - SET], WORK.BASE_GR_BACKUP_APPEND_1 [DATA Step - SET; PROC SORT - DATA=], WORK.TBBVEXPER_RESUMO_GR [PROC SORT - DATA=; PROC SQL - FROM], WORK.TBBVEXPER_RESUMO_GR_1 [DATA Step - MERGE], WORK.TBBVEXPER_RESUMO_GR_FINAL [DATA Step - SET; PROC SORT - DATA=], WORK.TBBVEXPER_RESUMO_GR_SEM_GR_BKP [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BKP_BU.TBBASEUNICA_BVEXPER_GR_RESUMOBKP, EXP_BU.TBBASEUNICA_BVEXPER_GR_RESUMO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbBaseUnica_BvExper_GR_Resumo.csv
+TEMP/DISCARDED OUTPUTS: BASE_EXCLUSAO, BASE_GR_BACKUP_APPEND, BASE_GR_BACKUP_APPEND_1, TBBVEXPER_RESUMO_GR_FINAL, TBBVEXPER_RESUMO_GR_SEM_GR_BKP, WORK.TBBVEXPER_RESUMO_GR_1, WORK.TBBVEXPER_RESUMO_GR_FINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**********************************************************************/
+/*SEPARA OS GR QUE FORAM BACKUPS EM ALGUM MÊS DE ACORDO COM A PLANILHA*/
+/**********************************************************************/
+
+PROC SQL;
+CREATE TABLE BASE_GR_BACKUP_APPEND AS
+SELECT
+
+A.*,
+b.NuAnoMes_Pausa_BvExper
+
+FROM WORK.TBBVEXPER_RESUMO_GR A
+
+INNER JOIN BASEGRC.TbGrBackup B ON A.NUANOMES = B.NuAnoMes_Congelamento_BvExper AND A.DSLOGINN1 = B.DsLogin_GR
+
+where
+A.NmCanalEstruturaComercial not in ('Canal Negocios', 'Canal Solar') /*30/06/2025 - DENIS RH INFORMOU QUE NÃO CONGELAMOS A PONTUAÇÃO DE CANAL DE NEGÓCIOS*/
+
+;RUN;
+
+/****************************************************************/
+/*ALTERA A DATA DE CONGELAMENTO DO MÊS ANTERIOR PARA O MES ATUAL*/
+/****************************************************************/
+
+DATA BASE_GR_BACKUP_APPEND_1;
+SET WORK.BASE_GR_BACKUP_APPEND;
+
+NuAnoMes_Orig = NuAnoMes;
+NuAnoMes = NuAnoMes_Pausa_BvExper;
+
+DROP NuAnoMes_Pausa_BvExper;
+
+;RUN;
+
+/*******************************************/
+/*CRIA BASE DE EXCLUSAO DE GR BACKUP DO MÊS*/
+/*******************************************/
+
+PROC SORT DATA=WORK.BASE_GR_BACKUP_APPEND_1 OUT=BASE_EXCLUSAO(KEEP=NuAnoMes DsLoginN1) NODUPKEY;BY NUANOMES DsLoginN1;RUN;
+
+/**************************************************/
+/*ORDENA BASE PRINCIPAL PARA O "MERGE" DE EXCLUSÃO*/
+/**************************************************/
+
+PROC SORT DATA=WORK.TbBvExper_Resumo_GR OUT=WORK.TBBVEXPER_RESUMO_GR_1;BY NUANOMES DSLOGINN1;RUN;
+
+/**************************************************/
+/*DELETA DA BASE QUE VAI PARA O DASH OS GRS BACKUP*/
+/**************************************************/
+
+DATA TBBVEXPER_RESUMO_GR_SEM_GR_BKP;
+MERGE 	WORK.TBBVEXPER_RESUMO_GR_1(IN=A)
+		WORK.BASE_EXCLUSAO (IN=B);
+BY NUANOMES DsLoginN1;
+IF A AND NOT B;
+;RUN;
+
+/*APENDA BASE DO GR BACKUP COM OS DADOS DO MêS ANTERIOR NO MÊS ATUAL*/
+
+DATA WORK.TBBVEXPER_RESUMO_GR_FINAL;
+SET WORK.TBBVEXPER_RESUMO_GR_SEM_GR_BKP
+	WORK.BASE_GR_BACKUP_APPEND_1;
+;RUN;
+
+/*******************/
+/*AJUSTES DE CAMPOS*/
+/*******************/
+
+DATA TBBVEXPER_RESUMO_GR_FINAL;
+SET WORK.TBBVEXPER_RESUMO_GR_FINAL;
+IF NuAnoMes_Orig NE . THEN FlGrBkp = 1;ELSE FlGrBkp = 0;
+RENAME NuAnoMes_Orig = NuAnoMes_Original;
+;RUN;
+
+PROC SORT DATA=WORK.TBBVEXPER_RESUMO_GR_FINAL;BY NmCanalEstruturaComercial NmSubEstruturaComercialA NuAnoMes DsLoginN1 TpBase;RUN;
+
+/********************************************************************************************************************/
+/*06/06/2024 - CRAVAMOS A THATIANA COMO GF POIS NA HIERARQUIA NAO ESTA VINDO ESTA MARCAÇÃO PARA ALGUNS COLABORADORES*/
+/********************************************************************************************************************/
+
+proc sql;
+update work.TBBVEXPER_RESUMO_GR_FINAL
+set DsLoginN2A = 'thatiana.souza'
+where
+	NuAnoMes >= 202405
+  and NmAreaEstruturaComercial = 'Canal Privado e FGTS'
+  and NmCanalEstruturaComercial = 'Canal Privado e FGTS'
+;RUN;
+
+/**********************/
+/*BKP DA BASE ANTERIOR*/
+/**********************/
+
+DATA BKP_BU.TbBaseUnica_BvExper_GR_ResumoBKP;
+SET EXP_BU.TbBaseUnica_BvExper_GR_Resumo;
+;RUN;
+
+/*******************/
+/*SALVA A BASE NOVA*/
+/*******************/
+
+DATA EXP_BU.TbBaseUnica_BvExper_GR_Resumo;
+SET WORK.TBBVEXPER_RESUMO_GR_FINAL;
+;RUN;
+
+proc export
+data=EXP_BU.TbBaseUnica_BvExper_GR_Resumo
+file='/riscosbvf/BA/processos/output/TbBaseUnica_BvExper_GR_Resumo.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

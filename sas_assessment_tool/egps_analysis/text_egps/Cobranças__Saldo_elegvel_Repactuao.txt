@@ -1,0 +1,1113 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Saldo_elegvel_Repactuao
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:58 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 65)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (13x | +65)
+----------------------------------------
+LINES_OF_CODE: 860
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (9x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: EMPILHA = /riscosbv/cobranca/gtavares/Reneg/Empilha; PRETER = /riscosbv/cobranca/preter; RENEG = /riscosbv/cobranca/gtavares/Reneg
+DETECTED_MACROS_DEFINED: base, libname, path, work
+DETECTED_MACROS_USED: Safra, base, dt_fim_m0, dt_fim_m1, fim_mes_M0, fim_mes_M1, libname, path, safra, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: BASE, DT_FIM_M0, DT_FIM_M1, FIM_MES_M0, FIM_MES_M1, LIBNAME, SAFRA
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY/GCP], EMPILHA.EMPILHA_RENEG_FINAL_&SAFRA [SAS/Local], PRETER.BASE_COBRANCA_202411 [SAS/Local], RENEG.BASE_ELEG_CONT_&SAFRA [SAS/Local], RENEG.CARGA_202412 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: EMPILHA, PRETER, RENEG
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [PROC SQL - JOIN], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM], EMPILHA.EMPILHA_RENEG_FINAL_&SAFRA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], PRETER.BASE_COBRANCA_202411 [DATA Step - SET], RENEG.BASE_ELEG_CONT_&SAFRA [DATA Step - SET], RENEG.CARGA_202412 [%DESCOMPACTA macro (x cp/gunzip copy to WORK)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, BASE_COBRANCA, BASE_ELEG_&SAFRA, CUBO_RENEG_MENOR90_&SAFRA, CUBO_SALDO_ELEGIVEL, RENEG_MAIOR90, RENEG_MAIOR90_&SAFRA, RENEG_MENOR90, SALDO_ELEGIVEL_RENEG_MAIOR90, VOL_ELEGIVEL_MAIOR90, VOL_ELEGIVEL_MENOR90
+DYNAMIC REFS (Ambiguous): RENEG.BASE_ELEG_CONT_{SAFRA}, {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET libname=%sysfunc(lowcase(&libname.));
+%LET base=%sysfunc(lowcase(&base.));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Saldo Elegível [OFF] */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 43 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Saldo Elegível [OFF] */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-bHlX1HVrpV1yL6ZA/code.sas */
+/* =========================INÍCIO TASK========================= */
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+LIBNAME RENEG '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+%DESCOMPACTA(RENEG, carga_202412);
+
+DATA BASE_COBRANCA;
+SET PRETER.BASE_COBRANCA_202411;
+nucontrato_num = nucontrato*1;
+RUN;
+
+PROC SQL;
+CREATE TABLE SALDO_ELEGIVEL_RENEG_MAIOR90 AS
+SELECT
+	A.*,
+	B.CARTEIRA,
+	B.FX_ATRASO
+FROM carga_202412 AS A
+
+LEFT JOIN BASE_COBRANCA AS B
+ON A.NUCONTRATO = B.nucontrato_num;
+
+QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_SALDO_ELEGIVEL AS
+SELECT
+	FX_ATRASO,
+	SUM(CARTEIRA) as CARTEIRA_TOTAL
+FROM SALDO_ELEGIVEL_RENEG_MAIOR90
+
+GROUP BY FX_ATRASO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Saldo Elegível [OFF] */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Saldo Elegível_menor90 */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 43 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Saldo Elegível_menor90 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-pGZDBFdzRBh2v3k7/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME EMPILHA    '/riscosbv/cobranca/gtavares/Reneg/Empilha';
+LIBNAME PRETER    '/riscosbv/cobranca/preter';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro volume_elegivel(safra, dt_fim_m0, dt_fim_m1);
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&safra.);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_MENOR90 AS
+SELECT
+	*,
+	B.SALDO_M0,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM empilha_reneg_final_&safra. AS A
+
+LEFT JOIN CONNECTION TO PERM(
+	SELECT DISTINCT
+		A.NuContrato,
+		MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro,
+		CASE
+			WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+			ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+		END AS SALDO_M0
+
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+	ON A.NUCONTRATO = J.NUCONTRATO
+	AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+	WHERE DATE(A.DtProcessamento) = &dt_fim_m0.
+	GROUP BY A.nucontrato, J.FlRestruturacaoContrato
+) AS B
+ON A.NUCONTRATO = INPUT(B.NUCONTRATO,BEST32.)
+
+AND A.SqContratoFinanceiro = B.sqcontratofinanceiro
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT DISTINCT
+	nucontratogestao,
+	dt_baixa,
+	st_reneg
+
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE DATE(dt_baixa) > &dt_fim_m0. AND DATE(dt_baixa) <= &dt_fim_m1.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = INPUT(C.nucontratogestao,BEST32.)
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_RENEG_MENOR90_&safra. AS
+SELECT
+	"ATIVA" AS BASE,
+	Elegibilidade_Final,
+	Grupo_Final_Decisao,
+	Teste_Controle,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 4 		THEN '001_004'
+		WHEN NUDIASATRASO <= 15 	THEN '005_015'
+		WHEN NUDIASATRASO <= 30		THEN '016_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 150	THEN '121_150'
+		WHEN NUDIASATRASO <= 180	THEN '151_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 30		THEN '001_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 180	THEN '121_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO_M0) as SALDO_M0
+
+FROM RENEG_MENOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+%macro volume_elegivel_2(safra, dt_fim_m0, dt_fim_m1);
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&safra.);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_MENOR90 AS
+SELECT
+	*,
+	B.SALDO_M0,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM empilha_reneg_final_&safra. AS A
+
+LEFT JOIN CONNECTION TO PERM(
+	SELECT DISTINCT
+		A.NuContrato,
+		MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro,
+		CASE
+			WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+			ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+		END AS SALDO_M0
+
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+	ON A.NUCONTRATO = J.NUCONTRATO
+	AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+	WHERE DATE(A.DtProcessamento) = &dt_fim_m0.
+	GROUP BY A.nucontrato, J.FlRestruturacaoContrato
+) AS B
+
+ON A.NUCONTRATO = B.NUCONTRATO
+AND A.SqContratoFinanceiro = B.sqcontratofinanceiro
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT DISTINCT
+	nucontratogestao,
+	dt_baixa,
+	st_reneg
+
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE DATE(dt_baixa) > &dt_fim_m0. AND DATE(dt_baixa) <= &dt_fim_m1.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = C.nucontratogestao
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_RENEG_MENOR90_&safra. AS
+SELECT
+	'ATIVA' as BASE,
+	Elegibilidade_Final,
+	Grupo_Final_Decisao,
+	Teste_Controle,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 4 		THEN '001_004'
+		WHEN NUDIASATRASO <= 15 	THEN '005_015'
+		WHEN NUDIASATRASO <= 30		THEN '016_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 150	THEN '121_150'
+		WHEN NUDIASATRASO <= 180	THEN '151_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 30		THEN '001_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 180	THEN '121_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO_M0) as SALDO_M0
+
+FROM RENEG_MENOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+
+
+
+
+
+
+%volume_elegivel(202501, '2024-12-31', '2025-01-31');
+%volume_elegivel(202502, '2025-01-31', '2025-02-28');
+%volume_elegivel(202503, '2025-02-28', '2025-03-31');
+%volume_elegivel(202504, '2025-03-31', '2025-04-30');
+%volume_elegivel(202505, '2025-04-30', '2025-05-31');
+%volume_elegivel(202506, '2025-05-31', '2025-06-30');
+%volume_elegivel(202507, '2025-06-30', '2025-07-31');
+
+%volume_elegivel_2(202508, '2025-07-31', '2025-08-31');
+%volume_elegivel_2(202509, '2025-08-31', '2025-09-30');
+%volume_elegivel_2(202510, '2025-09-30', '2025-10-31');
+%volume_elegivel_2(202511, '2025-10-31', '2025-11-30');
+%volume_elegivel_2(202512, '2025-11-30', '2025-12-31');
+
+DATA VOL_ELEGIVEL_MENOR90;
+SET CUBO_RENEG_MENOR90_:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Saldo Elegível_menor90 */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Saldo Elegível_maior90 */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 43 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Saldo Elegível_maior90 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-nOejoexGJfylm4Ue/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME PRETER    '/riscosbv/cobranca/preter';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro volume_elegivel(safra, fim_mes_M0, fim_mes_M1);
+
+DATA base_eleg_&safra.;
+SET RENEG.base_eleg_cont_&safra.:;
+RUN;
+
+proc sort data=base_eleg_&safra. NODUPKEY;
+by nucontrato;
+run;
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.Carteira,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM base_eleg_&safra. as A
+
+LEFT JOIN CONNECTION TO PERM(
+		SELECT
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			CASE
+				WHEN B.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS CARTEIRA
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS B
+		ON
+		A.NUCONTRATO = B.NUCONTRATO
+		AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE
+
+			DATE(A.DTPROCESSAMENTO) = &fim_mes_M0.
+
+		GROUP BY
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			B.FlRestruturacaoContrato
+		) AS B
+on a.nucontrato = INPUT(b.nucontrato, BEST32.)
+
+LEFT JOIN CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		nucontratogestao,
+		dt_baixa,
+		st_reneg
+
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+	WHERE DATE(dt_baixa) > &fim_mes_M0. AND DATE(dt_baixa) <= &fim_mes_M1.
+		AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+		AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = INPUT(C.nucontratogestao, BEST32.)
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_MAIOR90_&safra. AS
+SELECT
+	BASE,
+	"" as ELEGIBILIDADE_FINAL,
+	Modelo_Final,
+	Teste_Controle_Final,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 4 		THEN '001_004'
+		WHEN NUDIASATRASO <= 15 	THEN '005_015'
+		WHEN NUDIASATRASO <= 30		THEN '016_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 150	THEN '121_150'
+		WHEN NUDIASATRASO <= 180	THEN '151_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 30		THEN '001_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 180	THEN '121_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(CARTEIRA) as SALDO
+
+FROM RENEG_MAIOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+%macro volume_elegivel_2 (safra, fim_mes_M0, fim_mes_M1);
+
+DATA base_eleg_&safra.;
+SET RENEG.base_eleg_cont_&safra.:;
+RUN;
+
+proc sort data=base_eleg_&safra. NODUPKEY;
+by nucontrato;
+run;
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.Carteira,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM base_eleg_&safra. as A
+
+LEFT JOIN CONNECTION TO PERM(
+		SELECT
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			CASE
+				WHEN B.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS CARTEIRA
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS B
+		ON
+		A.NUCONTRATO = B.NUCONTRATO
+		AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE
+
+			DATE(A.DTPROCESSAMENTO) = &fim_mes_M0.
+
+		GROUP BY
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			B.FlRestruturacaoContrato
+		) AS B
+on a.nucontrato = b.nucontrato
+
+LEFT JOIN CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		nucontratogestao,
+		dt_baixa,
+		st_reneg
+
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+	WHERE DATE(dt_baixa) > &fim_mes_M0. AND DATE(dt_baixa) <= &fim_mes_M1.
+		AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+		AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = C.nucontratogestao
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_MAIOR90_&safra. AS
+SELECT
+	BASE,
+	"" as ELEGIBILIDADE_FINAL,
+	Modelo_Final,
+	Teste_Controle_Final,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 4 		THEN '001_004'
+		WHEN NUDIASATRASO <= 15 	THEN '005_015'
+		WHEN NUDIASATRASO <= 30		THEN '016_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 150	THEN '121_150'
+		WHEN NUDIASATRASO <= 180	THEN '151_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000_000'
+		WHEN NUDIASATRASO <= 30		THEN '001_030'
+		WHEN NUDIASATRASO <= 60 	THEN '031_060'
+		WHEN NUDIASATRASO <= 90 	THEN '061_090'
+		WHEN NUDIASATRASO <= 120 	THEN '091_120'
+		WHEN NUDIASATRASO <= 180	THEN '121_180'
+		WHEN NUDIASATRASO <= 360	THEN '181_360'
+		ELSE '361_999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(CARTEIRA) as SALDO
+
+FROM RENEG_MAIOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+
+
+
+
+
+%volume_elegivel(202501, '2024-12-31', '2025-01-31');
+
+%volume_elegivel(202502, '2025-01-31', '2025-02-28');
+%volume_elegivel(202503, '2025-02-28', '2025-03-31');
+%volume_elegivel(202504, '2025-03-31', '2025-04-30');
+%volume_elegivel(202505, '2025-04-30', '2025-05-31');
+%volume_elegivel(202506, '2025-05-31', '2025-06-30');
+%volume_elegivel(202507, '2025-06-30', '2025-07-31');
+
+%volume_elegivel_2(202508, '2025-07-31', '2025-08-31');
+%volume_elegivel_2(202509, '2025-08-31', '2025-09-30');
+%volume_elegivel_2(202510, '2025-09-30', '2025-10-31');
+%volume_elegivel_2(202511, '2025-10-31', '2025-11-30');
+%volume_elegivel_2(202512, '2025-11-30', '2025-12-31');
+
+DATA VOL_ELEGIVEL_MAIOR90;
+SET RENEG_MAIOR90_:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Saldo Elegível_maior90 */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME EMPILHA    '/riscosbv/cobranca/gtavares/Reneg/Empilha';
+LIBNAME PRETER    '/riscosbv/cobranca/preter';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro volume_elegivel(safra, dt_fim_m0, dt_fim_m1);
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&safra.);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_MENOR90 AS
+SELECT
+	*,
+	B.SALDO_M0,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM empilha_reneg_final_&safra. AS A
+
+LEFT JOIN CONNECTION TO PERM(
+	SELECT DISTINCT
+		A.NuContrato,
+		MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro,
+		CASE
+			WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+			ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+		END AS SALDO_M0
+
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+	ON A.NUCONTRATO = J.NUCONTRATO
+	AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+	WHERE DATE(A.DtProcessamento) = &dt_fim_m0.
+	GROUP BY A.nucontrato, J.FlRestruturacaoContrato
+) AS B
+ON A.NUCONTRATO = INPUT(B.NUCONTRATO,BEST32.)
+
+AND A.SqContratoFinanceiro = B.sqcontratofinanceiro
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT DISTINCT
+	nucontratogestao,
+	dt_baixa,
+	st_reneg
+
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE DATE(dt_baixa) > &dt_fim_m0. AND DATE(dt_baixa) <= &dt_fim_m1.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = INPUT(C.nucontratogestao,BEST32.)
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_RENEG_MENOR90_&safra. AS
+SELECT
+	"ATIVA" AS BASE,
+	Elegibilidade_Final,
+	Grupo_Final_Decisao,
+	Teste_Controle,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 4 		THEN '001-004'
+		WHEN NUDIASATRASO <= 15 	THEN '005-015'
+		WHEN NUDIASATRASO <= 30		THEN '016-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 150	THEN '121-150'
+		WHEN NUDIASATRASO <= 180	THEN '151-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 30		THEN '001-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 180	THEN '121-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO_M0) as SALDO_M0
+
+FROM RENEG_MENOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+%macro volume_elegivel_2(safra, dt_fim_m0, dt_fim_m1);
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&safra.);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_MENOR90 AS
+SELECT
+	*,
+	B.SALDO_M0,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM empilha_reneg_final_&safra. AS A
+
+LEFT JOIN CONNECTION TO PERM(
+	SELECT DISTINCT
+		A.NuContrato,
+		MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro,
+		CASE
+			WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+			ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+		END AS SALDO_M0
+
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+	ON A.NUCONTRATO = J.NUCONTRATO
+	AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+	WHERE DATE(A.DtProcessamento) = &dt_fim_m0.
+	GROUP BY A.nucontrato, J.FlRestruturacaoContrato
+) AS B
+
+ON A.NUCONTRATO = B.NUCONTRATO
+AND A.SqContratoFinanceiro = B.sqcontratofinanceiro
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT DISTINCT
+	nucontratogestao,
+	dt_baixa,
+	st_reneg
+
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE DATE(dt_baixa) > &dt_fim_m0. AND DATE(dt_baixa) <= &dt_fim_m1.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = C.nucontratogestao
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_RENEG_MENOR90_&safra. AS
+SELECT
+	'ATIVA' as BASE,
+	Elegibilidade_Final,
+	Grupo_Final_Decisao,
+	Teste_Controle,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 4 		THEN '001-004'
+		WHEN NUDIASATRASO <= 15 	THEN '005-015'
+		WHEN NUDIASATRASO <= 30		THEN '016-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 150	THEN '121-150'
+		WHEN NUDIASATRASO <= 180	THEN '151-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 30		THEN '001-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 180	THEN '121-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(SALDO_M0) as SALDO_M0
+
+FROM RENEG_MENOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+
+
+
+
+
+
+%volume_elegivel(202501, '2024-12-31', '2025-01-31');
+%volume_elegivel(202502, '2025-01-31', '2025-02-28');
+%volume_elegivel(202503, '2025-02-28', '2025-03-31');
+%volume_elegivel(202504, '2025-03-31', '2025-04-30');
+%volume_elegivel(202505, '2025-04-30', '2025-05-31');
+%volume_elegivel(202506, '2025-05-31', '2025-06-30');
+%volume_elegivel(202507, '2025-06-30', '2025-07-31');
+
+%volume_elegivel_2(202508, '2025-07-31', '2025-08-31');
+%volume_elegivel_2(202509, '2025-08-31', '2025-09-30');
+%volume_elegivel_2(202510, '2025-09-30', '2025-10-31');
+%volume_elegivel_2(202511, '2025-10-31', '2025-11-30');
+%volume_elegivel_2(202512, '2025-11-30', '2025-12-31');
+
+DATA VOL_ELEGIVEL_MENOR90;
+SET CUBO_RENEG_MENOR90_:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME PRETER    '/riscosbv/cobranca/preter';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro volume_elegivel(safra, fim_mes_M0, fim_mes_M1);
+
+DATA base_eleg_&safra.;
+SET RENEG.base_eleg_cont_&safra.:;
+RUN;
+
+proc sort data=base_eleg_&safra. NODUPKEY;
+by nucontrato;
+run;
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.Carteira,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM base_eleg_&safra. as A
+
+LEFT JOIN CONNECTION TO PERM(
+		SELECT
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			CASE
+				WHEN B.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS CARTEIRA
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS B
+		ON
+		A.NUCONTRATO = B.NUCONTRATO
+		AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE
+
+			DATE(A.DTPROCESSAMENTO) = &fim_mes_M0.
+
+		GROUP BY
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			B.FlRestruturacaoContrato
+		) AS B
+on a.nucontrato = INPUT(b.nucontrato, BEST32.)
+
+LEFT JOIN CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		nucontratogestao,
+		dt_baixa,
+		st_reneg
+
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+	WHERE DATE(dt_baixa) > &fim_mes_M0. AND DATE(dt_baixa) <= &fim_mes_M1.
+		AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+		AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = INPUT(C.nucontratogestao, BEST32.)
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_MAIOR90_&safra. AS
+SELECT
+	BASE,
+	"" as ELEGIBILIDADE_FINAL,
+	Modelo_Final,
+	Teste_Controle_Final,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 4 		THEN '001-004'
+		WHEN NUDIASATRASO <= 15 	THEN '005-015'
+		WHEN NUDIASATRASO <= 30		THEN '016-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 150	THEN '121-150'
+		WHEN NUDIASATRASO <= 180	THEN '151-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 30		THEN '001-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 180	THEN '121-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(CARTEIRA) as SALDO
+
+FROM RENEG_MAIOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+%macro volume_elegivel_2 (safra, fim_mes_M0, fim_mes_M1);
+
+DATA base_eleg_&safra.;
+SET RENEG.base_eleg_cont_&safra.:;
+RUN;
+
+proc sort data=base_eleg_&safra. NODUPKEY;
+by nucontrato;
+run;
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.Carteira,
+	CASE WHEN C.NUCONTRATOGESTAO IS NOT NULL THEN 1 ELSE 0 END AS FL_ADESAO
+
+FROM base_eleg_&safra. as A
+
+LEFT JOIN CONNECTION TO PERM(
+		SELECT
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			CASE
+				WHEN B.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS CARTEIRA
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS B
+		ON
+		A.NUCONTRATO = B.NUCONTRATO
+		AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE
+
+			DATE(A.DTPROCESSAMENTO) = &fim_mes_M0.
+
+		GROUP BY
+			A.NUCONTRATO,
+			A.SQCONTRATOFINANCEIRO,
+			B.FlRestruturacaoContrato
+		) AS B
+on a.nucontrato = b.nucontrato
+
+LEFT JOIN CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		nucontratogestao,
+		dt_baixa,
+		st_reneg
+
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+	WHERE DATE(dt_baixa) > &fim_mes_M0. AND DATE(dt_baixa) <= &fim_mes_M1.
+		AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+		AND st_reneg = 3
+) AS C
+ON A.NUCONTRATO = C.nucontratogestao
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_MAIOR90_&safra. AS
+SELECT
+	BASE,
+	"" as ELEGIBILIDADE_FINAL,
+	Modelo_Final,
+	Teste_Controle_Final,
+	&Safra. as SAFRA,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 4 		THEN '001-004'
+		WHEN NUDIASATRASO <= 15 	THEN '005-015'
+		WHEN NUDIASATRASO <= 30		THEN '016-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 150	THEN '121-150'
+		WHEN NUDIASATRASO <= 180	THEN '151-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO,
+	CASE
+		WHEN NUDIASATRASO <= 0 		THEN '000-000'
+		WHEN NUDIASATRASO <= 30		THEN '001-030'
+		WHEN NUDIASATRASO <= 60 	THEN '031-060'
+		WHEN NUDIASATRASO <= 90 	THEN '061-090'
+		WHEN NUDIASATRASO <= 120 	THEN '091-120'
+		WHEN NUDIASATRASO <= 180	THEN '121-180'
+		WHEN NUDIASATRASO <= 360	THEN '181-360'
+		ELSE '361-999'
+	END AS FX_ATRASO2,
+	FL_ADESAO,
+
+	COUNT(NUCONTRATO) AS QNT,
+	SUM(CARTEIRA) as SALDO
+
+FROM RENEG_MAIOR90
+GROUP BY 1,2,3,4,5,6,7,8
+;quit;
+
+%mend;
+
+
+
+
+
+
+%volume_elegivel(202501, '2024-12-31', '2025-01-31');
+
+%volume_elegivel(202502, '2025-01-31', '2025-02-28');
+%volume_elegivel(202503, '2025-02-28', '2025-03-31');
+%volume_elegivel(202504, '2025-03-31', '2025-04-30');
+%volume_elegivel(202505, '2025-04-30', '2025-05-31');
+%volume_elegivel(202506, '2025-05-31', '2025-06-30');
+%volume_elegivel(202507, '2025-06-30', '2025-07-31');
+
+%volume_elegivel_2(202508, '2025-07-31', '2025-08-31');
+%volume_elegivel_2(202509, '2025-08-31', '2025-09-30');
+%volume_elegivel_2(202510, '2025-09-30', '2025-10-31');
+%volume_elegivel_2(202511, '2025-10-31', '2025-11-30');
+%volume_elegivel_2(202512, '2025-11-30', '2025-12-31');
+
+DATA VOL_ELEGIVEL_MAIOR90;
+SET RENEG_MAIOR90_:;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,405 @@
+START_METADATA
+PROJECT: Rodas__campanha_MissaoBV
+FILE_SAS: z9999 - Meta MC + Seguros - CN + Exclusivos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -35
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), ARRAY (10x | +150)
+----------------------------------------
+LINES_OF_CODE: 276
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CMBV = /infogrc/Campanha_MissaoBV; CMBV_BKP = /infogrc/Campanha_MissaoBV/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBMETAPRODUCAOFINAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_META_PRODUCAO_ANALITICA_01, WORK.BASE_META_PRODUCAO_ANALITICA_03
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CMBV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_META_PRODUCAO_ANALITICA_01, WORK.BASE_META_PRODUCAO_ANALITICA_02, WORK.BASE_META_PRODUCAO_ANALITICA_03, WORK.BASE_META_PRODUCAO_ANALITICA_04
+TABLE_READ_PROVENANCE (Flow): BASES.TBMETAPRODUCAOFINAL [DATA Step - SET], WORK.BASE_META_PRODUCAO_ANALITICA_01 [PROC SQL - FROM], WORK.BASE_META_PRODUCAO_ANALITICA_02 [DATA Step - SET; PROC SQL - FROM], WORK.BASE_META_PRODUCAO_ANALITICA_03 [DATA Step - SET], WORK.BASE_META_PRODUCAO_ANALITICA_04 [DATA Step - SET; PROC SORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CMBV.TBANALITICOATINGIMENTO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_META_PRODUCAO_ANALITICA, BASE_META_PRODUCAO_ANALITICA_01, BASE_META_PRODUCAO_ANALITICA_02, BASE_META_PRODUCAO_ANALITICA_03, WORK.BASE_META_PRODUCAO_ANALITICA_02, WORK.BASE_META_PRODUCAO_ANALITICA_04
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CMBV '/infogrc/Campanha_MissaoBV';
+LIBNAME CMBV_BKP '/infogrc/Campanha_MissaoBV/Bases_BKP';
+
+DATA BASE_META_PRODUCAO_ANALITICA;
+SET bases.TbMetaProducaoFinal;
+WHERE
+NUANOMES BETWEEN 202510 AND 202512
+AND DSLOGINN1 <> ''
+AND NmCanalEstruturaComercial IN ('Canal Veiculos', 'Canal Negocios')
+and TpValor in ('VrSPF_VrAP_VrAuto', 'VrMargemContribuicao', 'ContaDigital')
+
+/*AND DsLoginN1 in (*/
+/*'aarao.souza', *//*CV*/
+/*'daniel.coelho', *//*CV - MOTOS*/
+/*'jean.cintra' *//*CV - PESADOS*/
+/*'aline.nauer') *//*CN*/
+/*'lucirene.santos')*/ /*CV*/
+
+;RUN;
+
+/*********************************************/
+/*UPDATES CASO NECESSÃRIO ZERAR ALGUNS CAMPOS*/
+/*********************************************/
+
+/**********************************************************************************************************/
+/*ZERA OS DADOS DE SEGUROS DE META ISONOMICA A PARTIR DE OUTUBRO-24 QUANDO A META DE SEGUROS VIROU NÏ ISO*/
+/**********************************************************************************************************/
+proc sql;
+update BASE_META_PRODUCAO_ANALITICA set VrMetaN1 = 0
+where NUANOMES >= 202410
+  and NmCanalEstruturaComercial = 'Canal Veiculos'
+  and NmGrupoProdutoMeta = 'Leves'
+  and StVeiculo = 'Usados'
+  AND TpValor in ('VrSPF', 'VrAP', 'VrSegurosAuto', 'VrSPF_VrAP', 'VrSPF_VrAP_VrAuto')
+
+ ;run;
+
+/******************************************************************************/
+/*ZERA A META ISONOMICA DE LEVES USADOS, MOTOS e PESADOS QUE SÏ NÏ ISONOMICA*/
+/******************************************************************************/
+ proc sql;
+update BASE_META_PRODUCAO_ANALITICA set VrMetaN1 = 0, VrMetaN1Denominador = 0, QtNumerador = 0, QtDenominador = 0, VrDenominador = 0, VrMedida = 0
+where NuAnoMes >= 202412
+  and NmCanalEstruturaComercial = 'Canal Veiculos'
+  and NmGrupoProdutoMeta = 'Leves'
+  and StVeiculo = 'Usados'
+  and TpValor in ('VrMargemContribuicao')
+ ;run;
+
+/***************************************************************************************/
+/*META N ISONOMICA DE MOTOS E PESADOS VALENDO A PARTIR DE AGOSTO-2023 E PESADOS: JAN-25*/
+/***************************************************************************************/
+proc sql;
+update BASE_META_PRODUCAO_ANALITICA set VrMetaN1 = 0,  VrMetaN1Denominador = 0, QtNumerador = 0, QtDenominador = 0, VrDenominador = 0, VrMedida = 0
+where NuAnoMes >= 202412
+  and NmCanalEstruturaComercial = 'Canal Veiculos'
+  and NmGrupoProdutoMeta IN ('Motos', 'Pesados')
+  and TpValor in ('VrMargemContribuicao')
+ ;run;
+
+/*********************************************/
+/*ZERA A MC ISONOMICA PARA GR MOTOS E PESADOS*/
+/*********************************************/
+proc sql;
+update BASE_META_PRODUCAO_ANALITICA set VrMetaN1 = 0,  VrMetaN1Denominador = 0, QtNumerador = 0, QtDenominador = 0, VrDenominador = 0, VrMedida = 0
+where NuAnoMes >= 202412
+  and NmCanalEstruturaComercial = 'Canal Veiculos'
+  AND NmGrupoCargoColaborador IN ('Gerente Relacionamento Pesados', 'Gerente Relacionamento Motos')
+  and TpValor in ('VrMargemContribuicao')
+ ;run;
+
+/*************************************************************************************/
+/*10/06/2025 - AJUSTE GR PESADOS PRODUZINDO NO CANAL DE NEGÓIOS E RECEBENDO METAS NI*/
+/*************************************************************************************/
+proc sql;
+update BASE_META_PRODUCAO_ANALITICA set VrMetaNIN1 = 0
+where NuAnoMes >= 202507
+and TpValor in ('VrProducao', 'VrMargemContribuicao')
+and NmCanalEstruturaComercial = 'Canal Veiculos'
+and NmAreaEstruturaComercial = 'Canal Pesados'
+and DsTipoCanalProducao = 'LOJA CANAL NEGOCIOS'
+and NmGrupoCargoColaborador in ('Gerente Relacionamento Pesados')
+;run;
+
+/***************************************************************************/
+/*ZERA A MC ISONOMICA PARA GR MOTOS E PESADOS PARA FAZER O AJUSTE DE PRÊIO*/
+/***************************************************************************/
+
+proc sql;
+update BASE_META_PRODUCAO_ANALITICA set VrMetaN1 = 0, VrMetaNIN1 = 0, VrMetaProducaoN1 = 0
+where NuAnoMes >= 202412 and nuanomes <= 202508
+  and NmCanalEstruturaComercial = 'Canal Veiculos'
+  and NmGrupoProdutoMeta in ('Motos', 'Pesados')
+  AND NmGrupoCargoColaborador IN ('Gerente Relacionamento Pesados', 'Gerente Relacionamento Motos') /*NÏ ESQUECER DE APLICAR ESTE UPDATE PARA TODOS OS CARGOS PARA O PRIMEIRO M?*/
+  and TpValor in ('VrSPF_VrAP_VrAuto')
+ ;run;
+
+/***************************************************************************/
+/*ZERA A MC ISONOMICA PARA GR MOTOS E PESADOS PARA FAZER O AJUSTE DE PRÃMIO*/
+/***************************************************************************/
+proc sql;
+update BASE_META_PRODUCAO_ANALITICA set VrMetaN1 = 0
+where NuAnoMes = 202509
+  and NmCanalEstruturaComercial = 'Canal Veiculos'
+  and NmGrupoProdutoMeta in ('Motos', 'Pesados')
+  AND NmCanalEstruturaComercial = 'Canal Veiculos'
+  and TpValor in ('VrSPF_VrAP_VrAuto')
+ ;run;
+
+/*********************************************************************************************************/
+/*CRIA NOVAS COLUNAS SEPARANDO MC DE RODAS E EGV // VALORES DE METAS DE INAD, PENPDV E SEGUROS CANCELADOS*/
+/*********************************************************************************************************/
+
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_01 AS
+SELECT
+A.*,
+
+/*MC*/
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('Leves', 'Motos', 'Pesados') Then VrMetaN1 else 0 end as VrMetaN1_MC_Rodas,
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('Leves', 'Motos', 'Pesados') Then VrMetaNIN1 else 0 end as VrMetaNIN1_MC_Rodas,
+
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('Leves', 'Motos', 'Pesados') and StVeiculo <> 'Usados' Then VrMedida else 0 end as VrMedida_MC_Rodas,
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('Leves', 'Motos', 'Pesados') and StVeiculo <> 'Novos' Then VrMedidaNI else 0 end as VrMedidaNI_MC_Rodas,
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('Leves', 'Motos', 'Pesados') Then VrMargemDescontos else 0 end as VrMargemDescontos_MC_Rodas,
+
+/*MC EGV*/
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('CVG Leves', 'CVG Pesados') Then VrMetaN1 else 0 end as VrMetaN1_MC_EGV,
+
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('CVG Leves', 'CVG Pesados') Then VrMedida else 0 end as VrMedida_MC_EGV,
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('CVG Leves', 'CVG Pesados') Then VrMedidaNI else 0 end as VrMedidaNI_MC_EGV,
+CASE WHEN NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and TpValor = 'VrMargemContribuicao' AND NmGrupoProdutoMeta IN ('CVG Leves', 'CVG Pesados') Then VrMargemDescontos else 0 end as VrMargemDescontos_MC_EGV,
+
+/*META CONTA DIGITAL*/
+CASE
+	WHEN TpValor = 'ContaDigital' AND NUANOMES >= 202412 and NUANOMES <= 202501 and NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') THEN 0.23
+	WHEN TpValor = 'ContaDigital' AND NUANOMES >= 202502 and NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') THEN (VrMetaN1 / VrMetaN1Denominador)
+END AS VrMetaContaDigital
+
+FROM BASE_META_PRODUCAO_ANALITICA A
+
+;RUN;
+
+/************************************/
+/*AGRUPA A BASE COM OS NOVOS VALORES*/
+/************************************/
+
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_02 AS
+SELECT
+
+NuAnoMes,
+CdColaborador,
+/*NmColaborador,*/
+NmGrupoCargoColaborador,
+DsLoginN1,
+TpValor,
+/*NmAreaEstruturaComercial,*/
+/*NmSubEstruturaComercialH,*/
+/*NmSubEstruturaComercialA,*/
+/*NmCanalEstruturaComercial,*/
+/*DsLoginN2H,*/
+/*DsLoginN2A,*/
+/*DsLoginN3H,*/
+/*DsLoginN3A,*/
+/*LstSubstituicao,*/
+/*LstColaboradorFocal,*/
+
+sum(A.VrMetaN1) AS VrMetaN1,
+sum(A.VrMetaNIN1) AS VrMetaNIN1,
+sum(A.QtNumerador) AS QtNumerador,
+sum(A.QtDenominador) AS QtDenominador,
+
+/*sum(A.VrDenominador) AS VrDenominador,*/
+SUM(A.VrDenominador) AS VrDenominador,
+
+sum(A.VrMedida) AS VrMedida,
+sum(A.QtNumeradorNI) AS QtNumeradorNI,
+sum(A.QtDenominadorNI) AS QtDenominadorNI,
+
+/*sum(A.VrDenominadorNI) AS VrDenominadorNI,*/
+SUM(A.VrDenominadorNI) AS VrDenominadorNI,
+
+sum(A.VrMedidaNI) AS VrMedidaNI,
+sum(A.QtSegurosCancelados) AS QtSegurosCancelados,
+sum(A.VrSegurosCancelados) AS VrSegurosCancelados,
+sum(A.VrMargemDescontos) AS VrMargemDescontos,
+
+SUM(A.VrMetaProducaoN1) AS VrMetaProducaoN1,
+
+SUM(VrMetaN1_MC_Rodas) AS VrMetaN1_MC_Rodas,
+SUM(A.VrMetaN1_MC_EGV) AS VrMetaN1_MC_EGV,
+SUM(A.VrMetaNIN1_MC_Rodas) AS VrMetaNIN1_MC_Rodas,
+
+SUM(VrMedida_MC_Rodas) AS VrMedida_MC_Rodas,
+SUM(VrMedidaNI_MC_Rodas) AS VrMedidaNI_MC_Rodas,
+
+SUM(VrMedida_MC_EGV) AS VrMedida_MC_EGV,
+SUM(VrMedidaNI_MC_EGV) AS VrMedidaNI_MC_EGV,
+
+SUM(VrMargemDescontos_MC_Rodas) AS VrMargemDescontos_MC_Rodas,
+SUM(VrMargemDescontos_MC_EGV) AS VrMargemDescontos_MC_EGV,
+
+SUM(VrMetaN1Denominador) AS VrMetaN1Denominador,
+
+AVG(VrMetaContaDigital) AS VrMetaContaDigital
+
+FROM WORK.BASE_META_PRODUCAO_ANALITICA_01 A
+
+/*WHERE a.CdColaborador = 69950*/
+/*AND NUANOMES = 202308*/
+
+GROUP BY 1,2,3,4,5/*,6,7,8,9,10,11,12,13,14*/
+/*ORDER BY 3*/
+
+;RUN;
+
+/*SUBSTITUI TUDO QUE FOI "MISSING OU '.' POR '0'*/
+/*SAS ESTAVA APRESENTANDO PROBLEMA QUANDO FAZIA O CALCULO COM O 'MISSING'*/
+
+data work.BASE_META_PRODUCAO_ANALITICA_02;
+	set work.BASE_META_PRODUCAO_ANALITICA_02;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+/*****************************************/
+/*CALCULA AS MEDIDAS, METAS E ATINGIMENTO*/
+/*****************************************/
+
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_03 AS
+SELECT
+
+TODAY() AS Data format ddmmyy10.,
+NuAnoMes,
+CdColaborador,
+NmGrupoCargoColaborador,
+DsLoginN1,
+TpValor,
+
+/*****************/
+/*SEGUROS NOMINAL*/
+/*****************/
+
+SUM(CASE
+		WHEN TpValor in ('VrSPF_VrAP_VrAuto') and NmGrupoCargoColaborador not in ('Gerente Relacionamento Motos', 'Gerente Relacionamento Pesados','Gerente Relacionamento Veiculos')
+		THEN (VrMedida)
+
+		WHEN TpValor in ('VrSPF_VrAP_VrAuto') and NmGrupoCargoColaborador in ('Gerente Relacionamento Motos', 'Gerente Relacionamento Pesados','Gerente Relacionamento Veiculos')
+		THEN (VrMedidaNI)
+
+ELSE 0
+END) AS VrMedida_Seguros FORMAT COMMAX20.2,
+
+SUM(CASE
+		WHEN TpValor in ('VrSPF_VrAP_VrAuto') and NmGrupoCargoColaborador not in ('Gerente Relacionamento Motos', 'Gerente Relacionamento Pesados','Gerente Relacionamento Veiculos')
+		THEN (VrSegurosCancelados)
+
+		WHEN TpValor in ('VrSPF_VrAP_VrAuto') and NmGrupoCargoColaborador in ('Gerente Relacionamento Motos', 'Gerente Relacionamento Pesados','Gerente Relacionamento Veiculos')
+		THEN (VrSegurosCancelados)
+
+ELSE 0
+END) AS VrSegurosCancelados_Seguros FORMAT COMMAX20.2,
+
+SUM(CASE
+		WHEN TpValor in ('VrSPF_VrAP_VrAuto') THEN (VrMetaN1 + VrMetaNIN1)
+ELSE 0
+END) AS VrMetaN1_Seguros FORMAT COMMAX20.2,
+
+(CALCULATED VrMedida_Seguros + CALCULATED VrSegurosCancelados_Seguros) / (CALCULATED VrMetaN1_Seguros) AS Pc_Ating_VrSPF_VrAP_VrAuto FORMAT commax20.10,
+
+/***************************************/
+/*ATINGIMENTO DE MC TOTAL (RODAS + EGV)*/
+/***************************************/
+
+/**********/
+/*MC RODAS*/
+/**********/
+
+SUM(CASE
+		WHEN TpValor in ('VrMargemContribuicao') AND NUANOMES >= 202505 AND NmGrupoCargoColaborador = 'Gerente Relacionamento CN (Virtualizado)' /*GR CN*/
+				THEN (VrMedida)
+
+		WHEN TpValor in ('VrMargemContribuicao') AND NUANOMES >= 202505 AND NmGrupoCargoColaborador <> 'Gerente Relacionamento CN (Virtualizado)' /*GR CV + EXCLUSIVOS*/
+				THEN (VrMedida_MC_Rodas + VrMedidaNI_MC_Rodas + VrMedida_MC_EGV)
+ELSE 0 END) AS VrMedidaMC_Total FORMAT COMMAX20.2,
+
+SUM(CASE WHEN TpValor in ('VrMargemContribuicao') AND NUANOMES >= 202505 THEN (VrMargemDescontos_MC_Rodas + VrMargemDescontos_MC_EGV) ELSE 0 END) AS VrMargemDescontos_Total FORMAT COMMAX20.2,
+
+SUM(CASE
+		WHEN TpValor in ('VrMargemContribuicao') AND NUANOMES >= 202505 AND NmGrupoCargoColaborador = 'Gerente Relacionamento CN (Virtualizado)' /*GR CN*/
+				THEN (VrMetaN1)
+
+		WHEN TpValor in ('VrMargemContribuicao') AND NUANOMES >= 202505 AND NmGrupoCargoColaborador <> 'Gerente Relacionamento CN (Virtualizado)' /*GR CV + EXCLUSIVOS*/
+				THEN (VrMetaN1_MC_Rodas + VrMetaNIN1_MC_Rodas + VrMetaN1_MC_EGV)
+ELSE 0 END) AS VrMetaMC_Total FORMAT COMMAX20.2,
+
+((CALCULATED VrMedidaMC_Total + CALCULATED VrMargemDescontos_Total)
+/
+((CALCULATED VrMetaMC_Total))) AS Pc_Ating_MC_Total FORMAT commax20.10,
+
+/***************/
+/*CONTA DIGITAL*/
+/***************/
+
+SUM(CASE WHEN TPVALOR = 'ContaDigital' THEN (QtNumeradorNI) ELSE 0 END) AS QtNumeradorNI_ContaDigital FORMAT COMMAX20.0,
+SUM(CASE WHEN TPVALOR = 'ContaDigital' THEN (QtDenominadorNI) ELSE 0 END) AS QtDenominadorNI_ContaDigital FORMAT COMMAX20.0,
+SUM(CASE WHEN TPVALOR = 'ContaDigital' THEN (VrMetaContaDigital) ELSE 0 END) AS VrMeta_ContaDigital FORMAT commax20.10,
+
+(CALCULATED QtNumeradorNI_ContaDigital / CALCULATED QtDenominadorNI_ContaDigital) / (CALCULATED VrMeta_ContaDigital ) AS Pc_Ating_Conta_Digital FORMAT commax20.10
+
+FROM WORK.BASE_META_PRODUCAO_ANALITICA_02
+
+GROUP BY 1,2,3,4,5,6/*,7,8,9,10,11,12,13,14*/
+
+;RUN;
+
+/************************************************************************/
+/*ZERA TODOS OS CAMPOS NUMÃRICOS DA BASE QUE ESTIVEREM VAZIOS OU MISSING*/
+/************************************************************************/
+
+data work.BASE_META_PRODUCAO_ANALITICA_04;
+	set work.BASE_META_PRODUCAO_ANALITICA_03;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+PROC SORT DATA=WORK.BASE_META_PRODUCAO_ANALITICA_04; BY DsLoginN1 NuAnoMes TpValor;RUN;
+
+DATA CMBV.TbAnaliticoAtingimento;
+SET WORK.BASE_META_PRODUCAO_ANALITICA_04;
+;RUN;
+
+/***********************************************************/
+/*UPDATE PARA AJUSTAR O CAMPO DATA PARA O FECHAMENTO DO MÃS*/
+/***********************************************************/
+
+/*%include '/infogrc/utils/all-includes.sas';*/
+/*LIBNAME CMBV '/infogrc/Campanha_MissaoBV';*/
+/**/
+/*proc sql;*/
+/*    update CMBV.TbAnaliticoAtingimento*/
+/*    set Data = input("31/10/2025", ddmmyy10.)*/
+/*    where NUANOMES = 202510;*/
+/*quit;*/

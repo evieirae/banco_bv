@@ -1,0 +1,122 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_credito_trabalhador
+FILE_SAS: run-funil_credito_trabalhador.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -4
+ODS_OUTPUTS_DETECTED: html
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (2x | +24), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 55
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, ODSTEXT
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_dur, W_fim, W_ini, swork
+DETECTED_MACROS_USED: W_dur, W_fim, W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/IGE_NEW/CREDITO_TRABALHADOR/codigos/1 - Gera Output Credito Trabalhador.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/IGE_NEW/CREDITO_TRABALHADOR/CODIGOS/1 - GERA OUTPUT CREDITO TRABALHADOR.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: IGELOG
+IMPORTED FILES (Requires Ingestion): /infogrc/IGE_NEW/CREDITO_TRABALHADOR/codigos/1 - Gera Output Credito Trabalhador.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/IGE_NEW/CREDITO_TRABALHADOR/codigos/1 - Gera Output Credito Trabalhador.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): IGELOG.LOGEXECUCAOPROCESSOS
+APPEND_ONLY_OUTPUTS: IGELOG.LOGEXECUCAOPROCESSOS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): IGELOG.LOGEXECUCAOPROCESSOS
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LOGEXE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/IGE_NEW/CREDITO_TRABALHADOR/codigos/1 - Gera Output Credito Trabalhador.sas
+
+END_METADATA
+================================================================================
+options validvarname=any;
+options nofmterr;
+
+/* Marcar horário de início da atualização */
+%LET W_ini = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+SUBJECT="Funil Crédito Trabalhador | Início da atualização";
+
+DATA _NULL_;
+	FILE MAIL_INI;
+		PUT "Processamento das bases do Funil Crédito Trabalhador iniciado.";
+		PUT "Este processo gerará as seguintes bases:";
+		PUT "BASE_FUNIL_CREDITO_TRABALHADOR.csv";
+
+RUN;
+
+/* Execução dos processos */
+%let swork = %sysfunc(getoption(work));
+
+%include '/infogrc/IGE_NEW/CREDITO_TRABALHADOR/codigos/1 - Gera Output Credito Trabalhador.sas';
+
+/* Calcular tempo de processamento total */
+%LET W_fim = %SYSFUNC(datetime());
+%LET W_dur = %SYSFUNC(intck(SECOND, &W_ini, &W_fim), tod8.);
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+    TYPE="text/html"
+    SUBJECT="Funil Crédito Trabalhador | Fim da atualização";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+/*PROC REPORT DATA=DATA_ATUALIZA nowd HEADLINE HEADSKIP*/
+/*style (report) = {background = none font_face = "Calibri" font_size = 9pt just=left OUTLINECOLOR = none}*/
+/*style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 9pt just=center OUTLINECOLOR = none}*/
+/*style (header) = {foreground = white font_face="Calibri" font_size = 9pt just=center background = #69c3cf OUTLINECOLOR = none} ;*/
+
+/*COLUMNS TpDados DtAtualizacao;*/
+
+/*RUN;*/
+PROC ODSTEXT;
+   p "Prezados,";
+   p "";
+   p "As bases do Funil Crédito Trabalhador foram atualizadas.";
+   p "A geração das bases demorou &W_dur. para ser concluída.";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+
+DATA LOGEXE;
+  IdProcesso = 'FNLCT';
+  LENGTH Processo $40.;
+  Processo = 'Funil Crédito Trabalhador';
+  FORMAT Inicio Final DATETIME18.;
+  Inicio = &W_ini.;
+  Final = &W_fim.;
+  Duracao = "&W_dur.";
+RUN;
+
+PROC APPEND DATA=LOGEXE BASE=IGELOG.LogExecucaoProcessos; RUN;

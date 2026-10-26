@@ -1,0 +1,162 @@
+START_METADATA
+PROJECT: Rodas__PainelEmprestimos
+FILE_SAS: 04 - TbProducaoEmprestimos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 82)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: HASH (1x | +70), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 107
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/BA/PROCESSOS/TMP/TBPRODUCAOEMPRESTIMOS.CSV [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /riscosbvf/BA/processos/tmp/TbProducaoEmprestimos.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.ASSINAT, WORK.HASH_MFS
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM], WORK.ASSINAT [PROC SQL - JOIN], WORK.HASH_MFS [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/tmp/TbProducaoEmprestimos.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBPRODUCAOEMPRESTIMOS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/tmp/TbProducaoEmprestimos.csv
+
+END_METADATA
+================================================================================
+proc sql;
+    create table TbProducaoEmprestimos as
+    select
+        t1.DtContrato format=DDMMYYS10. as DtContrato,
+        t1.DtEntradaProposta format=DDMMYYS10. as DtEntradaProposta,
+        t1.DtAtualizacao FORMAT=DDMMYYS10. AS DtAtualizacao,
+        t1.NmGrupoProdutoMeta,
+        t1.NuProposta format=BESTX32. as NuProposta,
+        t1.NuContrato format=BESTX32. as NuContrato,
+        t1.DsTipoCanalProducao,
+        t1.DsFilial,
+        t1.NmFilialC,
+        t3.TipoAssinatura,
+        t1.NmParceiroComercial,
+        t1.CdParceiroComercial,
+        t1.NmColaboradorC,
+        t1.CdPessoa,
+        t1.TpPessoa,
+        t3.genero,
+        t3.DsEstadoCivil,
+        t1.NuCpfCnpj,
+        t3.DsTipoProfissional,
+        t3.DsProfissao,
+        t3.dstiporesidencia,
+        t1.CdUfPessoa,
+        t1.NmCidadePessoa,
+        t1.QtAnosIdadePessoa,
+        t1.FxIdade,
+        t3.Renda format=COMMAX18.2 as Renda,
+        t1.QtParcelas format=COMMA6. as QtParcelas,
+        t3.QtDiasCarencia format=COMMA6. as QtDiasCarencia,
+        t1.QtSeguros format=COMMA6. as QtSeguros,
+        t1.VpSpreadRebate format=COMMAX18.2 as VpSpreadRebate,
+        t1.VrMargem format=COMMAX18.2 as VrMargem,
+        t1.VrProducao format=COMMAX18.2 as VrProducao,
+        t1.VrSeguros format=COMMAX18.2 as VrSeguros,
+        (t1.DtContrato - t1.DtEntradaProposta) as LeadTime,
+        case
+            when t1.TpPessoa = 'F' then 'Pessoa Física'
+            else 'Pessoa Jurídica'
+        end as TipoPessoa,
+        case
+            when t1.DtContrato ne 0 then '.'
+            else ''
+        end as Marcador,
+        case
+            when t1.QtParcelas <= 12 then 'Até 12x'
+            when t1.QtParcelas <= 24 then 'Até 24x'
+            when t1.QtParcelas <= 36 then 'Até 36x'
+            when t1.QtParcelas <= 48 then 'Até 48x'
+            when t1.QtParcelas <= 60 then 'Até 60x'
+            when t1.QtParcelas <= 72 then 'Até 72x'
+            when t1.QtParcelas <= 84 then 'Até 84x'
+            when t1.QtParcelas <= 96 then 'Até 96x'
+            else 'Mais de 96x'
+        end as FaixaParcelas,
+        case
+            when t3.QtDiasCarencia <= 30 then 'Até 30d'
+            when t3.QtDiasCarencia <= 60 then 'Até 60d'
+            when t3.QtDiasCarencia <= 90 then 'Até 90d'
+            when t3.QtDiasCarencia <= 120 then 'Até 120d'
+            else 'Mais de 120d'
+        end as Carência,
+        case
+            when t1.QtAnosIdadePessoa < 20 then '# Menos de 20 anos'
+            when t1.QtAnosIdadePessoa < 30 then '20 a 29 anos'
+            when t1.QtAnosIdadePessoa < 40 then '30 a 39 anos'
+            when t1.QtAnosIdadePessoa < 50 then '40 a 49 anos'
+            when t1.QtAnosIdadePessoa < 60 then '50 a 59 anos'
+            when t1.QtAnosIdadePessoa < 70 then '60 a 69 anos'
+            else '70 anos ou mais'
+        end as FaixaIdade,
+        case
+            when t3.Renda < 1321 then '1.Até 1 salário mínimo'
+            when t3.Renda < 2641 then '2.Até 2 salários mínimos'
+            when t3.Renda < 6601 then '3.Até 5 salários mínimos'
+            when t3.Renda < 13201 then '4.Até 10 salários mínimos'
+            when t3.Renda < 19801 then '5.Até 15 salários mínimos'
+            else '6.Mais de 15 salários mínimos'
+        end as FaixaSalarial,
+        case
+            when t1.NuContrato ne 0 then 1
+            else 0
+        end as QtContrato,
+        case
+            when t3.TipoAssinatura = 'Eletronica' then 1
+            else 0
+        end as FlAssEletronica
+    from
+        bases.tbproducao t1
+        left join work.hash_mfs t2 on (t1.NuProposta = t2.NuProposta)
+        left join work.assinat t3 on (t1.NuProposta = t3.NuProposta)
+/*        left join mesas.bu_nn t5 on (t1.NuProposta = t5.NuProposta)*/
+    where
+        t1.DtContrato >= '01JAN2024'd
+        and t1.NmGrupoProdutoMeta in ('Privado','CP','CP DESENROLA','Solar')
+    order by
+        t1.DtContrato desc;
+quit;
+
+filename exprt2 '/riscosbvf/BA/processos/tmp/TbProducaoEmprestimos.csv' encoding="utf-8";
+
+proc export
+data=TbProducaoEmprestimos
+outfile=exprt2 replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/TbProducaoEmprestimos.csv /riscosbvf/BA/processos/output/';

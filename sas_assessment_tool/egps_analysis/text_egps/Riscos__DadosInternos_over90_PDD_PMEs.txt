@@ -1,0 +1,376 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__DadosInternos_over90_PDD_PMEs
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:34 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (6x | +30)
+----------------------------------------
+LINES_OF_CODE: 263
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: AUX = /riscosbv/credito/PDD_RESULTADO/Auxiliar
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: anomes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUX.TBOPERACAOIFRS9_FINAL_&ANOMES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: AUX
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUX.TBOPERACAOIFRS9_FINAL_&ANOMES [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CLIENTE2_&ANOMES, CLIENTE_&ANOMES, FLAG_CIB, LISTAPEACCIB, LISTAPEACCIB_&ANOMES, MARCACIBIFPME, MARCACIBIFPME_&ANOMES, OVERPDD, OVERPDD_&ANOMES, PRECLIENTE_&ANOMES, RESULTADOPDD, TBOPERACAOIFRS9_FINAL2_&ANOMES, TBOPERACAOIFRS9_FINAL_&ANOMES
+DYNAMIC REFS (Ambiguous): AUX.TBOPERACAOIFRS9_FINAL_{ANOMES}
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Ajuste Tb Operacao IFRS9 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 64 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Ajuste Tb Operacao IFRS9 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-kvWZsX7pO4P3QWeh/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME AUX '/riscosbv/credito/PDD_RESULTADO/Auxiliar';
+
+%macro DataPMEsCerto(anomes);
+
+proc sql;
+create table listaPEACCIB_&anomes. as
+select distinct cdClienteRisco
+from aux.tboperacaoifrs9_final_&anomes. (where=(DsModeloRating in ('PME','PME2') and DsModalidadeCatalogoProduto='CCB PEAC'));
+quit;
+
+%mend;
+%DataPMEsCerto(202401);
+%DataPMEsCerto(202402);
+%DataPMEsCerto(202403);
+%DataPMEsCerto(202404);
+%DataPMEsCerto(202405);
+%DataPMEsCerto(202406);
+%DataPMEsCerto(202407);
+%DataPMEsCerto(202408);
+%DataPMEsCerto(202409);
+%DataPMEsCerto(202410);
+%DataPMEsCerto(202411);
+%DataPMEsCerto(202412);
+
+data listaPEACCIB;
+set listaPEACCIB_:;
+run;
+
+proc sql;
+create table listaPEACCIB as
+select distinct *
+from listaPEACCIB;
+quit;
+
+%macro teste(anomes);
+
+proc sql;
+create table flag_cib as
+select a.*,
+(case when missing(b.cdClienteRisco) then 0 else 1 end) as flag_PEAC_PME
+from aux.tboperacaoifrs9_final_&anomes. (where=(not missing(AAFechamento))) as a
+left join listaPEACCIB as b
+on a.cdClienteRisco=b.cdClienteRisco;
+quit;
+
+data tboperacaoifrs9_final_&anomes.;
+set flag_cib;
+format Modelo $20.;
+if DsModeloRating="" then Modelo="Missing";
+if DsModeloRating='2018' then Modelo = 'CIB';
+if DsModeloRating='AtribManual' then Modelo = 'Atribuicao Manual';
+if DsModeloRating='Atribuicao Manual' then Modelo = 'Atribuicao Manual';
+if DsModeloRating='CIB' then Modelo = 'CIB';
+if DsModeloRating='CORE' then Modelo = 'CIB';
+if DsModeloRating='CORE_2018' then Modelo = 'CIB';
+if DsModeloRating='Corp' then Modelo = 'CIB';
+if DsModeloRating='CorpLarge' then Modelo = 'CIB';
+if DsModeloRating='Default' then Modelo = 'Default';
+if DsModeloRating='Financiamentos de Projetos' then Modelo = 'ProjectFinance';
+if DsModeloRating='IF' then Modelo = 'IF';
+if DsModeloRating='IF_2021' then Modelo = 'IF';
+if DsModeloRating='InstFinanceira' then Modelo = 'IF';
+if DsModeloRating='Instituicoes Financeiras' then Modelo = 'IF';
+if DsModeloRating='Middle' then Modelo = 'NCORE';
+if DsModeloRating='Middle I - Middle 10M a 20M' then Modelo = 'NCORE';
+if DsModeloRating='Middle II - Fat. 20M a 30M' then Modelo = 'NCORE';
+if DsModeloRating='Middle III - Fat. 30M a 50M' then Modelo = 'NCORE';
+if DsModeloRating='Middle IV - Fat. 50M a 100M' then Modelo = 'NCORE';
+if DsModeloRating='Middle IV - Fat. 50M a 100M - Corporate' then Modelo = 'NCORE';
+if DsModeloRating='Middle V - Fat. 100M a 200M' then Modelo = 'NCORE';
+if DsModeloRating='Middle V - Fat. 100M a 200M - Corporate' then Modelo = 'NCORE';
+if DsModeloRating='NCORE' then Modelo = 'NCORE';
+if DsModeloRating='Novo Modelo - Fat. 200M a 700M' then Modelo = 'NCORE';
+if DsModeloRating='PF' then Modelo = 'PF';
+if DsModeloRating='PFPrivate' then Modelo = 'PF';
+if DsModeloRating='PFRural_2019' then Modelo = 'PF';
+if DsModeloRating='PME' then Modelo = 'PME';
+if DsModeloRating='PME2' then Modelo = 'PME';
+if DsModeloRating='Pessoa Fisica' then Modelo = 'PF';
+if DsModeloRating='ProjectFinance' then Modelo = 'ProjectFinance';
+if DsModeloRating='ProjectFinance2019' then Modelo = 'ProjectFinance';
+if DsModeloRating='ProjectFinance_2019' then Modelo = 'ProjectFinance';
+if DsModeloRating='Rating Default' then Modelo = 'Default';
+if DsModeloRating='null' then Modelo = 'Missing';
+if missing(DsModeloRating) then Modelo="Missing";
+
+if DsModalidadeCatalogoProduto= 'CCB PEAC' then  Modelo = 'PME';
+if DsModalidadeCatalogoProduto=: 'CESSÃO DE PORT' then  Modelo = 'PME';
+if DsModalidadeCatalogoProduto=: 'CESSAO DE PORT' then  Modelo = 'PME';
+if DsModalidadeCatalogoProduto=: 'Cessão de Port' then  Modelo = 'PME';
+if DsModalidadeCatalogoProduto=: 'Cessao de Port' then  Modelo = 'PME';
+
+if flag_PEAC_PME=1 then Modelo = 'CIB';
+
+if NmGrupoEconomico=: 'PEAC' then Modelo = 'PME';
+if NmGrupoEconomico=: 'Sacado' then Modelo = 'PME';
+
+
+
+run;
+
+proc sql;
+create table marcaCIBIFPME_&anomes. as
+select distinct cdClienteRisco,
+Modelo
+from tboperacaoifrs9_final_&anomes.
+group by 1,2;
+quit;
+
+%mend;
+
+%teste(202401);
+%teste(202402);
+%teste(202403);
+%teste(202404);
+%teste(202405);
+%teste(202406);
+%teste(202407);
+%teste(202408);
+%teste(202409);
+%teste(202410);
+%teste(202411);
+%teste(202412);
+
+data  marcaCIBIFPME;
+set  marcaCIBIFPME_:;
+run;
+
+proc sql;
+create table marcaCIBIFPME as
+select distinct *
+from marcaCIBIFPME (where=(not missing(cdClienteRisco)));
+quit;
+
+%macro teste(anomes);
+
+proc sql;
+create table precliente_&anomes. as
+select cdClienteRisco,
+max(BUCKET_FINAL) as BUCKET_FINAL,
+max(PcPD) as PcPD
+from aux.tboperacaoifrs9_final_&anomes. (where=(not missing(AAFechamento)))
+group by 1;
+quit;
+
+%mend;
+
+%teste(202401);
+%teste(202402);
+%teste(202403);
+%teste(202404);
+%teste(202405);
+%teste(202406);
+%teste(202407);
+%teste(202408);
+%teste(202409);
+%teste(202410);
+%teste(202411);
+%teste(202412);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%macro teste(anomes);
+
+proc sql;
+create table tboperacaoifrs9_final2_&anomes. as
+select *,
+b.Modelo as ModeloIF,
+c.Modelo as ModeloPME,
+d.Modelo as ModeloCIB,
+
+(case when a.Modelo = 'Missing' then
+
+(case when &anomes.<202001 then coalescec(b.Modelo,d.Modelo,a.Modelo)
+		else coalescec(c.Modelo,b.Modelo,d.Modelo,a.Modelo) end)
+
+else a.Modelo end) as Modelo2
+
+from tboperacaoifrs9_final_&anomes. as a
+left join (select distinct * from marcaCIBIFPME where Modelo='IF') as b
+on a.cdClienteRisco=b.cdClienteRisco
+left join (select distinct * from marcaCIBIFPME where Modelo='PME') as c
+on a.cdClienteRisco=c.cdClienteRisco
+left join (select distinct * from marcaCIBIFPME where Modelo='CIB') as d
+on a.cdClienteRisco=d.cdClienteRisco;
+quit;
+
+proc sql;
+create table cliente_&anomes. as
+select cdClienteRisco,
+Modelo2,
+max(BUCKET_FINAL) as BUCKET_FINAL,
+max(PcPd) as PcPd,
+sum(Vl_PE) as Vl_PE,
+sum(Vl_EAD) as Vl_EAD,
+sum(PROVISAO_BRGAAP) as Vl_PDD,
+max(QtDiaVencido) as DiasVencidos
+from tboperacaoifrs9_final2_&anomes.
+group by 1,2;
+quit;
+
+%mend;
+
+%teste(202401);
+%teste(202402);
+%teste(202403);
+%teste(202404);
+%teste(202405);
+%teste(202406);
+%teste(202407);
+%teste(202408);
+%teste(202409);
+%teste(202410);
+%teste(202411);
+%teste(202412);
+
+%macro ajuste_numero(anomes);
+
+data cliente_&anomes. (drop=DiasVencidos rename=DiasVencidos2=DiasVencidos);
+set cliente_&anomes.;
+DiasVencidos2=input(DiasVencidos,16.);
+run;
+
+proc sql;
+create table cliente2_&anomes. as
+select &anomes. as anomes,
+sum(Vl_EAD) as Carteira,
+sum(Vl_PDD) as PDD
+from cliente_&anomes. (where=(Modelo2='PME'));
+quit;
+
+%mend;
+
+%ajuste_numero(202401);
+%ajuste_numero(202402);
+%ajuste_numero(202403);
+%ajuste_numero(202404);
+%ajuste_numero(202405);
+%ajuste_numero(202406);
+%ajuste_numero(202407);
+%ajuste_numero(202408);
+%ajuste_numero(202409);
+%ajuste_numero(202410);
+%ajuste_numero(202411);
+%ajuste_numero(202412);
+
+data resultadoPDD;
+set cliente2_:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Ajuste Tb Operacao IFRS9 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. PD Cliente */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 64 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. PD Cliente */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-JcIpndmYbqtiGUSB/code.sas */
+/* =========================INÍCIO TASK========================= */
+%macro teste(anomes);
+
+proc sql;
+create table overPDD_&anomes. as
+select
+&anomes. as anomes,
+sum(Vl_EAD) as Vl_EAD,
+sum(Vl_PDD) as sumPDD,
+sum(case when DiasVencidos>90 then Vl_EAD else 0 end) as Over90_Sld,
+sum(case when DiasVencidos>90 then 1 else 0 end)/count(*) as Over90_Qtd
+from cliente_&anomes. (where=(Modelo2='PME'))
+group by 1;
+run;
+
+%mend;
+
+%teste(202401);
+%teste(202402);
+%teste(202403);
+%teste(202404);
+%teste(202405);
+%teste(202406);
+%teste(202407);
+%teste(202408);
+%teste(202409);
+%teste(202410);
+%teste(202411);
+%teste(202412);
+
+data overPDD;
+set overPDD_:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. PD Cliente */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

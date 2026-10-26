@@ -1,0 +1,399 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - Histórico Gravames B3 Analítico
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (6x | +120)
+----------------------------------------
+LINES_OF_CODE: 297
+CODE_TASKS_COUNT: 6
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /infogrc/utils/chassis.sas, /infogrc/utils/verifica/verifica-tbgravames.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /INFOGRC/UTILS/CHASSIS.SAS [SAS/Local], /INFOGRC/UTILS/VERIFICA/VERIFICA-TBGRAVAMES.SAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], DWBI_DTWH.TBAGENTEMIS [DBCON], DWBI_DTWH.TBGRAVAME [DBCON], DWBI_DTWH.TBGRAVAMEPANORAMA [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.GRAVAMEMES, WORK.TBAGENTE, WORK.TBGRAVAME, WORK.TBPRODUCAO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /infogrc/utils/chassis.sas, /infogrc/utils/verifica/verifica-tbgravames.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.GRAVAMEMES, WORK.TBAGENTE, WORK.TBGRAVAME, WORK.TBPRODUCAO
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM], DWBI_DTWH.TBAGENTEMIS [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBGRAVAME [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBGRAVAMEPANORAMA [Pass-Through Native (DBCON) - FROM], WORK.GRAVAMEMES [PROC SQL - FROM], WORK.TBAGENTE [PROC SQL - JOIN], WORK.TBGRAVAME [PROC SQL - FROM], WORK.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): /infogrc/utils/all-includes.sas, /infogrc/utils/chassis.sas, /infogrc/utils/verifica/verifica-tbgravames.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: GRAVAMEMES, TBAGENTE, TBGRAVAME, TBGRAVAME2, TBPRODUCAO, VALIDAMUNICIPIO, WORK.TBMIXGRAVAME
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET W_ini=%SYSFUNC(datetime());
+
+[[ FILE_REFS_MACRO ]]
+IN|/infogrc/utils/all-includes.sas|/INFOGRC/UTILS|ALL-INCLUDES.SAS||ok
+IN|/infogrc/utils/chassis.sas|/INFOGRC/UTILS|CHASSIS.SAS||ok
+IN|/infogrc/utils/verifica/verifica-tbgravames.sas|/INFOGRC/UTILS/VERIFICA|VERIFICA-TBGRAVAMES.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Histórico até 202407 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Histórico até 202407 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-fr7rdfIfS8ARlBSf/code.sas */
+/* =========================INÍCIO TASK========================= */
+option compress = binary;
+%include '/infogrc/utils/all-includes.sas';
+%include '/infogrc/utils/chassis.sas';
+%include '/infogrc/utils/verifica/verifica-tbgravames.sas';
+%PUT #!# INICIO ext_resultadomarketshare.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+
+
+
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE ValidaMunicipio AS
+SELECT * FROM connection to dbcon
+(
+select distinct nmarquivo
+FROM DWBI_DTWH.TbGravame
+)
+;quit;
+
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE GravameMes AS
+SELECT * FROM connection to dbcon
+(
+select *
+FROM DWBI_DTWH.TbGravame
+where nmarquivo in ('C4774.SR131.BV_M012024',
+'C4774.SR131.BV_M022024',
+'C4774.SR131.BV_M032024',
+'C4774.SR131.BV_M042024',
+'C4774.SR131.BV_M052024',
+'C4774.SR131.BV_M062024',
+'C4774.SR131.BV_M072024')
+		  AND NmStatusGravame IN (1,2)
+          AND TpVeiculo IN (1,2,3,4,5)
+)
+;quit;
+
+
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbAgente AS
+SELECT * FROM connection to dbcon
+(
+select *
+FROM DWBI_DTWH.TbAgenteMIS
+)
+;quit;
+
+PROC SQL;
+CREATE TABLE TbGravame AS
+SELECT
+GravameMes.*,
+CASE WHEN GravameMes.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameMes.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameMes.TpVeiculo = 5 THEN 'Pesados'
+				END AS Produto,
+
+CASE WHEN GravameMes.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END AS Estado_Bem,
+MIS.NmSubgrupoAgenteMis
+
+FROM WORK.GRAVAMEMES AS GravameMes
+LEFT JOIN WORK.TbAgente AS MIS
+ON GravameMes.nucnpjagente = MIS.NuCNPJAgente
+WHERE MIS.TpAgenteProdutoMIS IN ('1','2')
+;QUIT;
+
+
+
+PROC SQL;
+CREATE TABLE TbGravame2 AS
+SELECT
+
+nmarquivo,
+Produto,
+Estado_Bem,
+NmSubgrupoAgenteMis,
+count(*) AS QtGravames
+
+FROM WORK.TbGravame
+GROUP BY 1,2,3,4
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Histórico até 202407 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Histórico a partir 202408 */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Histórico a partir 202408 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-VFCtpfDTkfLQV8ks/code.sas */
+/* =========================INÍCIO TASK========================= */
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE ValidaMunicipio AS
+SELECT * FROM connection to dbcon
+(
+select distinct nmarquivo
+FROM DWBI_DTWH.TbGravamepanorama
+)
+;quit;
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE GravameMes AS
+SELECT * FROM connection to dbcon
+(
+select *
+FROM DWBI_DTWH.TbGravamepanorama
+where nmarquivo in ('C0004.PPE.M.20250201183246.062723000.txt',
+'C0004.PPE.M.20250301032439.777939000.txt',
+'C0004.PPE.M.20250401015844.500629000.txt',
+'C0004.PPE.M.20250501043006.964618000.txt',
+'C0004.PPE.M.20250601014725.357282000.txt',
+'C0004.PPE.M.20250701031251.985992000.txt',
+'C0004.PPE.M.20250801032125.670444000.txt',
+'C0004.PPE.M.20250901031916.984567000.txt'
+))
+;quit;
+
+
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbAgente AS
+SELECT * FROM connection to dbcon
+(
+select *
+FROM DWBI_DTWH.TbAgenteMIS
+)
+;quit;
+
+PROC SQL;
+CREATE TABLE TbGravame AS
+SELECT
+
+GravameMes.nmarquivo,
+GravameMes.NuContrato AS NuGravame,
+GravameMes.DtContrato,
+GravameMes.DtRegistroGravame,
+GravameMes.FlCVG,
+TbAgente.NmAgenteMIS,
+TbAgente.NmSubgrupoAgenteMis,
+TbAgente.TpAgenteProdutoMIS,
+
+CASE WHEN GravameMes.TpVeiculo IN ('AUTOMOVEL','CAMIONETA','CAMINHONETE','UTILITARIO') THEN 'Leves'
+                  WHEN GravameMes.TpVeiculo IN ('CICLOMOTOR','MOTONETA','MOTOCICLETA','TRICICLO','QUADRICICLO') THEN 'Motos'
+                  WHEN GravameMes.TpVeiculo IN ('CHASSI/PLATAFORMA','TRATOR DE RODAS','CAMINHAO','MICROONIBUS','ONIBUS','REBOQUE','SEMI-REBOQUE','CAMINHAO TRATOR') THEN 'Pesados'
+                  END AS TpVeiculo,
+
+CASE WHEN GravameMes.CdStatusVeiculo = 'N' THEN 'Novos'
+                  WHEN GravameMes.CdStatusVeiculo = 'U' THEN 'Usados'
+                  ELSE 'Indefinido' END AS StVeiculo
+
+FROM WORK.GRAVAMEMES AS GravameMes
+LEFT JOIN WORK.TBAGENTE AS TbAgente ON (INPUT(GravameMes.NuCNPJAgenteFinanceiro,14.) = TbAgente.NuCNPJAgente)
+
+WHERE CdStatusGravame <> 'B'  AND TbAgente.TpAgenteProdutoMIS <> '3' 
+AND GravameMes.TpVeiculo IN ('AUTOMOVEL','CAMIONETA','CAMINHONETE','UTILITARIO') 
+AND GravameMes.CdStatusVeiculo = 'U'   AND TbAgente.NmSubgrupoAgenteMis = 'BV'
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE TbProducao AS
+SELECT *
+FROM BASES.TBPRODUCAO
+WHERE 
+NmGrupoProdutoMeta IN ('Leves', 'Leves-BVO', 'Motos', 'Pesados', 'CVG Leves', 'CVG Pesados')
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Histórico a partir 202408 */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Join Produção */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Join Produção */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-6DcuOd6KOiDJacAw/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.TbMixGravame AS
+   SELECT t1.NmArquivo,
+          t1.NuGravame,
+          t1.DtContrato,
+          t1.DtRegistroGravame,
+          t1.FlCVG,
+          t1.NmAgenteMIS,
+          t1.NmSubgrupoAgenteMis,
+          t1.TpAgenteProdutoMIS,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t2.NuAnoMes,
+          t2.NuProposta,
+          t2.NuContrato,
+          t2.DtEntradaProposta,
+          t2.DtContrato AS DtContrato1,
+          t2.NmGrupoProdutoMeta,
+          t2.FxIdade,
+          t2.VrProducao
+      FROM WORK.TBGRAVAME t1
+           LEFT JOIN WORK.TBPRODUCAO t2 ON (INPUT(t1.NuGravame, 20.) = t2.NuProposta);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Join Produção */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+option compress = binary;
+%include '/infogrc/utils/all-includes.sas';
+%include '/infogrc/utils/chassis.sas';
+%include '/infogrc/utils/verifica/verifica-tbgravames.sas';
+%PUT #!# INICIO ext_resultadomarketshare.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbGravame AS
+SELECT
+
+GravameMes.nmarquivo,
+GravameMes.NuContrato AS NuGravame,
+GravameMes.DtContrato,
+GravameMes.DtRegistroGravame,
+GravameMes.FlCVG,
+TbAgente.NmAgenteMIS,
+TbAgente.NmSubgrupoAgenteMis,
+TbAgente.TpAgenteProdutoMIS,
+
+CASE WHEN GravameMes.TpVeiculo IN ('AUTOMOVEL','CAMIONETA','CAMINHONETE','UTILITARIO') THEN 'Leves'
+                  WHEN GravameMes.TpVeiculo IN ('CICLOMOTOR','MOTONETA','MOTOCICLETA','TRICICLO','QUADRICICLO') THEN 'Motos'
+                  WHEN GravameMes.TpVeiculo IN ('CHASSI/PLATAFORMA','TRATOR DE RODAS','CAMINHAO','MICROONIBUS','ONIBUS','REBOQUE','SEMI-REBOQUE','CAMINHAO TRATOR') THEN 'Pesados'
+                  END AS TpVeiculo,
+
+CASE WHEN GravameMes.CdStatusVeiculo = 'N' THEN 'Novos'
+                  WHEN GravameMes.CdStatusVeiculo = 'U' THEN 'Usados'
+                  ELSE 'Indefinido' END AS StVeiculo
+
+FROM WORK.GRAVAMEMES AS GravameMes
+LEFT JOIN WORK.TBAGENTE AS TbAgente ON (INPUT(GravameMes.NuCNPJAgenteFinanceiro,14.) = TbAgente.NuCNPJAgente)
+
+WHERE CdStatusGravame <> 'B'  AND TbAgente.TpAgenteProdutoMIS <> '3' 
+AND GravameMes.TpVeiculo IN ('AUTOMOVEL','CAMIONETA','CAMINHONETE','UTILITARIO') 
+AND GravameMes.CdStatusVeiculo = 'U'   AND TbAgente.NmSubgrupoAgenteMis = 'BV'
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBGRAVAME_0000 AS
+   SELECT t1.NmArquivo,
+          t1.NuGravame,
+          t1.DtContrato,
+          t1.DtRegistroGravame,
+          t1.FlCVG,
+          t1.NmAgenteMIS,
+          t1.NmSubgrupoAgenteMis,
+          t1.TpAgenteProdutoMIS,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t2.NuAnoMes,
+          t2.NuProposta,
+          t2.NuContrato,
+          t2.DtEntradaProposta,
+          t2.DtContrato AS DtContrato1,
+          t2.NmGrupoProdutoMeta,
+          t2.FxIdade,
+          t2.VrProducao
+      FROM WORK.TBGRAVAME t1
+           LEFT JOIN WORK.TBPRODUCAO t2 ON (INPUT(t1.NuGravame, 20.) = t2.NuProposta);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */

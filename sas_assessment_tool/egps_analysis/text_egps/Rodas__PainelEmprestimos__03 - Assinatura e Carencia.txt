@@ -1,0 +1,158 @@
+START_METADATA
+PROJECT: Rodas__PainelEmprestimos
+FILE_SAS: 03 - Assinatura e Carencia.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 101
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: IQPassword, IQUser
+DETECTED_MACROS_USED: IQPassword, IQUser
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CPC.TBCONTRATO [SYBASEIQ], DBA.TBPARCEIROCOMERCIAL [SYBASEIQ], DBA.TBPESSOA [SYBASEIQ], DBA.TBPESSOAFISICASOBANALISE [SYBASEIQ], DBA.TBPESSOASOBANALISE [SYBASEIQ], DBA.TBPESSOASOBANALISETIPOTELEFONE [SYBASEIQ], DBA.TBPROFISSAO [SYBASEIQ], DBA.TBPROPOSTA [SYBASEIQ], DBA.TBPROPOSTACOMPLEMENTO [SYBASEIQ], DBCOR.TBEMPRESACONVENIADA [SYBASEIQ], DBCOR.TBPARCEIROCOMERCIALCOLABORADOR [SYBASEIQ], DBCRED.TBPROPOSTACONSIGNADO [SYBASEIQ]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): CPC.TBCONTRATO [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPARCEIROCOMERCIAL [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPESSOA [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPESSOAFISICASOBANALISE [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPESSOASOBANALISE [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPESSOASOBANALISETIPOTELEFONE [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPROFISSAO [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (SYBASEIQ) - FROM], DBA.TBPROPOSTACOMPLEMENTO [Pass-Through Native (SYBASEIQ) - JOIN], DBCOR.TBEMPRESACONVENIADA [Pass-Through Native (SYBASEIQ) - FROM], DBCOR.TBPARCEIROCOMERCIALCOLABORADOR [Pass-Through Native (SYBASEIQ) - JOIN], DBCRED.TBPROPOSTACONSIGNADO [Pass-Through Native (SYBASEIQ) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: WORK.ASSINAT
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*-------- Consulta Ass. Eletrônica no PTASYBCTR --------*/
+%let IQUser = lgettbasasm;
+%let IQPassword = {SAS002}2CA25D1B221200514F0483281B352D1E21E9EC37458D4F7F;
+
+proc sql;
+	connect to sybaseiq as
+
+		dbcon (host='pta-iqprd01' server=ptaiqprd user="&IQUser." password="&IQPassword.");/**/
+	create table work.ASSINAT as
+		select
+			*
+		from connection to dbcon
+(
+
+ SELECT
+    CAST(proposta.Dtentradaproposta AS DATE) AS dtentradaproposta,
+     proposta.nuproposta,
+     Proposta.QtDiasCarencia,
+       CASE
+        WHEN PropostaComplemento.CdTipoMeioVenda = 10 THEN 'Eletronica'
+        WHEN PropostaComplemento.CdTipoMeioVenda = 0 THEN 'Convencional'
+        ELSE 'N/I'
+    END AS TipoAssinatura,
+    tbpessoafisica.CdSexo AS Genero,
+    CASE
+        WHEN tbpessoafisica.CdTipoResidencia = 1 THEN 'PROPRIO'
+        WHEN tbpessoafisica.CdTipoResidencia = 2 THEN 'FAMILIAR'
+        WHEN tbpessoafisica.CdTipoResidencia = 3 THEN 'ALUGADO'
+        WHEN tbpessoafisica.CdTipoResidencia = 4 THEN 'NÃO INFORMADO'
+        WHEN tbpessoafisica.CdTipoResidencia = 5 THEN 'PROPRIO FINANCIADO'
+        WHEN tbpessoafisica.CdTipoResidencia = 6 THEN 'FUNCIONAL'
+        WHEN tbpessoafisica.CdTipoResidencia = 7 THEN 'OUTROS'
+        WHEN tbpessoafisica.CdTipoResidencia = 8 THEN 'CEDIDO'
+    END AS DsTipoResidencia,
+
+    CASE
+        WHEN tbpessoafisica.CdTipoProfissional = 0 then 'NAO DEFINIDO'
+WHEN tbpessoafisica.CdTipoProfissional = 1 then  'ASSALARIADO'
+WHEN tbpessoafisica.CdTipoProfissional = 2 then  'EMPRESARIO'
+WHEN tbpessoafisica.CdTipoProfissional = 3 then  'AUTONOMO'
+WHEN tbpessoafisica.CdTipoProfissional = 4 then  'LIBERAL'
+WHEN tbpessoafisica.CdTipoProfissional = 5 then  'OUTROS'
+WHEN tbpessoafisica.CdTipoProfissional = 6 then  'FUNCIONARIO PUBLICO'
+WHEN tbpessoafisica.CdTipoProfissional = 7 then  'APOSENTADO OU PENSIONISTA'
+WHEN tbpessoafisica.CdTipoProfissional = 8 then  'INVESTIDOR'
+    END as DsTipoProfissional,
+    PROF.DsProfissao,
+     CASE
+        WHEN CdEstadoCivil = 1 then 'DESQUITADO'
+WHEN CdEstadoCivil = 2 then 'DIVORCIADO'
+WHEN CdEstadoCivil = 3 then 'SEPARADO'
+WHEN CdEstadoCivil = 4 then 'SOLTEIRO'
+WHEN CdEstadoCivil = 5 then 'CASADO'
+WHEN CdEstadoCivil = 6 then 'VIUVO'
+WHEN CdEstadoCivil = 7 then 'OUTROS'
+    END AS DsEstadoCivil,
+    tbpessoafisica.VrTotalReceitas AS Renda
+
+FROM
+    DBA.TbProposta Proposta
+LEFT JOIN DBA.TbPessoaSobAnalise Pessoasobanalise
+    ON Proposta.NuProposta = Pessoasobanalise.NuProposta
+
+LEFT JOIN DBA.TbPessoaFisicaSobAnalise tbpessoafisica
+    ON PessoaSobAnalise.CdPessoaSobAnalise = tbpessoafisica.CdPessoaSobAnalise
+        JOIN DBA.TbProfissao PROF
+    ON  PROF.CDPROFISSAO = tbpessoafisica.CDPROFISSAO
+LEFT JOIN DBA.TbPessoaSobAnaliseTipoTelefone TelRes
+    ON TelRes.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise
+    AND TelRes.CdTipoTelefone = 1
+LEFT JOIN DBA.TbPessoaSobAnaliseTipoTelefone TelCom
+    ON TelCom.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise
+    AND TelCom.CdTipoTelefone = 2
+LEFT JOIN DBA.TbPessoaSobAnaliseTipoTelefone TelCel
+    ON TelCel.CdPessoaSobAnalise = Pessoasobanalise.CdPessoaSobAnalise
+    AND TelCel.CdTipoTelefone = 3
+LEFT JOIN CPC.TbContrato TbContrato
+    ON Proposta.NuContratoGestao = TbContrato.NuContrato
+LEFT JOIN DBA.TbPropostaComplemento PropostaComplemento
+    ON PropostaComplemento.NuProposta = Proposta.NuProposta
+LEFT JOIN DBA.TbParceiroComercial Parceiropessoa
+    ON Parceiropessoa.CdParceiroComercial = Proposta.CdPessoa
+LEFT JOIN DBA.TbParceiroComercial Parceirocom
+    ON Parceirocom.CdParceiroComercial = Proposta.CdLoja
+LEFT JOIN DBA.TbParceiroComercial Coban
+    ON Coban.CdParceiroComercial = Proposta.CdPessoa
+LEFT JOIN DBA.TbPessoa Pessoa
+    ON Pessoa.CdPessoa = Parceiropessoa.CdPessoa
+LEFT JOIN DBA.TbPessoa PessoaConvenio
+    ON PessoaConvenio.CdPessoa = Parceirocom.CdPessoa
+LEFT JOIN DBCRED.TbPropostaConsignado Tbsimu
+    ON Tbsimu.NuProposta = Proposta.NuProposta
+LEFT JOIN DBCOR.TbParceiroComercialColaborador ParceiroColab
+    ON Parceirocom.CdParceiroComercial = ParceiroColab.CdParceiroComercial
+LEFT JOIN (
+    SELECT *
+    FROM DBCOR.TbEmpresaConveniada
+    WHERE FlAverbacaoAutomatica = 'N'
+      AND FlPermiteAverbacaoSite = 'S'
+) conveniada
+    ON conveniada.CdLoja = Parceirocom.CdParceiroComercial
+WHERE
+    Proposta.CdSubProduto IN (12,18,22,23,24,25,26,70)
+/*,19,20,75, 100, 8, 13, 59, 60, 63, 62, 38, 54,55, 56, 93, 67, 68, 71, 73, 72, 77, 82, 86, 85, 87, 88, 89, 96, 98, 97, 101*/
+    AND CAST(Proposta.Dtentradaproposta AS DATE) >= '2024-01-01'
+);
+QUIT;

@@ -1,0 +1,101 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_OKRs_tribo
+FILE_SAS: 3 - Gera output csat loja.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 42
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv, nuanomes
+DETECTED_MACROS_USED: dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.CONSOLIDADO_CSAT_LOJISTA
+TABLE_READ_PROVENANCE (Flow): WORK.CONSOLIDADO_CSAT_LOJISTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./Rodas_BaseOKR_CSAT_LOJISTA.csv
+TEMP/DISCARDED OUTPUTS: WORK.OKR_CSAT_LOJISTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	3 - Gera output okr csat loja.sas					| */
+/* | Descricao: Programa para gerar output do okr csat loja.				| */
+/* | 		Arquvio enviado por Larissa Borghi					| */
+/* | Objetivo: Apuração do Dash OKRs Tribo Rodas					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+%let nuanomes = (YEAR(TODAY())-1)*100+1;
+
+/* ======================================================================================*/
+/* =====================Gera output okr csat loja=========================*/
+/* ======================================================================================*/
+options datestyle=dmy;
+
+PROC SQL;
+   CREATE TABLE WORK.OKR_CSAT_LOJISTA AS
+   SELECT
+   		  datepart('Date Submitted'n) as DtSubmit format=ddmmyy10.,
+		  year(datepart('Date Submitted'n))*100+month(datepart('Date Submitted'n)) as Anomes,
+          'User'n,
+           'Qual Ã© a sua satisfaÃ§Ã£o em re'n as NotaSatisfacao,
+		 	case
+				when 'Qual Ã© a sua satisfaÃ§Ã£o em re'n = 5 then 'Ótimo'
+        		when 'Qual Ã© a sua satisfaÃ§Ã£o em re'n = 4 then 'Bom'
+				when 'Qual Ã© a sua satisfaÃ§Ã£o em re'n = 3 then 'Regular'
+				when 'Qual Ã© a sua satisfaÃ§Ã£o em re'n = 2 then 'Ruim'
+				when 'Qual Ã© a sua satisfaÃ§Ã£o em re'n = 1 then 'Péssimo'
+			end as NotaQualiSatisfacao
+      FROM WORK.CONSOLIDADO_CSAT_LOJISTA;
+QUIT;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+	DATA= OKR_CSAT_LOJISTA
+	FILE="&dir_csv./Rodas_BaseOKR_CSAT_LOJISTA.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

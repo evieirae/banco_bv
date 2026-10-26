@@ -1,0 +1,202 @@
+START_METADATA
+PROJECT: Rodas__FunilFI
+FILE_SAS: FI.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 133
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.FI_LOJA [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], CONVSIMU.TBSIMULACOES [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): BASES.FI_LOJA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.FI_LOJA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: FI_LOJA_SUMARIZADA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+PROC SQL;
+   CREATE TABLE BASES.FI_LOJA AS
+/*   CREATE TABLE FI_LOJA AS */
+
+   SELECT DISTINCT
+          MAX(t1.DtAtualizacao) FORMAT=DDMMYYS10. AS DtAtualizacao,
+          t1.NuAnoMes AS NuAnoMes,
+          t1.Produto AS Produto,
+		  t1.NuProposta,
+          t2.NuCnpjLoja,
+          PUT(t2.CdParceiroComercial, 12.) || '-' || t2.NmParceiroComercial AS NmParceiroComercial,
+          t2.CdParceiroComercial,
+          t2.NmColaboradorC,
+          t2.NmFilialC,
+          t2.NmSubEstruturaComercialC,
+          t2.NmAreaEstruturaComercialC,
+          t2.NmCanalEstruturaComercialC,
+          t2.DsLoginN1C,
+          t2.DsLoginN2C,
+          t2.DsLoginN3C,
+          t2.LstSubstituicaoC,
+          t1.TpPessoa AS TpPessoa,
+          t1.FlPap,
+          t1.FxIdade AS FxIdadeBem,
+
+          CASE
+            WHEN t1.CdSimulacaoInicial ne 0 then 1
+            else 0
+          end AS Qtd_PreAnalise,
+
+          CASE
+            WHEN t1.CdSimulacaoInicial ne 0 then 1
+            else 0
+          end - t1.FlCard AS Qtd_ParouPreAna,
+
+          t1.FlCard AS Qtd_Cards,
+          t1.FlPropostaOriginada AS Qtd_Propostas,
+          t1.FlPropostaAprovada AS Qtd_Aprovadas,
+          t1.FlPropostaPaga AS Qtd_Pagas,
+          t1.VrProducao FORMAT=COMMAX18.2 AS VrProducao,
+          t1.SistemaInicial AS SistemaInicial,
+          CASE
+
+			WHEN t1.SistemaInicial IN
+				('ESCALE')
+					THEN 'ESCALE'
+
+			WHEN t1.SistemaInicial IN
+				('AVONALE')
+					THEN 'AVONALE'
+
+			WHEN t1.SistemaInicial IN
+			('FI Brasil')
+					THEN 'FI Brasil'
+
+/*			WHEN t1.NuAnoMes < 202509 and t1.CdParceiroComercial IN */
+/*				(	421482, 408808, 408929, 408932, 409450, 409455, 409974, 410068, 391865, */
+/*					391868, 391869, 391850, 392411, 392414, 392416, 396541, 396539, 396794, */
+/*					398705, 398707, 398709, 398717, 398979, 398980, 398982, 398983, 398985, */
+/*					398987, 350852, 263866, 399016, 392511, 401250, 410313, 410311, 404268, */
+/*					405974, 405975, 411495, 411498, 411500, 411503, 424084, 424097, 424099, */
+/*					412944, 412939, 412945, 413606, 413044, 413765, 415621, 415624, 415626, */
+/*					415629, 415630, 415631, 415632, 415636, 433418, 433423, 433425, 433426, */
+/*					433481, 421074, 421075, 421076, 423832, 435041, 442102, 441806, 442103, */
+/*					442258, 442265, 442269, 378746, 378749, 378750, 378752, 378701, 378704, */
+/*					378706, 378708, 378709, 378712, 378713, 378714, 378715, 378716, 378718, */
+/*					378719, 378720, 378722, 378723, 378724, 378727, 378728, 378729, 378731, */
+/*					378732, 378734, 378581, 378582, 378584, 378586, 378587, 378589, 378590, */
+/*					378591, 378592, 378593, 378594, 378595, 378599, 378601, 378602, 378596, */
+/*					378603, 378597, 378598, 378604, 378605, 378607, 351745, 263828, 351748, */
+/*					263831, 355501, 351749, 367273, 367274, 368171, 378755, 378757, 378779, */
+/*					378780, 378763, 378782, 378783, 378759, 378762, 378784, 378768, 378770, */
+/*					378808, 378771, 378810, 378775, 378773, 378812, 378776, 378777, 378813, */
+/*					378815, 378818, 378820, 378822, 378439, 378442, 378445, 378447, 378449, */
+/*					378453, 378452) */
+/*					THEN 'LOCALIZA'*/
+
+			WHEN t1.SistemaInicial IN
+				('LOCALIZA')
+					THEN 'LOCALIZA' /*Alterado para sistema inicial em 12/02/2026 por Flávio Pereira*/
+
+			WHEN t1.SistemaInicial IN
+				('CREDERE')
+					THEN 'CREDERE'
+
+			WHEN t1.SistemaInicial IN
+				('SIMUJABUT')
+					THEN 'JABUTI'
+
+			WHEN t1.SistemaInicial IN
+				('NA_PISTA')
+					THEN 'NAPISTA'
+
+			WHEN t1.SistemaInicial IN
+				('SO_CARRAO')
+					THEN 'SOCARRAO'
+
+            /*WHEN t1.CdParceiroComercial
+IN (268861, 110168, 10909, 27912, 272926, 5833, 1430, 110234, 6624, 116965, */
+/*	                            264087, 418159, 21191, 45798, 454225) */
+			WHEN t1.SistemaInicial IN
+			('SMARTY SOLUTIONS') /*Alterado para sistema inicial em 12/02/2026 por Flávio Pereira*/
+THEN 'SMART SOLUTIONS'
+
+			ELSE 'N/A'
+
+          END AS ParceiroFI
+
+      FROM CONVSIMU.TBSIMULACOES t1
+      LEFT JOIN BASES.TBPARCEIROCOMERCIAL t2
+      ON t1.CdParceiroComercial = t2.CdParceiroComercial
+      WHERE
+	  /*t1.ProdutoGrupo IN ('Leves', 'Pesados', 'Motos') AND */
+		t1.NuAnoMes >= 202501
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE FI_LOJA_SUMARIZADA AS
+   SELECT DtAtualizacao,
+          NuAnoMes,
+          Produto,
+          NuCnpjLoja,
+          NmParceiroComercial,
+          CdParceiroComercial,
+          NmColaboradorC,
+          NmFilialC,
+          NmSubEstruturaComercialC,
+          NmAreaEstruturaComercialC,
+          NmCanalEstruturaComercialC,
+          DsLoginN1C,
+          DsLoginN2C,
+          DsLoginN3C,
+          LstSubstituicaoC,
+          TpPessoa,
+          FlPap,
+		  FxIdadeBem,
+          Qtd_PreAnalise,
+		  Qtd_ParouPreAna,
+          Qtd_Cards,
+          Qtd_Propostas,
+          Qtd_Aprovadas,
+          Qtd_Pagas,
+          VrProducao,
+		  SistemaInicial,
+          ParceiroFI
+   FROM
+       BASES.FI_LOJA
+   WHERE
+       ParceiroFI <> 'N/A'
+;QUIT;

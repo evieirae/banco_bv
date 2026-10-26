@@ -1,0 +1,145 @@
+START_METADATA
+PROJECT: Rodas__PainelRFM
+FILE_SAS: TbRFM.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 12)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 90
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/BA/PROCESSOS/TMP/TBRFM.CSV [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /riscosbvf/BA/processos/tmp/TbRFM.csv
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/tmp/TbRFM.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBPRODUCAOEMPRESTIMOS, TBRFM
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/tmp/TbRFM.csv
+
+END_METADATA
+================================================================================
+proc sql;
+    create table TbProducaoEmprestimos as
+    select
+        t1.DtContrato format=DDMMYYS10. as DtContrato,
+        t1.DtAtualizacao format=DDMMYYS10. as DtAtualizacao,
+        t1.NmGrupoProdutoMeta,
+        t1.NuProposta format=BESTX32. as NuProposta,
+        t1.NuContrato format=BESTX32. as NuContrato,
+		t2.NuCnpjLoja,
+		t2.NmParceiroComercial AS NmParceiroComercial,
+		t2.CdParceiroComercial,
+		t2.NmColaboradorC,
+		t2.NmFilialC,
+		t2.NmSubEstruturaComercialC,
+		t2.NmAreaEstruturaComercialC,
+		t2.NmCanalEstruturaComercialC,
+		t2.DsLoginN1C,
+		t2.DsLoginN2C,
+		t2.DsLoginN3C,
+		t2.LstSubstituicaoC,
+        t1.DsTipoCanalProducao,
+        t1.VrProducao format=COMMAX18.2 as VrProducao,
+        case
+            when t1.NuContrato ne 0 then 1
+            else 0
+        end as QtContrato,
+		CASE
+			WHEN t1.NmParceiroComercial  LIKE '%GR CONSUL%' OR t1.NmParceiroComercial LIKE '%COCKPIT%' THEN 'GR CONSULTOR'
+			WHEN t1.NmParceiroComercial  LIKE '%CP GARANTIA%'
+				OR t1.NmParceiroComercial  LIKE '%BV PARTI%'
+				OR t1.NmParceiroComercial  CONTAINS '%BV%' AND t1.NmParceiroComercial CONTAINS '%PARTICULAR%'
+				OR t1.NmParceiroComercial  LIKE '%BV BALC%'
+				OR t1.NmParceiroComercial  CONTAINS '%BV CP%'
+				OR t1.NmParceiroComercial  LIKE '%BV MESA%'
+				OR t1.NmParceiroComercial  CONTAINS '%BV %'
+				OR t1.CdParceiroComercial  IN (330023, 438407, 438415, 438444, 466647, 307861, 347441, 19474, 416382,
+												326679, 342798 ,360518 ,386992 ,414643 ,418607 ,419715 ,419716 ,424584 ,
+												435923 ,438183 ,438192 ,438222 ,438638 ,441516 ,452470 ,465399 ,466807 ,
+												467954, 468271)
+				THEN 'BALCÃO'
+			ELSE 'DEMAIS'
+		END as Separador
+    from
+        bases.tbproducao t1
+	  LEFT JOIN BASES.TBPARCEIROCOMERCIAL t2
+	  ON t1.CdParceiroComercial = t2.CdParceiroComercial
+    where
+        t1.DtContrato >= '01JAN2021'd
+        and t1.NmGrupoProdutoMeta in ('Motos', 'CVG Leves', 'CVG Pesados', 'Leves', 'Pesados')
+    order by
+        t1.DtContrato desc;
+quit;
+
+proc sql;
+    create table TbRFM as
+    select
+        DtContrato format=DDMMYYS10. as DtContrato,
+        DtAtualizacao format=DDMMYYS10. as DtAtualizacao,
+        NmGrupoProdutoMeta,
+        NuProposta format=BESTX32. as NuProposta,
+        NuContrato format=BESTX32. as NuContrato,
+		NuCnpjLoja,
+		NmParceiroComercial AS NmParceiroComercial,
+		CdParceiroComercial,
+		NmColaboradorC,
+		NmFilialC,
+		NmSubEstruturaComercialC,
+		NmAreaEstruturaComercialC,
+		NmCanalEstruturaComercialC,
+		DsLoginN1C,
+		DsLoginN2C,
+		DsLoginN3C,
+		LstSubstituicaoC,
+        DsTipoCanalProducao,
+        VrProducao format=COMMAX18.2 as VrProducao,
+        QtContrato
+    from
+        TbProducaoEmprestimos
+    where
+        Separador = 'DEMAIS'
+    order by
+        DtContrato desc;
+quit;
+
+filename exprt2 '/riscosbvf/BA/processos/tmp/TbRFM.csv' encoding="utf-8";
+
+proc export
+data=TbRFM
+outfile=exprt2 replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/TbRFM.csv /riscosbvf/BA/processos/output/';

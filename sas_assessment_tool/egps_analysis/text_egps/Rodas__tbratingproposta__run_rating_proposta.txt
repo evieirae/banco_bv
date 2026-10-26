@@ -1,0 +1,129 @@
+START_METADATA
+PROJECT: Rodas__tbratingproposta
+FILE_SAS: run_rating_proposta.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 50)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40), INFILE  (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 68
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/TBRATINGPROPOSTA/CSV_RATING_BQ/TBRATINGPROPOSTA.CSV [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: AUXL
+IMPORTED FILES (Requires Ingestion): /infogrc/TbRatingProposta/csv_rating_BQ/TbRatingProposta.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.AUXPROPOSTARATING, WORK.TBRATINGPROPOSTA
+TABLE_READ_PROVENANCE (Flow): AUXL.TBRATINGPROPOSTA [DATA Step - SET; PROC SQL - FROM], WORK.AUXPROPOSTARATING [DATA Step - SET], WORK.TBRATINGPROPOSTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/TbRatingProposta/csv_rating_BQ/TbRatingProposta.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): AUXL.TBRATINGPROPOSTA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUXL.TBRATINGPROPOSTA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: WORK.AUXPROPOSTARATING, WORK.TBRATINGPROPOSTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/TbRatingProposta/csv_rating_BQ/TbRatingProposta.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Import csv Rating.sas														| */
+/* | Descricao: Programa para importar arquivo de Rating em eatapa de proposta					| */
+/* |		Extração realzada via Databricks `datalab`.`mis`.`tbconcessaocredito_2025`		| */
+/* | Objetivo: 	Coleta de Rating em etapa de proposa 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de Ratig atualizada=========================*/
+/* ======================================================================================*/
+
+DATA work.TBRATINGPROPOSTA;
+    LENGTH
+        DtStatusProposta   8
+        CdSubProduto       8
+        NuProposta         8
+        NuContrato       $ 14
+        RUPED            $ 12 ;
+    FORMAT
+        DtStatusProposta YYMMDD10.
+        CdSubProduto     BEST2.
+        NuProposta       BEST9.
+        NuContrato       $CHAR14.
+        RUPED            $CHAR12. ;
+    INFORMAT
+        DtStatusProposta YYMMDD10.
+        CdSubProduto     BEST2.
+        NuProposta       BEST9.
+        NuContrato       $CHAR14.
+        RUPED            $CHAR12. ;
+    INFILE '/infogrc/TbRatingProposta/csv_rating_BQ/TbRatingProposta.csv'
+		FIRSTOBS=2
+        LRECL=20000
+        ENCODING="LATIN1"
+        /*TERMSTR=CRLF*/
+        DLM=','
+        MISSOVER
+        DSD ;
+    INPUT
+        DtStatusProposta : ?? YYMMDD10.
+        CdSubProduto     : ?? BEST2.
+        NuProposta       : ?? BEST9.
+        NuContrato       : $CHAR14.
+        RUPED            : $CHAR12. ;
+RUN;
+
+/*proc sql;*/
+/*delete * from AUXL.TBRATINGPROPOSTA*/
+/*where dtstatusproposta >= '01Nov2025'd ;quit;*/
+
+PROC SQL;
+   CREATE TABLE WORK.AUXPROPOSTARATING AS
+   SELECT * FROM work.TBRATINGPROPOSTA
+	WHERE NuProposta NOT IN (
+		SELECT
+			distinct NuProposta
+			FROM AUXL.TBRATINGPROPOSTA
+);
+QUIT;
+
+data AUXL.TBRATINGPROPOSTA;
+set AUXL.TBRATINGPROPOSTA
+	WORK.AUXPROPOSTARATING;
+run;

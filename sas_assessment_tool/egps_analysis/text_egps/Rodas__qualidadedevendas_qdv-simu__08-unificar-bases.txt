@@ -1,0 +1,92 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-simu
+FILE_SAS: 08-unificar-bases.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 36
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtMkt, DtOrig, DtProd, DtSimu
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: QDVCOMPLETO, QDVCOMPLETO01
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+options compress=yes;
+
+/* Gerar base para QDV Simu */
+PROC SQL;
+  CREATE TABLE QDVCompleto01 AS
+    SELECT * FROM Consolidado
+    OUTER UNION CORRESPONDING
+    SELECT * FROM MarketShare
+    OUTER UNION CORRESPONDING
+    SELECT * FROM SuperTrunfo
+    OUTER UNION CORRESPONDING
+    SELECT * FROM Inad
+    OUTER UNION CORRESPONDING
+    SELECT * FROM Simulacoes;
+RUN;
+
+PROC SQL;
+CREATE TABLE QDVCompleto AS
+  SELECT
+    &DtProd. FORMAT=mmddyy10. AS DtAtualizacaoProducao,
+    &DtOrig. FORMAT=mmddyy10. AS DtAtualizacaoOriginacao,
+    &DtSimu. FORMAT=mmddyy10. AS DtAtualizacaoSimulacao,
+    &DtMkt. FORMAT=mmddyy10. AS DtAtualizacaoMktShare,
+	*
+	FROM QDVCompleto01;
+RUN;
+
+/*
+data BASEGRC.QDVCompleto;
+set work.QDVCompleto;
+;RUN;
+*/
+
+%ExportaCSV(TbQualidadeVendasIGESimu,QDVCompleto);
+
+/*
+data QDVCubo_corte;
+set work.QDVCompleto;
+where NuAnoMes = 202405 and NmGrupoProdutoMeta IN('Leves-BVO','Leves');
+;RUN;
+
+ExportaCSV(TbQualidadeVendasIGESimu,QDVCubo_corte);*/

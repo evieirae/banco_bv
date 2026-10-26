@@ -1,0 +1,286 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_TbEnvioBvia
+FILE_SAS: TbEnvioBvia_RankingPDVs.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 202
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: SafraM1, SafraM3, SafraM6, dt_atu
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBMETANAOISONOMICA [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/NaPistaRankingPDV_&dt_atu..csv
+TEMP/DISCARDED OUTPUTS: METANILEVES, METANILEVES_FINAL, MKTSHARE, NAPISTARANKINGPDV, NAPISTARANKINGPDV1, RANKING3M, RANKING6M, RANKINGFINAL, RANKINGGERAL, TBSUPERTRUNFO
+DYNAMIC REFS (Ambiguous): {DT_ATU}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+/* ========================================================== */
+/* ============ Envio Ranking BVia ========================== */
+/* ========================================================== */
+
+PROC SQL;
+CREATE TABLE TbSuperTrunfo AS
+SELECT DISTINCT
+     TBPOTENCIALRODAS.NuAnoMes                     AS NuAnoMes
+    ,TBPOTENCIALRODAS.NmGrupoProduto               AS NmGrupoProduto
+    ,TBPOTENCIALRODAS.CdParceiroComercial          AS CdParceiroComercial
+	,ParceiroComercial.NmParceiroComercial         AS NmParceiroComercial
+	,TBPOTENCIALRODAS.RankingCliente               AS RankingCliente
+    ,TBPOTENCIALRODAS.QtBancos                     AS QtBancos
+    ,TBPOTENCIALRODAS.NmGrupo                      AS NmGrupo
+    ,TBPOTENCIALRODAS.QtdLojas                     AS QtdLojas
+    ,TBPOTENCIALRODAS.NuCnpjLoja                   AS NuCnpjLoja
+    ,TBPOTENCIALRODAS.NmTipoParceiroComercial      AS NmTipoParceiroComercial
+	,TBPOTENCIALRODAS.FlPorteA                     AS FlPorteA
+    ,TBPOTENCIALRODAS.DsLoginN3C                   AS DsLoginN3C
+	,TBPOTENCIALRODAS.DsLoginN2C                   AS DsLoginN2C
+	,TBPOTENCIALRODAS.DsLoginN1C                   AS DsLoginN1C
+/*	,TBPOTENCIALRODAS.VrGravamesMercado            AS VrGravamesMercado*/
+/*	,TBPOTENCIALRODAS.QtGravamesMercado            AS QtGravamesMercado*/
+	,SUM(VrGravamesMercado)/SUM(QtGravamesMercado) AS VrMediaGravames
+
+FROM TMP.TBPOTENCIALRODAS TBPOTENCIALRODAS
+	LEFT JOIN TMP.TbParceiroComercial ParceiroComercial
+		ON ParceiroComercial.cdparceirocomercial = TBPOTENCIALRODAS.cdparceirocomercial
+
+WHERE TBPOTENCIALRODAS.NmGrupoProduto in ("Leves")
+AND TBPOTENCIALRODAS.FlAtualizacaoMercado = 1
+AND TBPOTENCIALRODAS.NuAnoMes =  &SafraM1.
+AND TBPOTENCIALRODAS.CdParceiroComercial is not null
+AND TBPOTENCIALRODAS.flAtivo = 'S'
+
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+Order by TBPOTENCIALRODAS.CdParceiroComercial
+;RUN;
+
+/*Tabela auxiliar para fazer as quebras de média de ranking dos últimos 6 e 3 meses*/
+
+proc sql;
+CREATE TABLE RankingGeral AS
+SELECT DISTINCT
+TBPOTENCIALRODAS.NuAnoMes
+ ,TBPOTENCIALRODAS.CdParceiroComercial
+ ,CASE WHEN TBPOTENCIALRODAS.RankingCliente = . THEN 0 ELSE TBPOTENCIALRODAS.RankingCliente END AS RankingCliente
+/* ,MAX(TBPOTENCIALRODAS.RankingCliente)/3 AS Ranking3M*/
+
+FROM TMP.TBPOTENCIALRODAS TBPOTENCIALRODAS
+
+WHERE NuAnoMes between &SafraM1. and &SafraM6.
+AND TBPOTENCIALRODAS.NmGrupoProduto in ("Leves")
+AND TBPOTENCIALRODAS.FlAtualizacaoMercado = 1
+AND TBPOTENCIALRODAS.CdParceiroComercial is not null
+AND TBPOTENCIALRODAS.flAtivo = 'S'
+/*Group By 1,2*/
+/*Order by TBPOTENCIALRODAS.CdParceiroComercial*/
+;run;
+
+/*Média Ranking dos últimos 6 meses*/
+proc sql;
+CREATE TABLE Ranking6M AS
+SELECT DISTINCT
+  CdParceiroComercial
+ ,SUM(RankingCliente)/6 AS Ranking6M
+
+FROM RankingGeral
+
+WHERE NuAnoMes between &SafraM1. and &SafraM6.
+Group By 1
+;run;
+/*Média Ranking dos últimos 3 meses*/
+proc sql;
+CREATE TABLE Ranking3M AS
+SELECT DISTINCT
+  CdParceiroComercial
+ ,SUM(RankingCliente)/3 AS Ranking3M
+
+FROM RankingGeral
+
+WHERE NuAnoMes between &SafraM1. and &SafraM3.
+Group By 1
+;run;
+
+proc sql;
+CREATE TABLE RankingFinal AS
+SELECT
+     COALESCE(A.CdParceiroComercial, B.CdParceiroComercial) AS CdParceiroComercial
+    ,A.Ranking6M
+    ,B.Ranking3M
+FROM
+    Ranking6M AS A
+FULL JOIN
+    Ranking3M AS B
+ON
+    A.CdParceiroComercial = B.CdParceiroComercial
+;RUN;
+
+/*Cálculo para o %Peso Meta GR*/
+proc sql;
+CREATE TABLE MetaNILeves AS
+SELECT
+		 CdColaborador
+		,SUM(VrProducao) AS VrMetaNI
+
+FROM BASEGRC.TbMetaNaoisonomica
+WHERE NuAnoMes = &SafraM1.
+AND Produto = 'Leves'
+Group by 1
+;RUN;
+
+proc sql;
+CREATE TABLE MetaNILeves_Final AS
+SELECT
+	     MetaNI.NuAnoMes
+	    ,MetaNI.CdColaborador
+	    ,MetaNI.CdParceiroComercial
+	    ,MetaNI.VrProducao
+	    ,TotalLeves.VrMetaNI
+	    ,(MetaNI.VrProducao / TotalLeves.VrMetaNI) * 100 AS PercentualMeta
+FROM BASEGRC.TbMetaNaoisonomica MetaNI
+LEFT JOIN MetaNILeves TotalLeves
+	ON MetaNI.CdColaborador = TotalLeves.CdColaborador
+WHERE MetaNI.NuAnoMes = &SafraM1.
+AND MetaNI.Produto = 'Leves'
+;run;
+
+/*Cálculo MKT Share*/
+
+proc sql;
+CREATE TABLE MktShare AS
+SELECT
+		 CdParceiroComercial
+		,SUM(QtContrato)        AS QtContrato
+		,SUM(QtGravamesMercado) AS QtMercado
+		,SUM(QtContrato)/SUM(QtGravamesMercado) AS MktSharePDV
+
+FROM tmp.TbPotencialRodas
+WHERE NmGrupoProduto = 'Leves'
+AND CdParceiroComercial is not null
+AND flAtivo = 'S'
+AND NuAnoMes = &SafraM1.
+GROUP BY 1
+;RUN;
+
+proc sql;
+CREATE TABLE NaPistaRankingPDV1 AS
+SELECT
+     SuperTrunfo.NuAnoMes
+     ,SuperTrunfo.DsLoginN3C
+     ,SuperTrunfo.DsLoginN2C
+     ,SuperTrunfo.DsLoginN1C
+     ,SuperTrunfo.CdParceiroComercial
+     ,SuperTrunfo.NmParceiroComercial
+     ,Meta.PercentualMeta
+     ,MktShare.MktSharePDV
+     ,SuperTrunfo.FlPorteA
+     ,SuperTrunfo.RankingCliente
+     ,RankingFinal.Ranking3M
+     ,RankingFinal.Ranking6M
+     ,SuperTrunfo.VrMediaGravames
+
+     /* Adicionando ranges para MktSharePDV */
+     ,CASE
+         WHEN MktSharePDV < 0.10 THEN 'Faixa 1'
+         WHEN MktSharePDV >= 0.10 AND MktSharePDV < 0.30 THEN 'Faixa 2'
+         WHEN MktSharePDV >= 0.30 AND MktSharePDV < 0.50 THEN 'Faixa 3'
+         WHEN MktSharePDV >= 0.50 AND MktSharePDV < 0.70 THEN 'Faixa 4'
+         WHEN MktSharePDV >= 0.70 AND MktSharePDV < 0.90 THEN 'Faixa 5'
+         WHEN MktSharePDV >= 0.90 THEN 'Faixa 6'
+         ELSE 'Indefinido'
+     END AS Faixa_MktSharePDV
+
+     /* Adicionando ranges para PercentualMeta */
+     ,CASE
+         WHEN PercentualMeta < 0.01 THEN 'Peso 1'
+         WHEN PercentualMeta >= 0.01 AND PercentualMeta < 0.02 THEN 'Peso 2'
+         WHEN PercentualMeta >= 0.02 AND PercentualMeta < 0.05 THEN 'Peso 3'
+         WHEN PercentualMeta >= 0.05 THEN 'Peso 4'
+         ELSE 'Indefinido'
+     END AS Peso_MetaGR
+
+FROM TbSuperTrunfo SuperTrunfo
+	LEFT JOIN 	MetaNILeves_Final Meta
+		ON SuperTrunfo.CdParceiroComercial = Meta.CdParceiroComercial
+	LEFT JOIN  MktShare MktShare
+		ON SuperTrunfo.CdParceiroComercial = MktShare.CdParceiroComercial
+	LEFT JOIN RankingFinal RankingFinal
+		ON SuperTrunfo.CdParceiroComercial = RankingFinal.CdParceiroComercial
+;RUN;
+
+PROC SQL;
+CREATE TABLE NaPistaRankingPDV AS
+SELECT
+      DsLoginN3C         AS Regional
+     ,DsLoginN2C         AS GF
+     ,DsLoginN1C         AS Colaborador
+     ,CdParceiroComercial
+     ,NmParceiroComercial AS ParceiroComercial
+	 ,Peso_MetaGR
+	 ,Faixa_MktSharePDV
+	 ,FlPorteA            AS PorteLoja
+     ,RankingCliente      AS RankingLoja
+     ,Ranking3M           AS RankingLoja3m format commax20.2
+     ,Ranking6M           AS RankingLoja6m format commax20.2
+     ,VrMediaGravames     AS VrMedioBemFinanciado format commax20.2
+FROM NaPistaRankingPDV1
+;RUN;
+
+%LET 	dir_csv =/riscosbvf/BA/processos/output;
+
+data _null_;
+	dt_atu = today();
+	call symputx('dt_atu',put(dt_atu,YYMMDDN.));
+run;
+
+%put &dt_atu.;
+
+proc export
+data=NaPistaRankingPDV
+file="/riscosbvf/BA/processos/output/NaPistaRankingPDV_&dt_atu..csv" replace
+dbms=dlm;
+delimiter=';';
+run;

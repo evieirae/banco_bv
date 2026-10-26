@@ -1,0 +1,323 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_Funil_BVO
+FILE_SAS: 4 - Gera tbsimulacoes sumarizada BVO diaria.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 258
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: MXDATASIMUd, dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], TRIBO.MXDTSIMU [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: TRIBO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): TRIBO.MXDTSIMU [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TRIBO.MXDTSIMU
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./RODASBVO_PDEC_Diario.csv
+TEMP/DISCARDED OUTPUTS: CUBOSIMURODASBVO_DIARIO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	3 - Gera tbsimulacoes BVO diaria.sas														| */
+/* | Descricao: Programa gerar o output para o Dash Funil BVO.					| */
+/* | Objetivo: 	Apuração do Dash fUNIL BVO					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera tbsimulacoes BVO diaria=========================*/
+/* ======================================================================================*/
+
+proc sql print;
+
+select (year(MXDATASIMU)*100)+month(MXDATASIMU)-1 as MXDATASIMU INTO :MXDATASIMUd from tribo.MXDTSIMU;QUIT;
+
+PROC SQL;
+	CREATE TABLE CuboSimuRODASBVO_Diario AS
+		SELECT
+			A.DtSimulacaoInicial,
+			A.CdSimulacaoInicial,
+			A.nuproposta,
+			A.Produto,
+			A.NuCpfCnpj,
+			A.NuAnoMes AS Safra,
+			A.Mensageria,
+			A.SistemaInicial,
+			A.SistemaFinal,
+			A.PILOTO_V7,
+			A.ONDA_V7,
+			A.V7,
+			A.classificacao_pdv,
+			A.classificacao_pdv_nova,
+			A.NmParceiroComercial,
+			A.FlPorteA,
+			A.FlEsteiraBB,
+			A.MotivoDecisaoBB,
+			A.FxIdade,
+			A.Regional,
+			A.Canal,
+			A.Filial,
+			A.DsTipoCanalProducao,
+	A.FxRating,
+	A.MotivoRecusa2,
+	A.fx_ent_min_v1 as EntradaMinima,
+	A.Msg_Agrup,
+	B.MxDtSimu,
+	COUNT(DISTINCT Case WHEN (A.FlSimuValidaBVO = 1 ) then A.NuCpfCnpj End) AS QtdPreAnalise_Unico,
+	COUNT(DISTINCT
+	Case WHEN (A.FlSimuValidaBVO = 1 and A.FlCard <> 1) THEN  A.NuCpfCnpj
+	END)
+	AS FicaramPreAnalise,
+
+		COUNT(DISTINCT
+		Case WHEN (A.FlSimuValidaBVO = 1 and A.FlCard <> 1 and A.flconcorrente = 1) THEN  A.NuCpfCnpj
+		END)
+		AS flConcPreAnalise,
+			COUNT(DISTINCT
+			Case WHEN (A.FlSimuValidaBVO = 1 and A.FlCard = 1) THEN  A.NuCpfCnpj
+			END)
+			AS QtdCard_Unico,
+				COUNT(DISTINCT
+				Case WHEN (A.FlSimuValidaBVO = 1 and A.FlCard = 1) THEN  A.NuCpfCnpj
+				END)
+				- SUM(A.FlPropostaOriginada) AS FicaramCards,
+				COUNT(DISTINCT
+				Case WHEN (A.FlSimuValidaBVO = 1 and A.FlCard = 1 and A.FlPropostaOriginada <> 1 and A.flconcorrente = 1) THEN  A.NuCpfCnpj
+				END)
+				AS flConcCards,
+					SUM(A.FlPropostaOriginada) AS QtdOriginadas,
+					SUM(A.FlPropostaOriginada) - SUM(A.FlPropostaAprovada) AS FicaramPropostas,
+					COUNT(DISTINCT
+					Case WHEN (A.FlSimuValidaBVO = 1 and  A.FlPropostaOriginada = 1 and A.FlPropostaAprovada <> 1 and A.flconcorrente = 1) THEN  A.NuCpfCnpj
+					END)
+					AS flConcPropostas,
+						SUM(A.FlPropostaAprovada) AS QtdAprovadas,
+						SUM(A.FlPropostaAprovadaAjustada) as QtdAprovadaAjustadaBVO,
+						SUM(A.FlPropostaAprovada) - SUM(A.FlPropostaPaga) AS FicaramAprovadas,
+						COUNT(DISTINCT
+						CASE
+							WHEN (A.FlPropostaAprovada = 1 and A.FlPropostaPaga <> 1 and A.flconcorrente = 1) THEN  A.NuCpfCnpj
+						END)
+						AS flConcAprovadas,
+							SUM(A.FlPropostaPaga) AS QtdPagas,
+							COUNT(DISTINCT
+							CASE
+								WHEN (A.FlPropostaPaga = 1 and A.flconcorrente = 1) THEN  A.NuCpfCnpj
+							END)
+							AS flConcPagas,
+								SUM(A.FlConcorrente) AS QtdConcorrente,
+								SUM(A.VrProposta) FORMAT COMMAX12.2 as VrProposta,
+								SUM(A.VrProducao) FORMAT COMMAX12.2 as VrProducao,
+								SUM(A.VrSeguros) FORMAT COMMAX12.2 AS VrSeguros,
+								SUM(A.VrSeguroSPF) FORMAT COMMAX12.2 AS VrSeguroSPF,
+								SUM(A.VrSeguroAP) FORMAT COMMAX12.2 AS VrSeguroAP,
+								SUM(A.VrSeguroDemais) FORMAT COMMAX12.2 AS VrSeguroDemais,
+								SUM(A.VrSeguroCompleto) FORMAT COMMAX12.2 AS  VrSeguroCompleto,
+								SUM(CASE WHEN Msg_Agrup = 'Mensageria Positiva' THEN A.PcEntradaMinima*A.VrProposta ELSE 0 END) FORMAT COMMAX12.2 as ENTRADA_MINIMA_POND_P,
+								SUM(CASE WHEN Msg_Agrup = 'Mensageria Positiva' THEN A.PcEntradaAjust*A.VrProposta ELSE 0 END) FORMAT COMMAX12.2 as ENT_AJUST_POND_P,
+								AVG(A.MOBConc) FORMAT COMMAX12.2 AS MOBConc,
+								AVG(A.MOBConvContrato) FORMAT COMMAX12.2 AS MOBConvContrato,
+								AVG(A.MOBEfet) FORMAT COMMAX12.2 AS MOBEfet,
+								AVG(A.VpSpread) FORMAT COMMAX12.2 AS VpSpread,
+								AVG(A.VrMargemContribuicaoFinal) FORMAT COMMAX12.2 AS VrMargemContribuicaoFinal,
+								AVG(A.pc_entrada_v1) FORMAT COMMAX12.2 AS PcEntradaMinima,
+								AVG(A.PcEntradaAjust) FORMAT COMMAX12.2 AS PcEntradaAjust,
+								AVG(A.ent_min_1_ch) FORMAT COMMAX12.2 AS ent_min_1_ch,
+								AVG(A.ent_min_2_ch) FORMAT COMMAX12.2 AS ent_min_2_ch,
+								AVG(A.RatingCliente) FORMAT COMMAX12.2 AS RatingCliente,
+								AVG(A.RatingSimulacao) FORMAT COMMAX12.2 AS RatingSimulacao,
+								AVG(A.ProbabilidadeAprovacao) FORMAT COMMAX12.2 AS ProbabilidadeAprovacao,
+							    AVG(A.PcProbAproAjustada) as PcProbAproAjustada
+
+								FROM TbSimulacoes_00_RODASBVO_2 A
+									INNER JOIN
+									(SELECT MAX(DtSimulacaoInicial) format ddmmyy10. as MxDtSimu, NuAnoMes FROM	TbSimulacoes_00_RODASBVO_1 GROUP BY NuAnoMes) B
+									ON A.NuAnoMes = B.NuAnoMes
+									where 1=1
+									AND A.NuAnoMes >= &MXDATASIMUd.
+
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27;
+
+run;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+	DATA= CuboSimuRODASBVO_Diario
+	FILE="&dir_csv./RODASBVO_PDEC_Diario.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/**/
+/*PROC SQL;*/
+/*	CREATE TABLE CuboSimuRODASBVO_Diario AS*/
+/**/
+/*		SELECT*/
+/*			A.DtSimulacaoInicial,*/
+/*			A.Produto,*/
+/*			A.NuCpfCnpj,*/
+/*			A.NuAnoMes AS Safra,*/
+/*			A.Mensageria,*/
+/*			A.SistemaInicial,*/
+/*			A.SistemaFinal,*/
+/*			A.PILOTO_V7,*/
+/*			A.ONDA_V7,*/
+/*			A.V7,*/
+/*			A.classificacao_pdv,*/
+/*			A.classificacao_pdv_nova,*/
+/*			A.NmParceiroComercial,*/
+/*			A.FlPorteA,*/
+/*			A.FlEsteiraBB,*/
+/*			A.FxIdade,*/
+/*			A.Regional,*/
+/*			A.Canal,*/
+/*			A.Filial,*/
+/*			A.DsTipoCanalProducao,*/
+/**/
+/*		CASE */
+/*			WHEN A.ProbabilidadeAprovacao <= 0.5 THEN 'ZERO'*/
+/*			WHEN A.ProbabilidadeAprovacao <= 6.0 THEN 'ATÉ 6,0'*/
+/*			WHEN A.ProbabilidadeAprovacao <= 7.3 THEN '6,25-7,25'*/
+/*			WHEN A.ProbabilidadeAprovacao <= 7.9 THEN '7,5-7,75'*/
+/*			WHEN A.ProbabilidadeAprovacao <= 8.5 THEN '8,25-8,5'*/
+/*			WHEN A.ProbabilidadeAprovacao <= 9.8 THEN '8,75-9,75'*/
+/*			WHEN A.ProbabilidadeAprovacao <= 10 THEN '10'*/
+/*			ELSE 'ZERO' */
+/*		END */
+/*	AS FxRating,*/
+/**/
+/*	CASE */
+/*		WHEN A.MotivoRecusa = '' or A.MotivoRecusa = 'NAO RECUSADO' THEN 'Sem Recusa'*/
+/*		WHEN A.MotivoRecusa = 'REC_DESENROLA' then 'REC_DESENROLA'*/
+/*		WHEN A.MotivoRecusa = 'REC_GRAU_SEVERIDADE' then 'REC_GRAU_SEVERIDADE'*/
+/*		WHEN A.MotivoRecusa = 'REC_RATING_CPF' then 'REC_RATING_CPF'*/
+/*		ELSE 'Outros'*/
+/*	END */
+/*AS MotivoRecusa2,*/
+/*	A.fx_ent_min_v1 as EntradaMinima,*/
+/*	A.Msg_Agrup,*/
+/*	B.MxDtSimu,*/
+/*	COUNT(DISTINCT Case WHEN A.FlSimuValidaBVODia = 1 then A.NuCpfCnpj End) AS QtdPreAnalise_Unico,*/
+/*	COUNT(DISTINCT */
+/*	CASE */
+/*		WHEN A.FlSimuValidaBVODia = 1 and A.FlCard <> 1 THEN  A.NuCpfCnpj  */
+/*	END)*/
+/*	AS FicaramPreAnalise,*/
+/*	*/
+/*		COUNT(DISTINCT */
+/*		CASE */
+/*			WHEN A.FlSimuValidaBVODia = 1 and A.FlCard <> 1 and A.flconcorrente = 1 THEN  A.NuCpfCnpj  */
+/*		END)*/
+/*		AS flConcPreAnalise,*/
+/*			COUNT(DISTINCT */
+/*			CASE */
+/*				WHEN A.FlSimuValidaBVODia = 1 and A.FlCard = 1 THEN  A.NuCpfCnpj  */
+/*			END)*/
+/*			AS QtdCard_Unico,*/
+/*				COUNT(DISTINCT */
+/*				CASE */
+/*					WHEN A.FlSimuValidaBVODia = 1 and A.FlCard = 1 THEN  A.NuCpfCnpj  */
+/*				END)*/
+/*				- SUM(A.FlPropostaOriginada) AS FicaramCards,*/
+/*				COUNT(DISTINCT */
+/*				CASE */
+/*					WHEN A.FlSimuValidaBVODia = 1 and A.FlCard = 1 and A.FlPropostaOriginada <> 1 and A.flconcorrente = 1 THEN  A.NuCpfCnpj  */
+/*				END)*/
+/*				AS flConcCards,*/
+/*					SUM(A.FlPropostaOriginada) AS QtdOriginadas,*/
+/*					SUM(A.FlPropostaOriginada) - SUM(A.FlPropostaAprovada) AS FicaramPropostas,*/
+/*					COUNT(DISTINCT */
+/*					CASE */
+/*						WHEN A.FlPropostaOriginada = 1 and A.FlPropostaAprovada <> 1 and A.flconcorrente = 1 THEN  A.NuCpfCnpj  */
+/*					END)*/
+/*					AS flConcPropostas,*/
+/*						SUM(A.FlPropostaAprovada) AS QtdAprovadas,*/
+/*						SUM(A.FlPropostaAprovada) - SUM(A.FlPropostaPaga) AS FicaramAprovadas,*/
+/*						COUNT(DISTINCT */
+/*						CASE */
+/*							WHEN A.FlPropostaAprovada = 1 and A.FlPropostaPaga <> 1 and A.flconcorrente = 1 THEN  A.NuCpfCnpj  */
+/*						END)*/
+/*						AS flConcAprovadas,*/
+/*							SUM(A.FlPropostaPaga) AS QtdPagas,*/
+/*							COUNT(DISTINCT */
+/*							CASE */
+/*								WHEN A.FlPropostaPaga = 1 and A.flconcorrente = 1 THEN  A.NuCpfCnpj  */
+/*							END)*/
+/*							AS flConcPagas,*/
+/*								SUM(A.FlConcorrente) AS QtdConcorrente,*/
+/*								SUM(A.VrProposta) FORMAT COMMAX12.2 as VrProposta,*/
+/*								SUM(A.VrProducao) FORMAT COMMAX12.2 as VrProducao,*/
+/*								SUM(A.VrSeguros) FORMAT COMMAX12.2 AS VrSeguros,*/
+/*								SUM(A.VrSeguroSPF) FORMAT COMMAX12.2 AS VrSeguroSPF,*/
+/*								SUM(A.VrSeguroAP) FORMAT COMMAX12.2 AS VrSeguroAP,*/
+/*								SUM(A.VrSeguroDemais) FORMAT COMMAX12.2 AS VrSeguroDemais,*/
+/*								SUM(A.VrSeguroCompleto) FORMAT COMMAX12.2 AS  VrSeguroCompleto,*/
+/*								SUM(CASE WHEN Msg_Agrup = 'Mensageria Positiva' THEN A.PcEntradaMinima*A.VrProposta ELSE 0 END) FORMAT COMMAX12.2 as ENTRADA_MINIMA_POND_P,*/
+/*								SUM(CASE WHEN Msg_Agrup = 'Mensageria Positiva' THEN A.PcEntradaAjust*A.VrProposta ELSE 0 END) FORMAT COMMAX12.2 as ENT_AJUST_POND_P,*/
+/*								AVG(A.MOBConc) FORMAT COMMAX12.2 AS MOBConc,*/
+/*								AVG(A.MOBConvContrato) FORMAT COMMAX12.2 AS MOBConvContrato,*/
+/*								AVG(A.MOBEfet) FORMAT COMMAX12.2 AS MOBEfet,*/
+/*								AVG(A.VpSpread) FORMAT COMMAX12.2 AS VpSpread,*/
+/*								AVG(A.VrMargemContribuicaoFinal) FORMAT COMMAX12.2 AS VrMargemContribuicaoFinal,*/
+/*								AVG(A.pc_entrada_v1) FORMAT COMMAX12.2 AS PcEntradaMinima,*/
+/*								AVG(A.PcEntradaAjust) FORMAT COMMAX12.2 AS PcEntradaAjust,*/
+/*								AVG(A.ent_min_1_ch) FORMAT COMMAX12.2 AS ent_min_1_ch,*/
+/*								AVG(A.ent_min_2_ch) FORMAT COMMAX12.2 AS ent_min_2_ch,*/
+/*								AVG(A.RatingCliente) FORMAT COMMAX12.2 AS RatingCliente,*/
+/*								AVG(A.RatingSimulacao) FORMAT COMMAX12.2 AS RatingSimulacao,*/
+/*								AVG(A.ProbabilidadeAprovacao) FORMAT COMMAX12.2 AS ProbabilidadeAprovacao*/
+/*							*/
+/*								FROM TbSimulacoes_00_RODASBVO_2 A*/
+/*									INNER JOIN*/
+/*									(SELECT MAX(DtSimulacaoInicial) format ddmmyy10. as MxDtSimu, NuAnoMes FROM	TbSimulacoes_00_RODASBVO_1 GROUP BY NuAnoMes) B */
+/*									ON A.NuAnoMes = B.NuAnoMes*/
+/*									where 1=1*/
+/*									AND A.NuAnoMes >= &MXDATASIMUd.*/
+/*								*/
+/*	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25;*/
+/**/
+/**/
+/*run;*/

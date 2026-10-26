@@ -1,0 +1,582 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - Feirões Nacionais 45 dias
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 442
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASEGRC = /riscosbvf/BA/bases_gerenciais
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBRESULTADOFEIRAO [SAS/Local], BASES.TBPOTENCIALRODAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], BASES.TBRESULTADOFEIRAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASEGRC
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Planejamento Varejo\Planejamento e Inteligencia\Planejamento\Estudos\151. Análise Feirão\2025\base_controle_consolidado.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.base_controle_consolidado <- N:\DVMD\Planejamento Varejo\Planejamento e Inteligencia\Planejamento\Estudos\151. Análise Feirão\2025\base_controle_consolidado.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_CONTROLE_CONSOLIDADO
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBRESULTADOFEIRAO [PROC SQL - FROM], BASES.TBPOTENCIALRODAS [PROC SQL - FROM], BASES.TBPRODUCAO [PROC SQL - FROM], BASES.TBRESULTADOFEIRAO [PROC SQL - FROM], WORK.BASE_CONTROLE_CONSOLIDADO [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CONTROLE, CONTROLE_2, FEIRAOCONSOLIDADO, FEIRAOCONSOLIDADO_ANTES, FEIRAOCONSOLIDADO_DURANTE, JUNHO25, MS_PDV, PROD_PDV_ANTES, PROD_PDV_DURANTE, TBLOJASCONTROLE, WORK.QUERY_FOR_BASE_CONTROLE_CONSOLID, WORK.QUERY_FOR_TBRESULTADOFEIRAO, WORK.QUERY_FOR_TBRESULTADOFEIRAO1, WORK.TBRESULTADOFEIRAO, WORK.TBRESULTADOSEGUROS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Planejamento Varejo\Planejamento e Inteligencia\Planejamento\Estudos\151. Análise Feirão\2025\base_controle_consolidado.csv|N:/DVMD/PLANEJAMENTO VAREJO/PLANEJAMENTO E INTELIGENCIA/PLANEJAMENTO/ESTUDOS/151. ANÁLISE FEIRÃO/2025|BASE_CONTROLE_CONSOLIDADO.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 3) Base_Controle */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 3) Base_Controle */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-QWg9oqXbQxf7vAom/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE Junho25 AS
+   SELECT
+          202506 as BASEFEIRAO,
+t1.*
+      FROM base_controle_consolidado t1
+      WHERE t1.'Jun/25'n = 1
+	   AND t1.FlAtivo = 'S'
+	   AND t1.NmTipoParceiroComercial in ('Loja', 'Concessionaria')
+
+;QUIT;
+
+
+
+DATA TBLOJASCONTROLE;
+
+SET Junho25
+;run;
+
+proc sql;
+
+create table FEIRAOCONSOLIDADO_ANTES as
+
+select
+202505 AS BASEMES,
+A. *
+from TBLOJASCONTROLE A
+
+;quit;
+
+proc sql;
+
+create table FEIRAOCONSOLIDADO_DURANTE as
+
+select
+202506 AS BASEMES,
+A. *
+from TBLOJASCONTROLE A
+
+;quit;
+
+DATA FEIRAOCONSOLIDADO;
+
+SET FEIRAOCONSOLIDADO_ANTES FEIRAOCONSOLIDADO_DURANTE
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 3) Base_Controle */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 4) Base_Feirão */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 4) Base_Feirão */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1UmiQgEirIPJ3ghw/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE PROD_PDV_ANTES AS
+   SELECT
+
+ 			t1.dtentradaproposta,
+   			202505 as BASEPROPOSTAS,
+			t1.cdparceirocomercial,
+			t1.NmSubEstruturaComercialC,
+			t1.NmAreaEstruturaComercialC,
+			t1.NmGrupoProdutoMeta,
+		    (COUNT(t1.NuContrato)) AS QtdeContrato,
+            (SUM(t1.VrProducao)) AS VrProducao,
+            (SUM(t1.VrMargemContribuicao))  AS VrMargemContribuicao,
+            (SUM(t1.VrMargemContribuicaoFinal))  AS VrMargemContribuicaoFinal,
+            (SUM(t1.VrComissaoTotal))  AS VrComissaoTotal,
+            (SUM(t1.VrComissaoParcelada))  AS VrComissaoParcelada,
+            (SUM(t1.VrAcordoComercial))  AS VrAcordoComercial,
+            (SUM(t1.VrPerdaEstimada))  AS VrPerdaEstimada,
+            (SUM(t1.VpTxGerencial)) AS VpTxGerencial,
+            (SUM(t1.VpTxGerencialRebate)) AS VpTxGerencialRebate,
+            (SUM(t1.VpTxJuros)) AS VpTxJuros,
+            (SUM(t1.VpTirContabil)) AS VpTirContabil,
+            (SUM(t1.VpSpread)) AS VpSpread,
+            (SUM(t1.VpSpreadRebate)) AS VpSpreadRebate
+
+      FROM bases.TBPRODUCAO t1
+
+	  where t1.NmGrupoProdutoMeta in ('CVG Leves', 'Leves')
+	  AND t1.dtentradaproposta between '15Apr2025'd and '31May2025'd
+	  AND NmCanalEstruturaComercial = 'Canal Veiculos'
+
+      GROUP BY
+
+	  1,2,3,4,5,6
+
+;QUIT;
+
+
+PROC SQL;
+
+   CREATE TABLE CONTROLE AS
+   SELECT DISTINCT
+
+			A.BASEMES,
+			A.BASEFEIRAO,
+			A.CdParceiroComercial,
+			B.NmAreaEstruturaComercialC,
+			A.FlPorteA,
+			B.NmSubEstruturaComercialC,
+			B.NmGrupoProdutoMeta,
+
+            (SUM(B.QtdeContrato)) AS QtdeContrato,
+            (SUM(B.VrProducao)) AS VrProducao,
+            (SUM(B.VrMargemContribuicao))  AS VrMargemContribuicao,
+            (SUM(B.VrMargemContribuicaoFinal))  AS VrMargemContribuicaoFinal,
+            (SUM(B.VrComissaoTotal))  AS VrComissaoTotal,
+            (SUM(B.VrComissaoParcelada))  AS VrComissaoParcelada,
+            (SUM(B.VrAcordoComercial))  AS VrAcordoComercial,
+            (SUM(B.VrPerdaEstimada))  AS VrPerdaEstimada,
+            (SUM(B.VpTxGerencial)) AS VpTxGerencial,
+            (SUM(B.VpTxGerencialRebate)) AS VpTxGerencialRebate,
+            (SUM(B.VpTxJuros)) AS VpTxJuros,
+            (SUM(B.VpTirContabil)) AS VpTirContabil,
+            (SUM(B.VpSpread)) AS VpSpread,
+            (SUM(B.VpSpreadRebate)) AS VpSpreadRebate
+
+		   FROM FEIRAOCONSOLIDADO_ANTES A
+           LEFT JOIN PROD_PDV_ANTES B ON (A.BASEMES = B.BASEPROPOSTAS) AND (A.cdparceirocomercial = B.cdparceirocomercial)
+
+	       GROUP BY 1,2,3,4,5,6,7
+
+;QUIT;
+
+PROC SQL;
+
+   CREATE TABLE CONTROLE AS
+   SELECT DISTINCT
+
+			A.BASEMES,
+			A.BASEFEIRAO,
+			A.NmAreaEstruturaComercialC,
+			A.FlPorteA,
+			A.NmSubEstruturaComercialC,
+			A.NmGrupoProdutoMeta,
+
+       		(COUNT(DISTINCT(A.CdParceiroComercial))) AS QTLOJAS,
+            (SUM(A.QtdeContrato)) AS QtdeContrato,
+            (SUM(A.VrProducao)) AS VrProducao,
+            (SUM(A.VrMargemContribuicao))  AS VrMargemContribuicao,
+            (SUM(A.VrMargemContribuicaoFinal))  AS VrMargemContribuicaoFinal,
+            (SUM(A.VrComissaoTotal))  AS VrComissaoTotal,
+            (SUM(A.VrComissaoParcelada))  AS VrComissaoParcelada,
+            (SUM(A.VrAcordoComercial))  AS VrAcordoComercial,
+            (SUM(A.VrPerdaEstimada))  AS VrPerdaEstimada,
+            (SUM(A.VpTxGerencial)) AS VpTxGerencial,
+            (SUM(A.VpTxGerencialRebate)) AS VpTxGerencialRebate,
+            (SUM(A.VpTxJuros)) AS VpTxJuros,
+            (SUM(A.VpTirContabil)) AS VpTirContabil,
+            (SUM(A.VpSpread)) AS VpSpread,
+            (SUM(A.VpSpreadRebate)) AS VpSpreadRebate,
+            (SUM(B.QtGravamesMercado)) AS QtGravamesMercado,
+            (SUM(B.QTCTRSBV)) AS QTCTRSBV
+
+		   FROM CONTROLE A
+		   LEFT JOIN MS_PDV B ON A.CDPARCEIROCOMERCIAL = B.CDPARCEIROCOMERCIAL AND A.BASEMES = B.NUANOMES
+		   WHERE A.basemes >= 202401
+	       GROUP BY 1,2,3,4,5,6
+;QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE PROD_PDV_DURANTE AS
+   SELECT
+
+ 			t1.dtentradaproposta,
+   			202506 as BASEPROPOSTAS,
+			t1.cdparceirocomercial,
+			t1.NmSubEstruturaComercialC,
+			t1.NmAreaEstruturaComercialC,
+			t1.NmGrupoProdutoMeta,
+		    (COUNT(t1.NuContrato)) AS QtdeContrato,
+            (SUM(t1.VrProducao)) AS VrProducao,
+            (SUM(t1.VrMargemContribuicao))  AS VrMargemContribuicao,
+            (SUM(t1.VrMargemContribuicaoFinal))  AS VrMargemContribuicaoFinal,
+            (SUM(t1.VrComissaoTotal))  AS VrComissaoTotal,
+            (SUM(t1.VrComissaoParcelada))  AS VrComissaoParcelada,
+            (SUM(t1.VrAcordoComercial))  AS VrAcordoComercial,
+            (SUM(t1.VrPerdaEstimada))  AS VrPerdaEstimada,
+            (SUM(t1.VpTxGerencial)) AS VpTxGerencial,
+            (SUM(t1.VpTxGerencialRebate)) AS VpTxGerencialRebate,
+            (SUM(t1.VpTxJuros)) AS VpTxJuros,
+            (SUM(t1.VpTirContabil)) AS VpTirContabil,
+            (SUM(t1.VpSpread)) AS VpSpread,
+            (SUM(t1.VpSpreadRebate)) AS VpSpreadRebate
+
+      FROM bases.TBPRODUCAO t1
+
+	  where t1.NmGrupoProdutoMeta in ('CVG Leves', 'Leves')
+	  AND t1.dtentradaproposta between '01Jun2025'd and '15Jul2025'd
+	  AND NmCanalEstruturaComercial = 'Canal Veiculos'
+
+      GROUP BY
+
+	  1,2,3,4,5,6
+
+;QUIT;
+
+
+PROC SQL;
+
+   CREATE TABLE CONTROLE AS
+   SELECT DISTINCT
+
+			A.BASEMES,
+			A.BASEFEIRAO,
+			A.CdParceiroComercial,
+			B.NmAreaEstruturaComercialC,
+			A.FlPorteA,
+			B.NmSubEstruturaComercialC,
+			B.NmGrupoProdutoMeta,
+
+            (SUM(B.QtdeContrato)) AS QtdeContrato,
+            (SUM(B.VrProducao)) AS VrProducao,
+            (SUM(B.VrMargemContribuicao))  AS VrMargemContribuicao,
+            (SUM(B.VrMargemContribuicaoFinal))  AS VrMargemContribuicaoFinal,
+            (SUM(B.VrComissaoTotal))  AS VrComissaoTotal,
+            (SUM(B.VrComissaoParcelada))  AS VrComissaoParcelada,
+            (SUM(B.VrAcordoComercial))  AS VrAcordoComercial,
+            (SUM(B.VrPerdaEstimada))  AS VrPerdaEstimada,
+            (SUM(B.VpTxGerencial)) AS VpTxGerencial,
+            (SUM(B.VpTxGerencialRebate)) AS VpTxGerencialRebate,
+            (SUM(B.VpTxJuros)) AS VpTxJuros,
+            (SUM(B.VpTirContabil)) AS VpTirContabil,
+            (SUM(B.VpSpread)) AS VpSpread,
+            (SUM(B.VpSpreadRebate)) AS VpSpreadRebate
+
+		   FROM FEIRAOCONSOLIDADO_DURANTE A
+           LEFT JOIN PROD_PDV_DURANTE B ON (A.BASEMES = B.BASEPROPOSTAS) AND (A.cdparceirocomercial = B.cdparceirocomercial)
+
+	       GROUP BY 1,2,3,4,5,6,7
+
+;QUIT;
+
+PROC SQL;
+
+   CREATE TABLE CONTROLE_2 AS
+   SELECT DISTINCT
+
+			A.BASEMES,
+			A.BASEFEIRAO,
+			A.NmAreaEstruturaComercialC,
+			A.FlPorteA,
+			A.NmSubEstruturaComercialC,
+			A.NmGrupoProdutoMeta,
+
+       		(COUNT(DISTINCT(A.CdParceiroComercial))) AS QTLOJAS,
+            (SUM(A.QtdeContrato)) AS QtdeContrato,
+            (SUM(A.VrProducao)) AS VrProducao,
+            (SUM(A.VrMargemContribuicao))  AS VrMargemContribuicao,
+            (SUM(A.VrMargemContribuicaoFinal))  AS VrMargemContribuicaoFinal,
+            (SUM(A.VrComissaoTotal))  AS VrComissaoTotal,
+            (SUM(A.VrComissaoParcelada))  AS VrComissaoParcelada,
+            (SUM(A.VrAcordoComercial))  AS VrAcordoComercial,
+            (SUM(A.VrPerdaEstimada))  AS VrPerdaEstimada,
+            (SUM(A.VpTxGerencial)) AS VpTxGerencial,
+            (SUM(A.VpTxGerencialRebate)) AS VpTxGerencialRebate,
+            (SUM(A.VpTxJuros)) AS VpTxJuros,
+            (SUM(A.VpTirContabil)) AS VpTirContabil,
+            (SUM(A.VpSpread)) AS VpSpread,
+            (SUM(A.VpSpreadRebate)) AS VpSpreadRebate,
+            (SUM(B.QtGravamesMercado)) AS QtGravamesMercado,
+            (SUM(B.QTCTRSBV)) AS QTCTRSBV
+
+		   FROM CONTROLE A
+		   LEFT JOIN MS_PDV B ON A.CDPARCEIROCOMERCIAL = B.CDPARCEIROCOMERCIAL AND A.BASEMES = B.NUANOMES
+		   WHERE A.basemes >= 202401
+	       GROUP BY 1,2,3,4,5,6
+;QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.TBRESULTADOFEIRAO AS
+   SELECT
+ year(dtiniciofeirao)*100+ month(dtiniciofeirao) as BASEFEIRAO,
+          t1.IdFeirao,
+          t1.NmFeirao,
+          t1.NmModeloEvento,
+          t1.NmTipoEvento,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+		  t2.FlPorteA,
+		  t1.FlPeriodoComparativo,
+          t1.NmAreaEstruturaComercial,
+          t1.NmSubEstruturaComercialA,
+            (SUM(t1.VrProducaoHistoricaPDV)) FORMAT=18.2 AS VrProducaoHistoricaPDV,
+            (SUM(t1.VrProducaoHistoricaFeirao)) FORMAT=18.2 AS VrProducaoHistoricaFeirao,
+            (SUM(t1.VrProducaoIncrementalPDV)) FORMAT=18.2 AS VrProducaoIncrementalPDV,
+            (SUM(t1.VrProducaoMetaPDV)) FORMAT=18.2 AS VrProducaoMetaPDV,
+            (SUM(t1.VrProducaoMetaFeirao)) FORMAT=18.2 AS VrProducaoMetaFeirao,
+            (SUM(t1.QtPropostaOriginada)) FORMAT=18. AS QtPropostaOriginada,
+            (SUM(t1.QtPropostaAprovada)) FORMAT=18. AS QtPropostaAprovada,
+            (SUM(t1.QtPropostaEfetivada)) FORMAT=18. AS QtPropostaEfetivada,
+            (SUM(t1.VrProducao)) FORMAT=18.2 AS VrProducao,
+            (SUM(t1.QtContrato)) FORMAT=18. AS QtContrato,
+            (SUM(t1.VrMargem)) FORMAT=18.2 AS VrMargem,
+            (SUM(t1.VrMargemContribuicao)) FORMAT=18.2 AS VrMargemContribuicao,
+            (SUM(t1.VrMargemContribuicaoFinal)) FORMAT=18.2 AS VrMargemContribuicaoFinal,
+            (SUM(t1.VpTirContabil)) FORMAT=18.2 AS VpTirContabil,
+            (SUM(t1.VpTirDivulgada)) FORMAT=18.2 AS VpTirDivulgada,
+            (SUM(t1.VpTxGerencial)) FORMAT=18.2 AS VpTxGerencial,
+            '' AS QtCpfCnpj,
+            '' AS QtnucpfcnjpSimulacoes,
+            '' AS QtdPreAnalise,
+            '' AS QtdConvertidas,
+            '' AS QtdConcorrente,
+            '' AS QtdPagas,
+            '' AS QtdEfetivadas,
+			'' AS QtdCCB
+			'' AS QtdCCB
+      FROM BASES.TBRESULTADOFEIRAO AS t1
+	  		LEFT JOIN WORK.BASE_CONTROLE_CONSOLIDADO AS t2
+			ON (t1.CdParceiroComercial = t2.CdParceiroComercial)
+
+	  where year(dtiniciofeirao)*100+ month(dtiniciofeirao) between 202506 and 202506
+      GROUP BY
+
+1,2,3,4,5,6,7,8,9,10,11;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.TBRESULTADOSEGUROS AS
+   SELECT
+			year(t3.dtentradaproposta)*100 + month(t3.dtentradaproposta) as BASEPROPOSTAS,
+		    t3.NmSubEstruturaComercialC,
+			t3.NmAreaEstruturaComercialC,
+			(COUNT(t3.NuContrato)) AS QtdContrato,
+            (SUM(t3.FlBVMais)) AS QtdSPF,
+			(SUM(t3.FlCAP)) AS QtdAP,
+			(SUM(t3.FlCompleto)) AS QtdCompleto,
+			(SUM(t3.FlDemaisSemCompleto)) AS QtdDemais,
+			(SUM(t3.VrBVMais)) AS PremioSPF,
+			(SUM(t3.VrCap)) AS PremioAP,
+			(SUM(t3.VrCompleto)) AS PremioCompleto,
+			(SUM((t3.VrDemais - t3.VrCompleto))) AS PremioDemais
+
+			FROM BASES.TBPRODUCAO t3
+
+	  WHERE t3.NmGrupoProdutoMeta IN ('Leves', 'CVG Leves')
+	  AND year(t3.dtentradaproposta)*100 + month(t3.dtentradaproposta) BETWEEN 202506 AND 202506      GROUP BY 1,2,3;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 4) Base_Feirão */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 2) Base_MarketShare */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 2) Base_MarketShare */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-VWcrEymkS137e3Ho/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE MS_PDV AS
+   SELECT t1.NuAnoMes,
+          t1.CdParceiroComercial,
+            (SUM(t1.QtGravamesMercado)) AS QtGravamesMercado,
+            (SUM(t1.QtContrato)) AS QTCTRSBV
+      FROM BASES.TBPOTENCIALRODAS t1
+      WHERE t1.FxIdade NOT IN
+           (
+           'ZeroKM'
+           ) AND t1.NmGrupoProduto IN
+           (
+           'Leves'
+           )
+
+		   AND T1.NUANOMES >= 202401
+      GROUP BY t1.NuAnoMes,
+               t1.CdParceiroComercial;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 2) Base_MarketShare */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-qCDINdMZOaF8lKIL/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME BASEGRC '/riscosbvf/BA/bases_gerenciais';
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_CONTROLE_CONSOLID);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_CONTROLE_CONSOLID AS
+   SELECT DISTINCT t1.NmTipoParceiroComercial
+      FROM WORK.BASE_CONTROLE_CONSOLIDADO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.TBRESULTADOSEGUROS AS
+   SELECT
+			year(t3.dtentradaproposta)*100 + month(t3.dtentradaproposta) as BASEPROPOSTAS,
+		    t3.NmSubEstruturaComercialC,
+			t3.NmAreaEstruturaComercialC,
+			(COUNT(t3.NuContrato)) AS QtdContrato,
+            (SUM(t3.FlBVMais)) AS QtdSPF,
+			(SUM(t3.FlCAP)) AS QtdAP,
+			(SUM(t3.FlCompleto)) AS QtdCompleto,
+			(SUM(t3.FlDemaisSemCompleto)) AS QtdDemais,
+			(SUM(t3.VrBVMais)) AS PremioSPF,
+			(SUM(t3.VrCap)) AS PremioAP,
+			(SUM(t3.VrCompleto)) AS PremioCompleto,
+			(SUM((t3.VrDemais - t3.VrCompleto))) AS PremioDemais
+
+			FROM BASES.TBPRODUCAO t3
+
+	  WHERE t3.NmGrupoProdutoMeta IN ('Leves', 'CVG Leves')
+	  AND year(t3.dtentradaproposta)*100 + month(t3.dtentradaproposta) BETWEEN 202506 AND 202506      GROUP BY 1,2,3;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBRESULTADOFEIRAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBRESULTADOFEIRAO AS
+   SELECT DISTINCT t1.IdFeirao,
+          t1.NmFeirao,
+          t1.DtInicioFeirao,
+          t1.NmModeloEvento,
+          t1.NmTipoEvento
+      FROM BASES.TBRESULTADOFEIRAO t1
+      WHERE t1.NmTipoEvento = 'FEIRÃO BV NACIONAL' AND t1.DtInicioFeirao = '1Jun2024'd;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBRESULTADOFEIRAO1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBRESULTADOFEIRAO1 AS
+   SELECT DISTINCT t1.IdFeirao
+      FROM BASEGRC.TBRESULTADOFEIRAO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

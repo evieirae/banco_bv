@@ -1,0 +1,485 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Analise_ComposicaoCarteira_Taxa
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:25 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), INFILE  (1x | +10), %MACRO (5x | +25)
+----------------------------------------
+LINES_OF_CODE: 358
+CODE_TASKS_COUNT: 6
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: Dt_Ref, Dt_Ref_Inicial, SafraRef, month, server, year
+DETECTED_MACROS_USED: COUNT, Dt_Ref, Dt_Ref_Inicial, I, SafraInicio, SafraRef, month, passBI, server, userBI, year
+MACRO_SCOPE_GLOBALS: PASSBI, PASSSQL, USERBI, USERSQL
+MACRO_SCOPE_PARAMS: COUNT, SAFRAINICIO, SERVER
+CONNECTION_LIBS: DBCON, DBRPDD
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CARTAOBV.TBL_ATRASO_CARTOESBV [SAS/Local], DBRPDD.TBORIGEMCLASSIFICACAORISCOHIST [SQLSVR], ESTUDOS2.CARTAO3040_&SAFRAREF [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBL_CARTEIRA_CARTOESBV_V0
+IMPORTED_LIBNAMES: DBRPDD
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBL_CARTEIRA_CARTOESBV_V0
+TABLE_READ_PROVENANCE (Flow): CARTAOBV.TBL_ATRASO_CARTOESBV [PROC SQL - FROM], DBRPDD.TBORIGEMCLASSIFICACAORISCOHIST [DATA Step - SET], ESTUDOS2.CARTAO3040_&SAFRAREF [PROC SQL - FROM], WORK.TBL_CARTEIRA_CARTOESBV_V0 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CARTEIRA_PARC_TAXAMEDIA, CARTEIRA_PARC_TAXAMEDIA_&I, TBL_CARTEIRA_CARTOESBV_1, TBL_CARTEIRA_CARTOESBV_V0, TBL_CARTEIRA_PARCELADOS, TBORIGEMCLASSIFICACAORISCO, TESTE, WORK.QUERY_FOR_TBL_CARTEIRA_CARTOESBV, WORK.TBL_CARTEIRAOVER_CARTOESBV
+DYNAMIC REFS (Ambiguous): ESTUDOS2.CARTAO3040_{SAFRAREF}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET server=%upcase(&server.);
+%LET year=%sysfunc(int(&SafraInicio/100));
+%LET month=%sysfunc(sum(%sysfunc(mod(&SafraInicio,100)),-1));
+%LET Dt_Ref_Inicial=%sysfunc(mdy(&month,1,&year));
+%LET Dt_Ref=%sysfunc(intnx(month.1,&Dt_Ref_Inicial,%sysfunc(sum(&I,-1)),S));
+%LET SafraRef=%sysfunc(sum(%eval(%sysfunc(year(&Dt_Ref))*100),%eval(%sysfunc(month(&Dt_Ref)))));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 33 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dlTKMVr6CWjbuu39/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME DBRPDD SQLSVR Datasrc=DBRPDD_AD SCHEMA=dbo USER="marco.covielo" PASSWORD="sw4ma#1vU";
+
+
+
+
+options compress=binary;
+%global userBI;
+%global passBI;
+%global userSQL;
+%global passSQL;
+data _NULL_;
+	call symputx("userBI","marco_covielo");
+	call symputx("passBI","dc@53HeH#HHB");
+run;
+%macro ConexaoIQ(server);
+	%let server = %upcase(&server.);
+	%if &server. eq BI
+	%then %do;
+		connect to sasiosiq as dbcon (host="iqprdbi" server=iqprdbi user=&userBI. password=&passBI.);
+	%end;
+%mend;
+%macro IQ;connection to dbcon%mend;
+
+data TbOrigemClassificacaoRisco;
+	set DBRPDD.TbOrigemClassificacaoRiscoHist;
+	where NmSistemaOrigem='DXC' and datepart(DtProcessamento) in
+	      (
+           '31JAN2023'D,'28FEB2023'D,'31MAR2023'D,'30APR2023'D,'31MAY2023'D,'30JUN2023'D,'31JUL2023'D,'31AUG2023'D,'30SEP2023'D,'31OCT2023'D,'30NOV2023'D,'31DEC2023'D
+           '31JAN2024'D,'29FEB2024'D,'31MAR2024'D
+          )
+          AND CdProduto = 2;
+run;
+
+
+PROC SQL;
+CREATE TABLE TBL_CARTEIRA_CARTOESBV_V0 AS
+
+SELECT  A.DtProcessamento,
+        YEAR(DATEPART(A.DtProcessamento))*100 + MONTH(DATEPART(A.DtProcessamento)) AS SafraRef,
+		YEAR(DATEPART(A.DtInicioContrato))*100 + MONTH(DATEPART(A.DtInicioContrato)) AS SafraCtt_Cadoc,
+		DATEPART(A.DtInicioContrato) AS DtContrato_Cadoc,
+		A.NuContrato,
+		INPUT(SUBSTRN(COMPRESS(A.NuContrato),5,LENGTH(COMPRESS(A.NuContrato))-4),20.) AS CdContratoParcelamentoFtra,
+		INPUT(SUBSTRN(COMPRESS(A.NuContrato),1,2),20.) AS CdProduto,
+
+		CASE WHEN a.CdModalidade = 204 THEN 'Carteira Rotativo'
+		     WHEN a.CdModalidade = 210 THEN 'Carteira Parcelado'
+		     WHEN a.CdModalidade = 218 THEN 'Carteira Rotativo Atraso'
+		     WHEN a.CdModalidade = 1304 THEN 'Carteira A Vencer'
+		     WHEN a.CdModalidade IN (1901,1904) THEN 'Limite'
+		     ELSE 'Verificar'
+		     END AS NmGrupoCarteira,
+
+		CASE WHEN A.CdClassificacaoOperacao IN ('A','B','C')
+		     THEN 'Carteira Under60'
+		     ELSE 'Carteira Over60'
+		     END AS FlagCarteiraRotativo,
+
+		CASE WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '01' THEN '01-Rotativo'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '02' THEN '02-Saque'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '03' THEN '03-Parcelamento Emissor'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '04' THEN '04-Pagamento de Contas'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '05' THEN '05-Acordo em Fatura'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '06' THEN '06-Parcelamento de Fatura'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '07' THEN '07-Compras à Vista'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '08' THEN '08-Limite de Crédito'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '09' THEN '09-Parcelamento Total'
+		     WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '0A' THEN '0A-Saque Parcelado'
+			 WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '0B' THEN '0B-Crédito Pessoal'
+			 WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '0C' THEN '0C-Crediário'
+			 WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '0D' THEN '05-Acordo em Fatura CL'
+			 WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '0E' THEN '0E-PagContas Parcelado'
+			 WHEN SUBSTRN(COMPRESS(A.NuContrato),3,2) = '0F' THEN '06-Parcelamento de Fatura'
+			 ELSE 'Verificar'
+		     END AS NmCarteiraSegregada,
+
+	   CASE WHEN CALCULATED NmGrupoCarteira = 'Carteira A Vencer'                                                                     THEN 'Carteira À Vista'
+	        WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada = '03-Parcelamento Emissor'     THEN 'Carteira Parcelamento Emissor'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('05-Acordo em Fatura')      THEN 'Carteira Parcelamento Acordo'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('05-Acordo em Fatura CL')   THEN 'Carteira Parcelamento Acordo CL'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada = '09-Parcelamento Total'       THEN 'Carteira Parcelamento Especial'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('06-Parcelamento de Fatura','0C-Crediário','0A-Saque Parcelado','0F-Compulsório') THEN 'Carteira Parcelamento Fatura'
+
+		    WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('0B-Crédito Pessoal')     THEN 'Carteira Crédito Pessoal'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('0E-PagContas Parcelado') THEN 'Pagamento de Contas Parcelado'
+
+            WHEN (CALCULATED NmGrupoCarteira = 'Carteira Rotativo' OR CALCULATED NmGrupoCarteira = 'Carteira Rotativo Atraso') AND CALCULATED FlagCarteiraRotativo = 'Carteira Over60'  THEN 'Carteira Rotativo Over60'
+	        WHEN (CALCULATED NmGrupoCarteira = 'Carteira Rotativo' OR CALCULATED NmGrupoCarteira = 'Carteira Rotativo Atraso') AND CALCULATED FlagCarteiraRotativo = 'Carteira Under60' THEN 'Carteira Rotativo Under60'
+            ELSE 'Verificar'
+			END AS NmCarteiraDRE,
+
+		A.NuCpfCnpj,
+		b.Qt_DiasAtraso,
+		A.VlSaldoCarteira
+
+FROM TbOrigemClassificacaoRisco AS a
+
+LEFT JOIN
+(
+	SELECT DISTINCT t.DtProcessamento,
+                    t.NuCpfCnpj,
+	                MAX(t.QtDiaAtraso) AS Qt_DiasAtraso
+	FROM TbOrigemClassificacaoRisco AS t
+    WHERE t.CdClassificacaoOperacao <> 'HH'
+	GROUP BY 1,2
+) AS b
+ON a.DtProcessamento = b.DtProcessamento AND
+   a.NuCpfCnpj = b.NuCpfCnpj
+
+WHERE a.CdClassificacaoOperacao <> 'HH'
+ORDER BY 2;
+QUIT;
+
+proc sql;
+
+create table teste as
+
+select SafraRef,SafraCtt_Cadoc, sum(VlSaldoCarteira) as saldo
+from TBL_CARTEIRA_CARTOESBV_V0
+where NmCarteiraDRE = 'Carteira Parcelamento Acordo CL'
+group by 1,2 order by 1,2;
+quit;
+
+
+PROC SQL;
+
+	CREATE TABLE TBL_CARTEIRA_PARCELADOS AS
+
+	SELECT  SafraRef,
+	        Flag_Cruzamento,
+			YEAR(DtContrato)*100 + MONTH(DtContrato) AS SafraCtt,
+			SafraCtt_Cadoc,
+			NmCarteiraDRE,
+			TipoParcelado,
+			NuParcelaAdesao,
+			TxRateAdesao,
+			SUM(VlSaldoCarteira) AS Vr_Carteira
+
+	FROM TBL_CARTEIRA_CARTOESBV_1
+	GROUP BY 1,2,3,4,5,6,7,8
+;
+QUIT;
+
+PROC SQL;
+%ConexaoIQ(server=BI);
+
+	CREATE TABLE TBL_CARTEIRA_CARTOESBV_1 AS
+
+	SELECT  a.*,
+	        YEAR(INTNX('MONTH',DATEPART(DtProcessamento),-1))*100 + MONTH(INTNX('MONTH',DATEPART(DtProcessamento),-1)) AS SafraRef_Ant,
+	        CASE WHEN b.CPF IS NOT MISSING THEN 'S' ELSE 'N' END AS Flag_Cruzamento,
+	        b.CdContaCartao,
+	        b.DtContrato,
+			b.DtAceleracao,
+			b.VrAceleracao,
+			INTCK('MONTH',b.DtContrato,DATEPART(a.DtProcessamento)) AS MOB_Contrato,
+			CASE WHEN b.CPF IS NOT MISSING THEN b.TipoParcelado ELSE NmCarteiraDRE END AS TipoParcelado,
+	        b.NuParcelaAdesao,
+			b.TxRateAdesao
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Share de Carteira por Taxa */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 33 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Share de Carteira por Taxa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-fPJxVXw44zsbnSGi/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA CARTEIRA_PARC_TAXAMEDIA;
+
+INFILE DATALINES DSD DELIMITER="09"x;
+
+INPUT
+	SafraRef :BEST12.
+	Mod :$4.
+	TaxaContrato :BEST8.
+	NmGrupoCarteira :$35.
+	FlagCarteiraRotativo :$35.
+	NmCarteiraSegregada :$35.
+	NmCarteiraDRE :$35.
+	SaldoCarteira :BEST12.
+;
+DATALINES;
+RUN;
+
+options symbolgen;
+options compress=binary reuse=yes replace;
+
+%MACRO DO_LABEL_TX(SafraInicio,COUNT);
+
+%DO I = 1 %TO (&COUNT);
+
+	%let year = %sysfunc(int(&SafraInicio/100));
+	%let month = %sysfunc(mod(&SafraInicio,100));
+	
+	%let Dt_Ref_Inicial = %sysfunc(mdy(&month,1,&year));
+	%let Dt_Ref = %sysfunc(intnx(month.1,&Dt_Ref_Inicial,%sysfunc(sum(&I,-1)),S));
+	%let SafraRef = %sysfunc(sum(%eval(%sysfunc(year(&Dt_Ref))*100),%eval(%sysfunc(month(&Dt_Ref)))));
+
+	PROC SQL;
+
+	CREATE TABLE CARTEIRA_PARC_TAXAMEDIA_&I. AS
+
+	select &SafraRef. as SafraRef,
+	       a.Mod,
+		   ROUND((1+a.TaxEft/100)**(1/12)-1,0.001)  AS TaxaContrato,
+
+		   CASE WHEN a.Mod = '0204' THEN 'Carteira Rotativo'
+		     WHEN a.Mod = '0210' THEN 'Carteira Parcelado'
+		     WHEN a.Mod = '0218' THEN 'Carteira Rotativo Atraso'
+		     WHEN a.Mod = '1304' THEN 'Carteira A Vencer'
+		     WHEN a.Mod IN ('1901','1904') THEN 'Limite'
+		     ELSE 'Verificar'
+		     END AS NmGrupoCarteira,
+
+			CASE WHEN A.ClassOp IN ('A','B','C')
+			     THEN 'Carteira Under60'
+			     ELSE 'Carteira Over60'
+			     END AS FlagCarteiraRotativo,
+
+		   CASE WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '01' THEN '01-Rotativo'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '02' THEN '02-Saque'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '03' THEN '03-Parcelamento Emissor'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '04' THEN '04-Pagamento de Contas'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '05' THEN '05-Acordo em Fatura'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '06' THEN '06-Parcelamento de Fatura'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '07' THEN '07-Compras à Vista'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '08' THEN '08-Limite de Crédito'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '09' THEN '09-Parcelamento Total'
+		     WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '0A' THEN '0A-Saque Parcelado'
+			 WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '0B' THEN '0B-Crédito Pessoal'
+			 WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '0C' THEN '0C-Crediário'
+			 WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '0D' THEN '05-Acordo em Fatura CL'
+			 WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '0E' THEN '0E-PagContas Parcelado'
+			 WHEN SUBSTRN(COMPRESS(A.Contrt),3,2) = '0F' THEN '06-Parcelamento de Fatura'
+			 ELSE 'Verificar'
+		     END AS NmCarteiraSegregada,
+
+	   CASE WHEN CALCULATED NmGrupoCarteira = 'Carteira A Vencer'                                                                     THEN 'Carteira À Vista'
+	        WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada = '03-Parcelamento Emissor'     THEN 'Carteira Parcelamento Emissor'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('05-Acordo em Fatura')      THEN 'Carteira Parcelamento Acordo'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('05-Acordo em Fatura CL')   THEN 'Carteira Parcelamento Acordo CL'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada = '09-Parcelamento Total'       THEN 'Carteira Parcelamento Especial'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('06-Parcelamento de Fatura','0C-Crediário','0A-Saque Parcelado','0F-Compulsório') THEN 'Carteira Parcelamento Fatura'
+
+		    WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('0B-Crédito Pessoal')     THEN 'Carteira Crédito Pessoal'
+			WHEN CALCULATED NmGrupoCarteira = 'Carteira Parcelado' AND CALCULATED NmCarteiraSegregada IN ('0E-PagContas Parcelado') THEN 'Pagamento de Contas Parcelado'
+
+            WHEN (CALCULATED NmGrupoCarteira = 'Carteira Rotativo' OR CALCULATED NmGrupoCarteira = 'Carteira Rotativo Atraso') AND CALCULATED FlagCarteiraRotativo = 'Carteira Over60'  THEN 'Carteira Rotativo Over60'
+	        WHEN (CALCULATED NmGrupoCarteira = 'Carteira Rotativo' OR CALCULATED NmGrupoCarteira = 'Carteira Rotativo Atraso') AND CALCULATED FlagCarteiraRotativo = 'Carteira Under60' THEN 'Carteira Rotativo Under60'
+            ELSE 'Verificar'
+			END AS NmCarteiraDRE,
+
+	       SUM(Saldo) AS SaldoCarteira
+	from estudos2.CARTAO3040_&SafraRef. a
+	GROUP BY 1,2,3,4,5,6,7
+
+	;
+	QUIT;
+
+	DATA CARTEIRA_PARC_TAXAMEDIA;
+
+	SET CARTEIRA_PARC_TAXAMEDIA
+	    CARTEIRA_PARC_TAXAMEDIA_&I.
+	;
+	RUN;
+
+%END;
+%MEND DO_LABEL_TX;
+
+%DO_LABEL_TX(202301,25);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Share de Carteira por Taxa */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira Over */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 33 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira Over */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-CJDMCN52g5ddiO4G/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.TBL_CARTEIRAOVER_CARTOESBV AS
+
+	SELECT 	a.SafraRef,
+	        CASE WHEN COALESCE(a.DiasAtraso,0) > 15  THEN 'Cart_Over15'
+			     ELSE 'Outros' END AS FaixaOver15,
+	        CASE WHEN COALESCE(a.DiasAtraso,0) > 30  THEN 'Cart_Over30'
+			     ELSE 'Outros' END AS FaixaOver30,
+			CASE WHEN COALESCE(a.DiasAtraso,0) > 60  THEN 'Cart_Over60'
+			     ELSE 'Outros' END AS FaixaOver60,
+			CASE WHEN COALESCE(a.DiasAtraso,0) > 90  THEN 'Cart_Over90'
+			     ELSE 'Outros' END AS FaixaOver90,
+	        CASE WHEN COALESCE(a.DiasAtraso,0) BETWEEN 15  AND 90  THEN 'Cart_Over15_90'
+			     ELSE 'Outros' END AS FaixaOver15_90,
+	        SUM(a.SaldoCarteira) AS SaldoCarteira
+	FROM CARTAOBV.TBL_ATRASO_CARTOESBV AS a
+	GROUP BY 1,2,3,4,5,6;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira Over */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME DBRPDD SQLSVR Datasrc=DBRPDD_AD SCHEMA=dbo USER="marco.covielo" PASSWORD="sw4ma#1vU";
+
+
+
+
+options compress=binary;
+%global userBI;
+%global passBI;
+%global userSQL;
+%global passSQL;
+data _NULL_;
+	call symputx("userBI","marco_covielo");
+	call symputx("passBI","dc@53HeH#HHB");
+run;
+%macro ConexaoIQ(server);
+	%let server = %upcase(&server.);
+	%if &server. eq BI
+	%then %do;
+		connect to sasiosiq as dbcon (host="iqprdbi" server=iqprdbi user=&userBI. password=&passBI.);
+	%end;
+%mend;
+%macro IQ;connection to dbcon%mend;
+
+data TbOrigemClassificacaoRisco;
+	set DBRPDD.TbOrigemClassificacaoRiscoHist;
+	where NmSistemaOrigem='DXC' and datepart(DtProcessamento) in
+	      (
+           '31JAN2023'D,'28FEB2023'D,'31MAR2023'D,'30APR2023'D,'31MAY2023'D,'30JUN2023'D,'31JUL2023'D,'31AUG2023'D,'30SEP2023'D,'31OCT2023'D,'30NOV2023'D,'31DEC2023'D
+           '31JAN2024'D,'29FEB2024'D,'31MAR2024'D
+          )
+          AND CdProduto = 2;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBL_CARTEIRA_CARTOESBV);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBL_CARTEIRA_CARTOESBV AS
+   SELECT t1.SafraCtt_Cadoc,
+          t1.NmCarteiraDRE,
+          
+            (SUM(t1.VlSaldoCarteira)) FORMAT=20.4 AS SUM_of_VlSaldoCarteira
+      FROM WORK.TBL_CARTEIRA_CARTOESBV_V0 t1
+      GROUP BY t1.SafraCtt_Cadoc,
+               t1.NmCarteiraDRE;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBL_CARTEIRA_CARTOESBV);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBL_CARTEIRA_CARTOESBV AS
+   SELECT t1.SafraRef,
+          t1.SafraCtt_Cadoc,
+          t1.NmCarteiraDRE,
+          
+            (SUM(t1.VlSaldoCarteira)) FORMAT=20.4 AS SUM_of_VlSaldoCarteira
+      FROM WORK.TBL_CARTEIRA_CARTOESBV_V0 t1
+      GROUP BY t1.SafraRef,
+               t1.SafraCtt_Cadoc,
+               t1.NmCarteiraDRE;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */

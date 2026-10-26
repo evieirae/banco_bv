@@ -1,0 +1,210 @@
+START_METADATA
+PROJECT: SAS_UC4__tbacessominhabv
+FILE_SAS: tbacessominhabv.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:58 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 156
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ================== TbAcessoMinhaBV ===================== */
+/* ======================================================== */
+/**/
+/*data TbArquivo;*/
+/*	set BASEGRC.TbBaseAcessoMinhaBV;*/
+/*;run;*/
+/**/
+/*proc sql;delete from TbArquivo where DtAcesso >= '01May2020'd;quit;*/
+/**/
+/*proc sql;*/
+/*create table TbPessoaProducao as */
+/*select*/
+/*	 NuContrato*/
+/*	,NuCpfCnpj*/
+/*	,DtContrato as DtInicioVigencia format date9.*/
+/*	,intnx('month',DtContrato,2,'s') as DtFimVigencia format date9.*/
+/*from tmp.TbProducao*/
+/*where NuAnoMes >= 201901*/
+/*group by 1,2,3,4*/
+/*;quit;*/
+/**/
+/*proc sql;*/
+/*create table TbCpf as*/
+/*select distinct*/
+/*	NuCpfCnpj*/
+/*from TbPessoaProducao*/
+/*where NuCpfCnpj is not null*/
+/*;run;*/
+/**/
+/*proc sql;*/
+/*create table TbHash as*/
+/*select*/
+/*	 lower(a.NuCpfCnpj_NEW) as hash*/
+/*	,a.nucpfcnpj*/
+/*from fi_prodt.TbDbmkUnificada  a*/
+/*	inner join TbCpf  b*/
+/*		on  a.NuCpfCnpj = b.NuCpfCnpj*/
+/*;run;*/
+/**/
+/*proc sql;*/
+/*create table TbAcessosMinhaBV as*/
+/*select*/
+/*	 Hash.NuCpfCnpj*/
+/*	,mdy*/
+/*	(*/
+/*		 case compress(upper(substr(AcessosMinhaBV.Date,1,3)))*/
+/*			when 'JAN' then 1*/
+/*			when 'FEB' then 2*/
+/*			when 'MAR' then 3*/
+/*			when 'APR' then 4*/
+/*			when 'MAY' then 5*/
+/*			when 'JUN' then 6*/
+/*			when 'JUL' then 7*/
+/*			when 'AUG' then 8*/
+/*			when 'SEP' then 9*/
+/*			when 'OCT' then 10*/
+/*			when 'NOV' then 11*/
+/*			when 'DEC' then 12*/
+/*		 end*/
+/*		,input(substr(AcessosMinhaBV.Date,index(AcessosMinhaBV.Date,' ')+1,(index(AcessosMinhaBV.Date,',')-index(AcessosMinhaBV.Date,' '))-1),2.)*/
+/*		,input(substr(AcessosMinhaBV.Date,index(AcessosMinhaBV.Date,',')+2,4),4.)*/
+/*	) as DtAcesso format yymmdd10.*/
+/*from dados.TbMinhaBVEstudo60 AcessosMinhaBV */
+/*	inner join TbHash Hash*/
+/*		on  AcessosMinhaBV.'BV ID (v5) (evar5)'n = Hash.hash*/
+/**/
+/*group by 1,2*/
+/*;run;*/
+/**/
+/*proc sql;delete from TbAcessosMinhaBV where DtAcesso < '01May2020'd;quit;*/
+/**/
+/*data TbAcessosMinhaBV_final;*/
+/*set*/
+/*	TbAcessosMinhaBV*/
+/*	TbArquivo*/
+/*;run;*/
+/**/
+/**/
+/*proc sql;*/
+/*create table TbAcessosPessoa as*/
+/*select*/
+/*	 PessoaProducao.NuContrato*/
+/*	,sum(case when AcessosMinhaBV.NuCpfCnpj is null then 0 else 1 end)as QtAcessos*/
+/*from TbPessoaProducao PessoaProducao*/
+/**/
+/*	left join TbAcessosMinhaBV_final AcessosMinhaBV*/
+/*		on  PessoaProducao.NuCpfCnpj = AcessosMinhaBV.NuCpfCnpj*/
+/*		and AcessosMinhaBV.DtAcesso between PessoaProducao.DtInicioVigencia and PessoaProducao.DtFimVigencia*/
+/**/
+/*group by 1*/
+/*;run;*/
+/**/
+/**/
+/**/
+/*proc sql;*/
+/*create table TbAtualizacao as*/
+/*select*/
+/*	max(DtAcesso) as DtAtualizacao format date9.*/
+/*from TbAcessosMinhaBV_final*/
+/*;run;*/
+/**/
+/**/
+/*proc sql;*/
+/*create table TbAcessoContratoMinhaBV as*/
+/*select*/
+/*	 Producao.NuAnoMes	*/
+/*	,Producao.NmGrupoProdutoMeta*/
+/*	,Producao.DsTipoCanalProducao*/
+/*	,Producao.CdColaborador*/
+/*	,Producao.NmColaborador*/
+/*	,Producao.CdParceiroComercial*/
+/*	,Producao.NmParceiroComercial*/
+/*	,Producao.NmTipoParceiroComercial*/
+/*	,Producao.NmPromotora*/
+/*	,Producao.NmAreaEstruturaComercial*/
+/*	,Producao.NmSubEstruturaComercialH*/
+/*	,Producao.NmSubEstruturaComercialA*/
+/*	,Producao.NmCanalEstruturaComercial*/
+/*	,Producao.DsLoginN1*/
+/*	,Producao.DsLoginN2H*/
+/*	,Producao.DsLoginN2A*/
+/*	,Producao.DsLoginN3H*/
+/*	,Producao.DsLoginN3A*/
+/*	,Producao.LstSubstituicao*/
+/*	,Atualizacao.DtAtualizacao*/
+/*	,count(*) as QtContrato*/
+/*	,sum(case when AcessoPessoa.QtAcessos > 0 then 1 else 0 end)as QtContratoAcessos*/
+/*	,sum(AcessoPessoa.QtAcessos) as QtAcessos*/
+/**/
+/*from tmp.TbProducao Producao*/
+/*	*/
+/*	left join TbAcessosPessoa AcessoPessoa*/
+/*		on  Producao.NuContrato = AcessoPessoa.NuContrato*/
+/**/
+/*	left join TbAtualizacao Atualizacao*/
+/*		on  1=1*/
+/**/
+/*where Producao.NuAnoMes >= 201901*/
+/*group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20*/
+/*;run;*/
+/**/
+/*proc export */
+/*data=TbAcessoContratoMinhaBV*/
+/*file=' /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbAcessoContratoMinhaBV.csv' replace*/
+/*dbms=dlm;*/
+/*delimiter=';';*/
+/*run;*/
+/**/
+/*X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbAcessoContratoMinhaBV.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";*/

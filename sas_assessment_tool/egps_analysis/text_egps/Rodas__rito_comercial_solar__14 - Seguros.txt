@@ -1,0 +1,424 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 14 - Seguros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 348
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_SEGUROS_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SEGUROS_CANAL_SEM, BASE_SEGUROS_CANAL_TOTAL, BASE_SEGUROS_FILIAL_SEM, BASE_SEGUROS_FILIAL_TOTAL, BASE_SEGUROS_GRS_SEM, BASE_SEGUROS_GRS_TOTAL, BASE_SEGUROS_PDVS_SEM, BASE_SEGUROS_PDVS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+
+Proc Sql;
+Create Table Base_Seguros_Canal_Total as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Seguros_Canal_Sem as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,Case
+	When Day(Seg.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Seg.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Seg.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Seg.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Seguros_Filial_Total as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'Filial' as Visao
+,"" as DsLoginN1C
+,Seg.DsLoginN2C
+,Seg.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Seg.NmAreaEstruturaComercial as Dimensao2
+,Seg.NmAreaEstruturaComercial as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Seguros_Filial_Sem as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'Filial' as Visao
+,"" as DsLoginN1C
+,Seg.DsLoginN2C
+,Seg.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Seg.NmAreaEstruturaComercial as Dimensao2
+,Seg.NmAreaEstruturaComercial as Dimensao3
+,Case
+	When Day(Seg.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Seg.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Seg.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Seg.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Seguros_Grs_Total as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'GRs' as Visao
+,Seg.DsLoginN1 as DsLoginN1C
+,Seg.DsLoginN2C
+,Seg.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Seg.NmAreaEstruturaComercial as Dimensao2
+,Seg.NmColaborador as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Seguros_Grs_Sem as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'GRs' as Visao
+,Seg.DsLoginN1 as DsLoginN1C
+,Seg.DsLoginN2C
+,Seg.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Seg.NmAreaEstruturaComercial as Dimensao2
+,Seg.NmColaborador as Dimensao3
+,Case
+	When Day(Seg.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Seg.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Seg.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Seg.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Seguros_PDVs_Total as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'Cobans' as Visao
+,Seg.DsLoginN1C as DsLoginN1C
+,Seg.DsLoginN2C
+,Seg.DsLoginN3C
+,Seg.NmAreaEstruturaComercial as Dimensao1
+,Seg.NmColaborador as Dimensao2
+,Case
+	When Seg.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Seg.CdParceiroComercial,8.) || '-' || Seg.NmParceiroComercial
+End as Dimensao3
+/*,put(Seg.CdParceiroComercial, 8.) || '-' || Seg.NmParceiroComercial as Dimensao3*/
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Cobans_Solar_Saida as Parc On Seg.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Seguros_PDVs_Sem as
+Select
+'Seguros' as Base
+,Seg.NuAnoMes
+,'Cobans' as Visao
+,Seg.DsLoginN1C as DsLoginN1C
+,Seg.DsLoginN2C
+,Seg.DsLoginN3C
+,Seg.NmAreaEstruturaComercial as Dimensao1
+,Seg.NmColaborador as Dimensao2
+,Case
+	When Seg.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Seg.CdParceiroComercial,8.) || '-' || Seg.NmParceiroComercial
+End as Dimensao3
+/*,put(Seg.CdParceiroComercial, 8.) || '-' || Seg.NmParceiroComercial as Dimensao3*/
+,Case
+	When Day(Seg.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Seg.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Seg.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Seg.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Seg.QtCorridosDiaUtilMes
+
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Sum(Seg.VrBVMais) as VrBVMais
+,Sum(Seg.VrCAP) as VrCAP
+,Sum(Seg.VrPlacaSolar) as VrPlacaSolar
+,Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End) as VrProducao_PF_BVMais
+,Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End) as VrProducao_PF_AP_Placa
+,(Sum(Seg.VrBVMais)/Sum(Case When Seg.TpPessoa = 'F' Then Seg.VrProducao Else 0 End)) as Penet_BvMais
+,(Sum(Seg.VrCAP)/Sum(Case When Seg.FlCapEleg = 1 Then Seg.VrProducao Else 0 End)) As Penet_AP
+,Max(Seg.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Seg
+Left Join Base_Cobans_Solar_Saida as Parc On Seg.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+Left Join Base_Porte_Cobans_CNPJ as Porte On Seg.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Seg.NuAnomes = Porte.NuAnomes
+Where Seg.NuANomes >= &Base_m5. and Seg.NmGrupoProdutometa = 'Solar' and NmCanalEstruturaComercial = 'Canal Solar' and NmColaborador NE 'OPERADOR ESPECIAL CANAL DIGITAL' and
+		Seg.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Data ritosol.Base_Seguros_Solar;
+Set
+	Base_Seguros_PDVs_Total
+/*	Base_Seguros_PDVs_Sem*/
+
+	Base_Seguros_GRs_Total
+/*	Base_Seguros_GRs_Sem*/
+
+	Base_Seguros_Filial_Total
+/*	Base_Seguros_Filial_Sem*/
+
+	Base_Seguros_Canal_Total
+/*	Base_Seguros_Canal_Sem*/
+
+;Run;

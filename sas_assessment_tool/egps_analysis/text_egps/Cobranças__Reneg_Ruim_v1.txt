@@ -1,0 +1,1794 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Reneg_Ruim_v1
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:40 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 35)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (7x | +35)
+----------------------------------------
+LINES_OF_CODE: 1469
+CODE_TASKS_COUNT: 6
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (7x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: EMPILHA = /riscosbv/cobranca/gtavares/Reneg/Empilha; PRETER = /riscosbv/cobranca/preter; RENEG = /riscosbv/cobranca/gtavares/Reneg
+DETECTED_MACROS_DEFINED: base, libname, path, work
+DETECTED_MACROS_USED: ANOMES, anomes, base, dt_fim, dt_fim_m0, dt_fim_mob3, dt_inicio, libname, path, safra_m0, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES, BASE, DT_FIM, DT_FIM_M0, DT_FIM_MOB3, DT_INICIO, LIBNAME, SAFRA_M0
+CONNECTION_LIBS: PERM, PERM2
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY/GCP], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [BIGQUERY], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY], EMPILHA.EMPILHA_RENEG_FINAL_&ANOMES [SAS/Local], PRETER.BASE_COBRANCA [SAS/Local], PRETER.EMP_2024_BASE_COBRANCA [SAS/Local], RENEG.BASE_ELEG_CONT_&ANOMES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: EMPILHA, PRETER, RENEG
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ELEG_CONT_&ANOMES, WORK.EMPILHA_RENEG_FINAL_&ANOMES
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [PROC SQL - FROM], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_DBRENEG.TB_RENEG_SIMULADOR [PROC SQL - FROM; Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM; Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], EMPILHA.EMPILHA_RENEG_FINAL_&ANOMES [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], PRETER.BASE_COBRANCA [DATA Step - SET], PRETER.EMP_2024_BASE_COBRANCA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], RENEG.BASE_ELEG_CONT_&ANOMES [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], WORK.BASE_ELEG_CONT_&ANOMES [PROC SQL - JOIN], WORK.EMPILHA_RENEG_FINAL_&ANOMES [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, ANALITICO, ANALITICO_&ANOMES, BASE_COBRANCA, CUBO_FINAL, DT_BAIXA_&ANOMES, FINAL_RENEG_RUIM_RISCO, GCON, GCON_&ANOMES, RENEG_RUIM, RENEG_RUIM_&ANOMES, RENEG_RUIM_RISCO_&ANOMES, RENEG_SIMULADOR_ATRASO, RENEG_SIMULADOR_ATRASO_&ANOMES, WORK.RENEG_SIMULADOR, WORK.RENEG_SIMULADOR_&ANOMES
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET libname=%sysfunc(lowcase(&libname.));
+%LET base=%sysfunc(lowcase(&base.));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Reneg Ruim */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 54 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Reneg Ruim */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-I1YfF6KD9IpMQnD3/code.sas */
+/* =========================INÍCIO TASK========================= */
+%reneg_ruim_2('2025-08-01', '2025-09-01', 202508, 202507);
+%reneg_ruim_2('2025-09-01', '2025-10-01', 202509, 202508);
+
+
+DATA ANALITICO;
+SET ANALITICO_:;
+RUN;
+
+
+DATA FINAL_RENEG_RUIM_RISCO;
+SET RENEG_RUIM_RISCO_:;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_FINAL AS
+SELECT
+	SAFRA_RENEG
+	,PRODUTO
+	,FX_ATRASO
+	,FlRestruturacaoContrato
+	,FL_RENEG_RUIM
+	,FL_RISCO_RENEG_RUIM
+	,SAFRA_ATRASO
+	,MOB
+	,POLITICA
+	,COUNT(NUCONTRATOGESTAO) AS QNT
+	,SUM(SALDO_M0) AS SALDO_M0
+
+FROM FINAL_RENEG_RUIM_RISCO
+
+GROUP BY
+	SAFRA_RENEG
+	,PRODUTO
+	,FX_ATRASO
+	,FlRestruturacaoContrato
+	,FL_RENEG_RUIM
+	,FL_RISCO_RENEG_RUIM
+	,SAFRA_ATRASO
+	,MOB
+	,POLITICA
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Reneg Ruim */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Macro */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 54 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Macro */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-2Xgv8vrrN8qet7mD/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PRETER   '/riscosbv/cobranca/preter';
+LIBNAME EMPILHA   '/riscosbv/cobranca/gtavares/Reneg/Empilha';
+LIBNAME RENEG   '/riscosbv/cobranca/gtavares/Reneg';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%DESCOMPACTA(PRETER, emp_2024_base_cobranca);
+
+DATA BASE_COBRANCA;
+SET EMP_2024_BASE_COBRANCA
+	PRETER.BASE_COBRANCA:;
+WHERE NmProdutoRisco in ('LEVES', 'MOTOS', 'PESADOS', 'CVG LEVES', 'CVG PESADOS', 'CVG_LEVES', 'CVG_PESADOS');
+RUN;
+
+%macro reneg_ruim(dt_inicio, dt_fim, anomes, safra_m0);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+
+CREATE TABLE WORK.RENEG_SIMULADOR_&anomes. AS
+SELECT
+	*,
+	year(dt_baixa)*100+month(dt_baixa) as safra_reneg
+
+FROM CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		NuContratoGestao,
+		MAX(SqContratoFinanceiro) AS SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		MAX(sqcontratofinanceironovo) as sqcontratofinanceironovo,
+		MAX(DATE(dt_baixa))	AS dt_baixa,
+		MAX(DATE(dt_reneg))	AS dt_reneg,
+		FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+		WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim. and
+			(dt_cancelamento is null or dt_reativacao is not null) and
+			ST_RENEG = 3
+
+		GROUP BY NuContratoGestao, NuContratoGestaoNovo, FlRestruturacaoContrato
+
+		)
+
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE GCON_&ANOMES. AS
+SELECT *
+	,YEAR(DTPROCESSAMENTO)*100 + MONTH(DTPROCESSAMENTO) AS SAFRA_ATRASO
+
+FROM CONNECTION TO PERM(
+
+WITH LISTA_CONTRATOS AS (
+
+	SELECT DISTINCT
+		NuContratoGestao
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+	WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim. and
+	(dt_cancelamento is null or dt_reativacao is not null) and
+	ST_RENEG = 3
+)
+
+	SELECT
+		DATE(B.DTPROCESSAMENTO) 	AS DTPROCESSAMENTO,
+		A.NuContratoGestao AS NUCONTRATO,
+		MAX(B.NuDiasAtraso) as NuDiasAtraso,
+		B.SQCONTRATOFINANCEIRO
+
+	FROM LISTA_CONTRATOS AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+	ON A.NuContratoGestao = B.NuContrato
+
+	WHERE B.CDCARTEIRA IN (1,3,4,5,12)
+
+	GROUP BY
+		B.DTPROCESSAMENTO,
+		A.NuContratoGestao,
+		B.SQCONTRATOFINANCEIRO
+)
+;QUIT;
+
+PROC SQL;
+CREATE TABLE DT_BAIXA_&anomes. AS
+SELECT
+	NUCONTRATO,
+	SQCONTRATOFINANCEIRO,
+	MAX(DTPROCESSAMENTO) FORMAT=DDMMYY10. AS DT_ATRASO_RENEG
+FROM GCON_&anomes.
+GROUP BY 1,2
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+
+CREATE TABLE RENEG_SIMULADOR_ATRASO_&anomes. AS
+SELECT
+	A.*
+	,GCON.NUDIASATRASO
+	,GCON.DTPROCESSAMENTO
+	,GCON.SAFRA_ATRASO
+	,GCON2.Atraso_Baixa
+	,CASE
+		WHEN BCOB.CARTEIRA IS NOT NULL THEN BCOB.CARTEIRA
+		ELSE BCOB2.CARTEIRA
+	END AS SALDO_M0
+	,CASE
+		WHEN BCOB.NmProdutoRisco IS NOT NULL THEN BCOB.NmProdutoRisco
+		ELSE BCOB2.NmProdutoRisco
+	END AS PRODUTO
+	,CASE
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 30 THEN 1
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 60 THEN 2
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 90 THEN 3
+	    ELSE .
+	END AS MOB
+
+FROM RENEG_SIMULADOR_&anomes. AS A
+
+LEFT JOIN BASE_COBRANCA as BCOB
+ON A.NUCONTRATOGESTAO = BCOB.NuContrato and BCOB.SAFRA = &safra_m0.
+
+LEFT JOIN BASE_COBRANCA as BCOB2
+ON A.NUCONTRATOGESTAO = BCOB2.NuContrato and BCOB2.SAFRA = &anomes.
+
+LEFT JOIN GCON_&anomes. AS GCON
+ON A.NuContratoGestao = GCON.NUCONTRATO
+AND A.SqContratoFinanceiroNovo = GCON.SQCONTRATOFINANCEIRO
+AND GCON.DTPROCESSAMENTO > A.DT_BAIXA
+AND GCON.DTPROCESSAMENTO <= A.DT_BAIXA + 90
+
+LEFT JOIN (
+
+	SELECT
+		A.*,
+		B.NuDiasAtraso AS Atraso_Baixa
+	FROM DT_BAIXA_&anomes. 	AS A
+	LEFT JOIN GCON_&anomes. AS B
+	ON A.NUCONTRATO = B.NUCONTRATO AND A.DT_ATRASO_RENEG = B.DTPROCESSAMENTO
+) AS GCON2
+ON A.NuContratoGestao = GCON2.NUCONTRATO
+AND A.SqContratoFinanceiro = GCON2.SQCONTRATOFINANCEIRO
+
+WHERE GCON.NUDIASATRASO <> .
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RUIM_&anomes. AS
+SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		CASE
+			WHEN ATRASO_BAIXA <= 0    THEN 'EM DIA'
+			WHEN ATRASO_BAIXA <= 4    THEN '0001 A 0004'
+			WHEN ATRASO_BAIXA <= 15   THEN '0005 A 0015'
+			WHEN ATRASO_BAIXA <= 30   THEN '0016 A 0030'
+			WHEN ATRASO_BAIXA <= 60   THEN '0031 A 0060'
+			WHEN ATRASO_BAIXA <= 90   THEN '0061 A 0090'
+			WHEN ATRASO_BAIXA <= 120  THEN '0091 A 0120'
+			WHEN ATRASO_BAIXA <= 150  THEN '0121 A 0150'
+			WHEN ATRASO_BAIXA <= 180  THEN '0151 A 0180'
+			WHEN ATRASO_BAIXA <= 360  THEN '0181 A 0360'
+			WHEN ATRASO_BAIXA >  360  THEN '0360 A INF'
+		ELSE 'EM DIA' END AS FX_ATRASO,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MAX(safra_atraso) AS safra_atraso,
+		MOB,
+		CASE
+			WHEN MAX(nudiasatraso) > 31 THEN 31
+			ELSE MAX(nudiasatraso)
+		END AS nudiasatraso,
+		CASE
+			WHEN MAX(NUDIASATRASO) > 30 AND ATRASO_BAIXA > 30  THEN 1
+			ELSE 0
+		END AS FL_RENEG_RUIM_AUX,
+		SALDO_M0
+
+FROM RENEG_SIMULADOR_ATRASO_&anomes.
+WHERE PRODUTO IS NOT NULL
+
+GROUP BY
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		FX_ATRASO,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MOB,
+		SALDO_M0
+;QUIT;
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE RENEG_RUIM_RISCO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao
+	,A.SqContratoFinanceiro
+	,A.NuContratoGestaoNovo
+	,A.SqContratoFinanceiroNovo
+	,A.PRODUTO
+	,A.FX_ATRASO
+	,A.ATRASO_BAIXA
+	,A.dt_baixa
+	,A.dt_reneg
+	,A.FlRestruturacaoContrato
+	,A.safra_reneg
+	,A.safra_atraso
+	,A.MOB
+	,MAX(A.nudiasatraso) as nudiasatraso
+	,A.SALDO_M0
+	,MAX(C.FL_RENEG_RUIM) AS FL_RENEG_RUIM
+	,GCON.DTPROCESSAMENTO
+	,GCON.NUDIASATRASO AS ATRASO_DIA_ANTERIOR
+	,CASE
+		WHEN GCON.NUDIASATRASO BETWEEN 05 AND 09 AND ATRASO_BAIXA > 30  THEN 1
+		WHEN GCON.NUDIASATRASO BETWEEN 10 AND 25 AND ATRASO_BAIXA > 30 	THEN 2
+		WHEN GCON.NUDIASATRASO BETWEEN 26 AND 29 AND ATRASO_BAIXA > 30 	THEN 3
+		ELSE 0
+	END AS FL_RISCO_RENEG_RUIM
+	,PUT((GCON.DTPROCESSAMENTO + (31-GCON.NUDIASATRASO)), DATE9.) AS DT_FUTURA_QUEBRA
+	,MAX(CASE
+			WHEN POL.Grupo_Final_Decisao IS NOT NULL THEN POL.Grupo_Final_Decisao
+			WHEN POL2.Modelo_Final IS NOT NULL THEN POL2.Modelo_Final
+		ELSE "N/A"
+		END)
+	AS POLITICA
+
+FROM RENEG_RUIM_&anomes. AS A
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		NUCONTRATO,
+		DATE(DTPROCESSAMENTO) AS DTPROCESSAMENTO,
+		NUDIASATRASO
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+	WHERE DTPROCESSAMENTO = (SELECT MAX(DTPROCESSAMENTO) FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil)
+) AS GCON
+ON A.NuContratoGestao = GCON.NUCONTRATO
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX as FL_RENEG_RUIM,
+		MIN(MOB) AS MOB
+	FROM RENEG_RUIM_&anomes.
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao AND C.MOB <= A.MOB
+
+LEFT JOIN WORK.empilha_reneg_final_&anomes. AS POL
+ON INPUT(A.NuContratoGestao, best32.) = POL.NUCONTRATO AND A.SqContratoFinanceiro = POL.SQCONTRATOFINANCEIRO
+
+
+LEFT JOIN WORK.base_eleg_cont_&anomes. AS POL2
+ON INPUT(A.NuContratoGestao, best32.) = POL2.NUCONTRATO AND A.SqContratoFinanceiro = POL2.SQCONTRATOFINANCEIRO
+
+
+GROUP BY A.NuContratoGestao, A.MOB
+
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE ANALITICO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	MAX(A.FL_RENEG_RUIM) as FL_RENEG_RUIM,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.safra_atraso)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.safra_atraso)
+	END AS safra_atraso,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.MOB)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.MOB)
+	END AS MOB,
+	A.POLITICA,
+	A.SALDO_M0
+
+FROM RENEG_RUIM_RISCO_&ANOMES. AS A
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MIN(MOB) AS MOB,
+		MIN(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM_&anomes.
+	WHERE FL_RENEG_RUIM_AUX = 1
+	GROUP BY 1,2,3
+) AS B
+ON A.NuContratoGestao = B.NuContratoGestao
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MAX(MOB) AS MOB,
+		MAX(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM_&anomes.
+	WHERE FL_RENEG_RUIM_AUX = 0
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao
+
+GROUP BY
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	A.POLITICA,
+	A.SALDO_M0
+
+;QUIT;
+
+%mend;
+
+%macro reneg_ruim_2(dt_inicio, dt_fim, anomes, safra_m0);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+
+CREATE TABLE WORK.RENEG_SIMULADOR_&anomes. AS
+SELECT
+	*,
+	year(dt_baixa)*100+month(dt_baixa) as safra_reneg
+
+FROM CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		NuContratoGestao,
+		MAX(SqContratoFinanceiro) AS SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		MAX(sqcontratofinanceironovo) as sqcontratofinanceironovo,
+		MAX(DATE(dt_baixa))	AS dt_baixa,
+		MAX(DATE(dt_reneg))	AS dt_reneg,
+		FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+		WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim. and
+			(dt_cancelamento is null or dt_reativacao is not null) and
+			ST_RENEG = 3
+
+		GROUP BY NuContratoGestao, NuContratoGestaoNovo, FlRestruturacaoContrato
+
+		)
+
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE GCON_&ANOMES. AS
+SELECT *
+	,YEAR(DTPROCESSAMENTO)*100 + MONTH(DTPROCESSAMENTO) AS SAFRA_ATRASO
+
+FROM CONNECTION TO PERM(
+
+WITH LISTA_CONTRATOS AS (
+
+	SELECT DISTINCT
+		NuContratoGestao
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+	WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim. and
+	(dt_cancelamento is null or dt_reativacao is not null) and
+	ST_RENEG = 3
+)
+
+	SELECT
+		DATE(B.DTPROCESSAMENTO) 	AS DTPROCESSAMENTO,
+		A.NuContratoGestao AS NUCONTRATO,
+		MAX(B.NuDiasAtraso) as NuDiasAtraso,
+		B.SQCONTRATOFINANCEIRO
+
+	FROM LISTA_CONTRATOS AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+	ON A.NuContratoGestao = B.NuContrato
+
+	WHERE B.CDCARTEIRA IN (1,3,4,5,12)
+
+	GROUP BY
+		B.DTPROCESSAMENTO,
+		A.NuContratoGestao,
+		B.SQCONTRATOFINANCEIRO
+)
+;QUIT;
+
+PROC SQL;
+CREATE TABLE DT_BAIXA_&anomes. AS
+SELECT
+	NUCONTRATO,
+	SQCONTRATOFINANCEIRO,
+	MAX(DTPROCESSAMENTO) FORMAT=DDMMYY10. AS DT_ATRASO_RENEG
+FROM GCON_&anomes.
+GROUP BY 1,2
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+
+CREATE TABLE RENEG_SIMULADOR_ATRASO_&anomes. AS
+SELECT
+	A.*
+	,GCON.NUDIASATRASO
+	,GCON.DTPROCESSAMENTO
+	,GCON.SAFRA_ATRASO
+	,GCON2.Atraso_Baixa
+	,CASE
+		WHEN BCOB.CARTEIRA IS NOT NULL THEN BCOB.CARTEIRA
+		ELSE BCOB2.CARTEIRA
+	END AS SALDO_M0
+	,CASE
+		WHEN BCOB.NmProdutoRisco IS NOT NULL THEN BCOB.NmProdutoRisco
+		ELSE BCOB2.NmProdutoRisco
+	END AS PRODUTO
+	,CASE
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 30 THEN 1
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 60 THEN 2
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 90 THEN 3
+	    ELSE .
+	END AS MOB
+
+FROM RENEG_SIMULADOR_&anomes. AS A
+
+LEFT JOIN BASE_COBRANCA as BCOB
+ON A.NUCONTRATOGESTAO = BCOB.NuContrato and BCOB.SAFRA = &safra_m0.
+
+LEFT JOIN BASE_COBRANCA as BCOB2
+ON A.NUCONTRATOGESTAO = BCOB2.NuContrato and BCOB2.SAFRA = &anomes.
+
+LEFT JOIN GCON_&anomes. AS GCON
+ON A.NuContratoGestao = GCON.NUCONTRATO
+AND A.SqContratoFinanceiroNovo = GCON.SQCONTRATOFINANCEIRO
+AND GCON.DTPROCESSAMENTO > A.DT_BAIXA
+AND GCON.DTPROCESSAMENTO <= A.DT_BAIXA + 90
+
+LEFT JOIN (
+
+	SELECT
+		A.*,
+		B.NuDiasAtraso AS Atraso_Baixa
+	FROM DT_BAIXA_&anomes. 	AS A
+	LEFT JOIN GCON_&anomes. AS B
+	ON A.NUCONTRATO = B.NUCONTRATO AND A.DT_ATRASO_RENEG = B.DTPROCESSAMENTO
+) AS GCON2
+ON A.NuContratoGestao = GCON2.NUCONTRATO
+AND A.SqContratoFinanceiro = GCON2.SQCONTRATOFINANCEIRO
+
+WHERE GCON.NUDIASATRASO <> .
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RUIM_&anomes. AS
+SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		CASE
+			WHEN ATRASO_BAIXA <= 0    THEN 'EM DIA'
+			WHEN ATRASO_BAIXA <= 4    THEN '0001 A 0004'
+			WHEN ATRASO_BAIXA <= 15   THEN '0005 A 0015'
+			WHEN ATRASO_BAIXA <= 30   THEN '0016 A 0030'
+			WHEN ATRASO_BAIXA <= 60   THEN '0031 A 0060'
+			WHEN ATRASO_BAIXA <= 90   THEN '0061 A 0090'
+			WHEN ATRASO_BAIXA <= 120  THEN '0091 A 0120'
+			WHEN ATRASO_BAIXA <= 150  THEN '0121 A 0150'
+			WHEN ATRASO_BAIXA <= 180  THEN '0151 A 0180'
+			WHEN ATRASO_BAIXA <= 360  THEN '0181 A 0360'
+			WHEN ATRASO_BAIXA >  360  THEN '0360 A INF'
+		ELSE 'EM DIA' END AS FX_ATRASO,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MAX(safra_atraso) AS safra_atraso,
+		MOB,
+		CASE
+			WHEN MAX(nudiasatraso) > 31 THEN 31
+			ELSE MAX(nudiasatraso)
+		END AS nudiasatraso,
+		CASE
+			WHEN MAX(NUDIASATRASO) > 30 AND ATRASO_BAIXA > 30  THEN 1
+			ELSE 0
+		END AS FL_RENEG_RUIM_AUX,
+		SALDO_M0
+
+FROM RENEG_SIMULADOR_ATRASO_&anomes.
+WHERE PRODUTO IS NOT NULL
+
+GROUP BY
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		FX_ATRASO,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MOB,
+		SALDO_M0
+;QUIT;
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE RENEG_RUIM_RISCO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao
+	,A.SqContratoFinanceiro
+	,A.NuContratoGestaoNovo
+	,A.SqContratoFinanceiroNovo
+	,A.PRODUTO
+	,A.FX_ATRASO
+	,A.ATRASO_BAIXA
+	,A.dt_baixa
+	,A.dt_reneg
+	,A.FlRestruturacaoContrato
+	,A.safra_reneg
+	,A.safra_atraso
+	,A.MOB
+	,MAX(A.nudiasatraso) as nudiasatraso
+	,A.SALDO_M0
+	,MAX(C.FL_RENEG_RUIM) AS FL_RENEG_RUIM
+	,GCON.DTPROCESSAMENTO
+	,GCON.NUDIASATRASO AS ATRASO_DIA_ANTERIOR
+	,CASE
+		WHEN GCON.NUDIASATRASO BETWEEN 05 AND 09 AND ATRASO_BAIXA > 30  THEN 1
+		WHEN GCON.NUDIASATRASO BETWEEN 10 AND 25 AND ATRASO_BAIXA > 30 	THEN 2
+		WHEN GCON.NUDIASATRASO BETWEEN 26 AND 29 AND ATRASO_BAIXA > 30 	THEN 3
+		ELSE 0
+	END AS FL_RISCO_RENEG_RUIM
+	,PUT((GCON.DTPROCESSAMENTO + (31-GCON.NUDIASATRASO)), DATE9.) AS DT_FUTURA_QUEBRA
+	,MAX(CASE
+			WHEN POL.Grupo_Final_Decisao IS NOT NULL THEN POL.Grupo_Final_Decisao
+			WHEN POL2.Modelo_Final IS NOT NULL THEN POL2.Modelo_Final
+		ELSE "N/A"
+		END)
+	AS POLITICA
+
+FROM RENEG_RUIM_&anomes. AS A
+
+LEFT JOIN CONNECTION TO PERM (
+	SELECT
+		NUCONTRATO,
+		DATE(DTPROCESSAMENTO) AS DTPROCESSAMENTO,
+		NUDIASATRASO
+	FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+	WHERE DTPROCESSAMENTO = (SELECT MAX(DTPROCESSAMENTO) FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil)
+) AS GCON
+ON A.NuContratoGestao = GCON.NUCONTRATO
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX as FL_RENEG_RUIM,
+		MIN(MOB) AS MOB
+	FROM RENEG_RUIM_&anomes.
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao AND C.MOB <= A.MOB
+
+LEFT JOIN WORK.empilha_reneg_final_&anomes. AS POL
+
+ON A.NuContratoGestao = POL.NUCONTRATO AND A.SqContratoFinanceiro = POL.SQCONTRATOFINANCEIRO
+
+LEFT JOIN WORK.base_eleg_cont_&anomes. AS POL2
+
+ON A.NuContratoGestao = POL2.NUCONTRATO AND A.SqContratoFinanceiro = POL2.SQCONTRATOFINANCEIRO
+
+GROUP BY A.NuContratoGestao, A.MOB
+
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE ANALITICO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	MAX(A.FL_RENEG_RUIM) as FL_RENEG_RUIM,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.safra_atraso)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.safra_atraso)
+	END AS safra_atraso,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.MOB)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.MOB)
+	END AS MOB,
+	A.POLITICA,
+	A.SALDO_M0
+
+FROM RENEG_RUIM_RISCO_&ANOMES. AS A
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MIN(MOB) AS MOB,
+		MIN(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM_&anomes.
+	WHERE FL_RENEG_RUIM_AUX = 1
+	GROUP BY 1,2,3
+) AS B
+ON A.NuContratoGestao = B.NuContratoGestao
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MAX(MOB) AS MOB,
+		MAX(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM_&anomes.
+	WHERE FL_RENEG_RUIM_AUX = 0
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao
+
+GROUP BY
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	A.POLITICA,
+	A.SALDO_M0
+
+;QUIT;
+
+%mend;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Macro */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Macro_até202507 */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 58 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Macro_até202507 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Vm2S9g5qyZQf5QZc/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PRETER   '/riscosbv/cobranca/preter';
+LIBNAME EMPILHA   '/riscosbv/cobranca/gtavares/Reneg/Empilha';
+LIBNAME RENEG   '/riscosbv/cobranca/gtavares/Reneg';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro reneg_ruim(anomes, dt_inicio, dt_fim, safra_m0, dt_fim_m0, dt_fim_mob3);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+
+CREATE TABLE WORK.RENEG_SIMULADOR AS
+SELECT
+	A.*,
+	B.atraso as atraso_baixa,
+	year(A.dt_baixa)*100+month(A.dt_baixa) as safra_reneg
+
+FROM CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		NuContratoGestao,
+		MAX(SqContratoFinanceiro) AS SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		MAX(sqcontratofinanceironovo) as sqcontratofinanceironovo,
+		MAX(DATE(dt_baixa))	AS dt_baixa,
+		MAX(DATE(dt_reneg))	AS dt_reneg,
+		FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+		WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim. and
+			(dt_cancelamento is null or dt_reativacao is not null) and
+			ST_RENEG = 3
+
+		GROUP BY NuContratoGestao, NuContratoGestaoNovo, FlRestruturacaoContrato
+
+		) as A
+
+LEFT JOIN CONNECTION TO PERM(
+	SELECT DISTINCT
+	    A.nucontratogestao,
+	    A.sqcontratofinanceiro,
+		A.dt_baixa,
+		MIN(B.dt_vencimento) as dt_vencimento,
+	
+	
+	    MAX(DATE_DIFF(A.dt_baixa, B.dt_vencimento, DAY)) as atraso
+
+	FROM (
+	  SELECT DISTINCT
+		nucontratogestao,
+		sqcontratofinanceiro,
+		MAX(DATE(dt_baixa)) as dt_baixa,
+		MAX(DATE(dt_reneg)) as dt_reneg
+
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+	WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim.
+		AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+		AND st_reneg = 3
+	group by 1,2
+	) A
+
+	LEFT JOIN (
+	  SELECT DISTINCT
+		cd_contrato,
+		sq_contrato_financeiro,
+		st_parcela,
+		DATE(dt_ultimo_recebimento) as dt_ultimo_recebimento,
+		DATE(dt_vencimento) as dt_vencimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+
+	) B
+	ON B.cd_contrato = A.nucontratogestao and B.sq_contrato_financeiro = A.sqcontratofinanceiro
+	WHERE B.st_parcela = 'A' OR (B.st_parcela = 'Q' and date(B.dt_ultimo_recebimento) >= date(A.dt_baixa))
+	
+	
+
+	group by 1,2,3
+
+) AS B
+ON A.NuContratoGestao = B.NuContratoGestao
+
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE GCON AS
+SELECT *
+	,YEAR(DTPROCESSAMENTO)*100 + MONTH(DTPROCESSAMENTO) AS SAFRA_ATRASO
+
+FROM CONNECTION TO PERM(
+
+WITH LISTA_CONTRATOS AS (
+
+	SELECT DISTINCT
+		NuContratoGestao
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+	WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim. and
+	(dt_cancelamento is null or dt_reativacao is not null) and
+	ST_RENEG = 3
+)
+
+	SELECT
+		DATE(B.DTPROCESSAMENTO) 	AS DTPROCESSAMENTO,
+		A.NuContratoGestao AS NUCONTRATO,
+		MAX(B.NuDiasAtraso) as NuDiasAtraso,
+		B.SQCONTRATOFINANCEIRO
+
+	FROM LISTA_CONTRATOS AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+	ON A.NuContratoGestao = B.NuContrato
+
+	WHERE B.CDCARTEIRA IN (1,3,4,5,12)
+		AND B.DTPROCESSAMENTO > &dt_fim. AND  B.DTPROCESSAMENTO < &dt_fim_mob3.
+
+	GROUP BY
+		B.DTPROCESSAMENTO,
+		A.NuContratoGestao,
+		B.SQCONTRATOFINANCEIRO
+)
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CONNECT TO BIGQUERY AS PERM2 (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RENEG_SIMULADOR_ATRASO AS
+SELECT
+	A.*
+	,RPDD.SALDO_M0
+	,RPDD.PRODUTO
+	,GCON.NUDIASATRASO
+	,GCON.DTPROCESSAMENTO
+	,GCON.SAFRA_ATRASO
+	,CASE
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 30 THEN 1
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 60 THEN 2
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 90 THEN 3
+	    ELSE .
+	END AS MOB
+
+FROM RENEG_SIMULADOR AS A
+
+LEFT JOIN CONNECTION TO PERM2(
+	SELECT
+        cd_contrato,
+		vr_saldo_carteira as saldo_m0,
+		CASE
+			WHEN cd_produto_risco = '1' THEN 'LEVES'
+			WHEN cd_produto_risco = '2' THEN 'CARTOES'
+			WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+			WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+			WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+			WHEN cd_produto_risco = '6' THEN 'CP'
+			WHEN cd_produto_risco = '7' THEN 'EGV'
+			WHEN cd_produto_risco = '8' THEN 'EGV'
+			WHEN cd_produto_risco = '9' THEN 'MOTOS'
+			WHEN cd_produto_risco = '10' THEN 'PESADOS'
+			WHEN cd_produto_risco = '11' THEN 'TURISMO'
+			WHEN cd_produto_risco = '13' THEN 'SAUDE'
+			WHEN cd_produto_risco = '14' THEN 'SOLAR'
+			WHEN cd_produto_risco = '19' THEN 'FGTS'
+			WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+			WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+			WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+		 	ELSE 'OUTROS'
+		END AS PRODUTO
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &dt_fim_m0.
+) AS RPDD
+ON a.NuContratoGestao = RPDD.cd_contrato
+
+LEFT JOIN GCON AS GCON
+ON A.NuContratoGestao = GCON.NUCONTRATO
+AND A.SqContratoFinanceiroNovo = GCON.SQCONTRATOFINANCEIRO
+AND GCON.DTPROCESSAMENTO > A.DT_BAIXA
+AND GCON.DTPROCESSAMENTO <= A.DT_BAIXA + 90
+
+WHERE GCON.NUDIASATRASO <> .
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RUIM AS
+SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		CASE
+			when atraso_baixa <= 0 			THEN '000_000'
+			when atraso_baixa <= 4 			THEN '001_004'
+			when atraso_baixa <= 15 		THEN '005_015'
+			when atraso_baixa <= 30			THEN '016_030'
+			when atraso_baixa <= 60 		THEN '031_060'
+			when atraso_baixa <= 90 		THEN '061_090'
+			when atraso_baixa <= 120 		THEN '091_120'
+			when atraso_baixa <= 150 		THEN '121_150'
+			when atraso_baixa <= 180 		THEN '151_180'
+			when atraso_baixa <= 360 		THEN '181_360'
+			ELSE '361_999'
+		END AS FX_ATRASO,
+		CASE
+			when atraso_baixa <= 0 			THEN '000_000'
+			when atraso_baixa <= 30			THEN '001_030'
+			when atraso_baixa <= 60 		THEN '031_060'
+			when atraso_baixa <= 90 		THEN '061_090'
+			when atraso_baixa <= 120 		THEN '091_120'
+			when atraso_baixa <= 180 		THEN '121_180'
+			when atraso_baixa <= 360 		THEN '181_360'
+			ELSE '361_999'
+		END AS FX_ATRASO2,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MAX(safra_atraso) AS safra_atraso,
+		MOB,
+		CASE
+			WHEN MAX(nudiasatraso) > 31 THEN 31
+			ELSE MAX(nudiasatraso)
+		END AS nudiasatraso,
+		CASE
+			WHEN MAX(NUDIASATRASO) > 30 AND ATRASO_BAIXA > 30  THEN 1
+			ELSE 0
+		END AS FL_RENEG_RUIM_AUX,
+		SALDO_M0
+
+FROM RENEG_SIMULADOR_ATRASO
+WHERE PRODUTO IS NOT NULL
+
+GROUP BY
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		FX_ATRASO,
+		FX_ATRASO2,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MOB,
+		SALDO_M0
+;QUIT;
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE RENEG_RUIM_RISCO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao
+	,A.SqContratoFinanceiro
+	,A.NuContratoGestaoNovo
+	,A.SqContratoFinanceiroNovo
+	,A.PRODUTO
+	,A.FX_ATRASO
+	,A.FX_ATRASO2
+	,A.ATRASO_BAIXA
+	,A.dt_baixa
+	,A.dt_reneg
+	,A.FlRestruturacaoContrato
+	,A.safra_reneg
+	,A.safra_atraso
+	,A.MOB
+	,MAX(A.nudiasatraso) as nudiasatraso
+	,A.SALDO_M0
+	,MAX(C.FL_RENEG_RUIM) AS FL_RENEG_RUIM
+	,MAX(CASE
+			WHEN POL.Grupo_Final_Decisao IS NOT NULL THEN POL.Grupo_Final_Decisao
+			WHEN POL2.Modelo_Final IS NOT NULL THEN POL2.Modelo_Final
+		ELSE "N/A"
+		END)
+	AS POLITICA
+
+FROM RENEG_RUIM AS A
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX as FL_RENEG_RUIM,
+		MIN(MOB) AS MOB
+	FROM RENEG_RUIM
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao AND C.MOB <= A.MOB
+
+LEFT JOIN WORK.empilha_reneg_final_&anomes. AS POL
+ON INPUT(A.NuContratoGestao, best32.) = POL.NUCONTRATO AND A.SqContratoFinanceiro = POL.SQCONTRATOFINANCEIRO
+
+
+LEFT JOIN WORK.base_eleg_cont_&anomes. AS POL2
+ON INPUT(A.NuContratoGestao, best32.) = POL2.NUCONTRATO AND A.SqContratoFinanceiro = POL2.SQCONTRATOFINANCEIRO
+
+
+GROUP BY A.NuContratoGestao, A.MOB
+
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE ANALITICO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.FX_ATRASO2,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	MAX(A.FL_RENEG_RUIM) as FL_RENEG_RUIM,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.safra_atraso)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.safra_atraso)
+	END AS safra_atraso,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.MOB)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.MOB)
+	END AS MOB,
+	A.POLITICA,
+	A.SALDO_M0
+
+FROM RENEG_RUIM_RISCO_&ANOMES. AS A
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MIN(MOB) AS MOB,
+		MIN(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM
+	WHERE FL_RENEG_RUIM_AUX = 1
+	GROUP BY 1,2,3
+) AS B
+ON A.NuContratoGestao = B.NuContratoGestao
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MAX(MOB) AS MOB,
+		MAX(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM
+	WHERE FL_RENEG_RUIM_AUX = 0
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao
+
+GROUP BY
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.FX_ATRASO2,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	A.POLITICA,
+	A.SALDO_M0
+
+;QUIT;
+
+%mend;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Macro_até202507 */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Macro_a partir de 202508 */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 58 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Macro_a partir de 202508 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-9wcEJxEzdNLzMPW4/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PRETER   '/riscosbv/cobranca/preter';
+LIBNAME EMPILHA   '/riscosbv/cobranca/gtavares/Reneg/Empilha';
+LIBNAME RENEG   '/riscosbv/cobranca/gtavares/Reneg';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro reneg_ruim_2(anomes, dt_inicio, dt_fim, safra_m0, dt_fim_m0, dt_fim_mob3);
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+
+CREATE TABLE WORK.RENEG_SIMULADOR AS
+SELECT
+	A.*,
+	B.atraso as atraso_baixa,
+	year(A.dt_baixa)*100+month(A.dt_baixa) as safra_reneg
+
+FROM CONNECTION TO PERM(
+
+	SELECT DISTINCT
+		NuContratoGestao,
+		MAX(SqContratoFinanceiro) AS SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		MAX(sqcontratofinanceironovo) as sqcontratofinanceironovo,
+		MAX(DATE(dt_baixa))	AS dt_baixa,
+		MAX(DATE(dt_reneg))	AS dt_reneg,
+		FlRestruturacaoContrato
+
+		FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+		WHERE dt_baixa > &dt_fim_m0. and dt_baixa < &dt_fim. and
+			(dt_cancelamento is null or dt_reativacao is not null) and
+			ST_RENEG = 3
+
+		GROUP BY NuContratoGestao, NuContratoGestaoNovo, FlRestruturacaoContrato
+
+		) as A
+
+LEFT JOIN CONNECTION TO PERM(
+	SELECT DISTINCT
+	    A.nucontratogestao,
+	    A.sqcontratofinanceiro,
+		A.dt_baixa,
+		MIN(B.dt_vencimento) as dt_vencimento,
+	
+	
+	    MAX(DATE_DIFF(A.dt_baixa, B.dt_vencimento, DAY)) as atraso
+
+	FROM (
+	  SELECT DISTINCT
+		nucontratogestao,
+		sqcontratofinanceiro,
+		MAX(DATE(dt_baixa)) as dt_baixa,
+		MAX(DATE(dt_reneg)) as dt_reneg
+
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+	WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim.
+		AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+		AND st_reneg = 3
+	group by 1,2
+	) A
+
+	LEFT JOIN (
+	  SELECT DISTINCT
+		cd_contrato,
+		sq_contrato_financeiro,
+		st_parcela,
+		DATE(dt_ultimo_recebimento) as dt_ultimo_recebimento,
+		DATE(dt_vencimento) as dt_vencimento
+
+	FROM bv-pdbd-prd.dvry_core.tbparcela
+
+	) B
+	ON B.cd_contrato = A.nucontratogestao and B.sq_contrato_financeiro = A.sqcontratofinanceiro
+	WHERE B.st_parcela = 'A' OR (B.st_parcela = 'Q' and date(B.dt_ultimo_recebimento) >= date(A.dt_baixa))
+	
+	
+
+	group by 1,2,3
+
+) AS B
+ON A.NuContratoGestao = B.NuContratoGestao
+
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE GCON AS
+SELECT *
+	,YEAR(DTPROCESSAMENTO)*100 + MONTH(DTPROCESSAMENTO) AS SAFRA_ATRASO
+
+FROM CONNECTION TO PERM(
+
+WITH LISTA_CONTRATOS AS (
+
+	SELECT DISTINCT
+		NuContratoGestao
+	FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+
+	WHERE dt_baixa >= &dt_inicio. and dt_baixa < &dt_fim. and
+	(dt_cancelamento is null or dt_reativacao is not null) and
+	ST_RENEG = 3
+)
+
+	SELECT
+		DATE(B.DTPROCESSAMENTO) 	AS DTPROCESSAMENTO,
+		A.NuContratoGestao AS NUCONTRATO,
+		MAX(B.NuDiasAtraso) as NuDiasAtraso,
+		B.SQCONTRATOFINANCEIRO
+
+	FROM LISTA_CONTRATOS AS A
+
+	LEFT JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+	ON A.NuContratoGestao = B.NuContrato
+
+	WHERE B.CDCARTEIRA IN (1,3,4,5,12)
+		AND B.DTPROCESSAMENTO > &dt_fim. AND  B.DTPROCESSAMENTO < &dt_fim_mob3.
+
+	GROUP BY
+		B.DTPROCESSAMENTO,
+		A.NuContratoGestao,
+		B.SQCONTRATOFINANCEIRO
+)
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CONNECT TO BIGQUERY AS PERM2 (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE RENEG_SIMULADOR_ATRASO AS
+SELECT
+	A.*
+	,RPDD.SALDO_M0
+	,RPDD.PRODUTO
+	,GCON.NUDIASATRASO
+	,GCON.DTPROCESSAMENTO
+	,GCON.SAFRA_ATRASO
+	,CASE
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 30 THEN 1
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 60 THEN 2
+	    WHEN GCON.DTPROCESSAMENTO - A.dt_baixa <= 90 THEN 3
+	    ELSE .
+	END AS MOB
+
+FROM RENEG_SIMULADOR AS A
+
+LEFT JOIN CONNECTION TO PERM2(
+	SELECT
+        cd_contrato,
+		vr_saldo_carteira as saldo_m0,
+		CASE
+			WHEN cd_produto_risco = '1' THEN 'LEVES'
+			WHEN cd_produto_risco = '2' THEN 'CARTOES'
+			WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+			WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+			WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+			WHEN cd_produto_risco = '6' THEN 'CP'
+			WHEN cd_produto_risco = '7' THEN 'EGV'
+			WHEN cd_produto_risco = '8' THEN 'EGV'
+			WHEN cd_produto_risco = '9' THEN 'MOTOS'
+			WHEN cd_produto_risco = '10' THEN 'PESADOS'
+			WHEN cd_produto_risco = '11' THEN 'TURISMO'
+			WHEN cd_produto_risco = '13' THEN 'SAUDE'
+			WHEN cd_produto_risco = '14' THEN 'SOLAR'
+			WHEN cd_produto_risco = '19' THEN 'FGTS'
+			WHEN cd_produto_risco = '20' THEN 'Cartoes Bankly'
+			WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+			WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+		 	ELSE 'OUTROS'
+		END AS PRODUTO
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA = &dt_fim_m0.
+) AS RPDD
+ON a.NuContratoGestao = RPDD.cd_contrato
+
+LEFT JOIN GCON AS GCON
+ON A.NuContratoGestao = GCON.NUCONTRATO
+AND A.SqContratoFinanceiroNovo = GCON.SQCONTRATOFINANCEIRO
+AND GCON.DTPROCESSAMENTO > A.DT_BAIXA
+AND GCON.DTPROCESSAMENTO <= A.DT_BAIXA + 90
+
+WHERE GCON.NUDIASATRASO <> .
+
+;QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_RUIM AS
+SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		CASE
+			when atraso_baixa <= 0 			THEN '000_000'
+			when atraso_baixa <= 4 			THEN '001_004'
+			when atraso_baixa <= 15 		THEN '005_015'
+			when atraso_baixa <= 30			THEN '016_030'
+			when atraso_baixa <= 60 		THEN '031_060'
+			when atraso_baixa <= 90 		THEN '061_090'
+			when atraso_baixa <= 120 		THEN '091_120'
+			when atraso_baixa <= 150 		THEN '121_150'
+			when atraso_baixa <= 180 		THEN '151_180'
+			when atraso_baixa <= 360 		THEN '181_360'
+			ELSE '361_999'
+		END AS FX_ATRASO,
+		CASE
+			when atraso_baixa <= 0 			THEN '000_000'
+			when atraso_baixa <= 30			THEN '001_030'
+			when atraso_baixa <= 60 		THEN '031_060'
+			when atraso_baixa <= 90 		THEN '061_090'
+			when atraso_baixa <= 120 		THEN '091_120'
+			when atraso_baixa <= 180 		THEN '121_180'
+			when atraso_baixa <= 360 		THEN '181_360'
+			ELSE '361_999'
+		END AS FX_ATRASO2,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MAX(safra_atraso) AS safra_atraso,
+		MOB,
+		CASE
+			WHEN MAX(nudiasatraso) > 31 THEN 31
+			ELSE MAX(nudiasatraso)
+		END AS nudiasatraso,
+		CASE
+			WHEN MAX(NUDIASATRASO) > 30 AND ATRASO_BAIXA > 30  THEN 1
+			ELSE 0
+		END AS FL_RENEG_RUIM_AUX,
+		SALDO_M0
+
+FROM RENEG_SIMULADOR_ATRASO
+WHERE PRODUTO IS NOT NULL
+
+GROUP BY
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		NuContratoGestaoNovo,
+		SqContratoFinanceiroNovo,
+		PRODUTO,
+		FX_ATRASO,
+		FX_ATRASO2,
+		ATRASO_BAIXA,
+		dt_baixa,
+		dt_reneg,
+		FlRestruturacaoContrato,
+		safra_reneg,
+		MOB,
+		SALDO_M0
+;QUIT;
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=25);
+CREATE TABLE RENEG_RUIM_RISCO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao
+	,A.SqContratoFinanceiro
+	,A.NuContratoGestaoNovo
+	,A.SqContratoFinanceiroNovo
+	,A.PRODUTO
+	,A.FX_ATRASO
+	,A.FX_ATRASO2
+	,A.ATRASO_BAIXA
+	,A.dt_baixa
+	,A.dt_reneg
+	,A.FlRestruturacaoContrato
+	,A.safra_reneg
+	,A.safra_atraso
+	,A.MOB
+	,MAX(A.nudiasatraso) as nudiasatraso
+	,A.SALDO_M0
+	,MAX(C.FL_RENEG_RUIM) AS FL_RENEG_RUIM
+	,MAX(CASE
+			WHEN POL.Grupo_Final_Decisao IS NOT NULL THEN POL.Grupo_Final_Decisao
+			WHEN POL2.Modelo_Final IS NOT NULL THEN POL2.Modelo_Final
+		ELSE "N/A"
+		END)
+	AS POLITICA
+
+FROM RENEG_RUIM AS A
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX as FL_RENEG_RUIM,
+		MIN(MOB) AS MOB
+	FROM RENEG_RUIM
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao AND C.MOB <= A.MOB
+
+LEFT JOIN WORK.empilha_reneg_final_&anomes. AS POL
+
+ON A.NuContratoGestao = POL.NUCONTRATO AND A.SqContratoFinanceiro = POL.SQCONTRATOFINANCEIRO
+
+LEFT JOIN WORK.base_eleg_cont_&anomes. AS POL2
+
+ON A.NuContratoGestao = POL2.NUCONTRATO AND A.SqContratoFinanceiro = POL2.SQCONTRATOFINANCEIRO
+
+GROUP BY A.NuContratoGestao, A.MOB
+
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE ANALITICO_&ANOMES. AS
+SELECT DISTINCT
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.FX_ATRASO2,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	MAX(A.FL_RENEG_RUIM) as FL_RENEG_RUIM,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.safra_atraso)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.safra_atraso)
+	END AS safra_atraso,
+	CASE
+		WHEN MAX(A.FL_RENEG_RUIM) = 1 THEN MAX(B.MOB)
+		WHEN MAX(A.FL_RENEG_RUIM) = 0 THEN MAX(C.MOB)
+	END AS MOB,
+	A.POLITICA,
+	A.SALDO_M0
+
+FROM RENEG_RUIM_RISCO_&ANOMES. AS A
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MIN(MOB) AS MOB,
+		MIN(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM
+	WHERE FL_RENEG_RUIM_AUX = 1
+	GROUP BY 1,2,3
+) AS B
+ON A.NuContratoGestao = B.NuContratoGestao
+
+LEFT JOIN (
+	SELECT
+		NuContratoGestao,
+		SqContratoFinanceiro,
+		FL_RENEG_RUIM_AUX,
+		MAX(MOB) AS MOB,
+		MAX(safra_atraso) AS safra_atraso
+	FROM RENEG_RUIM
+	WHERE FL_RENEG_RUIM_AUX = 0
+	GROUP BY 1,2,3
+) AS C
+ON A.NuContratoGestao = C.NuContratoGestao
+
+GROUP BY
+	A.NuContratoGestao,
+	A.SqContratoFinanceiro,
+	A.NuContratoGestaoNovo,
+	A.SqContratoFinanceiroNovo,
+	A.PRODUTO,
+	A.FX_ATRASO,
+	A.FX_ATRASO2,
+	A.ATRASO_BAIXA,
+	A.dt_baixa,
+	A.dt_reneg,
+	A.FlRestruturacaoContrato,
+	A.safra_reneg,
+	A.POLITICA,
+	A.SALDO_M0
+
+;QUIT;
+
+%mend;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Macro_a partir de 202508 */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 58 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-AN8a2v6w3KCULAqP/code.sas */
+/* =========================INÍCIO TASK========================= */
+%reneg_ruim(202501, '2025-01-01', '2025-02-01', 202412, '2024-12-31', '2025-06-01');
+%reneg_ruim(202502, '2025-02-01', '2025-03-01', 202501, '2025-01-31', '2025-07-01');
+%reneg_ruim(202503, '2025-03-01', '2025-04-01', 202502, '2025-02-28', '2025-08-01');
+%reneg_ruim(202504, '2025-04-01', '2025-05-01', 202503, '2025-03-31', '2025-09-01');
+%reneg_ruim(202505, '2025-05-01', '2025-06-01', 202504, '2025-04-30', '2025-10-01');
+%reneg_ruim(202506, '2025-06-01', '2025-07-01', 202505, '2025-05-31', '2025-11-01');
+%reneg_ruim(202507, '2025-07-01', '2025-08-01', 202506, '2025-06-30', '2025-12-01');
+%reneg_ruim_2(202508, '2025-08-01', '2025-09-01', 202507, '2025-07-31', '2026-01-01');
+%reneg_ruim_2(202509, '2025-09-01', '2025-10-01', 202508, '2025-08-31', '2026-02-01');
+%reneg_ruim_2(202510, '2025-10-01', '2025-11-01', 202509, '2025-09-30', '2026-03-01');
+
+
+
+
+DATA ANALITICO;
+SET ANALITICO_:;
+RUN;
+
+
+DATA FINAL_RENEG_RUIM_RISCO;
+SET RENEG_RUIM_RISCO_:;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_FINAL AS
+SELECT
+	SAFRA_RENEG
+	,PRODUTO
+	,FX_ATRASO
+	,FX_ATRASO2
+	,FlRestruturacaoContrato
+	,FL_RENEG_RUIM
+
+	,SAFRA_ATRASO
+	,MOB
+	,POLITICA
+	,COUNT(NUCONTRATOGESTAO) AS QNT
+	,SUM(SALDO_M0) AS SALDO_M0
+
+FROM FINAL_RENEG_RUIM_RISCO
+
+GROUP BY
+	SAFRA_RENEG
+	,PRODUTO
+	,FX_ATRASO
+	,FX_ATRASO2
+	,FlRestruturacaoContrato
+	,FL_RENEG_RUIM
+
+	,SAFRA_ATRASO
+	,MOB
+	,POLITICA
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%reneg_ruim('2025-05-01', '2025-06-01', 202505, 202504);
+%reneg_ruim('2025-06-01', '2025-07-01', 202506, 202505);
+%reneg_ruim('2025-07-01', '2025-08-01', 202507, 202506);
+
+%reneg_ruim_2('2025-08-01', '2025-09-01', 202508, 202507);
+%reneg_ruim_2('2025-09-01', '2025-10-01', 202509, 202508);
+
+
+DATA ANALITICO;
+SET ANALITICO_:;
+RUN;
+
+
+DATA FINAL_RENEG_RUIM_RISCO;
+SET RENEG_RUIM_RISCO_:;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_FINAL AS
+SELECT
+	SAFRA_RENEG
+	,PRODUTO
+	,FX_ATRASO
+	,FlRestruturacaoContrato
+	,FL_RENEG_RUIM
+	,FL_RISCO_RENEG_RUIM
+	,SAFRA_ATRASO
+	,MOB
+	,POLITICA
+	,COUNT(NUCONTRATOGESTAO) AS QNT
+	,SUM(SALDO_M0) AS SALDO_M0
+
+FROM FINAL_RENEG_RUIM_RISCO
+
+GROUP BY
+	SAFRA_RENEG
+	,PRODUTO
+	,FX_ATRASO
+	,FlRestruturacaoContrato
+	,FL_RENEG_RUIM
+	,FL_RISCO_RENEG_RUIM
+	,SAFRA_ATRASO
+	,MOB
+	,POLITICA
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */

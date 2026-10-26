@@ -1,0 +1,79 @@
+START_METADATA
+PROJECT: Rodas__inad
+FILE_SAS: 00-email-e-parametros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (1x | +20), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 22
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* Marcar horário de início da atualização */
+%LET W_ini = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+SUBJECT="INAD Histórica | Início da atualização";
+
+DATA _NULL_;
+	FILE MAIL_INI;
+		PUT "Processamento das bases de INAD Históricas iniciado.";
+RUN;
+
+%include '/infogrc/utils/all-includes.sas';
+options compress=yes;
+
+DATA _NULL_;
+  /* Define parâmetros com base no dia atual */
+  hoje = TODAY();
+
+  /* Calcula variáveis */
+  anoAtual = YEAR(hoje);
+
+  /* Declarar macro variáveis */
+  CALL SYMPUT('anoAtual', PUT(anoAtual,4.));;
+RUN;

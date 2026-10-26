@@ -1,0 +1,115 @@
+START_METADATA
+PROJECT: Rodas__Incentivo_Comercial_Bateu_Levou_Solar
+FILE_SAS: 01 - TbGrComissaoPerf_Analitica.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 51
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ICOMS = /infogrc/Incentivo_Comercial/Solar; ICOMSBKP = /infogrc/Incentivo_Comercial/Solar/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: AnoMes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBGRINCENTIVO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: ICOMS, ICOMSBKP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRINCENTIVO [PROC SQL - JOIN], ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR, ICOMSBKP.TBCOMPERF_ANALITICA_BKP_&ANOMES
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBGRCOMISSAOPERF_ANALITICA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME ICOMS '/infogrc/Incentivo_Comercial/Solar';
+LIBNAME ICOMSBKP '/infogrc/Incentivo_Comercial/Solar/Bases_BKP';
+
+PROC SQL;
+CREATE TABLE TBGRCOMISSAOPERF_ANALITICA AS
+SELECT
+A.NuAnoMes,
+
+B.NmCanalEstruturaComercial,
+B.NmEstruturaComercialA,
+B.NmSubEstruturaComercialA,
+B.NmAreaEstruturaComercial,
+B.LstSubstituicao,
+B.LstColaboradorFocal,
+
+B.DsLoginN3A,
+CASE WHEN B.DsLoginN2A = '' THEN 'cadeira.vazia' ELSE B.DsLoginN2A END AS DsLoginN2A,
+
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+A.TpValor,
+
+A.VrMedida_Seguros,
+A.VrDenominador_Seguros,
+A.VrMetaN1_Seguros,
+A.VrMetaProducaoN1_Seguros,
+A.Pc_Ating_Seguros,
+
+A.VrMedidaMC,
+A.VrMargemDescontos_MC,
+A.VrMetaMC,
+A.Pc_Ating_MC,
+
+A.QtNumeradorNI_Efetivacao,
+A.QtDenominadorNI_Efetivacao,
+A.VrMeta_Efetivacao,
+A.Pc_Ating_Efetivacao,
+
+A.QtNumeradorNI_Produzindo,
+A.QtDenominadorNI_Produzindo,
+A.VrMeta_Produzindo,
+A.Pc_Ating_Produzindo
+
+FROM BASE_META_PRODUCAO_ANALITICA_03 A
+LEFT JOIN BASEGRC.TBGRINCENTIVO B ON B.DsLoginN1 = A.DsLoginN1 AND B.NUANOMES = A.NUANOMES
+;RUN;
+
+/*******************************/
+/*FAZ BKP DA ÚLTIMA BASE VALIDA*/
+/*******************************/
+
+DATA ICOMSBKP.TBCOMPERF_ANALITICA_BKP_&AnoMes.;
+SET ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR
+;RUN;
+
+/******************/
+/*SALVA BASE FINAL*/
+/******************/
+
+DATA ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR;
+SET TBGRCOMISSAOPERF_ANALITICA
+;RUN;

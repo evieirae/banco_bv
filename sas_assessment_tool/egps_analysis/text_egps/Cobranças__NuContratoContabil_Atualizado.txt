@@ -1,0 +1,881 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__NuContratoContabil_Atualizado
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-09-29 21:33:33 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 643
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (26x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ARTHUR = /riscosbv/cobranca/aesteves; BA3040 = /riscosbv/cobranca/est_cartoes/3040; B_GERAL = /riscosbv/cobranca/malmeida; CARD_ACR = /riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/; CARD_CS = /riscosbv/cobranca/ranapole/Cartoes/Modelagem; CARNEIRO = /riscosbv/cobranca/jcarneiro; CARTAOBV = /financas/cartoes; CUBO = /riscosbv/cobranca/dpompei/cartao/CA; EQUIPE3 = /riscosbvf/analytics/narciso/lucas/HACKATON_EQP3; ESTUDOS2 = /riscosbvf/indicadores/Estudos_2; EST_CART = /riscosbv/cobranca/jcarneiro/estrategia_cartoes; GH16 = /riscosbv/cobranca/dpompei/cartao/GH16; JOAO = /riscosbv/cobranca/bsilva/; MIS3040 = /riscosbv/cobranca/ranapole/Cartoes/3040/; MOVTO = /riscosbv/cobranca/erocha/CARTAO/MOVTO; PAGOSCBR = /riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber; PERF_CL = /riscosbv/cobranca/erocha/CARTAO/CL/MIS; PG_CYBER = /riscosbv/cobranca/jcarneiro/pagos_cyber; PRETER = /riscosbv/cobranca/preter; SATIE = /riscosbv/cobranca/Satie/; SHMESA = /riscosbvf/plan_mesas/shared
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DWBI_DTWH.TBCONTRATOPARCELAMENTOFATURA [BIGQUERY], CARD_ACR.EFETIVACOES_HIST [SAS/Local], CARNEIRO.INFO_CONTA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CARD_ACR, CARNEIRO
+EXPORTED_LIBNAMES: CARNEIRO
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DWBI_DTWH.TBCONTRATOPARCELAMENTOFATURA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], CARD_ACR.EFETIVACOES_HIST [DATA Step - SET], CARNEIRO.INFO_CONTA [PROC SQL - FROM; PROC SQL - JOIN], CARNEIRO.NUCONTRATO_CONTABIL [DATA Step - SET; PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): CARNEIRO.NUCONTRATO_CONTABIL
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CARNEIRO.NUCONTRATO_CONTABIL
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ACORDOS_CA, BASE_1_IQ, BASE_1_IQ_B, BASE_1_IQ_C, BASE_1_IQ_UNICO, BASE_1_IQ_UNICO_0, BASE_2_PARC, BASE_2_PARC_B, BASE_2_PARC_C, BASE_2_PARC_UNICO, BASE_CONTRATOS, BASE_PARCELADOS, BASE_PARCELADOS_B, CONFERE_DUPLICADOS, CONFERE_DUP_NOVOS, CONFERE_MISSING_RPDD, CONTRATO_UNICO_FINAL, NUCONTRATO_CONTABIL, NUCONTRATO_CONTABIL_0, NUCONTRATO_CONTABIL_AGRUPADA, NUCONTRATO_CPF, PARCELAMENTO_FATURA, PROVISAO_VAREJO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 25 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: LIBNAME */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-UhnolyEwYrllQx95/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CARTAOBV 	BASE '/financas/cartoes';
+LIBNAME MOVTO 		BASE '/riscosbv/cobranca/erocha/CARTAO/MOVTO';
+LIBNAME ARTHUR 		BASE '/riscosbv/cobranca/aesteves';
+LIBNAME JOAO 		BASE '/riscosbv/cobranca/bsilva/';
+libname CARD_ACR 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/';
+LIBNAME CUBO 		BASE '/riscosbv/cobranca/dpompei/cartao/CA';
+LIBNAME CARD_BC 	BASE'/riscosbv/cobranca/ranapole/Cartoes/3040';
+
+LIBNAME CARD_CS 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Modelagem';
+
+LIBNAME PERF_CL 	BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+
+
+LIBNAME GH16 		BASE '/riscosbv/cobranca/dpompei/cartao/GH16';
+
+LIBNAME CARNEIRO 	BASE '/riscosbv/cobranca/jcarneiro';
+
+
+
+LIbname equipe3 '/riscosbvf/analytics/narciso/lucas/HACKATON_EQP3';
+
+
+
+
+
+
+LIBNAME PERF_CL 	BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+
+LIBNAME EST_CART '/riscosbv/cobranca/jcarneiro/estrategia_cartoes';
+
+LIBNAME PG_CYBER	BASE '/riscosbv/cobranca/jcarneiro/pagos_cyber';
+
+LIBNAME BA3040 BASE '/riscosbv/cobranca/est_cartoes/3040';
+
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+Libname estudos2 '/riscosbvf/indicadores/Estudos_2';
+
+LIBNAME PAGOSCBR 	BASE '/riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber';
+
+LIBNAME B_GERAL 	BASE '/riscosbv/cobranca/malmeida';
+
+LIBNAME SHMESA '/riscosbvf/plan_mesas/shared';
+
+LIBNAME SATIE 	 	BASE '/riscosbv/cobranca/Satie/';
+
+LIBNAME MIS3040 	 	BASE '/riscosbv/cobranca/ranapole/Cartoes/3040/';
+
+/* =========================FIM TASK=========================== */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: NuContratoContabil - RPDD */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 25 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: NuContratoContabil - RPDD */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-LY82Qv3pedfJA2Xz/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+   Create table provisao_varejo as
+   select * from connection to perm
+     (select
+		*
+      from bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+	  where dt_referencia IN (
+								'2024-12-31',
+								'2025-01-31',
+								'2025-02-28',
+								'2025-03-31',
+								'2025-04-30',
+								'2025-05-31',
+								'2025-06-30',
+								'2025-07-31',
+								'2025-08-31',
+								'2025-09-30',
+								'2025-10-31',
+								'2025-11-30',
+								'2025-12-31',
+								'2026-01-31',
+								'2026-02-28',
+	  							'2026-03-31',
+	  							'2026-04-30',
+	  							'2026-05-31',
+	  							'2026-06-30'
+)
+
+	  and cd_produto_risco IN  (
+								'2'
+								)
+);
+   disconnect from perm;
+quit;
+
+data base_contratos;
+set provisao_varejo (keep=dt_referencia	cd_cpf_cnpj	cd_contrato	cd_produto_risco	cd_conta_cartao);
+
+nuconta = cd_conta_cartao*1;
+produto = SUBSTR(cd_contrato,1,2)*1;
+nucontrato = cd_contrato;
+cpf = cd_cpf_cnpj;
+run;
+
+
+
+proc sql;
+create table nucontrato_cpf as select distinct
+a.*,
+b.contador
+from
+(select nucontrato, cpf, produto
+,min(dt_referencia) as min_ref format date10.
+,max(dt_referencia) as max_ref format date10.
+from base_contratos
+group by nucontrato, cpf, produto) a
+left join
+
+(select nucontrato, count(*) as contador
+from
+(select nucontrato, cpf, produto
+,min(dt_referencia) as min_ref format date10.
+,max(dt_referencia) as max_ref format date10.
+from base_contratos
+group by nucontrato, cpf, produto)
+group by nucontrato) b
+
+on a.nucontrato = b.nucontrato
+;
+quit;
+
+
+
+
+
+
+DATA BASE_1_IQ;
+SET nucontrato_cpf;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_1_IQ_B AS SELECT
+A.*,
+B.NUCONTA_IQ,
+B.CONTADOR_IQ
+	FROM
+	BASE_1_IQ
+	A
+
+	LEFT JOIN
+
+	(SELECT A.*, B.CONTADOR_IQ
+
+		FROM
+		(SELECT
+			INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),3,9),9.) AS NUCONTA_IQ,
+			INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),1,2),2.) AS PRODUTO_IQ,
+			CPF
+			FROM
+			CARNEIRO.INFO_CONTA)
+		A
+
+		LEFT JOIN
+
+		(SELECT CPF, PRODUTO_IQ, COUNT(*) AS CONTADOR_IQ
+			FROM
+			(SELECT
+				INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),3,9),9.) AS NUCONTA_IQ,
+				INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),1,2),2.) AS PRODUTO_IQ,
+				CPF
+				FROM
+				CARNEIRO.INFO_CONTA)      
+		GROUP BY CPF, PRODUTO_IQ)
+		B
+
+	ON A.CPF = B.CPF AND A.PRODUTO_IQ = B.PRODUTO_IQ)
+	B
+ON
+A.CPF = B.CPF
+AND
+A.PRODUTO = B.PRODUTO_IQ;
+QUIT;
+
+DATA BASE_1_IQ_C;
+SET BASE_1_IQ_B;
+IF LENGTH(nucontrato) IN  (13,21) THEN
+	NUCONTA_1 = SUBSTR(nucontrato,5,9)*1;
+ELSE IF CONTADOR_IQ = 1 THEN
+	NUCONTA_1 = NUCONTA_IQ;
+
+RUN;
+
+
+
+DATA BASE_1_IQ_UNICO_0;
+SET BASE_1_IQ_C;
+WHERE NUCONTA_1 >0;
+nuconta = NUCONTA_1;
+DROP NUCONTA_IQ	CONTADOR_IQ	NUCONTA_1;
+RUN;
+
+PROC SORT DATA=BASE_1_IQ_UNICO_0 OUT=BASE_1_IQ_UNICO NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+
+
+
+
+DATA BASE_2_PARC;
+SET BASE_1_IQ_C;
+WHERE NUCONTA_1 =.;
+RUN;
+
+
+DATA ACORDOS_CA;
+SET CARD_ACR.EFETIVACOES_HIST;
+
+RUN;
+
+PROC SORT DATA=ACORDOS_CA;
+BY descending DATA_EFET;
+RUN;
+
+PROC SORT DATA=ACORDOS_CA NODUPKEY;
+BY NUCONTA PRODUTO;
+RUN;
+
+DATA ACORDOS_CA;
+SET ACORDOS_CA (KEEP=DATA_EFET SAFRA NUCONTA PRODUTO);
+TP = "5";
+RUN;
+
+PROC SORT DATA=ACORDOS_CA;
+BY descending DATA_EFET;
+RUN;
+
+
+
+proc sql;
+connect to bigquery as perm (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS = must MAX_CHAR_LEN = 30);
+
+create table PARCELAMENTO_FATURA as
+    select distinct
+	input(cdcontacartao,best22.) as cdcontacartao
+	,dtadesao
+	,input(cdtipoparcelado,best22.) as cdtipoparcelado
+
+    from connection to perm (
+
+	select distinct
+	cdcontacartao
+	,dtadesao
+	,cdtipoparcelado
+
+	from bv-pdbd-prd.trusted_dwbi_dtwh.tbcontratoparcelamentofatura
+	where dtadesao >= '2018-12-01'
+	);
+
+disconnect from perm;
+quit;
+
+DATA PARCELAMENTO_FATURA;
+SET PARCELAMENTO_FATURA;
+SAFRA = 100*YEAR(DtAdesao)+MONTH(DtAdesao);
+PRODUTO = SUBSTR(PUT(cdcontacartao,Z11.),1,2)*1;
+NUCONTA = SUBSTR(PUT(cdcontacartao,Z11.),3,9)*1;
+
+IF cdtipoparcelado = 2 THEN TP = "6";
+ELSE IF cdtipoparcelado = 3 THEN TP = "F";
+ELSE IF cdtipoparcelado = 4 THEN TP = "A";
+ELSE IF cdtipoparcelado = 5 THEN TP = "B";
+ELSE IF cdtipoparcelado = 6 THEN TP = "C";
+ELSE IF cdtipoparcelado = 7 THEN TP = "E";
+
+DATA_EFET = dtadesao;
+FORMAT DATA_EFET DDMMYY10.;
+
+DROP cdcontacartao dtadesao	cdtipoparcelado;
+RUN;
+
+PROC SORT DATA=PARCELAMENTO_FATURA;
+BY descending DATA_EFET;
+RUN;
+
+PROC SORT DATA=PARCELAMENTO_FATURA NODUPKEY;
+BY NUCONTA PRODUTO TP;
+RUN;
+
+
+
+DATA BASE_PARCELADOS;
+SET
+ACORDOS_CA
+PARCELAMENTO_FATURA;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_PARCELADOS_B AS SELECT
+A.*, B.CPF FROM
+BASE_PARCELADOS A
+LEFT JOIN
+CARNEIRO.INFO_CONTA B
+ON
+1E9*A.PRODUTO+A.NUCONTA = B.CDDIMCONTACARTAO;
+QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_2_PARC_B AS SELECT
+*
+FROM
+(SELECT
+A.*,
+B.NUCONTA AS NUCONTA_PARC,
+B.DATA_EFET,
+B.TP
+
+FROM BASE_2_PARC A
+LEFT JOIN
+BASE_PARCELADOS_B B
+
+ON A.CPF = B.CPF AND A.PRODUTO = B.PRODUTO
+AND
+SUBSTR(A.NUCONTRATO,4,1) = B.TP)
+WHERE DATA_EFET > 0
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_2_PARC_C AS SELECT
+A.*, B.contador
+FROM
+(SELECT DISTINCT
+nucontrato,	cpf,	NUCONTA_PARC AS nuconta,	produto, MIN(min_ref) AS min_ref format date10., MAX(max_ref) AS max_ref format date10.
+FROM
+BASE_2_PARC_B
+GROUP BY nucontrato,cpf,nuconta_parc,produto) A
+LEFT JOIN
+(SELECT nucontrato, COUNT(*) AS contador from
+(SELECT DISTINCT
+nucontrato,	cpf,	NUCONTA_PARC AS nuconta,	produto, MIN(min_ref) AS min_ref, MAX(max_ref) AS max_ref
+FROM
+BASE_2_PARC_B
+GROUP BY nucontrato,cpf,nuconta_parc,produto)
+GROUP BY NUCONTRATO) B
+ON A.nucontrato = b.nucontrato
+;
+QUIT;
+
+
+
+DATA BASE_2_PARC_UNICO;
+SET BASE_2_PARC_C;
+WHERE CONTADOR = 1;
+RUN;
+
+
+
+
+DATA CONTRATO_UNICO_FINAL;
+SET
+BASE_1_IQ_UNICO
+BASE_2_PARC_UNICO;
+DROP CONTADOR;
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE NUCONTRATO_CONTABIL_0 AS SELECT
+nucontrato AS NuContrato,
+cpf 		 AS CPF,
+nuconta 	 AS NUCONTA,
+produto	 AS PRODUTO
+FROM
+CONTRATO_UNICO_FINAL B
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CONFERE_DUP_NOVOS AS SELECT
+* FROM
+(SELECT A.*,B.CONTADOR FROM NUCONTRATO_CONTABIL_0 A LEFT JOIN
+(SELECT NUCONTRATO, COUNT(*) AS CONTADOR FROM
+NUCONTRATO_CONTABIL_0 GROUP BY NUCONTRATO) B
+ON A.NUCONTRATO = B.NUCONTRATO)
+WHERE CONTADOR >1
+;
+QUIT;
+
+DATA NUCONTRATO_CONTABIL_AGRUPADA;
+SET CARNEIRO.NUCONTRATO_CONTABIL
+NUCONTRATO_CONTABIL_0;
+RUN;
+
+PROC SORT DATA=NUCONTRATO_CONTABIL_AGRUPADA
+OUT=NUCONTRATO_CONTABIL NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA CARNEIRO.NUCONTRATO_CONTABIL;  
+SET NUCONTRATO_CONTABIL;
+RUN;
+
+
+
+
+
+PROC SQL;
+CREATE TABLE CONFERE_DUPLICADOS AS SELECT
+* FROM
+(SELECT A.*,B.CONTADOR FROM CARNEIRO.NUCONTRATO_CONTABIL A LEFT JOIN
+(SELECT NUCONTRATO, COUNT(*) AS CONTADOR FROM
+CARNEIRO.NUCONTRATO_CONTABIL GROUP BY NUCONTRATO) B
+ON A.NUCONTRATO = B.NUCONTRATO)
+WHERE CONTADOR >1
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CONFERE_MISSING_RPDD AS SELECT
+* FROM
+(SELECT A.*,B.NUCONTA AS NUCONTA_CORRIGIDA FROM base_contratos A LEFT JOIN
+CARNEIRO.NUCONTRATO_CONTABIL B
+ON A.NUCONTRATO = B.NUCONTRATO)
+WHERE NUCONTA_CORRIGIDA=.
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: NuContratoContabil - RPDD */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+   Create table provisao_varejo as
+   select * from connection to perm
+     (select
+		*
+      from bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+	  where dt_referencia IN (
+								'2024-12-31',
+								'2025-01-31',
+								'2025-02-28',
+								'2025-03-31',
+								'2025-04-30',
+								'2025-05-31',
+								'2025-06-30',
+								'2025-07-31',
+								'2025-08-31',
+								'2025-09-30',
+								'2025-10-31',
+								'2025-11-30',
+								'2025-12-31',
+								'2026-01-31',
+								'2026-02-28',
+	  							'2026-03-31',
+	  							'2026-04-30',
+	  							'2026-05-31',
+	  							'2026-06-30'
+)
+
+	  and cd_produto_risco IN  (
+								'2'
+								)
+);
+   disconnect from perm;
+quit;
+
+data base_contratos;
+set provisao_varejo (keep=dt_referencia	cd_cpf_cnpj	cd_contrato	cd_produto_risco	cd_conta_cartao);
+
+nuconta = cd_conta_cartao*1;
+produto = SUBSTR(cd_contrato,1,2)*1;
+nucontrato = cd_contrato;
+cpf = cd_cpf_cnpj;
+run;
+
+
+
+proc sql;
+create table nucontrato_cpf as select distinct
+a.*,
+b.contador
+from
+(select nucontrato, cpf, produto
+,min(dt_referencia) as min_ref format date10.
+,max(dt_referencia) as max_ref format date10.
+from base_contratos
+group by nucontrato, cpf, produto) a
+left join
+
+(select nucontrato, count(*) as contador
+from
+(select nucontrato, cpf, produto
+,min(dt_referencia) as min_ref format date10.
+,max(dt_referencia) as max_ref format date10.
+from base_contratos
+group by nucontrato, cpf, produto)
+group by nucontrato) b
+
+on a.nucontrato = b.nucontrato
+;
+quit;
+
+
+
+
+
+
+DATA BASE_1_IQ;
+SET nucontrato_cpf;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_1_IQ_B AS SELECT
+A.*,
+B.NUCONTA_IQ,
+B.CONTADOR_IQ
+	FROM
+	BASE_1_IQ
+	A
+
+	LEFT JOIN
+
+	(SELECT A.*, B.CONTADOR_IQ
+
+		FROM
+		(SELECT
+			INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),3,9),9.) AS NUCONTA_IQ,
+			INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),1,2),2.) AS PRODUTO_IQ,
+			CPF
+			FROM
+			CARNEIRO.INFO_CONTA)
+		A
+
+		LEFT JOIN
+
+		(SELECT CPF, PRODUTO_IQ, COUNT(*) AS CONTADOR_IQ
+			FROM
+			(SELECT
+				INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),3,9),9.) AS NUCONTA_IQ,
+				INPUT(SUBSTR(PUT(CDDIMCONTACARTAO,Z11.),1,2),2.) AS PRODUTO_IQ,
+				CPF
+				FROM
+				CARNEIRO.INFO_CONTA)      
+		GROUP BY CPF, PRODUTO_IQ)
+		B
+
+	ON A.CPF = B.CPF AND A.PRODUTO_IQ = B.PRODUTO_IQ)
+	B
+ON
+A.CPF = B.CPF
+AND
+A.PRODUTO = B.PRODUTO_IQ;
+QUIT;
+
+DATA BASE_1_IQ_C;
+SET BASE_1_IQ_B;
+IF LENGTH(nucontrato) IN  (13,21) THEN
+	NUCONTA_1 = SUBSTR(nucontrato,5,9)*1;
+ELSE IF CONTADOR_IQ = 1 THEN
+	NUCONTA_1 = NUCONTA_IQ;
+
+RUN;
+
+
+
+DATA BASE_1_IQ_UNICO_0;
+SET BASE_1_IQ_C;
+WHERE NUCONTA_1 >0;
+nuconta = NUCONTA_1;
+DROP NUCONTA_IQ	CONTADOR_IQ	NUCONTA_1;
+RUN;
+
+PROC SORT DATA=BASE_1_IQ_UNICO_0 OUT=BASE_1_IQ_UNICO NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+
+
+
+
+DATA BASE_2_PARC;
+SET BASE_1_IQ_C;
+WHERE NUCONTA_1 =.;
+RUN;
+
+
+DATA ACORDOS_CA;
+SET CARD_ACR.EFETIVACOES_HIST;
+
+RUN;
+
+PROC SORT DATA=ACORDOS_CA;
+BY descending DATA_EFET;
+RUN;
+
+PROC SORT DATA=ACORDOS_CA NODUPKEY;
+BY NUCONTA PRODUTO;
+RUN;
+
+DATA ACORDOS_CA;
+SET ACORDOS_CA (KEEP=DATA_EFET SAFRA NUCONTA PRODUTO);
+TP = "5";
+RUN;
+
+PROC SORT DATA=ACORDOS_CA;
+BY descending DATA_EFET;
+RUN;
+
+
+
+proc sql;
+connect to bigquery as perm (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS = must MAX_CHAR_LEN = 30);
+
+create table PARCELAMENTO_FATURA as
+    select distinct
+	input(cdcontacartao,best22.) as cdcontacartao
+	,dtadesao
+	,input(cdtipoparcelado,best22.) as cdtipoparcelado
+
+    from connection to perm (
+
+	select distinct
+	cdcontacartao
+	,dtadesao
+	,cdtipoparcelado
+
+	from bv-pdbd-prd.trusted_dwbi_dtwh.tbcontratoparcelamentofatura
+	where dtadesao >= '2018-12-01'
+	);
+
+disconnect from perm;
+quit;
+
+DATA PARCELAMENTO_FATURA;
+SET PARCELAMENTO_FATURA;
+SAFRA = 100*YEAR(DtAdesao)+MONTH(DtAdesao);
+PRODUTO = SUBSTR(PUT(cdcontacartao,Z11.),1,2)*1;
+NUCONTA = SUBSTR(PUT(cdcontacartao,Z11.),3,9)*1;
+
+IF cdtipoparcelado = 2 THEN TP = "6";
+ELSE IF cdtipoparcelado = 3 THEN TP = "F";
+ELSE IF cdtipoparcelado = 4 THEN TP = "A";
+ELSE IF cdtipoparcelado = 5 THEN TP = "B";
+ELSE IF cdtipoparcelado = 6 THEN TP = "C";
+ELSE IF cdtipoparcelado = 7 THEN TP = "E";
+
+DATA_EFET = dtadesao;
+FORMAT DATA_EFET DDMMYY10.;
+
+DROP cdcontacartao dtadesao	cdtipoparcelado;
+RUN;
+
+PROC SORT DATA=PARCELAMENTO_FATURA;
+BY descending DATA_EFET;
+RUN;
+
+PROC SORT DATA=PARCELAMENTO_FATURA NODUPKEY;
+BY NUCONTA PRODUTO TP;
+RUN;
+
+
+
+DATA BASE_PARCELADOS;
+SET
+ACORDOS_CA
+PARCELAMENTO_FATURA;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_PARCELADOS_B AS SELECT
+A.*, B.CPF FROM
+BASE_PARCELADOS A
+LEFT JOIN
+CARNEIRO.INFO_CONTA B
+ON
+1E9*A.PRODUTO+A.NUCONTA = B.CDDIMCONTACARTAO;
+QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_2_PARC_B AS SELECT
+*
+FROM
+(SELECT
+A.*,
+B.NUCONTA AS NUCONTA_PARC,
+B.DATA_EFET,
+B.TP
+
+FROM BASE_2_PARC A
+LEFT JOIN
+BASE_PARCELADOS_B B
+
+ON A.CPF = B.CPF AND A.PRODUTO = B.PRODUTO
+AND
+SUBSTR(A.NUCONTRATO,4,1) = B.TP)
+WHERE DATA_EFET > 0
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_2_PARC_C AS SELECT
+A.*, B.contador
+FROM
+(SELECT DISTINCT
+nucontrato,	cpf,	NUCONTA_PARC AS nuconta,	produto, MIN(min_ref) AS min_ref format date10., MAX(max_ref) AS max_ref format date10.
+FROM
+BASE_2_PARC_B
+GROUP BY nucontrato,cpf,nuconta_parc,produto) A
+LEFT JOIN
+(SELECT nucontrato, COUNT(*) AS contador from
+(SELECT DISTINCT
+nucontrato,	cpf,	NUCONTA_PARC AS nuconta,	produto, MIN(min_ref) AS min_ref, MAX(max_ref) AS max_ref
+FROM
+BASE_2_PARC_B
+GROUP BY nucontrato,cpf,nuconta_parc,produto)
+GROUP BY NUCONTRATO) B
+ON A.nucontrato = b.nucontrato
+;
+QUIT;
+
+
+
+DATA BASE_2_PARC_UNICO;
+SET BASE_2_PARC_C;
+WHERE CONTADOR = 1;
+RUN;
+
+
+
+
+DATA CONTRATO_UNICO_FINAL;
+SET
+BASE_1_IQ_UNICO
+BASE_2_PARC_UNICO;
+DROP CONTADOR;
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE NUCONTRATO_CONTABIL_0 AS SELECT
+nucontrato AS NuContrato,
+cpf 		 AS CPF,
+nuconta 	 AS NUCONTA,
+produto	 AS PRODUTO
+FROM
+CONTRATO_UNICO_FINAL B
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CONFERE_DUP_NOVOS AS SELECT
+* FROM
+(SELECT A.*,B.CONTADOR FROM NUCONTRATO_CONTABIL_0 A LEFT JOIN
+(SELECT NUCONTRATO, COUNT(*) AS CONTADOR FROM
+NUCONTRATO_CONTABIL_0 GROUP BY NUCONTRATO) B
+ON A.NUCONTRATO = B.NUCONTRATO)
+WHERE CONTADOR >1
+;
+QUIT;
+
+
+
+
+DATA NUCONTRATO_CONTABIL_AGRUPADA;
+SET CARNEIRO.NUCONTRATO_CONTABIL
+NUCONTRATO_CONTABIL_0;
+RUN;
+
+PROC SORT DATA=NUCONTRATO_CONTABIL_AGRUPADA
+OUT=NUCONTRATO_CONTABIL NODUPKEY;
+BY NUCONTRATO;
+RUN;
+
+DATA CARNEIRO.NUCONTRATO_CONTABIL;
+SET NUCONTRATO_CONTABIL;
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE CONFERE_DUPLICADOS AS SELECT
+* FROM
+(SELECT A.*,B.CONTADOR FROM CARNEIRO.CONTRATO_UNICO_FINAL A LEFT JOIN
+(SELECT NUCONTRATO, COUNT(*) AS CONTADOR FROM
+CARNEIRO.CONTRATO_UNICO_FINAL GROUP BY NUCONTRATO) B
+ON A.NUCONTRATO = B.NUCONTRATO)
+WHERE CONTADOR >1
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CONFERE_MISSING_RPDD AS SELECT
+* FROM
+(SELECT A.*,B.NUCONTA AS NUCONTA_CORRIGIDA FROM base_contratos A LEFT JOIN
+CARNEIRO.NUCONTRATO_CONTABIL B
+ON A.NUCONTRATO = B.NUCONTRATO)
+WHERE NUCONTA_CORRIGIDA=.
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

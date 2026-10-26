@@ -1,0 +1,251 @@
+START_METADATA
+PROJECT: Rodas__GestaoRotinaApp
+FILE_SAS: AtualizaTbParceiroApp_Fev26.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 55)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -22
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20), PROC APPEND (1x | +15), RETAIN (2x | +20)
+----------------------------------------
+LINES_OF_CODE: 174
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: max_id
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBPARCEIROAPP [DATA Step - UPDATE; PROC SORT - DATA=; PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): BASEGRC.TBPARCEIROAPP
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBPARCEIROAPP
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/tbvisitaparceiroinput.csv
+TEMP/DISCARDED OUTPUTS: COMPARACAO, DIVERGENCIAS, TBPARCEIROAPP, TBPARCEIROAPP_ATUAL, TBPARCEIROAPP_ATUALIZACAO, TBPARCEIROAPP_INATIVO, TBPARCEIROAPP_INCLUSAO, TBPARCEIROAPP_NOVOS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================================== */
+/* |	Programa: 	AtualizaTbParceiroComercialApp.sas													| */
+/* |	Descricao: 	Script que monta a TbParceiroComercial que carrega no App de Gestao de rotina		| */
+/* |	para extração de dados de Conversão no site da Cetip.						 					| */
+/* |	Objetivo: 	Input mna lista do shrePoint para mostrar no APP	.								| */
+/* |	Criador: Gustavo DOmingues - MIS IGE															| */
+/* |	Data:		29/05/2025																			| */
+/* ====================================================================================================== */
+
+%include '/infogrc/utils/all-includes.sas';
+
+/* Gera ID maximo da tabela para dar continuidade no ID*/
+
+proc sql;
+	select max(ID_seq) into :max_id from BaseGrc.TbParceiroApp
+;quit;
+
+/*gera base com parceiros novos ou reativados*/
+
+PROC SQL;
+CREATE TABLE TbParceiroApp_Novos AS
+  SELECT
+  		CdParceiroComercial
+		,cats(CdParceiroComercial, '-',
+					tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+					tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+					NmParceiroComercial, 'Á','A'),'À','A'),'Ã','A'),'Â','A'),'Ä','A'),
+										 'É','E'),'È','E'),'Ê','E'),'Ë','E'),
+										 'Í','I'),'Ì','I'),'Î','I'),'Ï','I'),
+										 'Ó','O'),'Ò','O'),'Õ','O'),'Ô','O'),'Ö','O'),
+										 'Ú','U'),'Ù','U'),'Û','U'),'Ü','U'),
+										 'Ç','C')
+					) as NmParceiroComercial
+		,DsLoginN1C
+		,coalesce(DsLoginN2C,DsLoginN1C) as DsLoginN2C
+		,coalesce(DsLoginN3C,DsLoginN2C,DsLoginN1C) as DsLoginN3C
+/*		,cat(strip(DsLoginN1C),'@bv.com.br') as EmailN1C	*/
+/*		,cat(strip(calculated DsLoginN2C),'@bv.com.br') as EmailN2C	*/
+/*		,cat(strip(calculated DsLoginN3C),'@bv.com.br') as EmailN3C*/
+		,tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+		 tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+			NmAreaEstruturaComercialC,
+										'á','a'),'à','a'),'ã','a'),'â','a'),'ä','a'),
+										'é','e'),'è','e'),'ê','e'),'ë','e'),
+										'í','i'),'ì','i'),'î','i'),'ï','i'),
+										'ó','o'),'ò','o'),'õ','o'),'ô','o'),'ö','o'),
+										'ú','u'),'ù','u'),'û','u'),'ü','u'),
+										'ç','c') as NmAreaEstruturaComercialC
+		,NmSubEstruturaComercialC
+		,1 as AcomapnhaPDV
+FROM tmp.TBPARCEIROCOMERCIAL AS A
+WHERE 1=1
+And a.DsLoginN1C <> ''
+And a.DsLoginN2C <> ''
+and a.flativo= 'S'
+and a.NmCanalEstruturaComercialC = 'Canal Veiculos'
+AND a.cdparceirocomercial not in (select distinct cdparceirocomercial from BaseGrc.TbParceiroApp)
+/*AND a.CdParceiroComercial in(50)*/
+;RUN;
+
+/*insere o ID_Seq nos novos parceiros*/
+data TbParceiroApp_Novos;
+set TbParceiroApp_Novos;
+retain ID_Seq 0;
+ID_Seq = 	&max_id.  + _N_;
+retain IndAcao 'I'
+;run;
+
+/*BUSCA CASOS QUE PRECISAM DE ATUALIZACAO*/
+
+/* Etapa 1: Ordenar as bases pela chave */
+
+proc sort data=basegrc.TbParceiroApp Out= TbParceiroApp; by cdparceirocomercial; run;
+
+PROC SQL;
+CREATE TABLE TbParceiroApp_Atual AS
+  SELECT
+  		CdParceiroComercial as CdParceiroComercial
+		,cats(CdParceiroComercial, '-',
+					tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+					tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+					NmParceiroComercial, 'Á','A'),'À','A'),'Ã','A'),'Â','A'),'Ä','A'),
+										 'É','E'),'È','E'),'Ê','E'),'Ë','E'),
+										 'Í','I'),'Ì','I'),'Î','I'),'Ï','I'),
+										 'Ó','O'),'Ò','O'),'Õ','O'),'Ô','O'),'Ö','O'),
+										 'Ú','U'),'Ù','U'),'Û','U'),'Ü','U'),
+										 'Ç','C')
+					) as NmParceiroComercialC_Novo
+		,DsLoginN1C as DsLoginN1C_Novo
+		,coalesce(DsLoginN2C,DsLoginN1C) as DsLoginN2C_Novo
+		,coalesce(DsLoginN3C,DsLoginN2C,DsLoginN1C) as DsLoginN3C_Novo
+		,tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+		 tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(tranwrd(
+			NmAreaEstruturaComercialC,
+										'á','a'),'à','a'),'ã','a'),'â','a'),'ä','a'),
+										'é','e'),'è','e'),'ê','e'),'ë','e'),
+										'í','i'),'ì','i'),'î','i'),'ï','i'),
+										'ó','o'),'ò','o'),'õ','o'),'ô','o'),'ö','o'),
+										'ú','u'),'ù','u'),'û','u'),'ü','u'),
+										'ç','c') as NmAreaEstruturaComercialC_Novo
+		,NmSubEstruturaComercialC as NmSubEstruturaComercialC_Novo
+		,1 as AcomapnhaPDV_Novo
+FROM tmp.TBPARCEIROCOMERCIAL AS A
+WHERE 1=1
+AND a.cdparceirocomercial in (select distinct cdparceirocomercial from BaseGrc.TbParceiroApp)
+/*AND a.CdParceiroComercial in(50)*/
+;RUN;
+
+proc sort data=TbParceiroApp_Atual; by CdParceiroComercial; run;
+
+/* Etapa 2: Juntar as bases lado a lado */
+data Comparacao;
+    merge TbParceiroApp(in=app) TbParceiroApp_Atual(in=com);
+    by cdparceirocomercial;
+    if app and com;
+run;
+
+/* Etapa 3: Identificar divergências */
+data Divergencias;
+    set Comparacao;
+
+    /* Exemplo: comparar campos nome, status e tipo */
+    if DsLoginN1C ne DsLoginN1C_Novo or
+       DsLoginN2C ne DsLoginN2C_Novo or
+       DsLoginN3C ne DsLoginN3C_Novo or
+	   NmAreaEstruturaComercialC ne NmAreaEstruturaComercialC_Novo
+/*	   NmSubEstruturaComercialC ne NmSubEstruturaComercialC_Novo */
+then output;
+run;
+
+proc sql;
+create table TbParceiroApp_Atualizacao as
+select
+	CdParceiroComercial
+,	NmParceiroComercialC_Novo as NmParceiroComercial
+,	DsLoginN1C_Novo as DsLoginN1C
+,	DsLoginN2C_Novo as DsLoginN2C
+,	DsLoginN3C_Novo as DsLoginN3C
+,	NmAreaEstruturaComercialC_Novo as NmAreaEstruturaComercialC
+,	NmSubEstruturaComercialC_Novo as NmSubEstruturaComercialC
+,	AcomapnhaPDV_Novo as AcomapnhaPDV
+,	ID_Seq
+,'A' as IndAcao
+
+from Divergencias
+where 1=1
+And DsLoginN1C_Novo <> ''
+And DsLoginN2C_Novo <> ''
+;run;
+
+/*Apenda nvos parceiros na abse historicaa*/
+
+proc append data=TbParceiroApp_Novos base=BaseGrc.TbParceiroApp force;run;
+
+/*Faz Update nos parceiros que precisaram de atualização*/
+
+proc sort data=BaseGrc.TbParceiroApp; by CdParceiroComercial ;run;
+proc sort data=TbParceiroApp_Atualizacao; by CdParceiroComercial ;run;
+
+data BaseGrc.TbParceiroApp;
+	update
+		BaseGrc.TbParceiroApp
+		TbParceiroApp_Atualizacao;
+by CdParceiroComercial
+;run;
+
+/*gera bases de parceirto inativos*/
+
+proc sql;
+create table TbParceiroAPP_Inativo as
+select distinct
+	 a.CdParceiroComercial
+	,a.NmParceiroComercial
+	,'E' as IndAcao
+from BaseGrc.TbParceiroApp  as a
+	inner join tmp.TbParceiroComercial as b
+		on a.CdParceiroComercial = b.CdParceiroComercial
+		and FlAtivo = 'N'
+where 1=1
+;run;
+
+/*Retira os inativos da base oficial*/
+proc sql;
+delete from BaseGrc.TbParceiroApp
+where cdparceirocomercial in (select cdparceirocomercial from TbParceiroInativo)
+;run;
+
+data TbParceiroApp_Inclusao;
+set TbParceiroApp_Atualizacao
+	TbParceiroApp_Novos
+	TbParceiroAPP_Inativo
+	;run;
+
+/* Exporta CSV */
+proc export
+data=TbParceiroApp_Inclusao
+file='/riscosbvf/BA/processos/output/tbvisitaparceiroinput.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

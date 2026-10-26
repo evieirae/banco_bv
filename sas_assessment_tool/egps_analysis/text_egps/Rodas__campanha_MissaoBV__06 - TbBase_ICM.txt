@@ -1,0 +1,115 @@
+START_METADATA
+PROJECT: Rodas__campanha_MissaoBV
+FILE_SAS: 06 - TbBase_ICM.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), PROC APPEND (1x | +15), ARRAY (5x | +75)
+----------------------------------------
+LINES_OF_CODE: 47
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CMBV = /infogrc/Campanha_MissaoBV; CMBV_BKP = /infogrc/Campanha_MissaoBV/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes, Max_Base_ICM
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], ICOM.TBGRCOMISSAOICM [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_ICM_1, WORK.MAX_DATA
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CMBV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ICM_1, WORK.BASE_ICM_2, WORK.BASE_ICM_3, WORK.MAX_DATA
+TABLE_READ_PROVENANCE (Flow): CMBV.BASE_ICM [PROC SQL - FROM], ICOM.TBGRCOMISSAOICM [PROC SQL - FROM], WORK.BASE_ICM_1 [DATA Step - SET], WORK.BASE_ICM_2 [DATA Step - SET], WORK.BASE_ICM_3 [PROC APPEND - DATA=], WORK.MAX_DATA [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): CMBV.BASE_ICM
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CMBV.BASE_ICM
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CMBV.BASE_ICM
+APPEND_ONLY_OUTPUTS: CMBV.BASE_ICM
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CMBV.BASE_ICM
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_ICM_1, MAX_DATA, WORK.BASE_ICM_2, WORK.BASE_ICM_3
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CMBV '/infogrc/Campanha_MissaoBV';
+LIBNAME CMBV_BKP '/infogrc/Campanha_MissaoBV/Bases_BKP';
+
+/*BASE ICM REALIZADO MÊS DA CAMPANHA*/
+
+PROC SQL;
+CREATE TABLE BASE_ICM_1 AS
+SELECT
+
+NuAnoMes,
+DsLoginn1,
+ICM as VrICM FORMAT COMMAX20.6
+
+FROM ICOM.TBGRCOMISSAOICM
+
+where NUANOMES between 202510 AND 202512
+
+order by 2,1
+
+;run;
+
+/*SUBSTITUI TUDO QUE FOI "MISSING OU '.' POR '0'*/
+/*ALGUNS CASOS ESTÃO "VAZIOS" AO FINALIZAR O SCRIPT*/
+
+data work.BASE_ICM_2;
+	set work.BASE_ICM_1;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+/*DATA CMBV.BASE_ICM;*/
+/*SET WORK.BASE_ICM_2;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_Base_ICM
+FROM CMBV.BASE_ICM
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_Base_ICM',Max_Base_ICM);
+;run;
+%PUT &Max_Base_ICM;
+
+PROC SQL;
+DELETE FROM CMBV.BASE_ICM
+WHERE NUANOMES = &Max_Base_ICM.;
+;RUN;
+
+DATA WORK.BASE_ICM_3;
+SET WORK.BASE_ICM_2;
+WHERE NuAnoMes = &Base_Mes.;
+;RUN;
+
+PROC APPEND BASE=CMBV.BASE_ICM DATA=WORK.BASE_ICM_3;RUN;

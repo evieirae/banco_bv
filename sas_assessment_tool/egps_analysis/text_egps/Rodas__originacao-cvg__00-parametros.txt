@@ -1,0 +1,148 @@
+START_METADATA
+PROJECT: Rodas__originacao-cvg
+FILE_SAS: 00-parametros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (2x | +40), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 68
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: HOML = /projetos/MISV/data/bases; TMP = /projetos/MISV/data/bases/tmp
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: Base_m0, Base_m1, CAPTURA_DU
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/Calendario.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/CALENDARIO.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], HOML.TBTEMPODATA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TEMPODATA
+IMPORTED_LIBNAMES: HOML
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/Calendario.sas, /infogrc/utils/libname.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TEMPODATA
+TABLE_READ_PROVENANCE (Flow): HOML.TBTEMPODATA [PROC SQL - FROM], WORK.TEMPODATA [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/Calendario.sas, /infogrc/utils/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): HOML.TBTEMPODATA
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_STDATA, FLTEMPODATA, TEMPODATA, TEMPODATA_DU
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/Calendario.sas
+[CODE REF] /infogrc/utils/libname.sas
+
+END_METADATA
+================================================================================
+/* Marcar horário de início da atualização */
+%LET W_ini = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+SUBJECT="Painel informativo de originação Produto CVG | Início da atualização";
+
+DATA _NULL_;
+	FILE MAIL_INI;
+		PUT "Processamento da base de originação CVG iniciado.";
+RUN;
+
+/* Executar código de geração da base */
+
+%include '/infogrc/utils/libname.sas';
+libname TMP '/projetos/MISV/data/bases/tmp';
+libname HOML '/projetos/MISV/data/bases';
+%include '/infogrc/utils/Calendario.sas';
+
+PROC SQL;
+CREATE TABLE FlTempoData as
+SELECT
+*
+FROM HOML.TBTEMPODATA A
+WHERE STDATA = 1 /*AND FlDiaUtil = 'S'*/
+
+;RUN;
+
+/*
+Data _NULL_;
+SET WORK.FlTempoData;
+
+DtRef = INTNX("Month",TODAY(),-1,'e');
+DtPrimeiroDU = INTNX("DiaUtil",DtRef,1);
+
+put DtPrimeiroDU = DDMMYY10.;
+
+IF DtPrimeiroDU = TODAY()
+THEN DO;
+	CALL SYMPUT ('Base_m0',NuAnoMes-1);
+	CALL SYMPUT ('Base_m1',NuAnoMes-2);
+	END;
+ELSE DO;
+	CALL SYMPUT ('Base_m0',NuAnoMes);
+	CALL SYMPUT ('Base_m1',NuAnoMes-1);
+END;
+
+Run;
+*/
+
+data _null_;
+CALL SYMPUT ('Base_m1',202312);
+CALL SYMPUT ('Base_m0',202401);
+;run;
+
+%put &Base_m0 &Base_m1;
+
+PROC SQL;
+CREATE TABLE TempoData as
+SELECT
+
+*
+
+FROM HOML.TBTEMPODATA A
+
+WHERE A.NUANOMES >= &Base_m1 /*AND FlDiaUtil = 'S'*/
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TempoData_DU as
+SELECT
+
+*
+
+FROM HOML.TBTEMPODATA A
+
+WHERE A.NUANOMES >= &Base_m1 AND FlDiaUtil = 'S'
+
+;RUN;
+
+/*CAPTURA STDATA*/
+
+DATA BASE_STDATA;
+SET WORK.TEMPODATA;
+IF STDATA = 1 THEN CAPTURA_DU = QtCorridosDiaUtilDia;
+ELSE CAPTURA_DU = 0;
+
+CALL SYMPUT ('CAPTURA_DU',CAPTURA_DU);
+;RUN;
+%PUT &CAPTURA_DU;

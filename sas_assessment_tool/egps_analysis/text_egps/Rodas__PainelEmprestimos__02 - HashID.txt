@@ -1,0 +1,79 @@
+START_METADATA
+PROJECT: Rodas__PainelEmprestimos
+FILE_SAS: 02 - HashID.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 70)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: HASH (1x | +70)
+----------------------------------------
+LINES_OF_CODE: 24
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: IQPassword, IQUser
+DETECTED_MACROS_USED: IQPassword, IQUser
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DBCRED.TBPROPOSTA [SYBASE], DBCRED.TBPROPOSTACOMPLEMENTOPARCEIRO [SYBASE]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): DBCRED.TBPROPOSTA [Pass-Through Native (SYBASE) - JOIN], DBCRED.TBPROPOSTACOMPLEMENTOPARCEIRO [Pass-Through Native (SYBASE) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: WORK.HASH_MFS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*-------- Consulta Ass. Eletrônica no PTASYBCTR --------*/
+%let IQUser = risco;
+%let IQPassword = {SAS002}46EE851319C19E8357848C1E;
+
+proc sql;
+	connect to SYBASE as
+
+		dbcon (server=PTASYBCTR user=&IQUser. password="&IQPassword.");/**/
+
+	create table work.HASH_MFS as
+		select
+			*
+		from connection to dbcon
+(
+SELECT H.NuProposta,
+		 H.VrAtributoPropostaParceiro
+FROM DBCRED..TbPropostaComplementoParceiro H
+INNER JOIN	DBCRED..TbProposta A
+ON A.NuProposta = H.NuProposta
+WHERE H.CdAtributoPropostaParceiro = 7
+AND H.VrAtributoPropostaParceiro IS NOT NULL
+AND A.StProposta = 'AP'
+AND A.CdSubProduto IN (12,18,22,23,24,25,26,70)
+/*,19,20,75, 100, 8, 13, 59, 60, 63, 62, 38, 54,55, 56, 93, 67, 68, 71, 73, 72, 77, 82, 86, 85, 87, 88, 89, 96, 98, 97, 101*/
+/*AND H.DtInclusao >= INPUT('01Jan2024:00:00:00', DATETIME20.)*/
+);
+
+QUIT;

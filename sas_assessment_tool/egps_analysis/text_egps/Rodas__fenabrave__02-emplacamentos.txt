@@ -1,0 +1,150 @@
+START_METADATA
+PROJECT: Rodas__fenabrave
+FILE_SAS: 02-emplacamentos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -11
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), CALL EXECUTE (1x | +45), %INCLUDE (1x | +20), PROC DATASETS (2x | +40), PROC APPEND (1x | +15), INFILE  (1x | +10), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 89
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, DATASETS, FREQ
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Arquivo
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ARQUIVO
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /RISCOSBVF/BA/PROCESSOS/MANUAIS/TBFENABRAVE_/&ARQUIVO. [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: FNBRAVE
+IMPORTED FILES (Requires Ingestion): /Emplacamentos_\d{4}_\d{2}\.txt, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/manuais/TbFenabrave_/&amp;Arquivo.
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /Emplacamentos_\d{4}_\d{2}\.txt, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/manuais/TbFenabrave_/&amp;Arquivo.
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): FNBRAVE.TB_FENABRAVE_EMPLACAMENTOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ARQUIVOS, TB_FENABRAVE_EMPLACAMENTOS, TMP
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (no_ext: 1, sas: 1, txt: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /Emplacamentos_\d{4}_\d{2}\.txt
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /riscosbvf/BA/processos/manuais/TbFenabrave_/&amp;Arquivo.
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/libname.sas';
+
+%macro Importa(Arquivo);
+	Data tmp; INFILE "/riscosbvf/BA/processos/manuais/TbFenabrave_/&Arquivo."
+	DSD MISSOVER DELIMITER=";" ;
+	format NmArquivo $50.;
+	NmArquivo = "&Arquivo.";
+
+	INPUT
+		CNPJ             : BEST14.
+		Razao_Social     : $CHAR78.
+		Data_Emplacamento :ANYDTDTM18.
+		Numero_Chassis   : $CHAR17.
+		Numero_Placa     : $CHAR7.
+		Fabricante       : $CHAR25.
+		Fabricante_Codigo :BEST5.
+		GrupoModeloVeiculo : $CHAR27.
+		GrupoModeloVeiculo_Codigo : BEST5.
+		Modelo           : $CHAR25.
+		Modelo_Codigo    : BEST6.
+		Segmento         : $CHAR21.
+		Segmento_Codigo  : BEST2.
+		SubSegmento      : $CHAR27.
+		SubSegmento_Codigo : BEST3.
+		Municipio        : $CHAR32.
+		Municipio_Codigo : BEST4.
+		Estado           : $CHAR2.
+		Combustivel      : $CHAR32.
+		Combustivel_Codigo : BEST2.
+		Ano_Fabricacao   : COMMAX7.
+		Campo22          : $CHAR20.
+		Campo23          : $CHAR20.
+		Campo24          : $CHAR20.
+		Campo25          : $CHAR20.
+		fname      		 : $CHAR20.;
+	FORMAT
+	    CNPJ             BEST14.
+	    Razao_Social     $CHAR78.
+	    Data_Emplacamento DATETIME18.
+	    Numero_Chassis   $CHAR17.
+	    Numero_Placa     $CHAR7.
+	    Fabricante       $CHAR25.
+	    Fabricante_Codigo BEST5.
+	    GrupoModeloVeiculo $CHAR27.
+	    GrupoModeloVeiculo_Codigo BEST5.
+	    Modelo           $CHAR25.
+	    Modelo_Codigo    BEST6.
+	    Segmento         $CHAR21.
+	    Segmento_Codigo  BEST2.
+	    SubSegmento      $CHAR27.
+	    SubSegmento_Codigo BEST3.
+	    Municipio        $CHAR32.
+	    Municipio_Codigo BEST4.
+	    Estado           $CHAR2.
+	    Combustivel      $CHAR32.
+	    Combustivel_Codigo BEST2.
+	    Ano_Fabricacao   BEST7.
+	    Campo22          $CHAR20.
+	    Campo23          $CHAR20.
+	    Campo24          $CHAR20.
+	    Campo25          $CHAR20.;
+	RUN;
+
+	proc append base=TB_FENABRAVE_EMPLACAMENTOS data=tmp;run;
+
+	proc datasets lib=work nolist;
+	delete tmp;
+	run;
+%mend;
+
+data Arquivos;
+	rc = filename('pasta', "/riscosbvf/BA/processos/manuais/TbFenabrave_/");
+		id = dopen('pasta');
+			do i = 1 to dnum(id);
+				Arquivo = dread(id, i);
+				if prxmatch('/Emplacamentos_\d{4}_\d{2}\.txt/', Arquivo) then output;
+			end;
+		id = dclose(id);
+	rc = filename('pasta');
+	keep Arquivo;
+run;
+
+/* Chamada da macro importação */
+proc datasets lib=work nolist;delete TB_FENABRAVE_EMPLACAMENTOS;run;
+data _null_;
+	set Arquivos;
+	call execute('%Importa('||Arquivo||')');
+run;
+
+proc freq data=TB_FENABRAVE_EMPLACAMENTOS;
+table nmarquivo;
+run;
+
+options compress=yes;
+
+DATA FNBRAVE.TB_FENABRAVE_EMPLACAMENTOS;
+SET TB_FENABRAVE_EMPLACAMENTOS;
+RUN;

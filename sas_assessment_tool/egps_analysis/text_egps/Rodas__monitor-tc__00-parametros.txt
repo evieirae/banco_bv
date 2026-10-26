@@ -1,0 +1,102 @@
+START_METADATA
+PROJECT: Rodas__monitor-tc
+FILE_SAS: 00-parametros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 36
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: SINAL, SINAL_2, TAB_LEVES, TAB_LEVES_MAX, TAB_LEVES_MIN, TAB_MOTOS, TAB_MOTOS_MAX, TAB_MOTOS_MIN, TAB_PESADOS, TAB_PESADOS_MAX, TAB_PESADOS_MIN, TC_MAX, TC_MIN, TC_VAR_MAX, TC_VAR_MAX_PF, TC_VAR_MIN, qtMeses
+DETECTED_MACROS_USED: qtMeses
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+
+END_METADATA
+================================================================================
+/*Parametros para os alertas de monitoramento da TC em Rodas*/
+%include '/infogrc/utils/libname.sas';
+%include '/infogrc/utils/IQ.sas';
+
+/* INFORMAR QTD MESES PARA O MONITORAMENTO */
+%let qtMeses = 2;
+
+DATA _NULL_;
+  /* Define parâmetros com base no dia atual */
+  hoje = TODAY();
+  hojeXM = INTNX('MONTH', hoje, ((&qtMeses. - 1) * -1), 'BEGINNING');
+  anoAnt = INTNX('YEAR', hoje, -1, 'BEGINNING');
+
+  /* Calcula variáveis */
+  SAFRAEXEC = (YEAR(hoje) * 100) + MONTH(hoje);
+  ANOATUAL = YEAR(hoje);
+
+  /*Declara var*/
+  CALL SYMPUT('SAFRA',SAFRAEXEC);
+RUN;
+
+/*Mínimos e Máximos em percentual*/
+
+%LET TC_MIN = 0.60;
+%LET TC_MAX = 0.70;
+
+/*Mínimos e Máximos em Valores*/
+
+%LET TC_VAR_MIN = 1299;
+%LET TC_VAR_MAX_PF = 1299;
+%LET TC_VAR_MAX = 1299;
+
+%Let SINAL = 0;
+%Let SINAL_2 = 1;
+
+/* Valores TAB */
+
+%LET TAB_LEVES = 444;
+%LET TAB_MOTOS = 299;
+%LET TAB_PESADOS = 789;
+
+%LET TAB_MOTOS_MAX = 0.75;
+%LET TAB_MOTOS_MIN = 0.60;
+
+%LET TAB_LEVES_MAX = 0.99;
+%LET TAB_LEVES_MIN = 0.90;
+
+%LET TAB_PESADOS_MAX = 1;
+%LET TAB_PESADOS_MIN = 0.80;
+
+/*Identificar quais são os parametros que subimos ao olhar as tabelas de produção*/

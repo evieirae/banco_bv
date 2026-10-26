@@ -1,0 +1,81 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-simples
+FILE_SAS: 08-unificar-bases.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 27
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtMkt, DtOrig, DtProd
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: QDVSIMPLES, QDVSIMPLES01
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* Passo 02/03 - Gerar base para QDV Completo */
+PROC SQL;
+  CREATE TABLE QDVSimples01 AS
+    SELECT * FROM Consolidado
+    OUTER UNION CORRESPONDING
+    SELECT * FROM MarketShare
+    OUTER UNION CORRESPONDING
+    SELECT * FROM SuperTrunfo
+    OUTER UNION CORRESPONDING
+    SELECT * FROM Inad;
+RUN;
+
+PROC SQL;
+CREATE TABLE QDVSimples AS
+  SELECT
+    &DtProd. FORMAT=mmddyy10. AS DtAtualizacaoProducao,
+    &DtOrig. FORMAT=mmddyy10. AS DtAtualizacaoOriginacao,
+    &DtMkt. FORMAT=mmddyy10. AS DtAtualizacaoMktShare,
+	*
+	FROM QDVSimples01;
+RUN;
+
+%ExportaCSV(TbQualidadeVendasIGE,QDVSimples);
+
+/*proc sql;
+create table tb as
+select * from QDVSimples
+where NuAnoMes=202504
+;run;
+
+%ExportaCSV(TbQualidadeVendasIGE,tb);*/

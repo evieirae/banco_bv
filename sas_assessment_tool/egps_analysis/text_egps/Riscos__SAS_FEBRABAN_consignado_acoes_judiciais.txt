@@ -1,0 +1,134 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__SAS_FEBRABAN_consignado_acoes_judiciais
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:14 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 80
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BDCIVEL = /riscosbv/MRO/BDCivel; TMP = /riscosbv/operacional/BDPO/baseTemp; YRIBEIRO = /riscosbv/juridico/yribeiro
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BDCIVEL.MASSIFICADO [SAS/Local], TMP.TBL1491CONTABILIDADE_AUX [SAS/Local], YRIBEIRO.TBLCONTRATOSIQ [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BDCIVEL, TMP, YRIBEIRO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BDPONOVA_COAUD, WORK.CONTRATOS_CONSIGNADO_PRIVADOS
+TABLE_READ_PROVENANCE (Flow): BDCIVEL.MASSIFICADO [PROC SQL - JOIN], TMP.TBL1491CONTABILIDADE_AUX [DATA Step - SET], WORK.BDPONOVA_COAUD [PROC SQL - JOIN], WORK.CONTRATOS_CONSIGNADO_PRIVADOS [PROC SQL - FROM], YRIBEIRO.TBLCONTRATOSIQ [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.BDPONOVA_COAUD, WORK.CONTRATOS_CONSIGNADO_PRIVADOS, WORK.FILTER_FOR_CONTRATOS_CONSIGNADO_
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-n2DxUeAvcteTwEYS/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname TMP      '/riscosbv/operacional/BDPO/baseTemp';
+libname YRIBEIRO '/riscosbv/juridico/yribeiro';
+libname BDCIVEL  '/riscosbv/MRO/BDCivel';
+
+DATA WORK.BDPONOVA_COAUD (COMPRESS=YES);
+
+SET TMP.TBL1491CONTABILIDADE_AUX;
+RUN;
+
+PROC SQL;
+   CREATE TABLE WORK.CONTRATOS_CONSIGNADO_PRIVADOS AS
+   SELECT DISTINCT t2.Pasta,
+          t1.NuContrato,
+          t3.DtCont,
+          t3.ClassEventoN2GRC,
+          t3.NuContaContabilCredito,
+          t3.NuContaContabilDebito,
+          t3.NaturLanc,
+          t3.DescrNova,
+          t1.NmModalidadeProduto,
+          t1.CdParceiroComercial,
+          t2.MotivoPadrao,
+          t2.Motivo,
+          t2.Submotivo,
+          t2.DtEncerramento,
+          t2.MotEncerr,
+          t2.Desfecho_Pagtos,
+          t2.NmFaseProcessoGrupoPadrao
+      FROM YRIBEIRO.TBLCONTRATOSIQ t1
+           RIGHT JOIN BDCIVEL.MASSIFICADO t2 ON (t1.NuContrato = t2.NuCONTRATO)
+           INNER JOIN WORK.BDPONOVA_COAUD t3 ON (t2.Pasta = t3.Pasta)
+      WHERE t1.NmModalidadeProduto = 'CONSIGNADO PRIVADO' AND t3.DtCont >= '1Jan2023'd;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_CONTRATOS_CONSIGNADO_);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_CONTRATOS_CONSIGNADO_ AS
+   SELECT t1.Pasta,
+          t1.NuContrato,
+          t1.DtCont,
+          t1.ClassEventoN2GRC,
+          t1.NuContaContabilCredito,
+          t1.NuContaContabilDebito,
+          t1.NaturLanc,
+          t1.DescrNova,
+          t1.NmModalidadeProduto,
+          t1.CdParceiroComercial,
+          t1.MotivoPadrao,
+          t1.Motivo,
+          t1.Submotivo,
+          t1.DtEncerramento,
+          t1.MotEncerr,
+          t1.Desfecho_Pagtos,
+          t1.NmFaseProcessoGrupoPadrao
+      FROM WORK.CONTRATOS_CONSIGNADO_PRIVADOS t1
+      WHERE t1.MotEncerr = 'EM CURSO';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,264 @@
+START_METADATA
+PROJECT: Rodas__status_conta
+FILE_SAS: statusconta_bkp_20251031.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 187
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASEGRC.TBGRUPOPRODUTOMETA [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], BASEGRC.TBGRUPOPRODUTOMETA [PROC SQL - JOIN], BASES.TBCOLABORADOR [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], TBPROPOSTA [Pass-Through Native (DBCON) - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): TBPROPOSTA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./TbPropostaStatusConta.csv
+TEMP/DISCARDED OUTPUTS: STATUSCONTA, STATUSCONTAFLAG, TBPROPOSTA, TBPROPOSTADETALHE, TBPROPOSTASTATUSCONTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE TbProposta AS
+SELECT * FROM connection to dbcon
+(
+WITH
+
+TbColaborador AS
+(
+	SELECT DISTINCT
+		 Colaborador.CdOperador
+		,first_value(Colaborador.CdColaborador) over (partition BY Colaborador.CdOperador ORDER BY CASE WHEN (Colaborador.NmColaborador LIKE 'DUP%' OR Colaborador.DsLogin LIKE 'DUP%') THEN 1 ELSE 0 END) AS CdColaborador
+		,first_value(Colaborador.CdFilial) over (partition BY Colaborador.CdOperador ORDER BY CASE WHEN (Colaborador.NmColaborador LIKE 'DUP%' OR Colaborador.DsLogin LIKE 'DUP%') THEN 1 ELSE 0 END) AS CdFilial
+
+	FROM DBA.TbColaborador Colaborador
+	WHERE Colaborador.CdColaborador > 0
+	AND Colaborador.CdOperador > 0
+)
+
+,TbProposta AS
+(
+			SELECT
+				 year(DATE(Proposta.DtEntradaProposta))*100+month(DATE(Proposta.DtEntradaProposta)) NuAnoMes
+				,DATE(Proposta.DtEntradaProposta) AS DtEntradaProposta
+				,DATE(Proposta.DtStatusProposta) AS DtStatusProposta
+				,Proposta.StProposta
+                ,SubProduto.CdProduto*1000000 + SubProduto.CdModalidadeProduto*1000 + coalesce(SubProduto.CdTipoBem,0) CdGrupoSubProduto
+				,Colaborador.CdColaborador
+				,Proposta.NuProposta
+				,Proposta.NuContratoGestao
+				,CASE WHEN SubProduto.CdProduto = 11 THEN Colaborador.CdFilial ELSE Regiao.CdFilial END AS CdFilial
+				,Proposta.CdLoja CdParceiroComercial
+				,PessoaSobAnalise.TpPessoa
+				,Proposta.CdSubProduto
+				,PessoaSobAnalise.NuCpfCnpj
+
+			FROM DBA.TbProposta Proposta
+
+				LEFT JOIN DBA.TbPessoaSobAnalise PessoaSobAnalise
+					ON  Proposta.NuProposta = PessoaSobAnalise.NuProposta
+					AND PessoaSobAnalise.CdPapel = 1
+
+				LEFT JOIN DBA.TbSubProduto SubProduto
+					ON Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+				LEFT JOIN DBA.TbLoja Loja
+					ON Proposta.CdLoja = Loja.CdLoja
+
+				LEFT JOIN DBA.TbRegiao Regiao
+					ON  Loja.CdRegiao = Regiao.CdRegiao
+
+				LEFT JOIN DBA.TbParceiroComercial ParceiroComercial
+					ON Proposta.CdLoja = ParceiroComercial.CdParceiroComercial
+
+				LEFT JOIN TbColaborador Colaborador
+					ON  Proposta.CdOperador = Colaborador.CdOperador
+
+				WHERE Proposta.TpProposta <> '3'
+					AND DATE(Proposta.DtEntradaProposta) >=  DATEADD(DAY, -30, TODAY())
+					AND Proposta.NuProposta <> 0
+					AND Proposta.StProposta IN ('A','AP')
+)
+SELECT
+*
+FROM TbProposta
+);QUIT;
+
+proc sql;
+create table TbPropostaDetalhe as
+select
+	 Proposta.NuProposta
+	,Proposta.DtEntradaProposta
+	,Proposta.StProposta
+	,Proposta.NuCpfCnpj
+	,Proposta.TpPessoa
+	,CATS(Proposta.CdParceiroComercial,' - ',COMPRESS(ParceiroComercial.NmParceiroComercial,'0D0A'x)) as NmParceiroComercial
+	,Colaborador.NmColaborador
+	,EstruturaComercial.NmAreaEstruturaComercial
+	,EstruturaComercial.NmSubEstruturaComercialA
+	,EstruturaComercial.NmCanalEstruturaComercial
+	,Colaborador.DsLogin as DsLoginN1
+	,EstruturaComercial.DsLoginN2A as DsLoginN2
+	,EstruturaComercial.DsLoginN3A as DsLoginN3
+	,ColaboradorFocal.LstColaboradorFocal
+
+	,GrupoProdutoMeta.nmgrupoprodutometa
+from TbProposta Proposta
+		LEFT JOIN tmp.TbParceiroComercial ParceiroComercial
+			ON  Proposta.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+		LEFT JOIN bases.TbEstruturaComercial EstruturaComercial
+			ON  Proposta.CdFilial = EstruturaComercial.CdFilial
+			AND Proposta.NuAnoMes  = EstruturaComercial.NuAnoMes
+			AND EstruturaComercial.NmNivel = 'N2'
+
+		LEFT JOIN bases.TbColaborador Colaborador
+			ON  Proposta.CdColaborador = Colaborador.CdColaborador
+
+		inner JOIN basegrc.TbGrupoProdutoMeta GrupoProdutoMeta
+			ON Proposta.CdGrupoSubProduto = GrupoProdutoMeta.CdGrupoSubProduto
+			and GrupoProdutoMeta.NmGrupoProdutoMeta IN ('CVG Pesados', 'CVG Leves', 'Leves', 'Motos','Pesados')
+
+		LEFT JOIN basegrc.TbColaboradorFocal ColaboradorFocal
+			on  Proposta.CdFilial = ColaboradorFocal.CdFilial
+			and GrupoProdutoMeta.NmGrupoProdutoMeta = ColaboradorFocal.NmGrupoProdutoMeta
+
+;run;
+
+proc sql;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage);
+create table StatusConta as
+select * from connection to perm(
+WITH
+  tb1 AS (
+  SELECT
+    controle.cdcontrolestatuscadastro,
+    controle.dtcontrolestatuscadastro,
+    controle.dtalteracao,
+    controle.cdstatuspreenchimentocadastro,
+    status.dsstatuspreenchimentocadastro,
+    pessoa.nucpfcnpj,
+    pessoa.nmpessoa,
+    pessoa.tppessoa,
+    ROW_NUMBER() OVER(PARTITION BY pessoa.nucpfcnpj ORDER BY controle.cdcontrolestatuscadastro DESC) ROW
+  FROM
+    `bv-pdbd-prd.trusted_dbglobal.tbcontrolestatuscadastro` controle
+  INNER JOIN
+    `bv-pdbd-prd.trusted_dbglobal.tbpessoa` pessoa
+  ON
+    controle.cdpessoa = pessoa.cdpessoa
+  LEFT JOIN `bv-pdbd-prd.trusted_dbglobal.tbstatuspreenchimentocadastro` status
+  ON status.cdstatuspreenchimentocadastro = controle.cdstatuspreenchimentocadastro
+  WHERE
+    TIMESTAMP_TRUNC(dtcontrolestatuscadastro, MONTH) >= TIMESTAMP_TRUNC(TIMESTAMP_SUB(CURRENT_TIMESTAMP(),INTERVAL 30 DAY),MONTH) )
+SELECT
+  a.cdcontrolestatuscadastro,
+  a.dtcontrolestatuscadastro,
+  a.dtalteracao dtalteracaofim,
+  a.cdstatuspreenchimentocadastro,
+  a.dsstatuspreenchimentocadastro,
+  a.nucpfcnpj,
+  a.nmpessoa,
+  a.tppessoa,
+  b.dtcontrolestatuscadastro dtcontrolestatuscadastroini
+FROM
+  tb1 a
+LEFT JOIN (
+  SELECT
+    nucpfcnpj,
+    MIN(dtcontrolestatuscadastro) dtcontrolestatuscadastro
+  FROM
+    tb1
+  GROUP BY
+    1) b
+ON
+  a.nucpfcnpj = b.nucpfcnpj
+WHERE
+  a.ROW = 1
+);
+disconnect from perm;
+run;
+
+proc sql;
+create table StatusContaFlag as
+select
+	nucpfcnpj,
+	catx(" - ",nucpfcnpj, nmpessoa) as NmCliente,
+	put(datepart(dtcontrolestatuscadastroini), date9.) || ' ' || put(timepart(dtcontrolestatuscadastroini), time8.) as dtEntrada,
+	put(datepart(dtalteracaofim), date9.) || ' ' || put(timepart(dtalteracaofim), time8.) as dtAlteracao,
+	dsstatuspreenchimentocadastro
+/*	max(case when cdstatuspreenchimentocadastro = 20 then 1 else 0 end) as flStatusAnalise,*/
+/*	max(case when cdstatuspreenchimentocadastro = 21 then 1 else 0 end) as flStatusAprovado,*/
+/*	max(case when cdstatuspreenchimentocadastro = 22 then 1 else 0 end) as flStatusNegado,*/
+/*	max(case when cdstatuspreenchimentocadastro = 23 then 1 else 0 end) as flStatusInconclusivo,*/
+/*	max(case when cdstatuspreenchimentocadastro = 24 then 1 else 0 end) as flStatusErro,*/
+/*	max(case when cdstatuspreenchimentocadastro = 25 then 1 else 0 end) as flStatusSuspenso,*/
+/*	max(case when cdstatuspreenchimentocadastro = 26 then 1 else 0 end) as flStatusAnalisePld*/
+from StatusConta
+/*group by 1,2*/
+order by 1
+;run;
+
+proc sql;
+create table TbPropostaStatusConta as
+select
+a.*,
+b.*,
+put(datepart(datetime()), date9.) || ' ' || put(timepart(datetime()), time8.) as dtprocessamento
+from TbPropostaDetalhe a
+inner join StatusContaFlag b on a.nucpfcnpj = b.nucpfcnpj
+;run;
+
+/*-- 20 em analise - PLD e FRAUDES*/
+/*-- 21 aprovado - PLD e FRAUDES*/
+/*-- 22 negado - PLD e FRAUDES*/
+/*-- 23 inconclusivo - FRAUDES*/
+/*-- 24 erro (em analise pro cliente) - FRAUDES*/
+/*-- 25 suspenso (em analise pro cliente) FRAUDES*/
+/*-- 26 analise - PLD*/
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT DATA=TbPropostaStatusConta
+	FILE="&dir_csv./TbPropostaStatusConta.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

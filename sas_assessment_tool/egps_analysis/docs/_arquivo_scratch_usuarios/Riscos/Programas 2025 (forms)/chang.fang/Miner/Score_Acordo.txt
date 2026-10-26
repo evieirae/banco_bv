@@ -1,0 +1,66 @@
+*------------------------------------------------------------*;
+* EM SCORE CODE;
+*------------------------------------------------------------*;
+*------------------------------------------------------------*;
+* TOOL: Input Data Source;
+* TYPE: SAMPLE;
+* NODE: Ids2;
+*------------------------------------------------------------*;
+*------------------------------------------------------------*;
+* TOOL: Filtering;
+* TYPE: MODIFY;
+* NODE: Filter;
+*------------------------------------------------------------*;
+*------------------------------------------------------------*;
+* TOOL: Extension Class;
+* TYPE: HPDM;
+* NODE: HPPart2;
+*------------------------------------------------------------*;
+*------------------------------------------------------------*;
+* TOOL: Extension Class;
+* TYPE: MODEL;
+* NODE: HPDMForest3;
+*------------------------------------------------------------*;
+%macro em_hpfst_score;
+
+  %if %symexist(hpfst_score_input)=0 %then %let hpfst_score_input=&em_score_output;
+  %if %symexist(hpfst_score_output)=0 %then %let hpfst_score_output=&em_score_output;
+  %if %symexist(hpfst_id_vars)=0 %then %let hpfst_id_vars = _ALL_;
+
+  %let hpvvn= %sysfunc(getoption(VALIDVARNAME));
+  options validvarname=V7;
+  proc hp4score data=&hpfst_score_input;
+  id &hpfst_id_vars;
+  %if %symexist(EM_USER_OUTMDLFILE)=0 %then %do;
+      %let hpfinEM=1;
+    score file="/riscosbv/operacional/ESTUDO_RO/ProvisaoCivelPaulo/Workspaces/EMWS1/HPDMForest3/OUTMDLFILE.bin" out=&hpfst_score_output;
+  %end;
+  %else %do;
+      %let hpfinEM=0;
+      score file="&EM_USER_OUTMDLFILE" out=&hpfst_score_output;
+  %end;
+    PERFORMANCE  DETAILS;
+  run;
+
+  options validvarname=&hpvvn;
+
+  data &hpfst_score_output;
+     set &hpfst_score_output;
+     %if &hpfinEM %then %do;
+         %symdel hpfst_score_input hpfst_score_output  EM_USER_OUTMDLFILE  / nowarn;
+     %end;
+%mend;
+
+%em_hpfst_score;
+data &em_score_output;
+set &em_score_output;
+*------------------------------------------------------------*;
+* TOOL: Score Node;
+* TYPE: ASSESS;
+* NODE: Score2;
+*------------------------------------------------------------*;
+*------------------------------------------------------------*;
+* Score2: Creating Fixed Names;
+*------------------------------------------------------------*;
+LABEL EM_PREDICTION= "Prediction for TARGET_Valor";
+EM_PREDICTION = P_TARGET_Valor;

@@ -1,0 +1,195 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_Atualiza_Base_Acesso_Site_App_GCP
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:08 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -20
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: HASH (6x | +420)
+----------------------------------------
+LINES_OF_CODE: 114
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: CONTATOS = /riscosbv/cobranca/rribeiro/contatos
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CLIE_CRM.TBPESSOACADASTRO [BIGQUERY], BV-PDBD-PRD.DVRY_CLIE_EXPDIGITAL.NAVEGACAO_APPWEB_FATO [BIGQUERY], CONTATOS.AUX_BASE_HASH [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CONTATOS
+EXPORTED_LIBNAMES: CONTATOS
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.AUX_ACESSOS, WORK.AUX_HIST_ACESSO_APP, WORK.AUX_HIST_ACESSO_SITE
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CLIE_CRM.TBPESSOACADASTRO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.DVRY_CLIE_EXPDIGITAL.NAVEGACAO_APPWEB_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], CONTATOS.AUX_BASE_HASH [PROC SQL - JOIN], WORK.AUX_ACESSOS [PROC SQL - FROM], WORK.AUX_HIST_ACESSO_APP [PROC SQL - FROM], WORK.AUX_HIST_ACESSO_SITE [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CONTATOS.AUX_HIST_ACESSO_APP, CONTATOS.AUX_HIST_ACESSO_SITE
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.AUX_ACESSOS, WORK.AUX_HIST_ACESSO_APP, WORK.AUX_HIST_ACESSO_SITE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00_Map_LIB */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-pBUkq1xjCakg9UBi/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CONTATOS '/riscosbv/cobranca/rribeiro/contatos';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Acessos_App_Web */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Acessos_App_Web */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hSqNhVRmgqjqQ5dj/code.sas */
+/* =========================INÍCIO TASK========================= */
+Options Reuse=yes Compress=binary;
+
+LIBNAME CONTATOS '/riscosbv/cobranca/rribeiro/contatos';
+
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (
+project   = 'bv-sadi-dtm'
+credfile  = '/projetos/acessos/bq/di/sadi-dtm.json'
+schema    = 'bv-pdbd-prd'
+Read_Mode = Storage
+Allow_Large_Results = must
+Max_Char_Len = 40
+);
+CREATE TABLE WORK.AUX_ACESSOS AS
+SELECT DISTINCT A.*
+FROM CONNECTION TO PERM (
+SELECT DISTINCT
+  a.cd_bv
+, b.idpessoa
+, b.idbv
+, a.tp_plataforma
+, Min(a.dt_evento) as Min_acesso
+, MAX(a.dt_evento) as Max_acesso
+, Count(distinct a.dt_evento) AS Qtd_Acesso
+from `bv-pdbd-prd.dvry_clie_expdigital.navegacao_appweb_fato` as a
+Left join `bv-pdbd-prd.dvry_clie_crm.tbpessoacadastro`   as b on a.cd_bv = b.idbv
+where a.dt_particao >= CAST(CURRENT_DATE()-30 AS DATE)
+AND a.cd_bv is not null
+AND a.cd_bv not in ('','%%BVID%%','/','/?utm_source=salesforce')
+AND A.tp_plataforma = 'APP'
+group by a.cd_bv, a.tp_plataforma, b.idpessoa, b.idbv
+) AS A
+;DISCONNECT FROM PERM
+;QUIT;
+
+
+
+
+
+Options Reuse=yes Compress=binary;
+PROC SQL;
+CREATE TABLE WORK.AUX_HIST_ACESSO_APP AS
+SELECT DISTINCT
+  'APP' AS CANAL
+, Today() Format = yymmdd10. Informat = yymmdd10. AS Dt_Ref
+, Datetime() Format = e8601dt19. Informat = e8601dt19. AS Dt_Extracao
+, (Year(A.MAX_ACESSO)*100+Month(A.MAX_ACESSO)) Format = best6. Informat = best6. AS SAFRA
+, A.MIN_ACESSO Format = yymmdd10. Informat = yymmdd10. As MIN_ACESSO
+, A.MAX_ACESSO Format = yymmdd10. Informat = yymmdd10. As MAX_ACESSO
+, A.QTD_ACESSO Format = best2. Informat = best2. AS Qtd_Acesso
+, CASE WHEN A.IdPessoa IS MISSING THEN B.IDPESSOA ELSE A.IDPESSOA END AS IdPessoa
+, Compress(A.cd_bv) Format = $36. Informat = $36. AS HashBV
+FROM WORK.AUX_ACESSOS AS A
+LEFT JOIN CONTATOS.AUX_BASE_HASH AS B ON COMPRESS(UPCASE(A.cd_bv)) = COMPRESS(UPCASE(B.HashBV))
+WHERE A.cd_bv IS NOT MISSING
+AND A.tp_plataforma = 'APP'
+Having IdPessoa IS NOT MISSING
+;QUIT;
+
+
+
+
+PROC SQL;
+CREATE INDEX IdPessoa ON WORK.AUX_HIST_ACESSO_APP(IdPessoa);
+
+Options Reuse=yes Compress=binary;
+
+
+
+
+PROC SQL;
+CREATE TABLE WORK.AUX_HIST_ACESSO_SITE AS
+SELECT DISTINCT
+  'SITE' AS CANAL
+, Today() Format = yymmdd10. Informat = yymmdd10. AS Dt_Ref
+, Datetime() Format = e8601dt19. Informat = e8601dt19. AS Dt_Extracao
+, (Year(A.MAX_ACESSO)*100+Month(A.MAX_ACESSO)) Format = best6. Informat = best6. AS SAFRA
+, A.MIN_ACESSO Format = yymmdd10. Informat = yymmdd10. As MIN_ACESSO
+, A.MAX_ACESSO Format = yymmdd10. Informat = yymmdd10. As MAX_ACESSO
+, A.QTD_ACESSO Format = best2. Informat = best2. AS Qtd_Acesso
+, CASE WHEN A.IdPessoa IS MISSING THEN B.IDPESSOA ELSE A.IDPESSOA END AS IdPessoa
+, Compress(A.cd_bv) Format = $36. Informat = $36. AS HashBV
+FROM WORK.AUX_ACESSOS AS A
+LEFT JOIN CONTATOS.AUX_BASE_HASH AS B ON COMPRESS(UPCASE(A.cd_bv)) = COMPRESS(UPCASE(B.HashBV))
+WHERE A.cd_bv IS NOT MISSING
+AND A.tp_plataforma = 'WEB'
+Having IdPessoa IS NOT MISSING
+ORder by Qtd_Acesso DESC
+;QUIT;
+
+PROC SQL;
+CREATE INDEX IdPessoa ON WORK.AUX_HIST_ACESSO_SITE(IdPessoa);
+
+
+
+
+
+Options Reuse=yes Compress=binary;
+PROC SQL;
+CREATE TABLE CONTATOS.AUX_HIST_ACESSO_APP AS
+SELECT DISTINCT A.*
+FROM WORK.AUX_HIST_ACESSO_APP AS A
+;QUIT;
+
+
+
+
+
+Options Reuse=yes Compress=binary;
+PROC SQL;
+CREATE TABLE CONTATOS.AUX_HIST_ACESSO_SITE AS
+SELECT DISTINCT A.*
+FROM WORK.AUX_HIST_ACESSO_SITE AS A
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Acessos_App_Web */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

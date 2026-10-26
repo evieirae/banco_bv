@@ -1,0 +1,503 @@
+START_METADATA
+PROJECT: Rodas__agent_space
+FILE_SAS: 05-AgentSpace_VisaoPDV_Motos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: RETAIN (1x | +10), PROC TRANSPOSE (19x | +190)
+----------------------------------------
+LINES_OF_CODE: 401
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: MaxMesBancos, SafraM0, SafraM1, SafraM2, SafraM3, SafraM4, SafraM5, SafraM6, SafraM7
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.RESUMOSIMULACOESRITO [SAS/Local], BASEGRC.TBFOCO_PDV [SAS/Local], BASEGRC.TBRITOMOTOS [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.RESUMOSIMULACOESRITO [PROC SQL - FROM], BASEGRC.TBFOCO_PDV [PROC SQL - JOIN], BASEGRC.TBRITOMOTOS [PROC SQL - FROM], TMP.TBORIGINACAO [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BANCOSRANKINGPDV, BANCOSRANKINGTRANSPOSE_TOP, BANCOSRANKING_TOPPDV, BASEAGENTESPACEPDVMOTOS, FOCOPDVTRANSPOSED, GRAVAMESBVTRANSPOSED, GRAVAMESMERCADOTRANSPOSED, PARTJOGOTRANSPOSED, PERCRGTRANSPOSED, QTDAPNPTRANSPOSED, QTDCARDPOSITIVOTRANSPOSED, QTDINAD15TRANSPOSED, QTDINAD30TRANSPOSED, QTDSEGAPTRANSPOSED, QTDSEGCOMPLETOTRANSPOSED, QTDSEGSPFTRANSPOSED, QTSEGDEMAISTRANSPOSED, RITOAGENT_SHAREENTMOTOS, RITOAGENT_SHAREENTTRANSPOSED, RITO_AGENTMOTOS, SHARETRANSPOSED, SPREADTRANSPOSED, TABELAM0, TBCANAL_AGENT, TBORIGINACAO_AGENTPDVMOTOS, TBORIG_AGENTPDVMOTOS, TBORIG_TRANSPOSEAGENTPDV, TBPORTE_AGENTMOTOS, TBPRODUCAO_AGENTMOTOS, VIROUBVTRANSPOSED
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*Dados de Originação*/
+
+proc sql;
+create table TbOriginacao_AgentPDVMotos as
+select
+ NmSubEstruturaComercialC as Regional
+,NmAreaEstruturaComercialC as Filial
+,NmColaboradorC 		as GR
+,cats(CdParceiroComercial,'-',NmParceiroComercial)	as PDV
+, case  	when nuanomes = &SafraM7. then 'M7'
+		when nuanomes = &SafraM6. then 'M6'
+		when nuanomes = &SafraM5. then 'M5'
+		when nuanomes = &SafraM4. then 'M4'
+		when nuanomes = &SafraM3. then 'M3'
+		when nuanomes = &SafraM2. then 'M2'
+		when nuanomes = &SafraM1. then 'M1'
+		when nuanomes = &SafraM0. then 'M0'
+	end as nuanomes
+,sum(case when FlConcorrente =1 then 1 else 0 end) as Qtdconcorrente
+,sum(case when FlPropostaAPNP =1  then 1 else 0 end) as QtdAPNP
+,sum(case when FlPropostaEfetivada=0 then 1 else 0 end) as QtdEfetivada
+from tmp.tboriginacao as a
+
+where  1=1
+and nuanomes >= &SafraM7.
+AND A.NmGrupoProdutoMeta in ('Motos')
+and NmTipoParceiroComercial in ('Loja','Concessionaria')
+and NmSubEstruturaComercialC in('Canal Motos')
+/*and FxIdade <> 'ZeroKM'*/
+/*and NmAreaEstruturaComercialC in ('Canal Goiânia','Canal Cascavel','Canal ABC','Canal Porto Alegre')*/
+/*and CdParceiroComercial IN( 3939 )*/
+/*and nuanomes = 202411*/
+group by 1,2,3,4,5
+;run;
+
+proc sql;
+create table TbOrig_AgentPDVMotos
+as
+select
+Regional
+,Filial
+,GR
+,PDV
+,nuanomes
+,sum(coalesce(QtdAPNP,0)) - sum(coalesce(Qtdconcorrente,0)) as EstoqueAPNP
+
+from TbOriginacao_AgentPDVMotos
+group by 1,2,3,4,5
+;run;
+
+proc transpose data=TbOrig_AgentPDVMotos out=TbOrig_TransposeAgentPDV (drop=_NAME_)
+prefix=EstoqueAPNP_;
+    by Regional Filial GR PDV ;
+    id nuanomes;
+    var EstoqueAPNP ;
+run;
+
+/******************************************************/
+/*BASE DADOS DE PRODUCAO*/
+/******************************************************/
+
+proc sql;
+create table TbProducao_AgentMotos as
+select
+ NmSubEstruturaComercialC as Regional
+,NmAreaEstruturaComercialC as Filial
+,NmColaboradorC 		as GR
+,cats(CdParceiroComercial,'-',NmParceiroComercial)	as PDV
+,case  	when nuanomes = &SafraM7. then 'M7'
+		when nuanomes = &SafraM6. then 'M6'
+		when nuanomes = &SafraM5. then 'M5'
+		when nuanomes = &SafraM4. then 'M4'
+		when nuanomes = &SafraM3. then 'M3'
+		when nuanomes = &SafraM2. then 'M2'
+		when nuanomes = &SafraM1. then 'M1'
+		when nuanomes = &SafraM0. then 'M0'
+	end as nuanomes
+,DsTipoCanalProducao as Canal
+,Count(NuContrato)  as QtdContratos
+,Sum(coalesce(VpSpread,0)) / sum (coalesce(Vrproducao,0)) as Spread
+,SUM(FlCap) as QtdSegAp
+,SUM(FlBVMais) as QtdSegSPF
+,SUM(FlCompleto) as QtdSegCompleto
+,SUM(QtDemaisSemCompleto) as QtSegDemais
+,(coalesce(SUM(CASE WHEN doc.NuContratoGestao IS NOT NULL THEN 1 ELSE 0 END), 0) /
+ coalesce(SUM(CASE WHEN a.NuContrato IS NOT NULL THEN 1 ELSE 0 END), 0)) AS PercRG
+from tmp.tbproducao as a
+		LEFT JOIN TipoDoc as doc
+		on doc.NuContratoGestao = a.NuContrato
+where  1=1
+and nuanomes >= &SafraM7.
+AND A.NmGrupoProdutoMeta in ('Motos')
+and NmTipoParceiroComercial in ('Loja','Concessionaria')
+and NmSubEstruturaComercialC in ('Canal Motos')
+/*and FxIdade <> 'ZeroKM'*/
+/*and NmAreaEstruturaComercialC in ('Canal Goiânia','Canal Cascavel','Canal ABC','Canal Porto Alegre')*/
+/*and CdParceiroComercial IN( 7665 ,469165 )*/
+/*and nuanomes = 202411*/
+group by 1,2,3,4,5,6
+order by 1,2,3,4,5,6
+;run;
+
+PROC SORT DATA=TbProducao_AgentMotos ;
+BY Regional Filial GR PDV;
+RUN;
+
+/******************************************************/
+/*FAZ O TRANSPOSE DAS COLUNAS*/
+/******************************************************/
+
+proc transpose data=TbProducao_AgentMotos out=SpreadTransposed (drop=_NAME_) prefix=Spread_;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var Spread ;
+run;
+
+proc transpose data=TbProducao_AgentMotos out=QtdSegApTransposed (drop=_NAME_) prefix=QtdSegAp_;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var QtdSegAp ;
+run;
+
+proc transpose data=TbProducao_AgentMotos out=QtdSegSPFTransposed (drop=_NAME_) prefix=QtdSegSPF_;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var QtdSegSPF ;
+run;
+
+proc transpose data=TbProducao_AgentMotos out=QtdSegCompletoTransposed (drop=_NAME_) prefix=QtdSegCompleto_;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var QtdSegCompleto ;
+run;
+
+proc transpose data=TbProducao_AgentMotos out=QtSegDemaisTransposed (drop=_NAME_) prefix=QtSegDemais_;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var QtSegDemais ;
+run;
+
+proc transpose data=TbProducao_AgentMotos out=PercRGTransposed (drop=_NAME_) prefix=PercRG_;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var PercRG ;
+run;
+
+/******************************************************/
+/*BUSCA DADOS DO RITO COMERCIAL*/
+/******************************************************/
+
+proc sql;
+create table Rito_AgentMotos as
+select
+ TbRito.NmSubEstruturaComercialC as Regional
+,TbRito.NmAreaEstruturaComercialC as Filial
+,TbRito.NmColaboradorC 		as GR
+,TbRito.NmParceiroComercial	as PDV
+,case  	when TbRito.nuanomes = &SafraM7. then 'M7'
+		when TbRito.nuanomes = &SafraM6. then 'M6'
+		when TbRito.nuanomes = &SafraM5. then 'M5'
+		when TbRito.nuanomes = &SafraM4. then 'M4'
+		when TbRito.nuanomes = &SafraM3. then 'M3'
+		when TbRito.nuanomes = &SafraM2. then 'M2'
+		when TbRito.nuanomes = &SafraM1. then 'M1'
+		when TbRito.nuanomes = &SafraM0. then 'M0'
+	end as nuanomes
+,Case when TBFOCO_PDV.Indicado = 1 then 'S' end as FocoPDV
+,(Sum (coalesce(Part_APNP,0))+
+ 		Sum (coalesce(Part_Cancelada,0))+
+		Sum (coalesce(Part_Card,0))+
+		Sum (coalesce(Part_SemCard,0))+
+		Sum (coalesce(Part_ContratosBV,0))+
+		Sum (coalesce(Part_Negada,0))) /  Sum(coalesce(Part_Mercado,0)) as PartJogo
+, Sum(Part_ContratosBV) /  ( Sum(Part_ContratosBV)+
+								Sum(Part_Card)+
+								Sum(Part_APNP)) as VirouBV
+
+,Sum(coalesce(Part_ContratosBV,0))  / Sum(coalesce(Part_Mercado,0)) as Share
+,Sum(coalesce(Part_Mercado,0)) as GravamesMercado
+,Sum(coalesce(Part_ContratosBV,0)) as GravamesBV
+,Sum (coalesce(Part_APNP,0)) as QtdApnp
+,Sum (coalesce(Part_Card,0)) - Sum(coalesce(Qtd_Sem_Prop_MesmaLjRec,0)) as QtdCardPositivo
+,(Sum(coalesce(Qtd_Efetivadas,0)) / 	(Sum(coalesce(Qtd_Efetivadas,0)) +
+						Sum (coalesce(Qtd_Sem_Prop_MesmaLj,0)) +
+						Sum (coalesce(Qtd_APNP_Conco_MesmaLj,0)))) as ShareEntrada
+,sum(coalesce(MedidaInad30,0)) / sum(coalesce(DenominadorInad30,0)) as Inad30
+,sum(coalesce(MedidaInad15,0)) / sum(coalesce(DenominadorInad15,0)) as Inad15
+from basegrc.TbRitoMotos as TbRito
+
+	left join basegrc.TBFOCO_PDV as TBFOCO_PDV
+	on TbRito.CdparceiroComercial = TBFOCO_PDV.CdparceiroComercial
+	and TbRito.nuanomes = TBFOCO_PDV.nuanomes
+where  1=1
+/*and CdParceiroComercial IN(120184)*/
+/*and nuanomes = 202411*/
+group by 1,2,3,4,5,6
+;run;
+
+PROC SORT DATA=Rito_AgentMotos ;
+BY Regional Filial GR PDV ;
+RUN;
+
+/******************************************************/
+/*FAZ O TRANSPOSE DAS COLUNAS DO RITO*/
+/******************************************************/
+
+proc transpose data=Rito_AgentMotos out=PartJogoTransposed (drop=_NAME_) prefix=PartJogo_;
+    by Regional Filial GR PDV ;
+    id nuanomes;
+    var PartJogo ;
+run;
+
+proc transpose data=Rito_AgentMotos out=VirouBVTransposed (drop=_NAME_) prefix=VirouBV_ ;
+    by Regional Filial GR PDV ;
+    id nuanomes;
+    var VirouBV ;
+run;
+
+proc transpose data=Rito_AgentMotos out=ShareTransposed (drop=_NAME_) prefix=Share_ ;
+    by Regional Filial GR PDV ;
+    id nuanomes;
+    var Share ;
+run;
+
+proc transpose data=Rito_AgentMotos out=GravamesMercadoTransposed (drop=_NAME_) prefix=GravamesMercado_ ;
+    by Regional Filial GR PDV ;
+    id nuanomes;
+    var GravamesMercado ;
+run;
+
+proc transpose data=Rito_AgentMotos out=GravamesBVTransposed (drop=_NAME_) prefix=GravamesBV_ ;
+    by Regional Filial GR PDV ;
+    id nuanomes;
+    var GravamesBV ;
+run;
+
+proc transpose data=Rito_AgentMotos out=QtdAPNPTransposed (drop=_NAME_) prefix=QtdAPNP_ ;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var QtdAPNP ;
+run;
+
+proc transpose data=Rito_AgentMotos out=QtdCardPositivoTransposed (drop=_NAME_) prefix=QtdCardPositivo_ ;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var QtdCardPositivo ;
+run;
+
+proc transpose data=Rito_AgentMotos out=QtdInad30Transposed (drop=_NAME_) prefix=Qtdinad30_ ;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var Inad30 ;
+run;
+
+proc transpose data=Rito_AgentMotos out=QtdInad15Transposed (drop=_NAME_) prefix=Qtdinad15_ ;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var Inad15 ;
+run;
+
+proc transpose data=Rito_AgentMotos out=FocoPDVTransposed (drop=_NAME_) prefix=Foco_ ;
+    by Regional Filial GR PDV;
+    id nuanomes;
+    var FocoPDV ;
+run;
+
+/******************************************************/
+/*BUSCA DADOS DO RITO COMERCIAL COM FX ENTRADA*/
+/******************************************************/
+
+proc sql;
+create table RitoAgent_ShareEntMotos as
+select
+ NmSubEstruturaComercialC as Regional
+,NmAreaEstruturaComercialC as Filial
+,NmColaboradorC 		as GR
+,NmParceiroComercial	as PDV
+,case  	when nuanomes = &SafraM7. then 'M7'
+		when nuanomes = &SafraM6. then 'M6'
+		when nuanomes = &SafraM5. then 'M5'
+		when nuanomes = &SafraM4. then 'M4'
+		when nuanomes = &SafraM3. then 'M3'
+		when nuanomes = &SafraM2. then 'M2'
+		when nuanomes = &SafraM1. then 'M1'
+		when nuanomes = &SafraM0. then 'M0'
+	end as nuanomes
+,CAse 	when FxEntradaMinima = '01 - até 10%' then 'ShareAte10_'
+		when FxEntradaMinima = '02 - até 20%' then 'ShareAte20_'
+		when FxEntradaMinima = '03 - até 30%' then 'ShareAte30_'
+		when FxEntradaMinima = '04 - até 40%' then 'ShareAte40_'
+		when FxEntradaMinima = '05 - Acima 40%' then 'Maior40_' End as FxEntradaMinima
+,(Sum(coalesce(Qtd_Efetivadas,0)) /(Sum(coalesce(Qtd_Efetivadas,0)) +
+						Sum (coalesce(Qtd_Sem_Prop_MesmaLj,0)) +
+						Sum (coalesce(Qtd_APNP_Conco_MesmaLj,0)))) as ShareEntrada
+from basegrc.TbRitoMotos
+where  1=1
+/*and CdParceiroComercial IN( 7665 ,469165 )*/
+/*and nuanomes = 202411*/
+group by 1,2,3,4,5,6
+;run;
+
+proc transpose data=RitoAgent_ShareEntMotos out=RitoAgent_ShareEntTransposed (drop=_NAME_) ;
+    by Regional Filial GR PDV;
+    id  FxEntradaMinima nuanomes;
+    var ShareEntrada ;
+run;
+
+/******************************************************/
+/*BUSCA DADOS DE RANKING DOS BANCOS*/
+/******************************************************/
+
+proc sql;
+create table BancosRankingPDV as
+Select
+ case  	when nuanomes = &SafraM7. then 'M7'
+		when nuanomes = &SafraM6. then 'M6'
+		when nuanomes = &SafraM5. then 'M5'
+		when nuanomes = &SafraM4. then 'M4'
+		when nuanomes = &SafraM3. then 'M3'
+		when nuanomes = &SafraM2. then 'M2'
+		when nuanomes = &SafraM1. then 'M1'
+		when nuanomes = &SafraM0. then 'M0'
+	end as nuanomes
+,NmSubEstruturaComercialC as Regional
+,NmAreaEstruturaComercialC	as  Filial
+,NmColaboradorC 		as GR
+,NmParceiroComercial as PDV
+/*,FxEntradaMinima	*/
+,Banco
+,Sum(coalesce(Qtd_APNP_Conco_MesmaLoja,0)) + Sum(coalesce(Qtd_Sem_Prop_MesmaLoja,0))  as TotalConcorrencia
+from basegrc.ResumoSimulacoesRito as cb
+where 1=1
+and banco not in ('N/A','BV')
+/*and CdParceiroComercial  IN( 7665 ,469165 )*/
+/*and FxEntradaMinima = '01 - até 10%'*/
+/*and NuAnoMes = 202502*/
+group by 1,2,3,4,5,6
+ORDER by 1,2,3,4 ,7 desc
+;quit;
+
+PROC SORT DATA=BancosRankingPDV ;
+BY NuAnoMes GR PDV ;
+RUN;
+
+data BancosRanking_TopPDV;
+    set BancosRankingPDV (Where=(TotalConcorrencia > 0));
+    by  NuAnoMes GR PDV ;
+    retain Top 0;
+    if first.PDV then Top = 0;
+    Top + 1;
+	BancoQtd = strip(Banco)||'('||strip(TotalConcorrencia)||')'; /* Nova coluna concatenada */
+	TopBanco = 'Banco'||strip(Top)||'_';
+run;
+
+PROC SORT DATA=BancosRanking_TopPDV ;
+BY Regional Filial GR PDV Top;
+RUN;
+
+/* Transformação dos dados */
+proc transpose data=BancosRanking_TopPDV out=BancosRankingTranspose_Top (drop=_NAME_);
+    by  Regional Filial GR PDV ;
+    id TopBanco NuAnoMes ;
+    var Banco ;
+	Where Top <=3;
+run;
+
+PROC SQL;
+  SELECT Distinct min(nuanomes)  INTO :MaxMesBancos FROM BancosRankingPDV
+;RUN;
+
+data TabelaM0 (Keep=NuAnomes BAnco);
+    length nuanomes $2 Banco $10 ;
+    do i = 1 to 3;
+        nuanomes = 'M0';
+        Banco = cats('Banco', i,'_'); /* Concatena 'banco' com o número */
+        output;
+    end;
+run;
+
+%if &MaxMesBancos. = M1 %then %do;
+/* Adicionando colunas fixas em branco caso nao tenha M0 */
+data BancosRankingTranspose_Top;
+    set BancosRankingTranspose_Top;
+    length Banco1_M0 Banco2_M0 Banco3_M0 $50; /* Ajuste o tamanho conforme necessário */
+    Banco1_M0 = '';
+    Banco2_M0 = '';
+    Banco3_M0 = '';
+run;
+%end;
+
+/******************************************************/
+/*BUSCA DADOS DE PORTE*/
+/******************************************************/
+
+proc sql;
+create table TbPorte_AgentMotos as
+select distinct
+ NmSubEstruturaComercialC as Regional
+,NmAreaEstruturaComercialC as Filial
+,NmColaboradorC 		as GR
+,NmParceiroComercial	as PDV
+,case when porte = 'Sem Porte' then 'Sem_Porte' else porte end as Porte
+from basegrc.TbRitoMotos
+where  1=1
+/*and CdParceiroComercial IN( 7665 ,469165 )*/
+/*and nuanomes = 202411*/
+;run;
+
+PROC SORT DATA=TbPorte_AgentMotos ;
+BY Regional Filial GR PDV ;
+RUN;
+
+/******************************************************/
+/*BUSCA DADOS DE CANAL*/
+/******************************************************/
+
+proc sql;
+create table TbCanal_Agent as
+select distinct
+ Regional
+,Filial
+,GR
+,PDV
+,Canal
+from tbproducao_AgentMotos as a
+where  1=1
+;run;
+
+PROC SORT DATA=TbCanal_Agent ;
+BY Regional Filial GR PDV ;
+RUN;
+
+/******************************************************/
+/*BUSCA FINAL*/
+/******************************************************/
+
+data BaseAgenteSpacePDVMotos;
+    merge 	TbPorte_Agent
+		  	TbCanal_Agent
+		    PartJogoTransposed VirouBVTransposed ShareTransposed GravamesMercadoTransposed GravamesBVTransposed QtdAPNPTransposed QtdCardPositivoTransposed
+		    SpreadTransposed QtdSegApTransposed QtdSegSPFTransposed QtdSegCompletoTransposed QtSegDemaisTransposed PercRGTransposed
+			BancosRankingTranspose_Top
+			RitoAgent_ShareEntTransposed
+			QtdInad30Transposed
+			QtdInad15Transposed
+			TbOrig_TransposeAgentPDV
+			FocoPDVTransposed
+;
+by Regional Filial GR PDV ;
+where Regional in ('Canal Motos')
+/*Where Filial in ('Canal Goiânia','Canal Cascavel','Canal ABC','Canal Porto Alegre');*/
+;run;

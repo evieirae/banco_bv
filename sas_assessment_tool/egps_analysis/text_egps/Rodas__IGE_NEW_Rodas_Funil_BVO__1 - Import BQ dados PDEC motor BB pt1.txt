@@ -1,0 +1,229 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_Funil_BVO
+FILE_SAS: 1 - Import BQ dados PDEC motor BB pt1 .sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 65)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (3x | +60), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 146
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: BVO = /riscosbvf/coaching/tribo_veiculos/SAS/bvo_sem_pp_ajuste; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: _timer_start, dir_csv
+DETECTED_MACROS_USED: base, dt_AtuMax, dt_AtuMin
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: BASE, DT_ATUMAX, DT_ATUMIN
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.APROSIMU_BVO_BB_1_1_SEM_PP
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.APROSIMU_BVO_BB_1_1_SEM_PP, WORK.APROSIMU_BVO_BB_1_2_1_SEM_PP
+TABLE_READ_PROVENANCE (Flow): WORK.APROSIMU_BVO_BB_1_1_SEM_PP [DATA Step - SET], WORK.APROSIMU_BVO_BB_1_2_1_SEM_PP [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: APROSIMU_BVO_BB_1_1_SEM_PP, APROSIMU_BVO_BB_1_3_SEM_PP, APROSIMU_BVO_BB_1_SEM_PP, APROSIMU_BVO_BB_SEM_PP_2, BASE_BVO_SEM_PP_&BASE, BASE_BVO_SEM_PP_FULL, BASE_BVO_SEM_PP_FULL_ND, WORK.APROSIMU_BVO_BB_1_2_1_SEM_PP, WORK.APROSIMU_BVO_BB_1_2_SEM_PP
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Import BQ dados PDEC motor BB pt1.sas														| */
+/* | Descricao: Programa para importar e tratar dados do motor BB.					| */
+/* | Objetivo: 	Apuração do Dash fUNIL BVO					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera tabela de dados sem proposta motor BB =========================*/
+/* ======================================================================================*/
+
+%let _timer_start = %sysfunc(datetime());
+
+%include '/infogrc/utils/all-includes.sas';
+libname bvo '/riscosbvf/coaching/tribo_veiculos/SAS/bvo_sem_pp_ajuste';
+
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 NOERRORABEND ;
+OPTIONS COMPRESS=BINARY REUSE=YES;
+
+%Macro BVO(dt_AtuMin,dt_AtuMax,base);
+
+	proc sql ;
+	connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+	      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+	   Create table base_bvo_sem_pp_&base. as
+	   select * from connection to perm
+	     (
+	 WITH
+	  tb_simulacao_proposta AS (
+	 SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta`
+	  WHERE TIMESTAMP_TRUNC(DT_SIMULACAO_PROPOSTA,MONTH) between &dt_AtuMin. and &dt_AtuMax. ),
+	  tb_simulacao_proposta_garantia AS (
+	  SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta_garantia`
+	  WHERE TIMESTAMP_TRUNC(DT_SIMULACAO_GARANTIA,MONTH) between &dt_AtuMin. and &dt_AtuMax. ),
+	  tb_simulacao_dado_fnnco AS (
+	  SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_dado_fnnco`
+	  WHERE TIMESTAMP_TRUNC(dt_simulacao_financiamento,MONTH) between &dt_AtuMin. and &dt_AtuMax. ),
+	  tb_simulacao_prazo_fnnco AS (
+	  SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_prazo_fnnco`
+	  WHERE TIMESTAMP_TRUNC(dt_simulacao_prazo_fnnco,MONTH) between &dt_AtuMin. and &dt_AtuMax. ),
+	  tb_simulacao_przo_fnnco_prpsa AS (
+	  SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_przo_fnnco_prpsa`
+	  WHERE DATE_TRUNC(dt_inclusao,MONTH) between DATE(&dt_AtuMin.) and DATE(&dt_AtuMax.) ),
+	  tb_simulacao_prazo_faixa_aprvo AS (
+	  SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_prazo_faixa_aprvo`
+	  WHERE TIMESTAMP_TRUNC(dt_inclusao,MONTH) between &dt_AtuMin. and &dt_AtuMax. ),
+	  tb_proposta_parceria  AS (
+	  SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_proposta_parceria`
+	  WHERE (dt_inclusao) between &dt_AtuMin. and &dt_AtuMax. ),
+
+	  tb_apro_simu AS (
+	  SELECT distinct
+	    cast(a.cd_simulacao_proposta as int64) as cd_simulacao_proposta
+	    ,date(a.dt_simulacao_proposta) as dt_simulacao_proposta
+	    ,cast(e.nu_proposta as int64) as nu_proposta
+	    ,cast(g.cd_parceiro_externo as int64) as cd_parceiro_externo
+		,f.CD_SIMULACAO_PRAZO_FNNCO                     AS Simu_Parc
+		,c.cd_simulacao_dado_fnnco                      AS cd_simu_dado
+		,f.DS_MOTIVO_DECISAO_PDEC                       AS motivo_decisao
+		,a.st_pre_analise_bvo                        	AS Decisao_preAnalise_Bvo
+		,f.PC_PROBABILIDADE_APROVACAO                   AS ProbabilidadeAprovacao
+		,g.cd_parceiro_externo 							AS cd_parceiro_bb
+		,e.NU_PROPOSTA 									as nuProposta
+
+	  FROM tb_simulacao_proposta a
+	LEFT JOIN tb_simulacao_proposta_garantia b
+	 ON b.cd_simulacao_proposta = a.cd_simulacao_proposta
+	LEFT JOIN tb_simulacao_dado_fnnco c
+	ON c.cd_simulacao_dado_fnnco = b.cd_simulacao_dado_fnnco
+	LEFT JOIN tb_simulacao_prazo_fnnco d
+	ON d.cd_simulacao_dado_fnnco = c.cd_simulacao_dado_fnnco
+	LEFT JOIN tb_simulacao_przo_fnnco_prpsa e
+	ON e.cd_simulacao_prazo_fnnco = d.cd_simulacao_prazo_fnnco
+	LEFT JOIN tb_simulacao_prazo_faixa_aprvo f
+	ON d.cd_simulacao_prazo_fnnco = f.cd_simulacao_prazo_fnnco
+	LEFT JOIN tb_proposta_parceria g
+	ON g.cd_simulacao_proposta = a.cd_simulacao_proposta
+	 WHERE e.nu_proposta is null
+	and cast(g.cd_parceiro_externo as int64)=41)
+
+	SELECT * FROM tb_apro_simu
+
+	);
+	   disconnect from perm;
+	quit;
+
+%Mend BVO;
+
+%BVO('2024-01-01','2024-06-30',202406);
+%BVO('2024-07-01','2024-12-31',202412);
+%BVO('2025-01-01','2025-06-30',202506);
+%BVO('2025-07-01','2025-12-31',202512);
+%BVO('2026-01-01','2026-06-30',202606);
+%BVO('2026-07-01','2026-12-31',202612);
+
+/* Junta base bvo_sem_pp_full */
+data base_bvo_sem_pp_full;
+	set base_bvo_sem_pp_:;
+run;
+
+proc sort data=base_bvo_sem_pp_full out=base_bvo_sem_pp_full_nd dupout=dup nodupkey;
+	by cd_simulacao_proposta;
+run;
+
+PROC SQL;
+CREATE TABLE aprosimu_bvo_bb_1_sem_pp AS
+
+SELECT * FROM base_bvo_sem_pp_full_nd
+
+;quit;
+PROC SORT DATA=aprosimu_bvo_bb_1_sem_pp
+	OUT=aprosimu_bvo_bb_1_1_sem_pp;
+	BY DESCENDING cd_simulacao_proposta DESCENDING cd_simu_dado  DESCENDING Simu_Parc;
+RUN;
+
+data work.aprosimu_bvo_bb_1_2_sem_pp;
+	set work.aprosimu_bvo_bb_1_1_sem_pp;
+	BY DESCENDING cd_simulacao_proposta DESCENDING cd_simu_dado  DESCENDING Simu_Parc;
+
+	if first.cd_simulacao_proposta then
+		n=1;
+	else n+1;
+run;
+proc sql;
+create table work.aprosimu_bvo_bb_1_2_1_sem_pp as
+	select
+		cd_simulacao_proposta,
+		avg(input(ProbabilidadeAprovacao,3.)) format commax12.2 as PcProbAproAjustada
+	from aprosimu_bvo_bb_1_2_sem_pp
+group by cd_simulacao_proposta;quit;
+
+proc sql;
+create table aprosimu_bvo_bb_1_3_sem_pp as
+Select *
+from aprosimu_bvo_bb_1_2_sem_pp
+where n = 1;quit;
+
+proc sql;
+
+create table aprosimu_bvo_bb_1_3_sem_pp as
+
+	Select
+		a.cd_simulacao_proposta
+		,a.Simu_Parc
+		,a.cd_simu_dado
+		,a.Decisao_preAnalise_Bvo
+		,a.motivo_decisao
+		,a.ProbabilidadeAprovacao
+		,a.nu_proposta
+		,input(a.cd_parceiro_bb,best.) as cd_parceiro_bb
+		,a.nuProposta
+		,a.n
+		,b.PcProbAproAjustada
+		,case when b.PcProbAproAjustada > 0 and a.motivo_decisao = 'OK' then 1 else 0 end as AprovacaoAjustada
+	from aprosimu_bvo_bb_1_3_sem_pp a
+		left join work.aprosimu_bvo_bb_1_2_1_sem_pp b
+		on a.cd_simulacao_proposta = b.cd_simulacao_proposta
+
+;quit;
+
+proc sql;
+
+create table aprosimu_bvo_bb_sem_pp_2 as
+
+select * from aprosimu_bvo_bb_1_3_sem_pp;quit;
+
+PROC SQL;CREATE INDEX cd_simulacao_proposta ON aprosimu_bvo_bb_sem_pp_2; QUIT;

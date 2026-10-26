@@ -1,0 +1,833 @@
+START_METADATA
+PROJECT: SAS_UC4__etl_cliente_sem_monitoramento
+FILE_SAS: etl_cliente_sem_monitoramento.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:03 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -49
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (5x | +400), MODIFY (1x | +30), PROC DATASETS (12x | +240), PROC APPEND (1x | +15), PROC CONTENTS (4x | +40), %MACRO (9x | +45)
+----------------------------------------
+LINES_OF_CODE: 676
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, CONTENTS, DATASETS, SQL
+HAS_DATA_STEP: Yes (9x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PDDDM = /projetos/miscredito/saspdd/datamart
+DETECTED_MACROS_DEFINED: IOMServer, SYSLAST, SYS_SQLREDUCEPUT, SYS_SQL_IP_SPEEDO, SYS_SQL_MAPPUTTO, etls_endTime, etls_hasPreExistingConstraint, etls_jobName, etls_lastTable, etls_lib, etls_numIndex, etls_otherTablesReferToThisTable, etls_recCheckExist, etls_recnt, etls_recordsAfter, etls_recordsBefore, etls_sql_pushDown, etls_startTime, etls_stepStartTime, etls_syntaxcheck, etls_table, etls_tableExist, etls_tableOptions, etls_userID, jobID, job_rc, metaPort, metaServer, sqlrc, sysrc, trans_rc, transformID
+DETECTED_MACROS_USED: SYSLAST, error, etls_debug, etls_lastTable, etls_otherTablesReferToThisTable, etls_recCheckExist, etls_syntaxcheck, etls_tableExist, etls_tableOptions, inDSOptions, job_rc, metaPort, metaServer, sqlrc, sys_sql_ip_all, syscc, syserr, syslibrc, table, trans_rc, workTableOut
+MACRO_SCOPE_GLOBALS: ETLS_DEBUG, ETLS_LASTTABLE, ETLS_NUMINDEX, ETLS_SQL_PUSHDOWN, ETLS_STEPSTARTTIME, ETLS_TABLEEXIST, JOB_RC, SQLRC, TRANS_RC
+MACRO_SCOPE_PARAMS: ERROR, INDSOPTIONS, TABLE, WORKTABLEOUT
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: PDDDM
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.ETLS_CONTENTS
+TABLE_READ_PROVENANCE (Flow): PDDDM.DMCLIENTECREDITO [PROC CONTENTS - DATA=; PROC SQL - FROM], PDDDM.DMCLIENTESEMMONITORAMENTO [PROC CONTENTS - DATA=], PDDDM.DMMONITORCLIENTE [PROC CONTENTS - DATA=; PROC SQL - JOIN], WORK.ETLS_CONTENTS [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): PDDDM.DMCLIENTECREDITO, PDDDM.DMCLIENTESEMMONITORAMENTO, PDDDM.DMMONITORCLIENTE
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): PDDDM.DMCLIENTECREDITO, PDDDM.DMCLIENTESEMMONITORAMENTO, PDDDM.DMMONITORCLIENTE
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): A5HWC8AO.BZ000OUS
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PDDDM.DMCLIENTECREDITO, PDDDM.DMCLIENTESEMMONITORAMENTO, PDDDM.DMMONITORCLIENTE
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: &WORKTABLEOUT, DMCLIENTESEMMONITORAMENTO, ETLS_COMMANDS_F, NOPRINT, OUT, WORK.ETLS_CONTENTS, WORK.W4Y5H5G9, WORK.W7QOZTT3, WORK.W7TIRSRO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/****************************************************************************
+ * Job:             etl_cliente_sem_monitoramento         A5HWC8AO.BR0005XK *
+ * Description:                                                             *
+ *                                                                          *
+ * Metadata Server: mor-sybqauat01                                          *
+ * Port:            8562                                                    *
+ * Location:        /Projeto PDD/2.0 - Jobs/2.5 - Data Mart                 *
+ *                                                                          *
+ * Server:          SASApp                                A5HWC8AO.AR000002 *
+ *                                                                          *
+ * Source Tables:   DmClienteCredito -                    A5HWC8AO.B700066Z *
+ *                   PDDDM.DmClienteCredito                                 *
+ *                  DmMonitorCliente -                    A5HWC8AO.B700066M *
+ *                   PDDDM.DmMonitorCliente                                 *
+ *                  DmMonitorCliente -                    A5HWC8AO.B700066M *
+ *                   PDDDM.DmMonitorCliente                                 *
+ * Target Tables:   DmClienteSemMonitoramento -           A5HWC8AO.B700066Q *
+ *                   PDDDM.DmClienteSemMonitoramento                        *
+ *                  DmMonitorCliente -                    A5HWC8AO.B700066M *
+ *                   PDDDM.DmMonitorCliente                                 *
+ *                                                                          *
+ * Generated on:    Sexta-feira, 26 de Dezembro de 2014 21h02min50s BRST    *
+ * Generated by:    sasetlrc                                                *
+ * Version:         SAS Data Integration Studio 4.6                         *
+ ****************************************************************************/
+
+/* General macro variables  */
+%let jobID = %quote(A5HWC8AO.BR0005XK);
+%let etls_jobName = %nrquote(etl_cliente_sem_monitoramento);
+%let etls_userID = %nrquote(sasetlrc);
+
+/* Setup to capture return codes  */
+%global job_rc trans_rc sqlrc ;
+%let sysrc = 0;
+%let job_rc = 0;
+%let trans_rc = 0;
+%let sqlrc = 0;
+%global etls_stepStartTime;
+/* initialize syserr to 0 */
+data _null_; run;
+
+%macro rcSet(error);
+   %if (&error gt &trans_rc) %then
+      %let trans_rc = &error;
+   %if (&error gt &job_rc) %then
+      %let job_rc = &error;
+%mend rcSet;
+
+%macro rcSetDS(error);
+   if &error gt input(symget('trans_rc'),12.) then
+      call symput('trans_rc',trim(left(put(&error,12.))));
+   if &error gt input(symget('job_rc'),12.) then
+      call symput('job_rc',trim(left(put(&error,12.))));
+%mend rcSetDS;
+
+/* Create metadata macro variables */
+%let IOMServer      = %nrquote(SASApp);
+%let metaPort       = %nrquote(8562);
+%let metaServer     = %nrquote(mor-sybqauat01);
+
+/* Set metadata options */
+options metaport       = &metaPort
+        metaserver     = "&metaServer";
+
+/* Setup for capturing job status  */
+%let etls_startTime = %sysfunc(datetime(),datetime.);
+%let etls_recordsBefore = 0;
+%let etls_recordsAfter = 0;
+%let etls_lib = 0;
+%let etls_table = 0;
+
+%global etls_debug;
+%macro etls_setDebug;
+   %if %str(&etls_debug) ne 0 %then
+      OPTIONS MPRINT%str(;);
+%mend;
+%etls_setDebug;
+
+/*==========================================================================*
+ * Step:            Join                                  A5HWC8AO.BZ000OUM *
+ * Transform:       Join                                                    *
+ * Description:                                                             *
+ *                                                                          *
+ * Source Tables:   DmClienteCredito -                    A5HWC8AO.B700066Z *
+ *                   PDDDM.DmClienteCredito                                 *
+ *                  DmMonitorCliente -                    A5HWC8AO.B700066M *
+ *                   PDDDM.DmMonitorCliente                                 *
+ * Target Table:    Join - work.W4Y5H5G9                  A5HWC8AO.C3000HZ0 *
+ *==========================================================================*/
+
+%let transformID = %quote(A5HWC8AO.BZ000OUM);
+%let trans_rc = 0;
+%let etls_stepStartTime = %sysfunc(datetime(), datetime20.);
+
+/* Access the data for CREDITO_BCO_PDD_DATAMART  */
+LIBNAME PDDDM BASE "/projetos/miscredito/saspdd/datamart";
+%rcSet(&syslibrc);
+
+%let etls_recCheckExist = 0;
+%let etls_recnt = 0;
+%macro etls_recordCheck;
+   %let etls_recCheckExist = %eval(%sysfunc(exist(PDDDM.DmClienteCredito, DATA)) or
+         %sysfunc(exist(PDDDM.DmClienteCredito, VIEW)));
+
+   %if (&etls_recCheckExist) %then
+   %do;
+      %local etls_syntaxcheck;
+      %let etls_syntaxcheck = %sysfunc(getoption(syntaxcheck));
+      /* Turn off syntaxcheck option to perform following steps  */
+      options nosyntaxcheck;
+
+      proc contents data = PDDDM.DmClienteCredito out = work.etls_contents(keep = nobs) noprint;
+      run;
+
+      data _null_;
+         set work.etls_contents (obs = 1);
+         call symput("etls_recnt", left(put(nobs,32.)));
+      run;
+
+      proc datasets lib = work nolist nowarn memtype = (data view);
+         delete etls_contents;
+      quit;
+
+      /* Reset syntaxcheck option to previous setting  */
+      options &etls_syntaxcheck;
+   %end;
+%mend etls_recordCheck;
+%etls_recordCheck;
+
+%let SYS_SQL_IP_SPEEDO = Y;
+%let SYS_SQL_MAPPUTTO = sas_put;
+%let SYS_SQLREDUCEPUT = DBMS;
+%global etls_sql_pushDown;
+%let etls_sql_pushDown = -1;
+option DBIDIRECTEXEC;
+
+proc datasets lib = work nolist nowarn memtype = (data view);
+   delete W4Y5H5G9;
+quit;
+
+proc sql;
+   create view work.W4Y5H5G9 as
+   select
+      DmClienteCredito.CdPessoaCredito length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdPessoaCredito',
+      DmClienteCredito.NmPessoaCliente length = 160
+         format = $160.
+         informat = $160.
+         label = 'NmPessoaCliente',
+      DmClienteCredito.CdOfficer length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdOfficer',
+      DmClienteCredito.NmOfficer length = 160
+         format = $160.
+         informat = $160.
+         label = 'NmOfficer',
+      DmClienteCredito.CdSegmentoMercado length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdSegmentoMercado',
+      DmClienteCredito.NmSegmentoMercado length = 50
+         format = $50.
+         informat = $50.
+         label = 'NmSegmentoMercado',
+      DmClienteCredito.CdRamoAtividadeCredito length = 10
+         format = $10.
+         informat = $10.
+         label = 'CdRamoAtividadeCredito',
+      DmClienteCredito.CdRatingClienteBacen length = 2
+         format = $2.
+         informat = $2.
+         label = 'CdRatingClienteBacen',
+      DmClienteCredito.NuCpfCnpj length = 14
+         format = $14.
+         informat = $14.
+         label = 'NuCpfCnpj',
+      DmClienteCredito.TpPessoa length = 1
+         format = $1.
+         informat = $1.
+         label = 'TpPessoa',
+      DmClienteCredito.CdDivisaoComercial length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdDivisaoComercial',
+      DmClienteCredito.NmDivisaoComercial length = 60
+         format = $60.
+         informat = $60.
+         label = 'NmDivisaoComercial',
+      DmClienteCredito.CdFilial length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdFilial',
+      DmClienteCredito.NmFilial length = 50
+         format = $50.
+         informat = $50.
+         label = 'NmFilial',
+      DmClienteCredito.CDGrupoEconomico length = 8
+         format = 11.
+         informat = 11.
+         label = 'CDGrupoEconomico',
+      DmClienteCredito.NmGrupoEconomico length = 35
+         format = $35.
+         informat = $35.
+         label = 'NmGrupoEconomico',
+      DmMonitorCliente.cdPessoa length = 8
+         format = 11.
+         informat = 11.
+         label = 'cdPessoa',
+      DmMonitorCliente.DtClassificacaoGeral length = 8
+         format = DATETIME22.3
+         informat = DATETIME22.3
+         label = 'DtClassificacaoGeral',
+      DmMonitorCliente.CdStatusMonitoramento length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusMonitoramento',
+      DmMonitorCliente.CdStatusInsuficienciaDuplicata length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusInsuficienciaDuplicata',
+      DmMonitorCliente.CdStatusBacen length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusBacen',
+      DmMonitorCliente.CdILMDuplicata length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdILMDuplicata',
+      DmMonitorCliente.CdInsuficenciaDireitoCredit length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdInsuficenciaDireitoCredit',
+      DmMonitorCliente.CdStatusVNP length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusVNP',
+      DmMonitorCliente.CdStatusClassificacaoFinal length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusClassificacaoFinal',
+      DmMonitorCliente.CdStatusClassificacaoAlterado length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusClassificacaoAlterado',
+      DmMonitorCliente.fx_fat_grupo length = 8
+         format = 12.
+         informat = 12.
+         label = 'fx_fat_grupo',
+      DmMonitorCliente.VrRisco length = 8
+         format = 11.
+         informat = 11.
+         label = 'VrRisco',
+      DmMonitorCliente.DsAreaOrigem length = 60
+         format = $60.
+         informat = $60.
+         label = 'DsAreaOrigem'
+   from
+      PDDDM.DmClienteCredito as DmClienteCredito left join
+      PDDDM.DmMonitorCliente as DmMonitorCliente
+         on
+         (
+            DmClienteCredito.CdPessoaCredito = DmMonitorCliente.cdPessoa
+            and DmMonitorCliente.cdPessoa = .
+         )
+   ;
+quit;
+
+%global etls_sql_pushDown;
+%let etls_sql_pushDown = &sys_sql_ip_all;
+
+%rcSet(&sqlrc);
+
+/**  Step end Join **/
+
+/*==========================================================================*
+ * Step:            Table Loader                          A5HWC8AO.BZ000OUN *
+ * Transform:       Table Loader (Version 2.1)                              *
+ * Description:                                                             *
+ *                                                                          *
+ * Source Table:    Join - work.W4Y5H5G9                  A5HWC8AO.C3000HZ0 *
+ * Target Table:    DmClienteSemMonitoramento -           A5HWC8AO.B700066Q *
+ *                   PDDDM.DmClienteSemMonitoramento                        *
+ *==========================================================================*/
+
+%let transformID = %quote(A5HWC8AO.BZ000OUN);
+%let trans_rc = 0;
+%let etls_stepStartTime = %sysfunc(datetime(), datetime20.);
+
+%let SYSLAST = %nrquote(work.W4Y5H5G9);
+
+%let SYS_SQL_IP_SPEEDO = Y;
+%let SYS_SQL_MAPPUTTO = sas_put;
+%let SYS_SQLREDUCEPUT = DBMS;
+%global etls_sql_pushDown;
+%let etls_sql_pushDown = -1;
+option DBIDIRECTEXEC;
+
+%global etls_tableExist;
+%global etls_numIndex;
+%global etls_lastTable;
+%let etls_tableExist = -1;
+%let etls_numIndex = -1;
+%let etls_lastTable = &SYSLAST;
+
+/*---- Define load data macro  ----*/
+
+/* --------------------------------------------------------------
+   Load Technique Selection: Replace - EntireTable
+   Constraint and index action selections: 'INIT','ASIS','ASIS','ASIS'
+   Additional options selections...
+      Set unmapped to missing on updates: false
+   -------------------------------------------------------------- */
+%macro etls_loader;
+
+   %let etls_tableOptions = ;
+
+   /*---- Map the columns  ----*/
+   proc datasets lib = work nolist nowarn memtype = (data view);
+      delete W7TIRSRO;
+   quit;
+
+   %put %str(NOTE: Mapping columns ...);
+   proc sql;
+      create view work.W7TIRSRO as
+         select
+            CdPessoaCredito,
+            NmPessoaCliente,
+            CdOfficer,
+            NmOfficer,
+            CdSegmentoMercado,
+            NmSegmentoMercado,
+            CdRamoAtividadeCredito,
+            CdRatingClienteBacen
+      from &etls_lastTable
+      ;
+   quit;
+
+   %let SYSLAST = work.W7TIRSRO;
+
+   %let etls_lastTable = &SYSLAST;
+   %let etls_tableOptions = ;
+
+   /* Determine if the target table exists  */
+   %let etls_tableExist = %eval(%sysfunc(exist(PDDDM.DmClienteSemMonitoramento, DATA)) or
+         %sysfunc(exist(PDDDM.DmClienteSemMonitoramento, VIEW)));
+
+   %if &etls_tableExist %then
+   %do;/* table exists  */
+      %let etls_hasPreExistingConstraint=0;
+
+      proc datasets lib = work nolist nowarn memtype = (data view);
+         delete etls_commands etls_commands_F;
+      quit;
+
+      %let etls_otherTablesReferToThisTable=0;
+
+      %macro etls_CIContents(table=,workTableOut=,inDSOptions=);
+         %put NOTE: Building table listing Constraints and Indexes for: &table;
+         proc datasets lib=work nolist; delete &workTableOut; quit;
+         proc contents data=&table&inDSOptions out2=&workTableOut noprint; run;
+
+         data &workTableOut;
+            length name $60 type $20 icown idxUnique idxNoMiss $3 recreate $600;
+            set &workTableOut;
+            type=upcase(type);
+            if type eq 'REFERENTIAL' then
+            do;
+               put "WARNING%QUOTE(:) Target table is referenced by constraints in"
+                    " another table: " ref;
+               call symput('etls_otherTablesReferToThisTable','1');
+               delete;
+            end;
+            if type='INDEX' and ICOwn eq 'YES' then delete;
+         run;
+         %rcSet(&syserr);
+
+      %mend etls_CIContents;
+
+      %etls_CIContents(table=PDDDM.DmClienteSemMonitoramento, workTableOut=etls_commands, inDSOptions=);
+
+      %if &etls_otherTablesReferToThisTable %then
+         %put WARNING%QUOTE(:) Replacing entire table will fail. Consider an alternate load technique or revising constraints.;
+      %else
+      %do; /* okay - remove foreign keys  */
+
+         data etls_commands_F;
+            set etls_commands;
+            if upcase(type)="FOREIGN KEY" then
+            do;
+               command='ic delete '||trim(name)||';';
+               output etls_commands_F;
+            end;
+         run;
+
+         %put %str(NOTE: Removing foreign keys before dropping table...);
+         data _null_;
+            set etls_commands_F;
+            %rcSet(&syserr);
+
+      %end; /* okay - remove foreign keys  */
+
+      proc datasets lib = work nolist nowarn memtype = (data view);
+         delete etls_commands etls_commands_F;
+      quit;
+
+      /*---- Drop a table  ----*/
+      %put %str(NOTE: Dropping table ...);
+      proc datasets lib = PDDDM nolist nowarn memtype = (data view);
+         delete DmClienteSemMonitoramento;
+      quit;
+
+      %rcSet(&syserr);
+
+      %let etls_tableExist = 0;
+
+   %end; /* table exists  */
+
+   /*---- Create a new table  ----*/
+   %if (&etls_tableExist eq 0) %then
+   %do;  /* if table does not exist  */
+
+      %put %str(NOTE: Creating table ...);
+
+      data PDDDM.DmClienteSemMonitoramento;
+         attrib CdPessoaCredito length = 8
+            format = 11.
+            informat = 11.
+            label = 'CdPessoaCredito';
+         attrib NmPessoaCliente length = $160
+            format = $160.
+            informat = $160.
+            label = 'NmPessoaCliente';
+         attrib CdOfficer length = 8
+            format = 11.
+            informat = 11.
+            label = 'CdOfficer';
+         attrib NmOfficer length = $160
+            format = $160.
+            informat = $160.
+            label = 'NmOfficer';
+         attrib CdSegmentoMercado length = 8
+            format = 11.
+            informat = 11.
+            label = 'CdSegmentoMercado';
+         attrib NmSegmentoMercado length = $50
+            format = $50.
+            informat = $50.
+            label = 'NmSegmentoMercado';
+         attrib CdRamoAtividadeCredito length = $10
+            format = $10.
+            informat = $10.
+            label = 'CdRamoAtividadeCredito';
+         attrib CdRatingClienteBacen length = $2
+            format = $2.
+            informat = $2.
+            label = 'CdRatingClienteBacen';
+         call missing(of _all_);
+         stop;
+      run;
+
+      %rcSet(&syserr);
+
+      /*---- Create the integrity constraints for a table  ----*/
+      %put %str(NOTE: Creating integrity constraints ...);
+      proc datasets library=PDDDM nolist;
+         modify DmClienteSemMonitoramento;
+            ic create not null (CdPessoaCredito);
+      quit;
+
+      %rcSet(&syserr);
+
+   %end;  /* if table does not exist  */
+
+   /*---- Append  ----*/
+   %put %str(NOTE: Appending data ...);
+
+   proc append base = PDDDM.DmClienteSemMonitoramento
+      data = &etls_lastTable (&etls_tableOptions)  force ;
+    run;
+
+   %rcSet(&syserr);
+
+   proc datasets lib = work nolist nowarn memtype = (data view);
+      delete W7TIRSRO;
+   quit;
+
+%mend etls_loader;
+%etls_loader;
+
+%let etls_recCheckExist = 0;
+%let etls_recnt = 0;
+%macro etls_recordCheck;
+   %let etls_recCheckExist = %eval(%sysfunc(exist(PDDDM.DmClienteSemMonitoramento, DATA)) or
+         %sysfunc(exist(PDDDM.DmClienteSemMonitoramento, VIEW)));
+
+   %if (&etls_recCheckExist) %then
+   %do;
+      %local etls_syntaxcheck;
+      %let etls_syntaxcheck = %sysfunc(getoption(syntaxcheck));
+      /* Turn off syntaxcheck option to perform following steps  */
+      options nosyntaxcheck;
+
+      proc contents data = PDDDM.DmClienteSemMonitoramento out = work.etls_contents(keep = nobs) noprint;
+      run;
+
+      data _null_;
+         set work.etls_contents (obs = 1);
+         call symput("etls_recnt", left(put(nobs,32.)));
+      run;
+
+      proc datasets lib = work nolist nowarn memtype = (data view);
+         delete etls_contents;
+      quit;
+
+      /* Reset syntaxcheck option to previous setting  */
+      options &etls_syntaxcheck;
+   %end;
+%mend etls_recordCheck;
+%etls_recordCheck;
+
+/**  Step end Table Loader **/
+
+/*==========================================================================*
+ * Step:            Extract                               A5HWC8AO.BZ000OUR *
+ * Transform:       Extract                                                 *
+ * Description:                                                             *
+ *                                                                          *
+ * Source Table:    DmMonitorCliente -                    A5HWC8AO.B700066M *
+ *                   PDDDM.DmMonitorCliente                                 *
+ * Target Table:    Extract - work.W7QOZTT3               A5HWC8AO.C3000HZ4 *
+ *==========================================================================*/
+
+%let transformID = %quote(A5HWC8AO.BZ000OUR);
+%let trans_rc = 0;
+%let etls_stepStartTime = %sysfunc(datetime(), datetime20.);
+
+%let etls_recCheckExist = 0;
+%let etls_recnt = 0;
+%macro etls_recordCheck;
+   %let etls_recCheckExist = %eval(%sysfunc(exist(PDDDM.DmMonitorCliente, DATA)) or
+         %sysfunc(exist(PDDDM.DmMonitorCliente, VIEW)));
+
+   %if (&etls_recCheckExist) %then
+   %do;
+      %local etls_syntaxcheck;
+      %let etls_syntaxcheck = %sysfunc(getoption(syntaxcheck));
+      /* Turn off syntaxcheck option to perform following steps  */
+      options nosyntaxcheck;
+
+      proc contents data = PDDDM.DmMonitorCliente out = work.etls_contents(keep = nobs) noprint;
+      run;
+
+      data _null_;
+         set work.etls_contents (obs = 1);
+         call symput("etls_recnt", left(put(nobs,32.)));
+      run;
+
+      proc datasets lib = work nolist nowarn memtype = (data view);
+         delete etls_contents;
+      quit;
+
+      /* Reset syntaxcheck option to previous setting  */
+      options &etls_syntaxcheck;
+   %end;
+%mend etls_recordCheck;
+%etls_recordCheck;
+
+%let SYSLAST = %nrquote(PDDDM.DmMonitorCliente);
+
+%let SYS_SQL_IP_SPEEDO = Y;
+%let SYS_SQL_MAPPUTTO = sas_put;
+%let SYS_SQLREDUCEPUT = DBMS;
+%global etls_sql_pushDown;
+%let etls_sql_pushDown = -1;
+option DBIDIRECTEXEC;
+
+/*---- Map the columns  ----*/
+proc datasets lib = work nolist nowarn memtype = (data view);
+   delete W7QOZTT3;
+quit;
+
+%put %str(NOTE: Mapping columns ...);
+proc sql;
+   create view work.W7QOZTT3 as
+      select
+         cdPessoa,
+         DtClassificacaoGeral,
+         CdStatusMonitoramento,
+         CdStatusInsuficienciaDuplicata,
+         CdStatusBacen,
+         CdILMDuplicata,
+         CdInsuficenciaDireitoCredit,
+         CdStatusVNP,
+         CdStatusClassificacaoFinal,
+         CdStatusClassificacaoAlterado,
+         NmPessoaCliente,
+         CdOfficer,
+         NmOfficer,
+         CdSegmentoMercado,
+         NmSegmentoMercado,
+         fx_fat_grupo,
+         VrRisco,
+         NuCpfCnpj,
+         NmGrupoEconomico,
+         CdFilial,
+         NmFilial,
+         CDGrupoEconomico,
+         DsAreaOrigem
+   from &SYSLAST
+      where CdStatusClassificacaoFinal = .
+   ;
+quit;
+
+%let SYSLAST = work.W7QOZTT3;
+
+%global etls_sql_pushDown;
+%let etls_sql_pushDown = &sys_sql_ip_all;
+
+%rcSet(&sqlrc);
+
+/**  Step end Extract **/
+
+/*==========================================================================*
+ * Step:            Update                                A5HWC8AO.BZ000OUS *
+ * Transform:       Update                                                  *
+ * Description:                                                             *
+ *                                                                          *
+ * Source Table:    Extract - work.W7QOZTT3               A5HWC8AO.C3000HZ4 *
+ * Target Table:    DmMonitorCliente -                    A5HWC8AO.B700066M *
+ *                   PDDDM.DmMonitorCliente                                 *
+ *==========================================================================*/
+
+%let transformID = %quote(A5HWC8AO.BZ000OUS);
+%let trans_rc = 0;
+%let etls_stepStartTime = %sysfunc(datetime(), datetime20.);
+
+%let etls_recnt = -1;
+%let SYSLAST = %nrquote(work.W7QOZTT3);
+
+%let SYS_SQL_IP_SPEEDO = Y;
+%let SYS_SQL_MAPPUTTO = sas_put;
+%let SYS_SQLREDUCEPUT = DBMS;
+%global etls_sql_pushDown;
+%let etls_sql_pushDown = -1;
+option DBIDIRECTEXEC;
+
+%macro etls_sql_update;
+
+/* Determine if the table exists  */
+%let etls_tableExist = %eval(%sysfunc(exist(PDDDM.DmMonitorCliente, DATA)) or
+      %sysfunc(exist(PDDDM.DmMonitorCliente, VIEW)));
+
+/*---- Create a new table  ----*/
+%if (&etls_tableExist eq 0) %then
+%do;  /* if table does not exist  */
+
+   %put %str(NOTE: Creating table ...);
+
+   data PDDDM.DmMonitorCliente;
+      attrib cdPessoa length = 8
+         format = 11.
+         informat = 11.
+         label = 'cdPessoa';
+      attrib DtClassificacaoGeral length = 8
+         format = DATETIME22.3
+         informat = DATETIME22.3
+         label = 'DtClassificacaoGeral';
+      attrib CdStatusMonitoramento length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusMonitoramento';
+      attrib CdStatusInsuficienciaDuplicata length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusInsuficienciaDuplicata';
+      attrib CdStatusBacen length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusBacen';
+      attrib CdILMDuplicata length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdILMDuplicata';
+      attrib CdInsuficenciaDireitoCredit length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdInsuficenciaDireitoCredit';
+      attrib CdStatusVNP length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusVNP';
+      attrib CdStatusClassificacaoFinal length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusClassificacaoFinal';
+      attrib CdStatusClassificacaoAlterado length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdStatusClassificacaoAlterado';
+      attrib NmPessoaCliente length = $160
+         format = $160.
+         informat = $160.
+         label = 'NmPessoaCliente';
+      attrib CdOfficer length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdOfficer';
+      attrib NmOfficer length = $160
+         format = $160.
+         informat = $160.
+         label = 'NmOfficer';
+      attrib CdSegmentoMercado length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdSegmentoMercado';
+      attrib NmSegmentoMercado length = $50
+         format = $50.
+         informat = $50.
+         label = 'NmSegmentoMercado';
+      attrib fx_fat_grupo length = 8
+         format = 12.
+         informat = 12.
+         label = 'fx_fat_grupo';
+      attrib VrRisco length = 8
+         format = 11.
+         informat = 11.
+         label = 'VrRisco';
+      attrib NuCpfCnpj length = $14
+         format = $14.
+         informat = $14.
+         label = 'NuCpfCnpj';
+      attrib NmGrupoEconomico length = $35
+         format = $35.
+         informat = $35.
+         label = 'NmGrupoEconomico';
+      attrib CdFilial length = 8
+         format = 11.
+         informat = 11.
+         label = 'CdFilial';
+      attrib NmFilial length = $50
+         format = $50.
+         informat = $50.
+         label = 'NmFilial';
+      attrib CDGrupoEconomico length = 8
+         format = 11.
+         informat = 11.
+         label = 'CDGrupoEconomico';
+      attrib DsAreaOrigem length = $60
+         format = $60.
+         informat = $60.
+         label = 'DsAreaOrigem';
+      call missing(of _all_);
+      stop;
+   run;
+
+   %rcSet(&syserr);
+
+%end;  /* if table does not exist  */
+
+/*---- Update the target table  ----*/
+proc sql;
+   update PDDDM.DmMonitorCliente
+      set
+         CdStatusClassificacaoFinal= 2
+   ;
+quit;
+
+%rcSet(&syscc);
+
+%mend etls_sql_update;
+
+/* execute etls_sql_update  */
+%etls_sql_update;
+
+/**  Step end Update **/
+
+%let etls_endTime = %sysfunc(datetime(),datetime.);

@@ -1,0 +1,86 @@
+START_METADATA
+PROJECT: Rodas__novoreuniaoexecutiva
+FILE_SAS: orcamento-nn.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 12)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 31
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: RELEXC = /infogrc/relatorioexecutivo
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/NOVOREUNIAOEXECUTIVA/BASES/ORCAMENTO_NN.CSV [SAS/Local], RELEXC.TBMETA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: RELEXC
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/novoreuniaoexecutiva/bases/orcamento_nn.csv
+TABLE_READ_PROVENANCE (Flow): RELEXC.TBMETA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/novoreuniaoexecutiva/bases/orcamento_nn.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RELEXC.TBMETA
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ORC_NN, ORC_NN_01
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/novoreuniaoexecutiva/bases/orcamento_nn.csv
+
+END_METADATA
+================================================================================
+LIBNAME RELEXC '/infogrc/relatorioexecutivo';
+
+PROC SQL;
+  CREATE TABLE orc_nn_01 AS
+    SELECT
+      NuAnoMes AS Safra,
+	  NmGrupoProdutoMeta AS Produto,
+	  COALESCE(DsTipoCanalProducao,'DESCONHECIDO') AS Canal,
+      SUM(CASE WHEN Tipo = 'Orçamento' AND TpValor = 'VrProducao' THEN VrMedida ELSE 0 END) AS OrcamentoVrProducao FORMAT=NUM18.2,
+	  SUM(CASE WHEN Tipo = 'Meta' AND TpValor = 'VrProducao' THEN VrMedida ELSE 0 END) AS MetaVrProducao FORMAT=NUM18.2,
+	  SUM(CASE WHEN Tipo = 'BN' AND TpValor = 'VrProducao' THEN VrMedida ELSE 0 END) AS BNVrProducao FORMAT=NUM18.2,
+      SUM(CASE WHEN Tipo = 'Orçamento' AND TpValor = 'VpTxSpread' THEN VrMedida ELSE 0 END) AS OrcamentoSpreadVp FORMAT=NUM18.2
+    FROM RELEXC.TbMeta
+	WHERE NmGrupoProdutoMeta IN ('Estudantil','Saude','Solar','Turismo')
+	  AND NmGrupoProdutoMeta IS NOT NULL
+	  AND NuAnoMes >= 202007
+    GROUP BY 1,2,3;
+RUN;
+
+PROC SQL;
+  CREATE TABLE orc_nn AS
+    SELECT
+      *
+    FROM orc_nn_01
+	WHERE (OrcamentoVrProducao + MetaVrProducao + BNVrProducao + OrcamentoSpreadVp) <> 0;
+RUN;
+
+filename exprt '/infogrc/novoreuniaoexecutiva/bases/orcamento_nn.csv' encoding="utf-8";
+
+proc export
+data=orc_nn
+outfile=exprt replace
+dbms=dlm;
+delimiter=';';
+run;

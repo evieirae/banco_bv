@@ -1,0 +1,213 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_EGV_Parceiros_digitais
+FILE_SAS: 3 - Import BQ Motivo Recusa Target.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -35
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 148
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: MISV_TMP = /projetos/MISV/data/bases/tmp; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: MXDATAPROP
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BV-PDBD-PRD.DVRY_CORP_CREDITO.MOTIVORECUSA_PROPOSTA_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_MOTIVORECUSATARGETEGV_0
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TRIBO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_MOTIVORECUSATARGETEGV_0, WORK.BASE_MOTIVORECUSATARGETEGV_1
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_CREDITO.MOTIVORECUSA_PROPOSTA_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], TRIBO.BASE_MOTIVORECUSATARGETEGV [DATA Step - SET; PROC SQL - FROM], WORK.BASE_MOTIVORECUSATARGETEGV_0 [PROC SQL - FROM], WORK.BASE_MOTIVORECUSATARGETEGV_1 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): TRIBO.BASE_MOTIVORECUSATARGETEGV
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TRIBO.BASE_MOTIVORECUSATARGETEGV
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TRIBO.BASE_MOTIVORECUSATARGETEGV
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_MOTIVORECUSATARGETEGV, BASE_MOTIVORECUSATARGETEGV_0, WORK.BASE_MOTIVORECUSATARGETEGV_1
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	3 - Import BQ Motivo Recusa Target.sas														| */
+/* | Descricao: Programa para importar do Big Query os motivos de recusa que são passíveis de conversão (Target)					| */
+/* | Objetivo: 	Apuração do Dash EGV Parceiras 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname MISV_TMP '/projetos/MISV/data/bases/tmp';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela Recusa Target=========================*/
+/* ======================================================================================*/
+
+proc sql print;
+	select (year(max(dt_entrada_proposta))*100)+month(max(dt_entrada_proposta))-1 as MXDATAPROP INTO :MXDATAPROP from tribo.base_MotivoRecusaTargetEgv;
+QUIT;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table base_MotivoRecusaTargetEgv_0 as
+   select * from connection to perm
+     (
+
+SELECT
+  *
+  ,  CASE
+		WHEN ds_motivo_recusa_minimo LIKE ('%LIMITE MÝNIMO%') THEN 1
+		WHEN ds_motivo_recusa_minimo LIKE ('%PRAZO FORA DA POLÝTICA%') THEN 1
+		WHEN ds_motivo_recusa_minimo LIKE ('%Recusa LTV%') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('%COMPROMETIMENTO%') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('%Valor financiado fora da polít%') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('TABELA: PRAZO NÒO PERMITIDO') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('CADASTRO: DATA NASCIMENTO DIVERGENTE') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('RECUSA NOME OU DATA DE NASCIMENTO DIVERGENTE') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('FORA NORMA : VALOR PROPOSTA') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('PRAZO FORA DA POLÝTICA') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('VALOR FINANCIADO FORA DA POLÝTICA') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('LIMITE MÝNIMO DE FINANCIAMENTO') THEN 1
+		WHEN UPPER(ds_motivo_recusa_minimo) LIKE ('TABELA: % COMPR. RENDA NÒO PERMITIDO') THEN 1
+		          ELSE 0 END AS Motivo_selecao
+ FROM bv-pdbd-prd.dvry_corp_credito.motivorecusa_proposta_fato
+
+  	) A
+WHERE 1=1
+AND a.ds_produto in ('egv_leves','egv_pesados')
+AND (year(a.dt_entrada_proposta)*100)+month(a.dt_entrada_proposta) >= &MXDATAPROP.;
+   disconnect from perm;
+quit;
+
+PROC SQL;
+   CREATE TABLE WORK.base_MotivoRecusaTargetEgv_1 AS
+   SELECT t1.nu_proposta,
+          t1.dt_entrada_proposta,
+          t1.ds_produto,
+          t1.ds_subproduto,
+          t1.st_proposta,
+			CASE
+				WHEN UPPER(t1.ds_motivo_recusa_minimo)	= 'RESTRIÞÒO POLITICA: COMPROMETIMENTO RENDA'
+					THEN 'RESTRIÇÃO POLITICA: COMPROMETIMENTO RENDA'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo)	= 'PRAZO FORA DA POLÝTICA'
+					THEN 'PRAZO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo)	= 'LIMITE MÝNIMO DE FINANCIAMENTO'
+					THEN 'LIMITE MÍNIMO DE FINANCIAMENTO'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo) LIKE ('%Valor financiado fora da polít%')
+					THEN 'VALOR FINANCIADO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo) LIKE ('TABELA: PRAZO NÒO PERMITIDO')
+					THEN 'PRAZO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo) LIKE ('PRAZO FORA DA POLÝTICA')
+					THEN 'PRAZO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo) LIKE ('VALOR FINANCIADO FORA DA POLÝTICA')
+					THEN 'VALOR FINANCIADO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo) LIKE ('LIMITE MÝNIMO DE FINANCIAMENTO')
+					THEN 'LIMITE MÍNIMO DESC FINANCIAMENTO'
+				WHEN UPPER(t1.ds_motivo_recusa_minimo) LIKE ('TABELA: % COMPR. RENDA NÒO PERMITIDO')
+					THEN 'COMPROMETIMENTO DE RENDA'
+		  				ELSE UPPER(t1.ds_motivo_recusa_minimo)
+		  	END AS ds_motivo_recusa_minimo,
+			CASE
+				WHEN t1.ds_motivo_recusa_maximo = 'RESTRIÞÒO POLITICA: COMPROMETIMENTO RENDA'
+					THEN 'RESTRIÇÃO POLITICA: COMPROMETIMENTO RENDA'
+				WHEN t1.ds_motivo_recusa_maximo =  'PRAZO FORA DA POLÝTICA'
+					THEN 'PRAZO FORA DA POLÍTICA'
+				WHEN t1.ds_motivo_recusa_maximo =  'TABELA: ANO DO BEM NÒO PERMITIDO'
+					THEN 'TABELA: ANO DO BEM NÃO  PERMITIDO'
+				WHEN t1.ds_motivo_recusa_maximo =  'LIMITE MÝNIMO DE FINANCIAMENTO'
+					THEN 'LIMITE MÍNIMO DE FINANCIAMENTO'
+					WHEN UPPER(t1.ds_motivo_recusa_maximo) LIKE ('%Valor financiado fora da polít%')
+					THEN 'VALOR FINANCIADO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_maximo) LIKE ('TABELA: PRAZO NÒO PERMITIDO')
+					THEN 'PRAZO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_maximo) LIKE ('PRAZO FORA DA POLÝTICA')
+					THEN 'PRAZO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_maximo) LIKE ('VALOR FINANCIADO FORA DA POLÝTICA')
+					THEN 'VALOR FINANCIADO FORA DA POLÍTICA'
+				WHEN UPPER(t1.ds_motivo_recusa_maximo) LIKE ('LIMITE MÝNIMO DE FINANCIAMENTO')
+					THEN 'LIMITE MÍNIMO DESC FINANCIAMENTO'
+				WHEN UPPER(t1.ds_motivo_recusa_maximo) LIKE ('TABELA: % COMPR. RENDA NÒO PERMITIDO')
+					THEN 'COMPROMETIMENTO DE RENDA'
+
+						ELSE t1.ds_motivo_recusa_maximo
+				END AS  ds_motivo_recusa_maximo,
+			t1.fl_motivo_score_psicometrico,
+			t1.ds_motivo_recusa_1,
+			t1.ds_motivo_recusa_2,
+			t1.ds_motivo_recusa_3,
+			t1.ds_motivo_recusa_4,
+			t1.ds_motivo_recusa_5,
+			t1.ds_motivo_recusa_6,
+			t1.ds_motivo_recusa_7,
+			t1.ds_motivo_recusa_8,
+			t1.ds_motivo_recusa_9,
+			t1.qt_motivo_recusa,
+			t1.ts_inclusao_analitico,
+			t1.Motivo_selecao
+      FROM WORK.base_MotivoRecusaTargetEgv_0 t1
+      WHERE t1.Motivo_selecao = 1;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE base_MotivoRecusaTargetEgv AS
+   SELECT t1.nu_proposta,
+          t1.dt_entrada_proposta,
+          t1.ds_produto,
+          t1.ds_subproduto,
+          t1.st_proposta,
+          COALESCE(t1.ds_motivo_recusa_minimo,t1.ds_motivo_recusa_maximo,'N/D') AS ds_motivo_recusa,
+          t1.fl_motivo_score_psicometrico,
+          t1.ds_motivo_recusa_1,
+          t1.ds_motivo_recusa_2,
+          t1.ds_motivo_recusa_3,
+          t1.ds_motivo_recusa_4,
+          t1.ds_motivo_recusa_5,
+          t1.ds_motivo_recusa_6,
+          t1.ds_motivo_recusa_7,
+          t1.ds_motivo_recusa_8,
+          t1.ds_motivo_recusa_9,
+          t1.qt_motivo_recusa,
+          t1.ts_inclusao_analitico,
+          t1.Motivo_selecao
+      FROM WORK.base_MotivoRecusaTargetEgv_1 t1;
+QUIT;
+
+PROC SQL;
+	DELETE * FROM TRIBO.base_MotivoRecusaTargetEgv WHERE (year(dt_entrada_proposta)*100)+month(dt_entrada_proposta) >= &MXDATAPROP.;
+QUIT;
+
+data TRIBO.base_MotivoRecusaTargetEgv (compress=yes);
+	set
+		TRIBO.base_MotivoRecusaTargetEgv
+		base_MotivoRecusaTargetEgv;
+run;

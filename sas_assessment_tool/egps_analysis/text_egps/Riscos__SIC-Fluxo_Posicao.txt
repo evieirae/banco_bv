@@ -1,0 +1,894 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__SIC-Fluxo_Posicao
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:44 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -72
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 719
+CODE_TASKS_COUNT: 13
+DETECTED_PROCS: PRINT, SORT, SQL
+HAS_DATA_STEP: Yes (14x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: SIC = /riscosbvf/gbinfra/atacado/; SOLATAC = /riscosbvf/gbinfra/atacado
+DETECTED_MACROS_DEFINED: dtref
+DETECTED_MACROS_USED: Lista_mod_PME, dtref
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: SICBATGL
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): SIC.DBTEMPPOSICAOSASHIST [SAS/Local], SICBATGL.TBFLUXOCAIXA [SQLSVR], SICBATGL.TBMODALIDADECATALOGOPRODUTO [SQLSVR], SICBATGL.TBPOSICAO [SQLSVR], SICBATGL.TBTEMPPOSICAOSAS [SQLSVR], SICBATGL.TBTIPOFLUXOCAIXA [SQLSVR], SICBATGL.VWMEMORIAMARCACAOPDD [SQLSVR]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TESTE, WORK.TESTE_2
+IMPORTED_LIBNAMES: SIC, SICBATGL
+EXPORTED_LIBNAMES: SIC, SOLATAC
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.TESTE, WORK.TESTE_2
+TABLE_READ_PROVENANCE (Flow): SIC.DBFLUXOCAIXASIC [DATA Step - SET; PROC SQL - FROM], SIC.DBFLUXOCAIXASICHIST [DATA Step - SET; PROC SQL - FROM], SIC.DBTEMPPOSICAOSASHIST [PROC SQL - FROM], SICBATGL.TBFLUXOCAIXA [PROC SQL - FROM], SICBATGL.TBMODALIDADECATALOGOPRODUTO [PROC SQL - FROM], SICBATGL.TBPOSICAO [PROC SQL - JOIN], SICBATGL.TBTEMPPOSICAOSAS [DATA Step - SET; PROC SQL - FROM], SICBATGL.TBTIPOFLUXOCAIXA [PROC SQL - JOIN], SICBATGL.VWMEMORIAMARCACAOPDD [PROC SQL - FROM], SOLATAC.DBTEMPPOSICAOSAS [DATA Step - SET; PROC SQL - FROM], SOLATAC.DBTEMPPOSICAOSASHIST [DATA Step - SET; PROC SQL - FROM], SOLATAC.DBTEMPPOSICAOSAS_LEASING [DATA Step - SET], WORK.TESTE [PROC SQL - FROM], WORK.TESTE_2 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): SIC.DBFLUXOCAIXASIC, SIC.DBFLUXOCAIXASICHIST, SOLATAC.DBTEMPPOSICAOSAS, SOLATAC.DBTEMPPOSICAOSASHIST, SOLATAC.DBTEMPPOSICAOSAS_LEASING
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SIC.DBFLUXOCAIXASIC, SIC.DBFLUXOCAIXASICHIST, SOLATAC.DBTEMPPOSICAOSAS, SOLATAC.DBTEMPPOSICAOSASHIST, SOLATAC.DBTEMPPOSICAOSASHIST_BCK, SOLATAC.DBTEMPPOSICAOSAS_BCK, SOLATAC.DBTEMPPOSICAOSAS_LEASING
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE, BASE_LIB, BASE_PDD, BASE_UNICA, COMPARATIVO, LEASING, SEM_DUP, TESTE, TESTE2, TESTE3, TESTE4, TESTE_2, TESTE_3, VALID_LEASING, WORK.QUERY_FOR_DBFLUXOCAIXASICHIST, WORK.TESTE_0
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET dtref='31dec2025'd;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. SIC Fluxo */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. SIC Fluxo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-PnYxItJK6ad7vmkt/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let dtref = '31dec2025'd;
+
+
+LIBNAME SICBATGL SQLSVR  DATASRC=DBSICCONCILIADOR  SCHEMA=DBO  USER=_SAS_BATGL_APPL  PASSWORD="{SAS002}9DF9130B4B17EE092D4FD27326E7C63D42641CA7" ;
+
+LIBNAME SIC '/riscosbvf/gbinfra/atacado/';
+
+PROC SQL;
+CREATE TABLE BASE AS
+SELECT
+  a.*,
+  b.NmTipoFluxoCaixa
+
+FROM SICBATGL.TbFLuxoCaixa as a
+left join SICBATGL.TbTipoFluxoCaixa as b
+  on (a.CdTipoFluxoCaixa = b.CdTipoFluxoCaixa)
+where a.DtReferencia = &dtref. 
+and TpOrigemSistema = 'L';
+QUIT;
+
+data sic.DBFLUXOCAIXASIC;
+	set BASE;
+
+	format NuCnpjVeiculoLegal2 15.;
+	format CdModalidadeCatalogoProduto2 3.;
+	format NuCpfCnpjParte2 15.;
+	format NuCpfCnpjContraparte2 15.;
+	format CdIndexador2 3.;
+	format CdMoeda2 2.;
+	format VrTotalTarifa2 $1.;
+	format CdOperacao2 7.;
+	format CdTipoOperacao2 $1.;
+	format CdPraca2 3.;
+	format PcLimitadorCorrecaoMonetaria2 $1.;
+	format TpAmortizacao2 1.;
+	format VrSaldoContabil2 $1.;
+	format VrAmortizacaoTir2 $1.;
+	format VrFluxoCaixaTir2 $1.;
+	format VrSaldoContabilTIR2 $1.;
+	format VrPUFechamento2 $1.;
+	format CdIndexadorOriginal2 3.;
+	format VrPremio2 $1.;
+	format VrNegociadoTermo_old2 $1.;
+	format PcNegociadoTermo_old2 $1.;
+	format PcNegociadoTermo2 $1.;
+	format VrNegociadoTermo2 $1.;
+	format VrPuInformado2 $1.;
+
+	DtReferencia2 = DATEPART(DtReferencia);
+	DtInicioFluxoCaixa2 = DATEPART(DtInicioFluxoCaixa);
+	DtFixingPosFixadoInicio2 = DATEPART(DtFixingPosFixadoInicio);
+	DtFixingPosFixadoFim2 = DATEPART(DtFixingPosFixadoFim);
+	DtVencimentoFluxoCaixa2 = DATEPART(DtVencimentoFluxoCaixa);
+	DtLiquidacaoFluxoCaixa2 = DATEPART(DtLiquidacaoFluxoCaixa);
+	DtLiquidacaoPrincipal2 = DATEPART(DtLiquidacaoPrincipal);
+	DtInicioBarreira2 = DATEPART(tInicioBarreira);
+	DtFimBarreira2 = DATEPART(DtFimBarreira);
+	DtInicioMediaIndexador2 = DATEPART(DtInicioMediaIndexador);
+	DtFimMediaIndexador2 = DATEPART(DtFimMediaIndexador);
+	DtInicioContrato2 = DATEPART(DtInicioContrato);
+	DtMarcacaoMercado2 = DATEPART(DtMarcacaoMercado);
+	DtFixingPosFixadoIniIndexador2 = DATEPART(DtFixingPosFixadoIniIndexador);
+	DtFixingPosFixadoFimIndexador2 = DATEPART(DtFixingPosFixadoFimIndexador);
+	DtFixingPosFixadoInicioMoeda2 = DATEPART(DtFixingPosFixadoInicioMoeda);
+	DtFixingPosFixadoFimMoeda2 = DATEPART(DtFixingPosFixadoFimMoeda);
+	DtFixingPosFixadoIniCrossRate2 = DATEPART(DtFixingPosFixadoIniCrossRate);
+	DtFixingPosFixadoFimCrossRate2 = DATEPART(DtFixingPosFixadoFimCrossRate);
+	DtRenegociacao2 = DATEPART(DtRenegociacao);
+	DtReferenciaPrevia2 = DATEPART(DtReferenciaPrevia);
+
+	VrTotalTarifa2 = input(VrTotalTarifa, $1.);
+	CdTipoOperacao2 = input(CdTipoOperacao, $1.);
+	PcLimitadorCorrecaoMonetaria2 = input(PcLimitadorCorrecaoMonetaria, $1.);
+	VrSaldoContabil2 = input(VrSaldoContabil, $1.);
+	VrAmortizacaoTir2 = input(VrAmortizacaoTir, $1.);
+	VrFluxoCaixaTir2 = input(VrFluxoCaixaTir, $1.);
+	VrSaldoContabilTIR2 = input(VrSaldoContabilTIR, $1.);
+	VrPUFechamento2 = input(VrPUFechamento, $1.);
+	VrPremio2 = input(VrPremio, $1.);
+	VrNegociadoTermo_old2 = input(VrNegociadoTermo_old, $1.);
+	PcNegociadoTermo_old2 = input(PcNegociadoTermo_old, $1.);
+	PcNegociadoTermo2 = input(PcNegociadoTermo, $1.);
+	VrNegociadoTermo2 = input(VrNegociadoTermo, $1.);
+	VrPuInformado2 = input(VrPuInformado, $1.);
+
+	NuCnpjVeiculoLegal2 = COMPRESS(PUT(NuCnpjVeiculoLegal, 15.));
+	CdModalidadeCatalogoProduto2 = COMPRESS(PUT(CdModalidadeCatalogoProduto, 3.));
+	NuCpfCnpjParte2 = COMPRESS(PUT(NuCpfCnpjParte, 15.));
+	NuCpfCnpjContraparte2 = COMPRESS(PUT(NuCpfCnpjContraparte, 15.));
+	CdIndexador2 = COMPRESS(PUT(CdIndexador, 3.));
+	CdMoeda2 = COMPRESS(PUT(CdMoeda, 2.));
+	CdOperacao2 = COMPRESS(PUT(CdOperacao, 7.));
+	CdPraca2 = COMPRESS(PUT(CdPraca, 3.));
+	TpAmortizacao2 = COMPRESS(PUT(TpAmortizacao, 1.));
+	CdIndexadorOriginal2 = COMPRESS(PUT(CdIndexadorOriginal, 3.));
+
+	format DtReferencia2 DATE9.;
+	format DtInicioFluxoCaixa2 DATE9.;
+	format DtFixingPosFixadoInicio2 DATE9.;
+	format DtFixingPosFixadoFim2 DATE9.;
+	format DtVencimentoFluxoCaixa2 DATE9.;
+	format DtLiquidacaoFluxoCaixa2 DATE9.;
+	format DtLiquidacaoPrincipal2 DATE9.;
+	format DtInicioBarreira2 DATE9.;
+	format DtFimBarreira2 DATE9.;
+	format DtInicioMediaIndexador2 DATE9.;
+	format DtFimMediaIndexador2 DATE9.;
+	format DtInicioContrato2 DATE9.;
+	format DtMarcacaoMercado2 DATE9.;
+	format DtFixingPosFixadoIniIndexador2 DATE9.;
+	format DtFixingPosFixadoFimIndexador2 DATE9.;
+	format DtFixingPosFixadoInicioMoeda2 DATE9.;
+	format DtFixingPosFixadoFimMoeda2 DATE9.;
+	format DtFixingPosFixadoIniCrossRate2 DATE9.;
+	format DtFixingPosFixadoFimCrossRate2 DATE9.;
+	format DtRenegociacao2 DATE9.;
+	format DtReferenciaPrevia2 DATE9.;
+
+	drop DtReferencia DtInicioFluxoCaixa DtFixingPosFixadoInicio DtFixingPosFixadoFim
+		 DtVencimentoFluxoCaixa DtLiquidacaoFluxoCaixa DtLiquidacaoPrincipal DtInicioBarreira
+	 	 DtFimBarreira DtInicioMediaIndexador DtFimMediaIndexador DtInicioContrato
+		 DtMarcacaoMercado DtFixingPosFixadoIniIndexador DtFixingPosFixadoFimIndexador
+		 DtFixingPosFixadoInicioMoeda DtFixingPosFixadoFimMoeda DtFixingPosFixadoIniCrossRate
+		 DtFixingPosFixadoFimCrossRate DtRenegociacao DtReferenciaPrevia NuCnpjVeiculoLegal
+		 CdModalidadeCatalogoProduto NuCpfCnpjParte NuCpfCnpjContraparte CdIndexador CdMoeda
+		 VrTotalTarifa CdOperacao CdTipoOperacao CdPraca PcLimitadorCorrecaoMonetaria TpAmortizacao
+		 VrSaldoContabil VrAmortizacaoTir VrFluxoCaixaTir VrSaldoContabilTIR VrPUFechamento
+		 CdIndexadorOriginal VrPremio VrNegociadoTermo_old PcNegociadoTermo_old PcNegociadoTermo
+		 VrNegociadoTermo VrPuInformado;
+
+	rename DtReferencia2 = DtReferencia;
+	rename DtInicioFluxoCaixa2 = DtInicioFluxoCaixa;
+	rename DtFixingPosFixadoInicio2 = DtFixingPosFixadoInicio;
+	rename DtFixingPosFixadoFim2 = DtFixingPosFixadoFim;
+	rename DtVencimentoFluxoCaixa2 = DtVencimentoFluxoCaixa;
+	rename DtLiquidacaoFluxoCaixa2 = DtLiquidacaoFluxoCaixa;
+	rename DtLiquidacaoPrincipal2 = DtLiquidacaoPrincipal;
+	rename DtInicioBarreira2 = DtInicioBarreira;
+	rename DtFimBarreira2 = DtFimBarreira;
+	rename DtInicioMediaIndexador2 = DtInicioMediaIndexador;
+	rename DtFimMediaIndexador2 = DtFimMediaIndexador;
+	rename DtInicioContrato2 = DtInicioContrato;
+	rename DtMarcacaoMercado2 = DtMarcacaoMercado;
+	rename DtFixingPosFixadoIniIndexador2 = DtFixingPosFixadoIniIndexador;
+	rename DtFixingPosFixadoFimIndexador2 = DtFixingPosFixadoFimIndexador;
+	rename DtFixingPosFixadoInicioMoeda2 = DtFixingPosFixadoInicioMoeda;
+	rename DtFixingPosFixadoFimMoeda2 = DtFixingPosFixadoFimMoeda;
+	rename DtFixingPosFixadoIniCrossRate2 = DtFixingPosFixadoIniCrossRate;
+	rename DtFixingPosFixadoFimCrossRate2 = DtFixingPosFixadoFimCrossRate;
+	rename DtRenegociacao2 = DtRenegociacao;
+	rename DtReferenciaPrevia2 = DtReferenciaPrevia;
+	rename NuCnpjVeiculoLegal2 = NuCnpjVeiculoLegal;
+	rename CdModalidadeCatalogoProduto2 = CdModalidadeCatalogoProduto;
+	rename NuCpfCnpjParte2 = NuCpfCnpjParte;
+	rename NuCpfCnpjContraparte2 = NuCpfCnpjContraparte;
+	rename CdIndexador2 = CdIndexador;
+	rename CdMoeda2 = CdMoeda;
+	rename VrTotalTarifa2 = VrTotalTarifa;
+	rename CdOperacao2 = CdOperacao;
+	rename CdTipoOperacao2 = CdTipoOperacao;
+	rename CdPraca2 = CdPraca;
+	rename PcLimitadorCorrecaoMonetaria2 = PcLimitadorCorrecaoMonetaria;
+	rename TpAmortizacao2 = TpAmortizacao;
+	rename VrSaldoContabil2 = VrSaldoContabil;
+	rename VrAmortizacaoTir2 = VrAmortizacaoTir;
+	rename VrFluxoCaixaTir2 = VrFluxoCaixaTir;
+	rename VrSaldoContabilTIR2 = VrSaldoContabilTIR;
+	rename VrPUFechamento2 = VrPUFechamento;
+	rename CdIndexadorOriginal2 = CdIndexadorOriginal;
+	rename VrPremio2 = VrPremio;
+	rename VrNegociadoTermo_old2 = VrNegociadoTermo_old;
+	rename PcNegociadoTermo_old2 = PcNegociadoTermo_old;
+	rename PcNegociadoTermo2 = PcNegociadoTermo;
+	rename VrNegociadoTermo2 = VrNegociadoTermo;
+	rename VrPuInformado2 = VrPuInformado;
+
+run;
+
+
+PROC SQL;
+CREATE TABLE VALID_LEASING AS
+SELECT DISTINCT CdGrupoConciliacao
+FROM SIC.DBFLUXOCAIXASIC;
+
+TITLE 'CDGRUPOCONCILIAÇÃO, VERIFICAR SE EXISTE 14 = LEASING';
+SELECT * FROM VALID_LEASING;
+TITLE;
+QUIT;
+
+PROC SQL OUTOBS=10;
+SELECT DISTINCT DtReferencia
+FROM sic.DBFLUXOCAIXASICHIST
+ORDER BY DtReferencia DESC;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. SIC Fluxo */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. Salvar histórico */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. Salvar histórico */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dWaVMGhuyAWhxoTe/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA SIC.DBFLUXOCAIXASICHIST(COMPRESS=YES REUSE=YES);
+	SET SIC.DBFLUXOCAIXASICHIST SIC.DBFLUXOCAIXASIC;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. Salvar histórico */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Libnames */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 24 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Libnames */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-RXc6IewbfjhpfhSy/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname SOLATAC '/riscosbvf/gbinfra/atacado';
+
+
+LIBNAME SICBATGL SQLSVR  DATASRC=DBSICCONCILIADOR  SCHEMA=DBO  USER=_SAS_BATGL_APPL  PASSWORD="{SAS002}9DF9130B4B17EE092D4FD27326E7C63D42641CA7" ;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Libnames */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Incluir Leasing */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 24 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Incluir Leasing */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-RrNLDEBzT33qsjmg/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE SOLATAC.DBTEMPPOSICAOSAS_LEASING AS SELECT*
+FROM SICBATGL.TBTEMPPOSICAOSAS
+WHERE  CDGRUPOCONCILIACAO = 14
+;QUIT;RUN;
+
+
+DATA SOLATAC.DBTEMPPOSICAOSAS_LEASING;
+SET SOLATAC.DBTEMPPOSICAOSAS_LEASING;
+
+DTREFERENCIA2 				= DATEPART(DTREFERENCIA);
+DTREFERENCIA3 				= DATEPART(DTREFERENCIA);
+DTVENCIMENTO2 				= DATEPART(DTVENCIMENTO);
+DTBOLETAGEM2 				= DATEPART(DTBOLETAGEM);
+DTINICIO2 					= DATEPART(DTINICIO);
+
+FORMAT DTREFERENCIA2 DDMMYY10.;
+FORMAT DTREFERENCIA3 DDMMYY10.;
+FORMAT DTVENCIMENTO2 DDMMYY10.;
+FORMAT DTBOLETAGEM2 DDMMYY10.;
+FORMAT DTINICIO2 DDMMYY10.;
+
+DROP DTREFERENCIA DTVENCIMENTO DTBOLETAGEM DTINICIO;
+RENAME DTREFERENCIA3 = DTREFERENCIA;
+RENAME DTVENCIMENTO2 = DTVENCIMENTO;
+RENAME DTBOLETAGEM2 = DTBOLETAGEM;
+RENAME DTINICIO2 = DTINICIO;
+RUN;
+
+
+
+
+*/
+
+/* =========================FIM TASK=========================== */
+/* TASK: Incluir Leasing */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01 - DbTempSAS-V1 */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 28 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01 - DbTempSAS-V1 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-HfNHSPGqdl5fofTl/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname SOLATAC '/riscosbvf/gbinfra/atacado';
+
+
+LIBNAME SICBATGL SQLSVR  DATASRC=DBSICCONCILIADOR  SCHEMA=DBO  USER=_SAS_BATGL_APPL  PASSWORD="{SAS002}9DF9130B4B17EE092D4FD27326E7C63D42641CA7" ;
+
+data base_lib;
+set SOLATAC.DBTEMPPOSICAOSAS;
+run;
+
+PROC SQL OUTOBS=10;
+TITLE VERIFICAR SE ESTÁ NO HISTÓRICO;
+SELECT DISTINCT DTREFERENCIA2
+FROM SOLATAC.DBTEMPPOSICAOSASHIST
+ORDER BY DTREFERENCIA2 DESC;
+TITLE;
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE SOLATAC.DBTEMPPOSICAOSAS AS(
+SELECT
+  	A.*,
+  	B.FLGARANTIA,
+  	B.FLINSTITUICAOFINANCEIRA,
+  	B.CDRATINGCLIENTE,
+  	B.FLEMPRESALIGADA,
+  	B.FLEMISSOREMPRESALIGADA,
+  	B.CDPARTE
+FROM SICBATGL.TBTEMPPOSICAOSAS AS A
+LEFT JOIN SICBATGL.TBPOSICAO AS B
+	ON (A.CDGRUPOCONCILIACAO = B.CDGRUPOCONCILIACAO
+	AND A.SQPOSICAO = B.SQPOSICAO
+	AND A.DTREFERENCIA = B.DTREFERENCIA)
+
+WHERE A.DTREFERENCIA = &dtref.) 
+
+;QUIT;RUN;
+
+
+DATA SOLATAC.DBTEMPPOSICAOSAS;
+	SET SOLATAC.DBTEMPPOSICAOSAS;
+	DTREFERENCIA2 = DATEPART(DTREFERENCIA);
+	DTREFERENCIA = DATEPART(DTREFERENCIA);
+	DTVENCIMENTO = DATEPART(DTVENCIMENTO);
+	DTINICIO = DATEPART(DTINICIO);
+	DTBOLETAGEM = DATEPART(DTBOLETAGEM);
+	DTBAIXAPREJUIZO = DATEPART(DTBAIXAPREJUIZO);
+	FORMAT DTREFERENCIA DDMMYY10.;
+	FORMAT DTREFERENCIA2 DDMMYY10.;
+	FORMAT DTVENCIMENTO DDMMYY10.;
+	FORMAT DTINICIO DDMMYY10.;
+	FORMAT DTBOLETAGEM DDMMYY10.;
+	FORMAT DTBAIXAPREJUIZO DDMMYY10.;
+RUN;
+
+
+DATA SOLATAC.DBTEMPPOSICAOSAS;
+	SET SOLATAC.DBTEMPPOSICAOSAS;
+	FORMAT VRAJUSTEMTM 20.2;
+	FORMAT VRBAIXADOPREJUIZOCONTABIL 20.2;
+	FORMAT VRBAIXADOPREJUIZOGERENCIAL 20.2;
+	FORMAT VRCUSTOMEDIOPOSICAO 20.2;
+	FORMAT VRPUPOSICAO 20.2;
+	FORMAT VRRESULTADODIARIOCOMERCIAL 20.2;
+	FORMAT VRRESULTADODIARIOCONTABILCARREGA 20.2;
+	FORMAT VRRESULTADODIARIOCONTABILDAYTRAD 20.2;
+	FORMAT VRRESULTADODIARIOCUSTOOPORTUNIDA 20.2;
+	FORMAT VRRESULTADODIARIOGERENCIAL 20.2;
+	FORMAT VRRESULTADODIARIOMESA 20.2;
+	FORMAT VRRESULTADODIARIOMORA 20.2;
+	FORMAT VRRESULTADODIARIOTIR 20.2;
+	FORMAT VRRESULTADOPDDCONTABIL 20.2;
+	FORMAT VRRESULTADOPDDGERENCIAL 20.2;
+	FORMAT VRSALDOCONTABIL 20.2;
+	FORMAT VRSALDOCUSTOOPORTUNIDADE 20.2;
+	FORMAT VRSALDOGERENCIAL 20.2;
+	FORMAT VRSALDOMORA 20.2;
+	FORMAT VRSALDOPRINCIPALATUAL 20.2;
+	FORMAT VRCONTABILTIR 20.2;
+	FORMAT VRSALDOJURO 20.2;
+	FORMAT VRRESULTADOHIPOTETICO 20.2;
+	FORMAT VRRESULTADOEFTVOINTRDAEXCDNTE 20.2;
+	FORMAT VRRESULTADOEFETIVOINTRADIA 20.2;
+	FORMAT VRADIANTAMENTOMOEDANACIONAL 20.2;
+	FORMAT VRSALDOPRINCIPALATLMDAESTRNGRA 20.2;
+	FORMAT VRSALDOPRINCIPALATUALDOLAR 20.2;
+	FORMAT VRSALDOJUROANTECIPADO 20.2;
+	FORMAT VRCOMISSAOANTECIPADA 20.2;
+	FORMAT VRCOMISSAOPOSTECIPADA 20.2;
+	FORMAT VRRESULTADOACCRUAL 20.2;
+	FORMAT VRSALDORENDADESPESAAPROPRIAR 20.2;
+	FORMAT VRCOTACAOPOSICAO 20.2;
+	FORMAT VRPRINCIPAL 20.2;
+	FORMAT VRRESULTADOCOMERCIALNR 20.2;
+	FORMAT VRMERCADOTIRTES 20.2;
+	FORMAT VROYETIR 20.2;
+	FORMAT VRDIVTIR 20.2;
+	FORMAT VRRNRTIRTES 20.2;
+	FORMAT VROYE 20.2;
+	FORMAT VRREP 20.2;
+	FORMAT VRREPVOLTA 20.2;
+	FORMAT VRREPACUMULADO 20.2;
+	FORMAT VRSALDOMERCADO 20.2;
+	FORMAT VRCOMISSAO 20.2;
+	FORMAT VRCONTABILTIRTESOURARIA 20.2;
+	FORMAT VRCOTACAOINDEXADORVARIACAO 20.2;
+	FORMAT VRCOTACAOPARTIDA 20.2;
+	FORMAT VRCOTACAOSPOT 20.2;
+	FORMAT VRCOTACAOTERMO 20.2;
+	FORMAT VRCURVAMTMVARIACAO 20.2;
+	FORMAT VRDESCONTOBAIXA 20.2;
+	FORMAT VRDIFERIR 20.2;
+	FORMAT VRDIV 20.2;
+	FORMAT VREXERCICIO 20.2;
+	FORMAT VRIR 20.2;
+	FORMAT VRNAOPAGO 20.2;
+	FORMAT VRPDD 20.2;
+	FORMAT VRPOSTECIPADO 20.2;
+	FORMAT VRPUANTERIOR 20.2;
+	FORMAT VRPUFECHAMENTO 20.2;
+	FORMAT VRPUMEDIO 20.2;
+	FORMAT VRRESGATE 20.2;
+	FORMAT VRRESGATETIRTESOURARIA 20.2;
+	FORMAT VRRESGATETIR 20.2;
+	FORMAT VRRESULTADOAGIO 20.2;
+	FORMAT VRRESULTADOCOMISSAO 20.2;
+	FORMAT VRRESULTADOMTM 20.2;
+	FORMAT VRRESULTADONR 20.2;
+	FORMAT VRRESULTADOPREMIO 20.2;
+	FORMAT VRRESULTADOVARIACAOINDICE 20.2;
+	FORMAT VRRNRTESOURARIA 20.2;
+	FORMAT VRTIRCOTACAOPARTIDA 20.2;
+	FORMAT VRVALIDACAORESULTADOCURVA 20.2;
+	FORMAT VRVALIDACAORESULTADOINDEXADOR 20.2;
+	FORMAT VRRESGATETES 20.2;
+	FORMAT VRMERCADOTES 20.2;
+	FORMAT VRSALDOCORRECAOMONETARIA 20.2;
+	FORMAT VRSALDOVNP 20.2;
+RUN;
+
+proc sql;
+SELECT DISTINCT DTREFERENCIA2 FROM SOLATAC.DBTEMPPOSICAOSAS;
+quit;
+
+
+
+
+PROC SQL;
+   	DELETE *
+    FROM SOLATAC.DBTEMPPOSICAOSASHIST
+    WHERE DTREFERENCIA2 IN (SELECT DISTINCT DTREFERENCIA2 FROM SOLATAC.DBTEMPPOSICAOSAS);
+QUIT;
+
+;
+
+
+
+
+
+
+DATA SOLATAC.DBTEMPPOSICAOSASHIST;
+SET SOLATAC.DBTEMPPOSICAOSASHIST SOLATAC.DBTEMPPOSICAOSAS;
+RUN;
+
+
+PROC SQL;
+	SELECT DTREFERENCIA2, COUNT(*) AS QTDREGISTROS
+	FROM SOLATAC.DBTEMPPOSICAOSAS
+	GROUP BY DTREFERENCIA2
+	ORDER BY DTREFERENCIA2;
+QUIT;
+
+
+PROC SQL OUTOBS=10;
+	SELECT DISTINCT DTREFERENCIA2, COUNT(*)AS QTDREGISTROS
+	FROM SOLATAC.DBTEMPPOSICAOSASHIST
+	GROUP BY DTREFERENCIA2
+	ORDER BY DTREFERENCIA2 DESC;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01 - DbTempSAS-V1 */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Backup */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 28 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Backup */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-shwDE1jobivtl7pF/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname SOLATAC '/riscosbvf/gbinfra/atacado';
+
+
+data SOLATAC.DBTEMPPOSICAOSAS_BCK;
+set SOLATAC.DBTEMPPOSICAOSAS;
+run;
+
+
+data SOLATAC.DBTEMPPOSICAOSASHIST_BCK;
+set SOLATAC.DBTEMPPOSICAOSASHIST;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Backup */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Erro - 28.02 */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 28 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Erro - 28.02 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-S211h6kpC9kcioNb/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname SOLATAC '/riscosbvf/gbinfra/atacado';
+
+PROC SQL NOPRINT;
+	select distinct CdModalidadeCatalogoProduto INTO :Lista_mod_PME SEPARATED BY ", " from SICBATGL.TbModalidadeCatalogoProduto
+	where upcase(DsModalidadeCatalogoProduto) contains ("CESSÃO DE PORTFÓLIO") or DsModalidadeCatalogoProduto eq "Cessão Mand Cob TM";
+QUIT;
+
+data teste;
+set SICBATGL.TBTEMPPOSICAOSAS;
+where DtReferencia eq '31oct2023'd;
+run;
+
+proc sql;
+create table teste2 as
+select CdChaveNegocio, count(CdChaveNegocio) as dup
+from teste
+group by 1;
+
+create table teste3 as
+select a.*, b.dup
+from teste as a
+left join teste2 as b
+on a.CdChaveNegocio = b.CdChaveNegocio;
+where a.CdModalidadeProduto in (&Lista_mod_PME.);
+quit;
+
+data teste4;
+set teste3;
+if dup = 2 and CdModalidadeProduto in (&Lista_mod_PME.) and VrSaldoVNP = 0 then delete;
+run;
+
+proc sort data=teste out=sem_dup nodupkey;
+by CdChaveNegocio;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Erro - 28.02 */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: B.U X PDD */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 28 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: B.U X PDD */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-wKijttqondTMzs3K/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+SELECT MAX(cdfechamentoPDD) AS cdfechamentoPDD FROM SICBATGL.vwMemoriaMarcacaoPDD
+;QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_PDD AS
+SELECT NuOperacao,
+	   DsModalidadeCatalogoProduto,
+	   SUM(VrSaldoContabilBRL) AS Saldo
+FROM SICBATGL.vwMemoriaMarcacaoPDD
+WHERE cdfechamentoPDD in (1784)
+GROUP BY 1,2;
+QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_UNICA AS
+SELECT NuObjetoNegociacao,
+	   SUM(VrSaldoContabil) AS Saldo
+FROM SOLATAC	.DBTEMPPOSICAOSASHIST
+WHERE DTREFERENCIA2 IN ('28jun2024'D)
+GROUP BY 1;
+QUIT;
+
+
+
+
+
+PROC SQL;
+CREATE TABLE COMPARATIVO AS
+SELECT A.NuOperacao,
+	   A.DsModalidadeCatalogoProduto,
+	   A.Saldo AS Saldo_PDD,
+	   B.Saldo AS Saldo_BU,
+	   (A.Saldo - B.Saldo) AS Dif_Saldo
+FROM BASE_PDD A
+LEFT JOIN BASE_UNICA B
+ON A.NuOperacao = B.NuObjetoNegociacao
+WHERE A.DsModalidadeCatalogoProduto NOT IN ("Fiança - Finimp")
+
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: B.U X PDD */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00 - Valida Leasing */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: PFD Flow 28 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00 - Valida Leasing */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-WgpX6Tcw7vugQtQ3/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.TESTE_0 AS
+   SELECT t1.DtReferencia2,
+          t1.CdModalidadeProduto,
+          
+            (SUM(t1.VrSaldoContabil)) FORMAT=22.6 AS SUM_of_VrSaldoContabil
+      FROM SIC.DBTEMPPOSICAOSASHIST t1
+      WHERE t1.TpContabil = 'A' AND DAY(t1.DtReferencia2) BETWEEN 24 AND 31
+      GROUP BY t1.DtReferencia2,
+               t1.CdModalidadeProduto;
+QUIT;
+
+DATA TESTE;
+	SET TESTE_0;
+	REF = YEAR(DtReferencia2)*100+MONTH(DtReferencia2);
+RUN;
+
+PROC SORT DATA=TESTE OUT=TESTE_2;
+	BY DESCENDING REF DESCENDING DtReferencia2;
+RUN;
+
+PROC SORT DATA=TESTE_2 NODUPKEY;
+	BY DESCENDING REF;
+RUN;
+
+DATA TESTE_2 (KEEP=DATAS_DISPONIVEIS);
+	SET TESTE_2;
+	RENAME DtReferencia2 = DATAS_DISPONIVEIS;
+RUN;
+
+PROC SQL;
+   CREATE TABLE LEASING AS
+   SELECT t1.DtReferencia2,SUM_of_VrSaldoContabil AS VrSaldoContabil format commax20.2
+      FROM WORK.TESTE t1
+      WHERE t1.CdModalidadeProduto = 168;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE TESTE_3 AS
+   SELECT a.*,b.VrSaldoContabil AS SALDO
+      FROM WORK.TESTE_2 AS A
+      LEFT JOIN LEASING AS B
+	  ON A.DATAS_DISPONIVEIS = B.DtReferencia2
+	  ORDER BY 1 DESC;
+QUIT;
+
+DATA TESTE_3;
+	RETAIN DATAS_DISPONIVEIS CONTEM_LEASING SALDO;
+	SET TESTE_3;
+	IF NOT MISSING(SALDO) THEN CONTEM_LEASING = 'SIM';
+	ELSE CONTEM_LEASING = 'NAO';
+RUN;
+
+TITLE "DATAS DISPONIVEIS NA TABELA SIC.DBTEMPPOSICAOSASHIST";
+PROC PRINT;
+RUN;
+TITLE;
+
+PROC SQL;
+	DROP TABLE TESTE_0,TESTE,TESTE_2,TESTE_3,LEASING;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00 - Valida Leasing */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+libname SOLATAC '/riscosbvf/gbinfra/atacado';
+
+PROC SQL NOPRINT;
+	select distinct CdModalidadeCatalogoProduto INTO :Lista_mod_PME SEPARATED BY ", " from SICBATGL.TbModalidadeCatalogoProduto
+	where upcase(DsModalidadeCatalogoProduto) contains ("CESSÃO DE PORTFÓLIO") or DsModalidadeCatalogoProduto eq "Cessão Mand Cob TM";
+QUIT;
+
+data teste;
+set SICBATGL.TBTEMPPOSICAOSAS;
+where DtReferencia eq '31oct2023'd;
+run;
+
+proc sql;
+create table teste2 as
+select CdChaveNegocio, count(CdChaveNegocio) as dup
+from teste
+group by 1;
+
+create table teste3 as
+select a.*, b.dup
+from teste as a
+left join teste2 as b
+on a.CdChaveNegocio = b.CdChaveNegocio;
+where a.CdModalidadeProduto in (&Lista_mod_PME.);
+quit;
+
+data teste4;
+set teste3;
+if dup = 2 and CdModalidadeProduto in (&Lista_mod_PME.) and VrSaldoVNP = 0 then delete;
+run;
+
+proc sort data=teste out=sem_dup nodupkey;
+by CdChaveNegocio;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE teste AS SELECT*
+FROM SICBATGL.TBTEMPPOSICAOSAS
+;QUIT;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 012 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+SELECT MAX(cdfechamentoPDD) AS cdfechamentoPDD FROM SICBATGL.vwMemoriaMarcacaoPDD
+;QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_PDD AS
+SELECT NuOperacao,
+	   DsModalidadeCatalogoProduto,
+	   SUM(VrSaldoContabilBRL) AS Saldo
+FROM SICBATGL.vwMemoriaMarcacaoPDD
+WHERE cdfechamentoPDD in (1784)
+GROUP BY 1,2;
+QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_UNICA AS
+SELECT NuObjetoNegociacao,
+	   SUM(VrSaldoContabil) AS Saldo
+FROM SOLATAC.DBTEMPPOSICAOSASHIST
+WHERE DTREFERENCIA2 IN ('28jun2024'D)
+GROUP BY 1;
+QUIT;
+
+
+
+
+
+PROC SQL;
+CREATE TABLE COMPARATIVO AS
+SELECT A.NuOperacao,
+	   A.DsModalidadeCatalogoProduto,
+	   A.Saldo AS Saldo_PDD,
+	   B.Saldo AS Saldo_BU,
+	   (A.Saldo - B.Saldo) AS Dif_Saldo
+FROM BASE_PDD A
+LEFT JOIN BASE_UNICA B
+ON A.NuOperacao = B.NuObjetoNegociacao
+WHERE A.DsModalidadeCatalogoProduto NOT IN ("Fiança - Finimp")
+
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 012 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 013 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_DBFLUXOCAIXASICHIST);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_DBFLUXOCAIXASICHIST AS
+   SELECT DISTINCT t1.DtReferencia
+      FROM SIC.DBFLUXOCAIXASICHIST t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 013 */
+/* =========================FIM TASK=========================== */

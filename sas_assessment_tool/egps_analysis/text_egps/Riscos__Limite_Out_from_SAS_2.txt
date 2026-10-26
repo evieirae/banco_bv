@@ -1,0 +1,847 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Limite_Out_from_SAS_2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:18 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -16
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), RETAIN (2x | +20), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 623
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: FREQ, PRINT, REPORT, SORT, SQL
+HAS_DATA_STEP: Yes (25x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISCRED = /riscosbv/credito/MISCREDITO; SIC = /riscosbvf/gbinfra/atacado/
+DETECTED_MACROS_DEFINED: anomes, global, ref_limite, vencexp
+DETECTED_MACROS_USED: ANOMES, SYSSCPL, _SASSERVERNAME, anomes, disponivel, global, limite, ref_limite, vencexp
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DBGLOBAL.TBGRUPOECONOMICO [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202511 [SAS/Local], MISCRED.TBCRED_BASE_GLOBAL_&GLOBAL [SAS/Local], SIC.DMRELATIOLIMITESHIST [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DBGLOBAL, MISCRED, SIC
+EXPORTED_LIBNAMES: MISCRED, TBCRED_ANALITICO_SRC_&ANOMES
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.SORT, WORK.TESTE
+TABLE_READ_PROVENANCE (Flow): DBGLOBAL.TBGRUPOECONOMICO [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202511 [DATA Step - SET; Resolved dynamic lib.member&macro (%LET)], MISCRED.TBCRED_BASE_GLOBAL_&GLOBAL [PROC SORT - DATA=], MISCRED.TBCRED_LIMITE_OUT_202511 [DATA Step - SET; PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], SIC.DMRELATIOLIMITESHIST [PROC SQL - FROM], TBCRED_ANALITICO_SRC_&ANOMES._2 [DATA Step - SET; Resolved qualified read (%LET)], WORK.SORT [PROC FREQ - DATA=], WORK.TESTE [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): MISCRED.TBCRED_LIMITE_OUT_202511
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): MISCRED.TBCRED_LIMITE_OUT_202511, TBCRED_ANALITICO_SRC_&ANOMES._2
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CARTEIRA, CARTEIRA1, CARTEIRA11, GLOBAL_01, GLOBAL_02, GLOBAL_03, GLOBAL_04, LIMITE1, TBCRED_ANALITICO_SRC_202511, TB_CARTEIRA_LIMITE, TB_CARTEIRA_LIMITE_10, TB_CARTEIRA_LIMITE_11, TB_CARTEIRA_LIMITE_2, TB_CARTEIRA_LIMITE_3, TB_CARTEIRA_LIMITE_4, TB_CARTEIRA_LIMITE_5, TB_CARTEIRA_LIMITE_6, TB_CARTEIRA_LIMITE_7, TB_CARTEIRA_LIMITE_8, TB_CARTEIRA_LIMITE_9, TB_GLOBAL_GRUPOECONOMICO, TB_LIMITE, TB_LIMITE_2, TB_LIMITE_3, TB_LIMITE_4, TB_LIMITE_5, TB_LIMITE_SEMRISCO, TITLE, VALIDA, VALIDAR_01, WORK.SORT
+DYNAMIC REFS (Ambiguous): MISCRED.TBCRED_BASE_GLOBAL_{GLOBAL}
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 0 - Gera Base Analitica */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 34 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 0 - Gera Base Analitica */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-6H9oZwcQCdPmLwTR/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname miscred "/riscosbv/credito/MISCREDITO";
+libname SIC '/riscosbvf/gbinfra/atacado/';
+
+
+
+TITLE "DATAS DISPONIVEIS NA TABELA SIC.DMRELATIOLIMITESHIST";
+PROC SQL OUTOBS=10;
+   SELECT t1.DtReferencia AS DATAS_DISPONIVEIS format ddmmyy10.
+   	,COUNT(*) AS QTE_DE_LINHAS
+      FROM SIC.DMRELATIOLIMITESHIST t1
+	  GROUP BY t1.DtReferencia
+      ORDER BY DATAS_DISPONIVEIS DESC;
+QUIT;
+TITLE;
+
+
+
+%let anomes = 202511;         
+%let global = &anomes.;       
+%let vencexp = '30nov2025'd;  
+
+
+%let ref_limite = '10dec2025'd;
+
+DATA TBCRED_ANALITICO_SRC_&ANOMES.;
+
+	SET MISCRED.BASE_UNICA_ATACADO_&ANOMES.;
+
+	WHERE DsTipoCarteira = "REGULAR";
+	if DsTipoBase = 'SIC' then sn_pdd = .; else sn_pdd = 1;
+
+	KEEP 	AnoMes_Referencia
+			CdClienteRisco
+			NuCpfCnpjClienteRisco
+			DsClienteRisco
+			DsGrupoEconomicoRisco
+			DsRatingCliente
+			DsSetorClienteRisco
+			DsSetorClienteRisco_novo
+			DsNivelRiscoSetor_novo
+			DsSegmentoClienteRisco
+			DsAreaPlc
+			DsStatus_Monitoramento
+			
+			DsFilial
+			NuObjetoNegociacao
+			DsGrupoProduto
+			DsProduto
+			DtInicioOperacao
+			DtVencimentoParcela
+			DsOfficerClienteLimite
+			DsMoeda_Indexador
+			VrSaldo
+			CdRatingAtribuido
+			VrProvisao
+			sn_pdd
+			VrFaturamento_Cliente
+			VrFaturamento_Grupo
+			;
+
+RUN;
+
+DATA TBCRED_ANALITICO_SRC_&ANOMES._2;
+	SET TBCRED_ANALITICO_SRC_&ANOMES.;
+
+	RENAME  CdClienteRisco = CdPessoa
+			NuCpfCnpjClienteRisco = NumeroCnpjCpf_ClienteRisco
+			DsRatingCliente = DsRating
+			DsNivelRiscoSetor_novo = NivelRiscoSetor_novo
+			DsStatus_Monitoramento = Status_Monitoramento
+			
+			DsFilial = DsFilialPlc
+			NuObjetoNegociacao = NuContratoOperacao
+			DsMoeda_Indexador = Moeda_Indexador
+			CdRatingAtribuido = RatingAtribuido
+			VrProvisao = Provisao
+			VrFaturamento_Cliente = Faturamento_Cliente
+			VrFaturamento_Grupo = Faturamento_Grupo
+	;
+ RUN;
+
+
+
+ 
+DATA TBCRED_ANALITICO_SRC_&ANOMES.;
+
+	RETAIN 	AnoMes_Referencia
+			CdPessoa
+			NumeroCnpjCpf_ClienteRisco
+			DsClienteRisco
+			DsGrupoEconomicoRisco
+			DsSetorClienteRisco
+			DsSegmentoClienteRisco
+			DsSetorClienteRisco_novo
+			NivelRiscoSetor_novo
+			DsAreaPlc
+			DsFilialPlc
+			DsGrupoProduto
+			DsProduto
+			DsRating
+			NuContratoOperacao
+			CdADL
+			NuContratoOperacao_GL
+			DtInicioOperacao
+			DtVencimentoParcela
+			VrSaldo
+			Moeda_Indexador
+			DsOfficerClienteLimite
+			Status_Monitoramento
+			
+			RatingAtribuido
+			Provisao
+			sn_pdd;
+
+	SET TBCRED_ANALITICO_SRC_&ANOMES._2;
+
+ 	NuContratoOperacao_GL = NuContratoOperacao;
+
+	IF ANYALPHA(COMPRESS(NuContratoOperacao,"-")) = 0 and find(NuContratoOperacao,"-") > 0 then do;
+		CdADL = substrn(NuContratoOperacao,find(NuContratoOperacao,"-")+1,10)*1;
+		NuContratoOperacao = put(substrn(NuContratoOperacao,1,find(NuContratoOperacao,"-")-1)*1,z15.);
+	end;
+	else CdADL = .;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 0 - Gera Base Analitica */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1. Gerar Base */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 34 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1. Gerar Base */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: NNXMyO4OZROXj27h/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE tb_limite AS
+   SELECT t1.cdgrupoeconomico AS cdgrupoeconomico,
+   		  '01JAN1960'D AS dtabertura FORMAT DATE9.,
+          t1.NomeGrupo AS nmgrupoeconomico,
+          
+            (MEAN(t1.Aprovado_Grupo_LMR)) FORMAT=COMMAX22.2 AS  lmr ,
+          
+            (MAX(INPUT(t1.VencimentoGrupoLMR,DDMMYY10.))) FORMAT=DATE9. AS venclmr,
+          
+            (MEAN(t1.Aprovado_Grupo_Exposicao)) FORMAT=COMMAX22.2 AS  exposicao,
+			CALCULATED venclmr FORMAT=DATE9. AS vencexposicao
+      FROM SIC.DMRELATIOLIMITESHIST t1
+      WHERE t1.DtReferencia = &ref_limite AND t1.cdgrupoeconomico NOT IS MISSING
+      GROUP BY t1.cdgrupoeconomico,
+               t1.NomeGrupo
+      ORDER BY t1.cdgrupoeconomico;
+QUIT;
+
+proc sort data=tb_limite nodupkey out=tb_limite_2;
+by nmgrupoeconomico;
+run;
+
+data tb_limite_3;
+set tb_limite_2;
+
+format dia1 2.;
+format mes1 2.;
+format ano1 4.;
+format dtAbertura1 date9.;
+
+format dia2 2.;
+format mes2 2.;
+format ano2 4.;
+format VencLMR1 date9.;
+
+format dia3 2.;
+format mes3 2.;
+format ano3 4.;
+format VencExposicao1 date9.;
+
+dia1=day(dtAbertura);
+mes1=month(dtAbertura);
+ano1=year(dtAbertura);
+
+dtAbertura1 = mdy(mes1,dia1,ano1);
+
+dia2=day(VencLMR);
+mes2=month(VencLMR);
+ano2=year(VencLMR);
+
+VencLMR1 = mdy(mes2,dia2,ano2);
+
+dia3=day(VencExposicao);
+mes3=month(VencExposicao);
+ano3=year(VencExposicao);
+
+VencExposicao1 = mdy(mes3,dia3,ano3);
+
+lmr1 = lmr*1;
+exposicao1 = exposicao*1;
+
+if NmGrupoEconomico = 'AD ORO SA' then NmGrupoEconomico = 'AD ORO';
+
+run;
+
+data tb_limite_4;
+set tb_limite_3;
+drop dia1 mes1 ano1 dia2 mes2  ano2 dia3 mes3 ano3
+dtAbertura VencLMR VencExposicao lmr exposicao;
+run;
+
+data tb_limite_5;
+set tb_limite_4;
+rename
+dtAbertura1 = dtAbertura
+VencLMR1 = VencLMR
+VencExposicao1 = VencExposicao
+lmr1 = lmr
+exposicao1=exposicao;
+run;
+
+
+
+libname dbglobal META LIBRARY=DBGLOBAL METAOUT=DATA;
+
+data tb_global_grupoeconomico;
+set dbglobal.tbgrupoeconomico;
+if NmGrupoEconomico = 'AD ORO SA' then NmGrupoEconomico = 'AD ORO';
+run;
+
+proc sort data=tb_global_grupoeconomico nodupkey;
+by _all_;
+run;
+
+
+proc sql;
+	create table tb_limite as
+		select a.*,
+			   b.NmGrupoEconomico as nmgrupoeconomico_global
+	from tb_limite_5 a left join tb_global_grupoeconomico b
+	on a.cdgrupoeconomico=b.CdGrupoEconomico;
+quit;
+
+proc sort data=tb_limite;
+by nmgrupoeconomico_global;
+run;
+
+data tb_limite;
+set tb_limite;
+if nmgrupoeconomico_global = "" then nmgrupoeconomico_global = NmGrupoEconomico;
+run;
+
+
+
+proc sort data=miscred.tbcred_base_global_&global.
+		  out=global_01 (compress=yes reuse=yes) ;
+by descending datavinculo;
+run;
+
+proc sort data=global_01
+		  out =global_02 (compress = yes reuse = yes) nodupkey;
+by Grupo_Economico;
+run;
+
+data global_03;
+set global_02;
+keep Grupo_Economico Segmento_Mercado NmFilial;
+where Grupo_Economico is not null;
+run;
+
+proc sort data=global_03 nodupkey out=global_04;
+by Grupo_Economico;
+run;
+
+proc sql;
+	create table tb_limite as
+		select a.*,
+			   b.Segmento_Mercado,
+			   b.NmFilial
+	from tb_limite a left join global_04 b
+	on a.nmgrupoeconomico_global = b.Grupo_Economico;
+quit;
+
+
+
+proc sort data=global_01
+		  out =global_02 (compress = yes reuse = yes) nodupkey;
+by Cliente;
+run;
+
+data global_03;
+set global_02;
+keep Cliente Segmento_Mercado NmFilial;
+where Cliente is not null;
+run;
+
+proc sort data=global_03 nodupkey out=global_04;
+by Cliente;
+run;
+
+proc sql;
+	create table tb_limite as
+		select a.*,
+			   b.Segmento_Mercado as Segmento_Mercado1,
+			   b.NmFilial as NmFilial1
+	from tb_limite a left join global_04 b
+	on a.nmgrupoeconomico_global = b.Cliente;
+quit;
+
+data tb_limite (drop=Segmento_Mercado1 NmFilial1);
+set tb_limite;
+if Segmento_Mercado = "" then Segmento_Mercado = Segmento_Mercado1;
+if NmFilial = "" then NmFilial = NmFilial1;
+run;
+
+
+proc sql;
+	create table carteira as
+		select  DsGrupoEconomicoRisco,
+				DsAreaPlc as DsArea,
+				DsFilialPlc as NmFilial,
+				sum(VrSaldo) as Risco
+	from tbcred_analitico_src_&anomes.
+	group by 1,2,3;
+quit;
+
+data carteira;
+set carteira;
+if DsArea in ('INVESTIMENTO & DISTRIBUIÇAO', 'TESOURARIA') then DsArea = 'INSTITUICAO FINANCEIRA';
+run;
+
+
+proc sql;
+	create table carteira1 as
+		select  DsGrupoEconomicoRisco,
+				DsArea,
+				sum(Risco) as Risco
+	from carteira
+	group by 1,2;
+quit;
+
+proc sql;
+	create table tb_carteira_limite as
+		select  a.*,
+				b.lmr,
+				b.exposicao,
+				b.VencExposicao
+	from carteira1 a left join tb_limite b
+	on a.DsGrupoEconomicoRisco = b.nmgrupoeconomico_global;
+quit;
+
+
+data carteira11 (keep= DsGrupoEconomicoRisco sn_carteira);
+set carteira;
+sn_carteira = 1;
+run;
+
+proc sort data=carteira11 nodupkey;
+by _all_;
+run;
+
+proc sql;
+	create table tb_limite as
+		select  a.nmgrupoeconomico_global as DsGrupoEconomicoRisco,
+				a.lmr,
+				a.exposicao,
+				a.Segmento_Mercado as DsArea,
+				a.NmFilial,
+				a.VencExposicao,
+				b.sn_carteira
+	from tb_limite a left join carteira11 b
+	on a.nmgrupoeconomico_global = b.DsGrupoEconomicoRisco;
+quit;
+
+
+data validar_01;
+set tb_limite;
+where sn_carteira = .;
+run;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+data tb_limite_semrisco (drop=sn_carteira);
+set tb_limite (where = (sn_carteira = .));
+if exposicao = 0 then delete;
+run;
+
+
+data tb_carteira_limite_2;
+set tb_carteira_limite tb_limite_semrisco;
+run;
+
+data tb_carteira_limite_2;
+set tb_carteira_limite_2;
+
+if DsArea = 'COMERCIAL' then DsArea = 'CORPORATE';
+
+if DsArea = 'PRIVATE' then delete;
+if DsArea = '' then delete;
+
+if risco = . then risco = 0;
+if lmr = . then lmr = 0;
+if exposicao in (0, .) or exposicao<0 then exposicao = 0;
+
+run;
+
+
+
+proc sql;
+	create table carteira as
+		select  DsGrupoEconomicoRisco,
+				DsFilialPlc as NmFilial
+	from tbcred_analitico_src_&anomes.;
+quit;
+
+proc sort data=carteira nodupkey;
+by DsGrupoEconomicoRisco;
+run;
+
+proc sql;
+	create table tb_carteira_limite_3 as
+		select a.*,
+				b.NmFilial as NmFilial1
+	from tb_carteira_limite_2 a left join carteira b
+	on a.DsGrupoEconomicoRisco=b.DsGrupoEconomicoRisco;
+quit;
+
+data tb_carteira_limite_4 (drop=NmFilial1);
+set tb_carteira_limite_3;
+if NmFilial = "" then NmFilial = NmFilial1;
+run;
+
+
+data tb_carteira_limite_4;
+set tb_carteira_limite_4;
+if exposicao = 0 and Risco > 0 then exposicao=Risco;
+if exposicao<Risco then exposicao=Risco;
+
+format Referencia 8. Disponivel 25. Ativo_Inativo $15. status_limite $15.;
+Referencia = &anomes.;
+Disponivel = exposicao - Risco;
+if Risco = 0 then Ativo_Inativo = 'INATIVO'; else
+				  Ativo_Inativo = 'ATIVO';
+
+if VencExposicao <= &vencexp. then status_limite = 'VENCIDO'; else
+								   status_limite = 'VIGENTE';
+if VencExposicao = "" then status_limite = 'VENCIDO';
+run;
+
+
+proc sql;
+	create table tb_carteira_limite_5 as
+		select DsGrupoEconomicoRisco,
+			   count(DsArea) as qtde
+	from tb_carteira_limite_4
+	group by 1;
+quit;
+
+data tb_carteira_limite_6;
+set tb_carteira_limite_5;
+where qtde = 2;
+run;
+
+proc sql;
+	create table tb_carteira_limite_7 as
+		select a.DsGrupoEconomicoRisco,
+			   b.DsArea,
+			   b.exposicao,
+			   b.Risco,
+			   b.Disponivel,
+			   b.vencexposicao
+	from tb_carteira_limite_6 a left join tb_carteira_limite_4 b
+	on a.DsGrupoEconomicoRisco=b.DsGrupoEconomicoRisco;
+quit;
+
+proc sql;
+	create table tb_carteira_limite_8 as
+		select DsGrupoEconomicoRisco,
+			   DsArea,
+			   exposicao,
+			   Risco,
+			   Disponivel,
+			   vencexposicao,
+			   sum(Risco) as risco_grupo
+	from tb_carteira_limite_7
+	group by DsGrupoEconomicoRisco;
+quit;
+
+data tb_carteira_limite_9;
+set tb_carteira_limite_8;
+if vencexposicao <= &vencexp. then
+	do;
+	exposicao1 = Risco;
+	Disponivel1 = 0;
+	end;
+if DsGrupoEconomicoRisco = 'ITAU' then
+	do;
+	exposicao1 = Risco;
+	Disponivel1 = 0;
+	end;
+if (vencexposicao > &vencexp. and DsGrupoEconomicoRisco ne 'ITAU') then
+	do;
+	perc = risco/risco_grupo;
+	exposicao1 = exposicao*perc;
+	Disponivel1 = exposicao1-risco;
+	end;
+sn_corrigir = 1;
+run;
+
+proc sql;
+	create table tb_carteira_limite_10 as
+		select  a.*,
+				b.sn_corrigir,
+				b.exposicao1,
+				b.Disponivel1
+	from tb_carteira_limite_4 a left join tb_carteira_limite_9 b
+	on a.DsGrupoEconomicoRisco=b.DsGrupoEconomicoRisco and a.DsArea=b.DsArea;
+quit;
+
+data tb_carteira_limite_11;
+set tb_carteira_limite_10;
+if sn_corrigir = 1 then
+	do;
+	exposicao = exposicao1;
+	Disponivel = Disponivel1;
+	end;
+run;
+
+
+data tb_carteira_limite_11;
+set tb_carteira_limite_11;
+if Risco = 0 and status_limite = 'VENCIDO' then delete;
+run;
+
+
+proc sql;
+	create table MISCRED.tbcred_limite_out_&anomes. as
+		select Referencia,
+			   DsGrupoEconomicoRisco as GrupoEconomico,
+			   NmFilial,
+			   DsArea,
+			   exposicao as Limite format commax22.2,
+			   Risco format commax22.2,
+			   Disponivel format commax22.2,
+			   Ativo_Inativo,
+			   vencexposicao as MaxDtVectoLimite,
+			   status_limite
+	from tb_carteira_limite_11;
+quit;
+
+DATA MISCRED.tbcred_limite_out_&anomes.(compress=yes reuse=yes);
+SET MISCRED.tbcred_limite_out_&anomes.;
+RUN;
+
+
+
+proc sql;
+title visão consolidada - limites atacado;
+create table valida as
+select  DsArea,
+		sum (limite) as LIMITE format = commax22.0,
+		sum(risco) as RISCO format = commax22.0,
+		sum(disponivel) as 'LIMITE DISPONÍVEL'n format = commax22.0
+from miscred.tbcred_limite_out_&anomes.
+group by 1;
+quit;
+title;
+
+proc sql;
+create table limite1 as
+select round(sum(Limite),1) as limite,
+	   round(sum(Disponivel),1) as disponivel
+from miscred.tbcred_limite_out_&anomes.;
+quit;
+
+data _null_;
+set limite1;
+call symput('Limite',limite);
+call symput('Disponivel',disponivel);
+run;
+
+%put &limite.;
+%put &disponivel.;
+
+%macro divergencia;
+
+%if &limite.>0 and &disponivel. >0 %then %do;
+
+	data title; title = "Base processada com sucesso"; run;
+
+	proc report data=title nowindows noheader
+	  style(column) = { foreground=green font_weight=bold just=center };
+
+	run;
+
+	proc print data=valida noobs;run;
+
+%end;
+%else %do;
+
+	data title; title = "Há erros no processamento."; run;
+
+	proc report data=title nowindows noheader
+	  style(column) = { background=red just=center };
+	run;
+
+	proc print data=valida noobs;run;
+
+%end;
+
+%mend;
+%divergencia;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1. Gerar Base */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.SORT);
+
+
+PROC SQL;
+	CREATE VIEW WORK.SORT AS
+		SELECT T.DtReferencia
+	FROM WORK.TESTE as T
+;
+QUIT;
+
+TITLE;
+TITLE1 "One-Way Frequencies";
+TITLE2 "Results";
+FOOTNOTE;
+FOOTNOTE1 "Generated by the SAS System (&_SASSERVERNAME, &SYSSCPL) on %TRIM(%QSYSFUNC(DATE(), NLDATE20.)) at %TRIM(%SYSFUNC(TIME(), TIMEAMPM12.))";
+PROC FREQ DATA=WORK.SORT
+	ORDER=INTERNAL
+;
+	TABLES DtReferencia /  SCORES=TABLE;
+RUN;
+
+RUN; QUIT;
+%_eg_conditional_dropds(WORK.SORT);
+TITLE; FOOTNOTE;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA TBCRED_ANALITICO_SRC_&ANOMES.;
+
+	SET MISCRED.BASE_UNICA_ATACADO_&ANOMES.;
+
+	WHERE DsTipoCarteira = "REGULAR";
+	if DsTipoBase = 'SIC' then sn_pdd = .; else sn_pdd = 1;
+
+	KEEP 	AnoMes_Referencia
+			CdClienteRisco
+			NuCpfCnpjClienteRisco
+			DsClienteRisco
+			DsGrupoEconomicoRisco
+			DsRatingCliente
+			DsSetorClienteRisco
+			DsSetorClienteRisco_novo
+			DsNivelRiscoSetor_novo
+			DsSegmentoClienteRisco
+			DsAreaPlc
+			DsStatus_Monitoramento
+			
+			DsFilial
+			NuObjetoNegociacao
+			DsGrupoProduto
+			DsProduto
+			DtInicioOperacao
+			DtVencimentoParcela
+			DsOfficerClienteLimite
+			DsMoeda_Indexador
+			VrSaldo
+			CdRatingAtribuido
+			VrProvisao
+			sn_pdd
+			VrFaturamento_Cliente
+			VrFaturamento_Grupo
+			;
+
+RUN;
+
+DATA TBCRED_ANALITICO_SRC_&ANOMES._2;
+	SET TBCRED_ANALITICO_SRC_&ANOMES.;
+
+	RENAME  CdClienteRisco = CdPessoa
+			NuCpfCnpjClienteRisco = NumeroCnpjCpf_ClienteRisco
+			DsRatingCliente = DsRating
+			DsNivelRiscoSetor_novo = NivelRiscoSetor_novo
+			DsStatus_Monitoramento = Status_Monitoramento
+			
+			DsFilial = DsFilialPlc
+			NuObjetoNegociacao = NuContratoOperacao
+			DsMoeda_Indexador = Moeda_Indexador
+			CdRatingAtribuido = RatingAtribuido
+			VrProvisao = Provisao
+			VrFaturamento_Cliente = Faturamento_Cliente
+			VrFaturamento_Grupo = Faturamento_Grupo
+	;
+ RUN;
+
+
+
+ 
+DATA TBCRED_ANALITICO_SRC_&ANOMES.;
+
+	RETAIN 	AnoMes_Referencia
+			CdPessoa
+			NumeroCnpjCpf_ClienteRisco
+			DsClienteRisco
+			DsGrupoEconomicoRisco
+			DsSetorClienteRisco
+			DsSegmentoClienteRisco
+			DsSetorClienteRisco_novo
+			NivelRiscoSetor_novo
+			DsAreaPlc
+			DsFilialPlc
+			DsGrupoProduto
+			DsProduto
+			DsRating
+			NuContratoOperacao
+			CdADL
+			NuContratoOperacao_GL
+			DtInicioOperacao
+			DtVencimentoParcela
+			VrSaldo
+			Moeda_Indexador
+			DsOfficerClienteLimite
+			Status_Monitoramento
+			
+			RatingAtribuido
+			Provisao
+			sn_pdd;
+
+	SET TBCRED_ANALITICO_SRC_&ANOMES._2;
+
+ 	NuContratoOperacao_GL = NuContratoOperacao;
+
+	IF ANYALPHA(COMPRESS(NuContratoOperacao,"-")) = 0 and find(NuContratoOperacao,"-") > 0 then do;
+		CdADL = substrn(NuContratoOperacao,find(NuContratoOperacao,"-")+1,10)*1;
+		NuContratoOperacao = put(substrn(NuContratoOperacao,1,find(NuContratoOperacao,"-")-1)*1,z15.);
+	end;
+	else CdADL = .;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,468 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Crédito__Esteira - OMIE Cedentes - Gestão Mensal de Limites
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:24 UTC
+BUSINESS_AREA: Crédito
+TARGET_ARCH: DATABRICKS (Score: 90)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 375
+CODE_TASKS_COUNT: 10
+DETECTED_PROCS: EXPORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (8x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ATACADO = /riscosbvf/gbinfra/atacado; GCSERASA = /riscosbvf/insight/GCarteira; INSIGHT = /riscosbvf/insight; MISCRED = /riscosbv/credito/MISCREDITO; PLCA = /riscosbv/credito/rgustavo/ESTRATEGIA/SME/PLCA; PME = /riscosbv/credito/SME; SHAREATA = /riscosbvf/plan_mesas/shared/atacado; SME = /riscosbv/credito/rgustavo/ESTRATEGIA/SME; SOCIOS = /riscosbvf/plan_mesas/comp_total
+DETECTED_MACROS_DEFINED: datam
+DETECTED_MACROS_USED: datam
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_CREDITOAT.PLCA_SUSPENSAOPJ_FATO [BIGQUERY], INSIGHT.TBBRUTA [SAS/Local], INSIGHT.TBPMEANALITICA [SAS/Local], PME.BASE_HISTORICA_GESTAO_OMIE [SAS/Local], PME.BASE_HISTORICA_OMIE_CEDENTES [SAS/Local], PME.BASE_SCORE_SERASA_PJ [SAS/Local], PME.TBOPERACOESHISTORICAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: INSIGHT, PME
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\00.InputModelo\_OMIE\INFOS_CEDENTES_OMIE_REV_MENSAL.xlsx[SHEET='Planilha1']
+TEMP/DISCARDED_FILE_INPUT: WORK.INFOS_CEDENTES_OMIE_REV_MENSAL <- N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\00.InputModelo\_OMIE\INFOS_CEDENTES_OMIE_REV_MENSAL.xlsx[SHEET='Planilha1']
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_CREDITOAT.PLCA_SUSPENSAOPJ_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], INSIGHT.TBBRUTA [PROC SQL - FROM], INSIGHT.TBPMEANALITICA [DATA Step - SET], PME.BASE_HISTORICA_GESTAO_OMIE [DATA Step - SET], PME.BASE_HISTORICA_OMIE_CEDENTES [DATA Step - SET], PME.BASE_SCORE_SERASA_PJ [PROC SQL - JOIN], PME.TBOPERACOESHISTORICAS [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\01.OutputEsteira\_OMIE\TBGESTAOLIMITESFINAL.xlsx
+TEMP/DISCARDED OUTPUTS: ANALISETBOPERACOESHISTORICAS, ANALISETBOPERACOESTRANSPOSTA, ANALISETBOPERACOESTRATADA, OVER90, TBCONSOLIDADA, TBGESTAOLIMITES, TBGESTAOLIMITESFINAL, TBMONITORAMENTO, TBMOTOR, TBMOTOR2, TBOPERACOESHISTORICAS, TBPRINAD, TBRESTRITIVOS, TBSUSPENSAO, TBSUSPENSAOATIVA, TBVARIAVEIS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET datam=today();
+%LET SYSLAST=WORK.INFOS_CEDENTES_OMIE_REV_MENSAL;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\00.InputModelo\_OMIE\INFOS_CEDENTES_OMIE_REV_MENSAL.xlsx[SHEET='Planilha1']|N:/DCCR/FILE SERVER GRUPOS ECONÔMICOS/00.PORTFOLIOS_PME/00.ESTEIRAPME/00.INPUTMODELO/_OMIE|INFOS_CEDENTES_OMIE_REV_MENSAL.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Libname */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-OTNwiUjn6RMZ1PTZ/code.sas */
+/* =========================INÍCIO TASK========================= */
+options compress = binary;
+
+
+
+libname pme         '/riscosbv/credito/SME'                           access = readonly;
+libname plca        '/riscosbv/credito/rgustavo/ESTRATEGIA/SME/PLCA'  access = readonly;
+libname sme 		'/riscosbv/credito/rgustavo/ESTRATEGIA/SME'       access = readonly;
+libname miscred		'/riscosbv/credito/MISCREDITO'                    access = readonly;
+libname insight 	'/riscosbvf/insight'                              access = readonly;
+libname shareata 	'/riscosbvf/plan_mesas/shared/atacado'            access = readonly;
+libname atacado		'/riscosbvf/gbinfra/atacado'                      access = readonly;
+libname gcserasa 	'/riscosbvf/insight/GCarteira'                    access = readonly;
+libname socios 		'/riscosbvf/plan_mesas/comp_total'                access = readonly;
+
+
+
+proc sql ;
+connect to bigquery as perm (project='bv-saop-dtm' credfile='/projetos/acessos/bq/op/saop-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage);
+options compress=binary;
+
+
+
+%let datam = today();
+
+data _null_;
+ call symput('am00',compress(year(intnx('month',&datam.,-0 ))*100+month(intnx('month',&datam.,-0 ))));
+ call symput('am01',compress(year(intnx('month',&datam.,-1 ))*100+month(intnx('month',&datam.,-1 ))));
+ call symput('am02',compress(year(intnx('month',&datam.,-2 ))*100+month(intnx('month',&datam.,-2 ))));
+ call symput('a00',compress(year(intnx('month',&datam.,-0 ))));
+ call symput('a01',compress(year(intnx('month',&datam.,0 )) -1));
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Monitoramento */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Monitoramento */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Kku9aMCxCjR1LBYN/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table TbVariaveis as select
+		  DtEnvio
+         ,IDCedente
+         ,CNPJCedente as DsCedente
+         ,NomeCedente as NmCedente
+         ,DataEntradaOmie
+         ,DataOnboarding
+         ,DataOptIn
+         ,DataRecebimentoDados
+         ,FaturamentoAnual
+         ,TempoCedenteMeses
+         ,CARCAPUltmes
+         ,CARCAPMediaUlt3meses
+         ,CARCAPMediaUlt6meses
+         ,CARUltmes
+         ,CARMediaUlt3meses
+         ,CARMediaUlt6meses
+         ,MDA
+         ,LimiteBancos
+         ,CiclosAntecip
+         ,TotalAntecipUlt12meses
+         ,PagoSobreOperado12meses
+         ,ValorMaxAtrasoAntecipUlt12meses
+         ,PontualidadePagamentoAntecipacao
+         ,MediaAtrasoAntecipacao
+         ,Rua
+         ,Numero
+         ,Bairro
+         ,Cidade
+         ,Estado
+         ,CEP
+         ,Banco
+         ,Agencia
+         ,ContaComDigito
+         ,Score
+         ,Rating
+         ,VersaoRating
+         ,LimiteMajoracaoProposto
+		 ,int(LimiteMajoracaoProposto/1000)*1000 as LimiteMajoracaoAjustado
+         ,PercentualCanceladas
+         ,Ever5
+         ,PossuiRecompra
+         ,QuantidadeSacadosComValorElegive
+         ,ValorElegivel
+         ,QuantidadeSacadosUlt6Meses
+         ,'Classificação'n as DsPipe
+         ,LimiteAtual
+from infos_cedentes_omie_rev_mensal where CNPJCedente ne ''
+;run;
+
+proc sql;
+create table TbMonitoramento as select
+		 substr(NuCpfCnpj,1,8) as CNPJRaiz
+		,max(FlAtivoP) as FlAtivoP
+		,max(FlAtivoGP) as FlAtivoGP
+		,max(DtClassificacaoSME) as DtClassificacao format = ddmmyy10.
+		,max(DsClassificacaoSME) as DsClassificacao
+from Insight.TbBruta where TpPessoa = 'J' group by 1
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Monitoramento */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. Bloqueio PLCA */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. Bloqueio PLCA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-LRKtEralOODUEMcG/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm (project='bv-saop-dtm' credfile='/projetos/acessos/bq/op/saop-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=110);
+
+options compress=binary;
+create table TbSuspensao as
+   select * from connection to perm
+    (select *
+      from bv-pdbd-prd.dvry_corp_creditoat.plca_suspensaopj_fato);
+   disconnect from perm;
+quit;
+
+data TbSuspensaoAtiva;
+set TbSuspensao;
+where fl_suspensao_ativa = 1;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. Bloqueio PLCA */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03. Limites Motor */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03. Limites Motor */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-9lK1KI5tE8UNNvPb/code.sas */
+/* =========================INÍCIO TASK========================= */
+data TbMotor;
+set pme.base_historica_gestao_omie;
+where FlagVigente = 1;
+run;
+
+data TbMotor2;
+set pme.base_historica_omie_cedentes;
+where FlagVigente = 1;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03. Limites Motor */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 04. Prinad Atual */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 04. Prinad Atual */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-piQjYOZJgkWEntfJ/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table TbPrinad as select
+			a.*
+		   ,b.score AS ScoreHPJ8
+		   ,case when b.score = .     or b.score <= 5   then 100.00
+		  		 when b.score >= 6   and b.score <= 50  then 30.89
+				 when b.score >= 51  and b.score <= 100 then 10.58
+				 when b.score >= 101 and b.score <= 150 then 6.22
+			     when b.score >= 151 and b.score <= 200 then 4.99
+				 when b.score >= 201 and b.score <= 250 then 3.73
+				 when b.score >= 251 and b.score <= 300 then 2.91
+				 when b.score >= 301 and b.score <= 350 then 2.35
+				 when b.score >= 351 and b.score <= 400 then 2.12
+				 when b.score >= 401 and b.score <= 450 then 1.62
+				 when b.score >= 451 and b.score <= 500 then 1.37
+				 when b.score >= 501 and b.score <= 550 then 1.17
+				 when b.score >= 551 and b.score <= 600 then 1.01
+				 when b.score >= 601 and b.score <= 650 then 0.87
+				 when b.score >= 651 and b.score <= 700 then 0.75
+				 when b.score >= 701 and b.score <= 750 then 0.65
+				 when b.score >= 751 and b.score <= 800 then 0.56
+				 when b.score >= 801 and b.score <= 850 then 0.48
+				 when b.score >= 851 and b.score <= 900 then 0.40
+				 when b.score >= 901 and b.score <= 950 then 0.33
+				 when b.score >= 951 and b.score <= 999 then 0.24
+			 else 100.00 end as PrinadHPJ8
+from TbVariaveis as a
+left join pme.base_score_serasa_pj as b on substr(a.DsCedente,1,8) = b.cnpj
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 04. Prinad Atual */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 05. Restritivos */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 05. Restritivos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-TX1b7R7MnKDxkPJV/code.sas */
+/* =========================INÍCIO TASK========================= */
+data TbRestritivos;
+	set insight.TbPMEAnalitica;
+	where FlAtual = 1;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 05. Restritivos */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 06. ILM e Over90 */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 06. ILM e Over90 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-7oXUmQh6RWb7eD2a/code.sas */
+/* =========================INÍCIO TASK========================= */
+data TbOperacoesHistoricas;
+set pme.TbOperacoesHistoricas;
+run;
+
+proc sql;
+create table AnaliseTbOperacoesHistoricas as select
+nudocumentocedente,
+nmstatusfinal,
+count(*) as qtd
+from TbOperacoesHistoricas
+group by 1,2;
+run;
+
+proc transpose
+data=AnaliseTbOperacoesHistoricas
+out=AnaliseTbOperacoesTransposta
+prefix=Status_;
+by nudocumentocedente;
+id nmstatusfinal;
+var qtd;
+run;
+
+data AnaliseTbOperacoesTratada;
+set AnaliseTbOperacoesTransposta;
+if 'Status_Liquidada'n = . then QtOpLiquidadas = 0; else QtOpLiquidadas = 'Status_Liquidada'n;
+if 'Status_A vencer'n  = . then QtOpAVencer    = 0; else QtOpAVencer    = 'Status_A vencer'n ;
+if 'Status_Em atraso'n = . then QtOpVencidas   = 0; else QtOpVencidas   = 'Status_Em atraso'n;
+drop _NAME_ 'Status_Liquidada'n 'Status_A vencer'n 'Status_Em atraso'n;
+QtOpTotal = QtOpLiquidadas + QtOpAVencer + QtOpVencidas;
+if QtOpLiquidadas = 0 then PcILM = -1; else PcILM = QtOpLiquidadas/(QtOpVencidas+QtOpLiquidadas);
+run;
+
+proc sql;
+create table Over90 as select
+nudocumentocedente,
+max(flover90) as FlOver90
+from TbOperacoesHistoricas
+group by 1
+; run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 06. ILM e Over90 */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 07. Consolidado */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 07. Consolidado */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-KwjctojcHpTigzOO/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table TbConsolidada as select
+         a.*
+		,b.DsClassificacao
+        ,case when c.fl_suspensao_ativa = . then 0 else c.fl_suspensao_ativa end as FlSuspensoPLCA
+		,d.LimiteMotor as LimiteM2
+		,d.LimiteRaizMotor as LimiteRaizM2
+		,d.VlLimiteRevisao as LimiteM1
+		,d.LimiteRaizRevisao as LimiteRaizM1
+		,h.LimiteRaizFinal as LimiteRaizAtual
+		,case when e.VrComercial = . then 0 else e.VrComercial end as VrRestritivos
+		,case when f.PcILM = . then -1 else f.PcILM end as PcILM
+		,case when g.FlOver90 = . then -1 else g.FlOver90 end as FlOver90
+from TbPrinad as a
+left join TbMonitoramento as b on substr(a.DsCedente,1,8)=b.CNPJRaiz
+left join TbSuspensaoAtiva as c on substr(a.DsCedente,1,8)=c.cd_cpf_cnpj
+left join TbMotor as d on a.DsCedente=d.CNPJCedente
+left join TbRestritivos as e on a.DsCedente=e.NuCnpj
+left join AnaliseTbOperacoesTratada as f on a.DsCedente=f.nudocumentocedente
+left join Over90 as g on a.DsCedente=g.nudocumentocedente
+left join TbMotor2 as h on a.DsCedente=h.CNPJCedente
+
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 07. Consolidado */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 08. Gestão de Limites */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: PFD Flow 21 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 08. Gestão de Limites */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-qPEuYxY9hNRgDrgF/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+   create table TbGestaoLimites as select
+	*
+   ,case when LimiteM1 = . then LimiteAtual else LimiteM1 end as LimiteVigente
+   ,case when LimiteRaizM1 = . then LimiteRaizAtual else LimiteRaizM1 end as LimiteRaizVigente
+   ,case when DsPipe in ('Gelado','Frio') then 'Inativo' else 'Ativo  ' end as DsStatusAtivo
+   ,case when FlSuspensoPLCA = 1                                               then 'Já está bloqueado '
+         when (PercentualCanceladas >= 10 or ScoreHPJ8 <= 100 or FlOver90 = 1) then 'Deve ser bloqueado'
+                                                                               else 'Desbloqueado      '
+    end as DsStatus
+   ,case when calculated DsStatus = 'Desbloqueado      ' then 'Desbloqueado'
+                                                         else 'Bloqueado   ' end as DsStatusFinal
+   ,case when LimiteM1 ne LimiteM2 then 'Alteração na última revisão '
+                                   else 'Manutenção na última revisão' end as DsStatusUltRevisao
+   ,case when calculated DsStatus = 'Desbloqueado      ' and
+         (ScoreHPJ8 <= 200 or DsClassificacao in ('PCMR2','PCMR3','PCMR4') or PercentualCanceladas >= 5) and
+         (calculated LimiteVigente >= 3*LimiteMajoracaoProposto or calculated LimiteVigente >= 3*CARMediaUlt6meses) and
+		 calculated DsStatusUltRevisao = 'Manutenção na última revisão' and
+         DsPipe ne 'Quente'
+         then 'Redução   '
+	     when calculated DsStatus = 'Desbloqueado      ' and
+              VrRestritivos <= 5000 and
+              ScoreHPJ8 > 200 and
+              DsClassificacao not in ('PCMR2','PCMR3','PCMR4') and
+              Ever5 ne 1 and
+			  PercentualCanceladas <= 5 and
+              QuantidadeSacadosUlt6Meses >= 10 and
+              PcILM = 1 and
+			  DsPipe = 'Quente' and
+			  calculated DsStatusUltRevisao = 'Manutenção na última revisão'
+		 then 'Aumento   '
+	else 'Manutenção' end as DsStatusLimite
+   ,case when calculated DsStatusAtivo = 'Ativo  ' and calculated DsStatusLimite = 'Aumento   '
+         then max(int(min(1500000,
+		              2*(calculated LimiteVigente),
+					  calculated LimiteVigente+200000,
+                      LimiteMajoracaoProposto)/1000)*1000,calculated LimiteVigente)
+         when calculated DsStatusAtivo = 'Ativo  ' and calculated DsStatusLimite = 'Redução   '
+		 then max(int(LimiteMajoracaoProposto/1000)*1000,5000)
+    else calculated LimiteVigente end as NovoLimite
+	,100*(calculated NovoLimite/calculated LimiteVigente-1) as PcDeltaLimite format=f8.2
+	,(calculated LimiteRaizVigente-calculated LimiteVigente+calculated NovoLimite) as LimiteRaiz
+   from TbConsolidada
+;run;
+
+data TbGestaoLimitesFinal;
+set TbGestaoLimites;
+if NovoLimite = LimiteVigente then DsStatusLimite = 'Manutenção'; else DsStatusLimite = DsStatusLimite;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 08. Gestão de Limites */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TBGESTAOLIMITESFINAL
+    OUTFILE='N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\01.OutputEsteira\_OMIE\TBGESTAOLIMITESFINAL.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */

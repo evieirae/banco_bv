@@ -1,0 +1,125 @@
+START_METADATA
+PROJECT: Rodas__PainelBVCompensa
+FILE_SAS: 02 - TbProducao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 72
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBORIGINACAO [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBORIGINACAO [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PARCEIROS_SOLAR, TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*Base de Parceiros para os Favorecidos do Canal Solar*/
+Proc Sql;
+Create Table Base_Parceiros_Solar as
+Select Distinct CdParceiroComercial, NuCnpjLoja, NmParceiroComercial
+From Bases.TbParceiroComercial
+Where NmCanalEstruturaComercialC = 'Canal Solar'
+;Quit;
+
+/* Criação de tabela de Produção com dados de BASES.TBPRODUCAO */
+PROC SQL;
+   CREATE TABLE TbProducao AS
+   SELECT t1.DtContrato FORMAT=DDMMYYS10. AS DtContrato,
+          PUT(t1.DtContrato, YYMMN6.) AS AnoMes,
+          t1.DtLiquidacaoEfetiva FORMAT=DDMMYYS10. AS DtLiquidacaoEfetiva,
+          t1.DtCancelamento FORMAT=DDMMYYS10. AS DtCancelamento,
+          t1.DtAtualizacao FORMAT=DDMMYYS10. AS DtAtualizacao,
+          t1.NmGrupoProdutoMeta,
+          t1.NuProposta FORMAT=BESTX32. AS NuProposta,
+          t1.NuContrato FORMAT=BESTX32. AS NuContrato,
+          t1.DsTipoCanalProducao,
+		  Case
+			When t1.CdParceiroComercial = 418254 and t1.NmGrupoProdutoMeta = 'Solar' Then t3.CdParceiroComercial
+			Else t1.CdParceiroComercial
+		  End as CdParceiroComercial,
+		  Case
+			When t1.CdParceiroComercial = 418254 and t1.NmGrupoProdutoMeta = 'Solar' Then t3.NmParceiroComercial
+			Else t1.NmParceiroComercial
+		  End as CdParceiroComercial,
+		  CASE
+		  	WHEN t1.VrCliente < t1.VrProducao
+				THEN 1
+			ELSE 0
+		  END AS FlContratoDesdobro,
+          t1.QtParcelas FORMAT=COMMA6. AS QtParcelas,
+          t1.QtSeguros FORMAT=COMMA6. AS QtSeguros,
+          t1.VpSpreadRebate FORMAT=COMMAX18.2 AS VpSpreadRebate,
+          t1.VrMargem FORMAT=COMMAX18.2 AS VrMargem,
+          t1.VrProducaoLiquida FORMAT=COMMAX18.2 AS VrProducaoLiquida,
+		  t1.VrProducao-(CASE
+							WHEN PUT(t1.DtCancelamento, YYMMN6.) = PUT(t1.DtContrato, YYMMN6.)
+								THEN t1.VrProducaoLiquida
+							ELSE 0
+						 END)-
+						(CASE
+							WHEN PUT(t1.DtLiquidacaoEfetiva, YYMMN6.) = PUT(t1.DtContrato, YYMMN6.)
+								THEN t1.VrProducaoLiquida
+							ELSE 0
+						 END)-
+						t2.VrRetencao-
+						(CASE
+		  					WHEN t1.VrOutroDesdobro < t1.VrProducao
+								THEN t1.VrOutroDesdobro
+							ELSE 0
+		  				 END) FORMAT=COMMAX18.2 AS VrProducaoBVCompensa,
+		  t1.VrSeguros-(CASE WHEN PUT(t1.DtCancelamento, YYMMN6.) = PUT(t1.DtContrato, YYMMN6.) THEN t1.VrSeguros ELSE 0 END)-(CASE WHEN PUT(t1.DtLiquidacaoEfetiva, YYMMN6.) = PUT(t1.DtContrato, YYMMN6.) THEN t1.VrSeguros ELSE 0 END) FORMAT=COMMAX18.2 AS VrSeguros
+
+	  FROM BASES.TBPRODUCAO t1
+	  INNER JOIN BASES.TBORIGINACAO t2
+	  ON t1.NuProposta = t2.NuProposta
+	  LEFT JOIN Base_Parceiros_Solar AS t3
+	  ON T1.NuCnpjLojaFavorecido = t3.NuCnpjLoja And t1.NmGrupoProdutometa = 'Solar'
+      WHERE t1.DtContrato >= '1Jan2024'd AND t1.NmGrupoProdutoMeta IN
+           (
+           'CVG Pesados',
+           'CVG Leves',
+           'Solar',
+           'Motos',
+           'Leves',
+           'Pesados',
+           'Saude',
+		   'FGTS'
+           )
+      ORDER BY t1.DtContrato DESC;
+QUIT;

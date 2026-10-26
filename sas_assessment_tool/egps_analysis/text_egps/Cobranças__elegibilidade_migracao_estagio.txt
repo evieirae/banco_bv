@@ -1,0 +1,566 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__elegibilidade_migracao_estagio
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:50 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (3x | +240)
+----------------------------------------
+LINES_OF_CODE: 412
+CODE_TASKS_COUNT: 11
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (12x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: RENEG = /riscosbv/cobranca/gtavares/Reneg
+DETECTED_MACROS_DEFINED: fim_vigencia, hoje, safra_atual
+DETECTED_MACROS_USED: BASE_MIGRACAO, Base_PDEC, fim_vigencia, hoje, safra_atual
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: SQLSVR
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DICTIONARY.TABLES [SAS/Local], GOPRRENEGOCIACAOPARAMETRIZACAO.TBRENEGOCIACAOEXCECAO [SQLSVR], RENEG.RENEG_ACAO_31A90_&SAFRA_ATUAL [SAS/Local], SASHELP.VTABLE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.LISTA_EXCECAO_COMPLETA
+IMPORTED_LIBNAMES: RENEG
+EXPORTED_LIBNAMES: RENEG
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\Estrategia\Repactuação\07 Ações\07 Migração de Estágio\00 Base Riscos\Base_migração_estagio_jan26.xlsx
+TEMP/DISCARDED_FILE_INPUT: WORK.Base_migracao_estagio <- N:\DVMD\Cobrança\Estrategia\Repactuação\07 Ações\07 Migração de Estágio\00 Base Riscos\Base_migração_estagio_jan26.xlsx
+TEMP/DISCARDED_TABLE_INPUT: WORK.LISTA_EXCECAO_COMPLETA
+TABLE_READ_PROVENANCE (Flow): DICTIONARY.TABLES [PROC SQL - FROM], GOPRRENEGOCIACAOPARAMETRIZACAO.TBRENEGOCIACAOEXCECAO [Pass-Through Native (SQLSVR) - FROM], RENEG.RENEG_ACAO_31A90_&SAFRA_ATUAL [DATA Step - SET], SASHELP.VTABLE [PROC SQL - FROM], WORK.LISTA_EXCECAO_COMPLETA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RENEG.BASE_ELEG_MIGRACAO_&HOJE
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_ACAO_RECORRENTE, BASE_ELEG_MIGRACAO_BAU, BASE_ELEG_MIGRACAO_RECORRENTE, BASE_EXPORT_JA_ELEGIVEIS, BASE_EXPORT_NOVOS_ELEGIVEIS, BASE_JA_ELEGIVEIS, BASE_MIGRACAO, BASE_NOVOS_ELEGIVEIS, BASE_PDEC_1, BASE_PDEC_2, BASE_PDEC_3, EXPORT_FINAL, JA_ELEGIVEIS_BAU, JA_ELEGIVEIS_RECORRENTE, LISTA_EXCECAO_COMPLETA, TABELAS_MIGRACAO, TOTAL_BAU, TOTAL_RECORRENTE, VALIDA_PARAMETROS, WORK.VALIDACAO_LISTA_EXCECAO_ATE90
+DYNAMIC REFS (Ambiguous): RENEG.RENEG_ACAO_31A90_{SAFRA_ATUAL}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET safra_atual=202602;
+%LET hoje=20260226;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\Estrategia\Repactuação\07 Ações\07 Migração de Estágio\00 Base Riscos\Base_migração_estagio_jan26.xlsx|N:/DVMD/COBRANÇA/ESTRATEGIA/REPACTUAÇÃO/07 AÇÕES/07 MIGRAÇÃO DE ESTÁGIO/00 BASE RISCOS|BASE_MIGRAÇÃO_ESTAGIO_JAN26.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00 Parâmetros */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00 Parâmetros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-fthcMaOYKUP7e7VI/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+
+%LET safra_atual = &safra_atual;
+
+PROC SQL;
+CREATE TABLE BASE_PDEC_1 AS
+SELECT *
+FROM DICTIONARY.TABLES
+WHERE LIBNAME = 'RENEG' AND MEMNAME LIKE '%RENEG_ATE_90_%' AND MEMNAME LIKE '%_TESCON_%';
+QUIT;
+
+PROC SORT DATA= BASE_PDEC_1 OUT= BASE_PDEC_2;
+BY DESCENDING CRDATE;
+RUN;
+
+DATA BASE_PDEC_3;
+SET  BASE_PDEC_2 (OBS=1);
+RUN;
+
+DATA _NULL_;
+SET  BASE_PDEC_3;
+CALL SYMPUT('Base_PDEC', COMPRESS(CAT("RENEG.", PUT(MEMNAME, 30.))));
+RUN;
+
+
+
+
+
+DATA BASE_ACAO_RECORRENTE;
+SET RENEG.RENEG_ACAO_31A90_&safra_atual.: (DROP=GH)
+;RUN;
+
+
+
+
+
+DATA VALIDA_PARAMETROS;
+Base_PDEC = PUT("&Base_PDEC.", $100.);
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00 Parâmetros */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01 Já Elegíveis */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01 Já Elegíveis */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-xMotaOv4bOHZwxFW/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET hoje = &hoje;
+%LET fim_vigencia = &fim_vigencia;
+
+PROC SQL;
+CREATE TABLE JA_ELEGIVEIS_RECORRENTE AS
+SELECT
+	A.*,
+	CASE WHEN B.Contrato_pos IS NOT NULL THEN 1 ELSE 0 END AS FL_RISCO_MIGRACAO
+
+FROM BASE_ACAO_RECORRENTE AS A
+LEFT JOIN Base_migracao_estagio AS B
+ON INPUT(A.NUCONTRATO, BEST32.) = B.Contrato_pos
+WHERE B.Contrato_pos IS NOT NULL AND Elegibilidade_Recorrente = "Elegível" AND Teste_Controle_Acao = "Teste"
+;QUIT;
+
+PROC SQL;
+CREATE TABLE JA_ELEGIVEIS_BAU AS
+SELECT
+	A.*,
+	CASE WHEN B.Contrato_pos IS NOT NULL THEN 1 ELSE 0 END AS FL_RISCO_MIGRACAO
+
+FROM &Base_PDEC. AS A
+LEFT JOIN Base_migracao_estagio AS B
+ON INPUT(A.NUCONTRATO, BEST32.) = B.Contrato_pos
+WHERE B.Contrato_pos IS NOT NULL AND Elegibilidade_Final = "Elegível" AND Teste_Controle = "Teste"
+;QUIT;
+
+DATA BASE_JA_ELEGIVEIS;
+SET
+	JA_ELEGIVEIS_BAU
+	JA_ELEGIVEIS_RECORRENTE
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_EXPORT_JA_ELEGIVEIS AS
+SELECT DISTINCT NuContrato                          AS NuContrato,
+				SqContratoFinanceiro                AS SqContratoFinanceiro,
+				&hoje.                  			AS DtInicioVigenciaExcecao,
+				&fim_vigencia.			            AS DtFimVigenciaExcecao,
+
+				CASE
+					WHEN Grupo_Recorrente IS NOT NULL THEN 'Repactuacao Rodas - Migracao de estagio Sem Entrada'
+					ELSE 'Repactuacao Rodas - Migracao de estagio'
+				END AS DsMotivoExcecao,
+
+				'S'                                 AS FlExcecaoLiberada,
+				'30'                                AS QtDiaCarenciaMinima,
+				'45'                                AS QtDiaCarenciaMaxima,
+
+				QtPrazoMinimo,
+				QtPrazoMaximo,
+
+				'0'                                 AS PcDescontoMulta,
+				'0'                                 AS PcDescontoMora,
+				'0'                                 AS PcDescontoPrincipal,
+
+				CASE
+					WHEN TxJuros_Acao_Final IS NOT NULL THEN TxJuros_Acao_Final
+					ELSE TxJurosFinal
+				END AS TxJuroContrato format=4.2,
+
+				'Cobranca'                          AS NmAreaExcecao,
+				"guilherme.tavares"            		AS DsLogin,
+				'S'                                 AS Sobrepoe
+
+FROM BASE_JA_ELEGIVEIS
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01 Já Elegíveis */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Apêndice_Elegibilidade Reneg */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Apêndice_Elegibilidade Reneg */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hyxXLqxSGTgvLMho/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL NOTHREADS OUTOBS=1;;
+CREATE TABLE TABELAS_MIGRACAO AS
+SELECT	libname,
+		memname
+FROM SASHELP.VTABLE
+WHERE	(TRIM(UPCASE(libname)) LIKE '%RENEG%' AND
+		TRIM(UPCASE(memname)) LIKE '%BASE_ELEG_MIGRACAO_%')
+ORDER BY CRDATE DESC;
+QUIT;
+
+DATA _NULL_;
+SET  TABELAS_MIGRACAO;
+CALL SYMPUT('BASE_MIGRACAO', COMPRESS(CAT("RENEG.", PUT(MEMNAME, 30.))));
+RUN;
+
+DATA BASE_MIGRACAO;
+SET &BASE_MIGRACAO.;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Apêndice_Elegibilidade Reneg */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02 Novos Elegíveis */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02 Novos Elegíveis */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-kVAaJnjfna4ceQHz/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET hoje = &hoje;
+%LET fim_vigencia = &fim_vigencia;
+
+PROC SQL;
+CREATE TABLE BASE_ELEG_MIGRACAO_RECORRENTE AS
+SELECT
+	A.*,
+	CASE WHEN B.Contrato_pos IS NOT NULL THEN 1 ELSE 0 END AS FL_RISCO_MIGRACAO
+
+FROM BASE_ACAO_RECORRENTE AS A
+LEFT JOIN Base_migracao_estagio AS B
+ON INPUT(A.NUCONTRATO, BEST32.) = B.Contrato_pos
+WHERE
+	B.Contrato_pos IS NOT NULL AND
+	((Elegibilidade_Recorrente <> "Elegível") OR (Elegibilidade_Recorrente = "Elegível" AND Teste_Controle_Acao = "Controle"))
+;QUIT;
+
+PROC SQL;
+CREATE TABLE BASE_ELEG_MIGRACAO_BAU AS
+SELECT
+	A.*,
+	CASE WHEN B.Contrato_pos IS NOT NULL THEN 1 ELSE 0 END AS FL_RISCO_MIGRACAO
+
+FROM &Base_PDEC. AS A
+LEFT JOIN Base_migracao_estagio AS B
+ON INPUT(A.NUCONTRATO, BEST32.) = B.Contrato_pos
+
+WHERE
+	B.Contrato_pos IS NOT NULL AND
+	((Elegibilidade_Final <> "Elegível") OR (Elegibilidade_Final = "Elegível" AND Teste_Controle = "Controle"))
+;QUIT;
+
+DATA BASE_NOVOS_ELEGIVEIS;
+SET
+	BASE_ELEG_MIGRACAO_RECORRENTE
+	BASE_ELEG_MIGRACAO_BAU;
+aleatorio_migracao = floor(rand("Uniform") * 10);
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_EXPORT_NOVOS_ELEGIVEIS AS
+SELECT DISTINCT NuContrato                          AS NuContrato,
+				SqContratoFinanceiro                AS SqContratoFinanceiro,
+				&hoje.                  			AS DtInicioVigenciaExcecao,
+				&fim_vigencia.			            AS DtFimVigenciaExcecao,
+
+				'Repactuacao Rodas - Migracao de estagio' AS DsMotivoExcecao,
+
+				'S'                                 AS FlExcecaoLiberada,
+				'30'                                AS QtDiaCarenciaMinima,
+				'45'                                AS QtDiaCarenciaMaxima,
+
+				QtPrazoMinimo,
+				QtPrazoMaximo,
+
+				'0'                                 AS PcDescontoMulta,
+				'0'                                 AS PcDescontoMora,
+				'0'                                 AS PcDescontoPrincipal,
+
+				TxJuros 							AS TxJuroContrato format=4.2,
+
+				'Cobranca'                          AS NmAreaExcecao,
+				"guilherme.tavares"            		AS DsLogin,
+				'S'                                 AS Sobrepoe
+
+FROM BASE_NOVOS_ELEGIVEIS
+WHERE aleatorio_migracao >= 2;
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02 Novos Elegíveis */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Total_para_validar */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Total_para_validar */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-7QGdiDpXva8EIAxc/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TOTAL_RECORRENTE AS
+SELECT
+	A.*,
+	CASE WHEN B.Contrato_pos IS NOT NULL THEN 1 ELSE 0 END AS FL_RISCO_MIGRACAO
+
+FROM BASE_ACAO_RECORRENTE AS A
+LEFT JOIN Base_migracao_estagio AS B
+ON INPUT(A.NUCONTRATO, BEST32.) = B.Contrato_pos
+WHERE B.Contrato_pos IS NOT NULL
+;QUIT;
+
+PROC SQL;
+CREATE TABLE TOTAL_BAU AS
+SELECT
+	A.*,
+	CASE WHEN B.Contrato_pos IS NOT NULL THEN 1 ELSE 0 END AS FL_RISCO_MIGRACAO
+
+FROM &Base_PDEC. AS A
+LEFT JOIN Base_migracao_estagio AS B
+ON INPUT(A.NUCONTRATO, BEST32.) = B.Contrato_pos
+WHERE B.Contrato_pos IS NOT NULL
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Total_para_validar */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03 Base_Riscos_Enriquecida */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03 Base_Riscos_Enriquecida */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-YQJ3ag6usEgIMYd7/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET hoje = &hoje;
+
+PROC SQL;
+
+CREATE TABLE RENEG.BASE_ELEG_MIGRACAO_&hoje. AS
+SELECT
+	A.*,
+	CASE
+		WHEN B.NUCONTRATO IS NOT NULL THEN "Já elegível"
+		WHEN C.NUCONTRATO IS NOT NULL AND C.aleatorio_migracao >= 2 THEN "Novo elegível - Teste"
+		WHEN C.NUCONTRATO IS NOT NULL AND C.aleatorio_migracao < 2 THEN "Novo elegível - Controle"
+		ELSE "Reneg não disponível"
+	END AS Elegibilidade_Reneg
+
+FROM Base_migracao_estagio AS A
+
+LEFT JOIN BASE_JA_ELEGIVEIS AS B
+ON INPUT(B.NUCONTRATO, BEST32.) = A.Contrato_pos
+
+LEFT JOIN BASE_NOVOS_ELEGIVEIS AS C
+ON INPUT(C.NUCONTRATO, BEST32.) = A.Contrato_pos
+
+;QUIT;
+
+DATA EXPORT_FINAL;
+SET
+	BASE_EXPORT_NOVOS_ELEGIVEIS
+	BASE_EXPORT_JA_ELEGIVEIS;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03 Base_Riscos_Enriquecida */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 04 Validação Pós */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 04 Validação Pós */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hhFcKLe4ebhzwklF/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+CONNECT TO SQLSVR (DATASRC=DBGOPR USER=GOPR_SAS PASSWORD="{SAS002}1F43540F45FB8CF123802C6A49F8525354124C9637553D8F");
+
+CREATE TABLE LISTA_EXCECAO_COMPLETA AS
+SELECT LISTAEXCECAO.*
+
+FROM CONNECTION TO SQLSVR (SELECT *FROM GOPRRENEGOCIACAOPARAMETRIZACAO.TBRENEGOCIACAOEXCECAO) LISTAEXCECAO
+;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.VALIDACAO_LISTA_EXCECAO_ATE90 AS
+   SELECT DISTINCT t1.*
+      FROM WORK.LISTA_EXCECAO_COMPLETA t1
+      WHERE
+	  		t1.DsMotivoExcecao LIKE '%Repactuacao Rodas - Migracao de estagio%'
+
+
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 04 Validação Pós */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE BASE_EXPORT_JA_ELEGIVEIS AS
+SELECT DISTINCT NuContrato                          AS NuContrato,
+				SqContratoFinanceiro                AS SqContratoFinanceiro,
+				20260226                  			AS DtInicioVigenciaExcecao,
+				20260316			             	AS DtFimVigenciaExcecao,
+
+				CASE
+					WHEN Grupo_Recorrente IS NOT NULL THEN 'Repactuacao Rodas - Migracao de estagio Sem Entrada'
+					ELSE 'Repactuacao Rodas - Migracao de estagio'
+				END AS DsMotivoExcecao,
+
+				'S'                                 AS FlExcecaoLiberada,
+				'30'                                AS QtDiaCarenciaMinima,
+				'45'                                AS QtDiaCarenciaMaxima,
+
+				QtPrazoMinimo,
+				QtPrazoMaximo,
+
+				'0'                                 AS PcDescontoMulta,
+				'0'                                 AS PcDescontoMora,
+				'0'                                 AS PcDescontoPrincipal,
+
+				CASE
+					WHEN TxJuros_Acao_Final IS NOT NULL THEN TxJuros_Acao_Final
+					ELSE TxJurosFinal
+				END AS TxJuroContrato format=4.2,
+
+				'Cobranca'                          AS NmAreaExcecao,
+				"guilherme.tavares"            		AS DsLogin,
+				'S'                                 AS Sobrepoe
+
+FROM BASE_JA_ELEGIVEIS
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA _NULL_;
+SET  TABELAS_MIGRACAO;
+CALL SYMPUT('BASE_MIGRACAO', COMPRESS(CAT("RENEG.", PUT(MEMNAME, 30.))));
+RUN;
+
+DATA ULTIMA_ELEGIBILIDADE;
+SET &BASE_MIGRACAO.;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE BASE_EXPORT_NOVOS_ELEGIVEIS AS
+SELECT DISTINCT NuContrato                          AS NuContrato,
+				SqContratoFinanceiro                AS SqContratoFinanceiro,
+				20260226                  			AS DtInicioVigenciaExcecao,
+				20260316			             	AS DtFimVigenciaExcecao,
+
+				'Repactuacao Rodas - Migracao de estagio' AS DsMotivoExcecao,
+
+				'S'                                 AS FlExcecaoLiberada,
+				'30'                                AS QtDiaCarenciaMinima,
+				'45'                                AS QtDiaCarenciaMaxima,
+
+				QtPrazoMinimo,
+				QtPrazoMaximo,
+
+				'0'                                 AS PcDescontoMulta,
+				'0'                                 AS PcDescontoMora,
+				'0'                                 AS PcDescontoPrincipal,
+
+				TxJuros 							AS TxJuroContrato format=4.2,
+
+				'Cobranca'                          AS NmAreaExcecao,
+				"guilherme.tavares"            		AS DsLogin,
+				'S'                                 AS Sobrepoe
+
+FROM BASE_NOVOS_ELEGIVEIS
+WHERE aleatorio_migracao >= 2;
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA EXPORT_FINAL;
+SET
+	BASE_EXPORT_NOVOS_ELEGIVEIS
+	BASE_EXPORT_JA_ELEGIVEIS;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,291 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_cubo_estudo
+FILE_SAS: 06-inad.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 224
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: AnoAtual, safra13M, safraXM
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.TBMOLICAR_SUV [SAS/Local], AUXL.TBROLLOUTMENSAGERIA [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], INAD.INADHISTORICA [SAS/Local], SHMESA.BASEUNICARODAS_&ANOATUAL [SAS/Local], SHMESA.BASEUNICARODAS_2022 [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.TBMOLICAR_SUV [PROC SQL - JOIN], AUXL.TBROLLOUTMENSAGERIA [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - JOIN], INAD.INADHISTORICA [PROC SQL - FROM], SHMESA.BASEUNICARODAS_&ANOATUAL [DATA Step - SET], SHMESA.BASEUNICARODAS_2022 [DATA Step - SET], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEUNICARODAS, DADOSPARCEIRO, INAD, INAD13M, INADHISTORICA, INFOCLIENTE
+DYNAMIC REFS (Ambiguous): SHMESA.BASEUNICARODAS_{ANOATUAL}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: Incluido flag de rastreador										  			  */
+/* Dta: 12/05/2023                 															  */
+/*============================================================================================*/
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: Incluido campos de banco digital									  			  */
+/* Dta: 12/07/2023                 															  */
+/*============================================================================================*/
+
+/*Tirei esse step por que esta impactando a criação da base quando não esta em d-1 */
+/*%VerificaAtualizacao(/infogrc/utils/bases/tbmolicar_suv.sas7bdat,12,300);*/
+
+DATA BaseUnicaRodas;
+SET SHMESA.BaseUnicaRodas_2022 - SHMESA.BaseUnicaRodas_&AnoAtual.;
+  WHERE INPUT(TRANSTRN(Safra_Proposta,'.',TRIMN('')),6.) >= &safraXM.;
+RUN;
+
+PROC SQL;
+CREATE TABLE DadosParceiro AS
+  SELECT
+    PCO.CdParceiroComercial,
+/*	POT.NuAnoMes,*/
+    case when NmGrupoProduto = 'Leves' then POT.FlPorteA
+		 when NmGrupoProduto = 'Motos' then POT.FlPorteMotos end AS Porte,
+	PCO.NmGrupoConcessionaria,
+	PCO.CdUf as UfParceiro
+  FROM TMP.TBPOTENCIALRODAS as POT
+  LEFT JOIN tmp.tbparceirocomercial as PCO
+  	on PCo.cdparceirocomercial = pot.cdparceirocomercial
+  WHERE 1=1
+    AND PCO.CdParceiroComercial <> .
+/*    AND FlPorteA IS NOT NULL*/
+	and POT.NmGrupoProduto in ("Leves")
+  ORDER BY
+    CdParceiroComercial,
+    NuAnoMes DESC;
+RUN;
+
+PROC SORT DATA=DadosParceiro NODUPKEY; BY CdParceiroComercial; RUN;
+
+PROC SQL;
+CREATE TABLE Inad13M AS
+  SELECT
+    'INAD' AS TpDados,
+    INPUT(TRANSTRN(BU.Safra_Proposta,'.',TRIMN('')),6.) AS SafraProposta,
+    COALESCE(ORI.nuanomes,INPUT(TRANSTRN(BU.Safra_Proposta,'.',TRIMN('')),6.)) as nuanomes,
+    CASE WHEN ORI.DtEntradaProposta >= TODAY()-90 THEN ORI.DtEntradaProposta
+	     ELSE intnx('month',ORI.DtEntradaProposta,0,'BEGINNING')
+         END AS DtReferencia format mmddyy10.,
+	case when BVO.CdParceiroComercial<>. and
+    ORI.fxidade ='ZeroKM' then 'Leves-BVO' else coalesce(ORI.NmGrupoProdutoMeta,TRANSTRN(BU.produto,'CPG','CVG')) end as NmGrupoProdutoMeta,
+    ORI.DsTipoCanalProducao as DsTipoCanalProducao,
+    ORI.NmAreaEstruturaComercial,
+    ORI.NmSubEstruturaComercialA AS NmSubEstruturaComercialA,
+	STRIP(PUT(ORI.CdParceiroComercial,6.)) || " - " || ORI.NmParceiroComercial AS NmParceiroComercial,
+	ORI.QtAnosIdade,
+    CASE WHEN ORI.QtAnosIdade BETWEEN 11 AND 14 THEN '11 a 14 anos'
+         WHEN ORI.QtAnosIdade BETWEEN 15 AND 19 THEN '15 a 19 anos'
+         WHEN ORI.QtAnosIdade >= 20 THEN '20 anos e acima'
+         ELSE ORI.FxIdade
+    END AS FxIdade,
+    ORI.FxParcela,
+    ORI.FxEntrada,
+    CASE WHEN ORI.NuScoreFim <= 5.5 THEN 'SCORE 5 - 5.5'
+	     WHEN ORI.NuScoreFim > 5.5 AND ORI.NuScoreFim <= 6.5 THEN 'SCORE 6 - 6.5'
+	     WHEN ORI.NuScoreFim > 6.5 AND ORI.NuScoreFim <= 7.5 THEN 'SCORE 7 - 7.5'
+	     WHEN ORI.NuScoreFim > 7.5 AND ORI.NuScoreFim <= 8.5 THEN 'SCORE 8 - 8.5'
+	     WHEN ORI.NuScoreFim > 8.5 THEN 'SCORE 9 - 10'
+    END AS Fx_Score,
+    CASE WHEN ORI.NuRating = . THEN ''
+         WHEN ORI.NuRating <= 5.5 THEN 'RATING 5 - 5.5'
+	     WHEN ORI.NuRating > 5.5 AND ORI.NuRating <= 6.5 THEN 'RATING 6 - 6.5'
+	     WHEN ORI.NuRating > 6.5 AND ORI.NuRating <= 7.5 THEN 'RATING 7 - 7.5'
+	     WHEN ORI.NuRating > 7.5 AND ORI.NuRating <= 8.5 THEN 'RATING 8 - 8.5'
+	     WHEN ORI.NuRating > 8.5 THEN 'RATING 9 - 10'
+    END AS FxRating,
+    MLC.combustivel,
+	MT.CilindradaBV as Cilindradas,
+	MT.CilindradaMercado as CilindradasMercado,
+	COALESCE(MSG.Mensageria,'9. Não houve mensageria') AS Mensageria,
+	MSG.Mensageria2,
+    COALESCE(SUV.DsMolicarConfiguracao,'N') AS DsMolicarConfiguracao,
+    PRD.FlBVMais AS PossuiSPF,
+    PRD.FlCap AS PossuiCap,
+    PRD.FlDemaisSemCompleto AS PossuiAuto,
+    PRD.FlCompleto AS PossuiCompleto,
+    MBV.Onda AS FlOndaMotorBV,
+    MBV.DataRollout as DataRollout FORMAT=mmddyy10.,
+	BU.FlPAP,
+    BU.CdSexo AS Genero,
+	BU.UF_Cliente AS UFCliente,
+	CASE WHEN BU.Renda = . THEN ''
+	     WHEN BU.Renda BETWEEN 0 AND 1100 THEN 'Até R$ 1.100'
+         WHEN BU.Renda BETWEEN 1100.01 AND 2500 THEN 'Até R$ 2.500'
+		 WHEN BU.Renda BETWEEN 2500.01 AND 5000 THEN 'Até R$ 5.000'
+		 WHEN BU.Renda BETWEEN 5000.01 AND 7500 THEN 'Até R$ 7.500'
+		 WHEN BU.Renda BETWEEN 7500.01 AND 10000 THEN 'Até R$ 10.000'
+		 WHEN BU.Renda > 10000 THEN 'Acima de R$ 10.000'
+	END AS FxRenda,
+	CASE WHEN ORI.VrPrestacao = . THEN ''
+	     WHEN ORI.VrPrestacao BETWEEN 0 AND 100 THEN 'Até R$ 100'
+		 WHEN ORI.VrPrestacao BETWEEN 100 AND 250 THEN 'Até R$ 250'
+		 WHEN ORI.VrPrestacao BETWEEN 250 AND 500 THEN 'Até R$ 500'
+		 WHEN ORI.VrPrestacao BETWEEN 500 AND 750 THEN 'Até R$ 750'
+		 WHEN ORI.VrPrestacao BETWEEN 750 AND 1000 THEN 'Até R$ 1000'
+		 WHEN ORI.VrPrestacao BETWEEN 1000 AND 1500 THEN 'Até R$ 1500'
+		 WHEN ORI.VrPrestacao BETWEEN 1500 AND 2000 THEN 'Até R$ 2000'
+         WHEN ORI.VrPrestacao > 2000 THEN 'Acima de R$ 2000'
+	END AS FxPrestacao,
+	CASE WHEN ORI.VrFinanciamento = . THEN ''
+	     WHEN ORI.VrFinanciamento BETWEEN 0 AND 15000 THEN 'Até R$ 15.000'
+		 WHEN ORI.VrFinanciamento BETWEEN 15000 AND 20000 THEN 'Até R$ 20.000'
+		 WHEN ORI.VrFinanciamento BETWEEN 20000 AND 30000 THEN 'Até R$ 30.000'
+		 WHEN ORI.VrFinanciamento BETWEEN 30000 AND 40000 THEN 'Até R$ 40.000'
+		 WHEN ORI.VrFinanciamento BETWEEN 40000 AND 50000 THEN 'Até R$ 50.000'
+         WHEN ORI.VrFinanciamento > 50000 THEN 'Acima de R$ 50.000'
+	END AS FxFinanciamento,
+	Led.CompraLeads,
+	Led.Origem,
+	CASE WHEN FNI.NuProposta <> . THEN 'S' ELSE 'N' END AS FlFNI,
+	COALESCE(ORI.FlLeilao,'N') AS FlLeilao,
+	COALESCE(ORI.FlC2C,'N') AS FlC2C,
+	UPCASE(ORI.CdMarca) AS CdMarca,
+	BU.TipoPolitica as TipoPolitica,
+	COALESCE(PRD.FlRastreador,ORI.FlRastreador) as FlRastreador,
+	Ori.NmTipoParceiroComercial as NmTipoParceiroComercial,
+
+	CASE WHEN TBDI.FlElegivel = 1 THEN 'S' ELSE 'N' END AS FlElegivel,
+	CASE WHEN TBDI.FlpenetracaocontacartaoD60 = 1 THEN 'S' ELSE 'N' END AS FlpenetracaocontacartaoD60,
+	CASE WHEN TBDI.FlpenetracaoD60 = 1 THEN 'S' ELSE 'N' END AS FlpenetracaoD60,
+
+	case when BVOonda.CdParceiroComercial<>. then 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.) else 'Demais' end as FlGrupoBVO,
+
+	DPA.Porte,
+	DPA.UfParceiro,
+	DPA.NmGrupoConcessionaria,
+
+	SUM(CASE WHEN Ori.StProposta = 'AP' THEN 1 ELSE 0 END) AS Denominador_Eleg,
+    SUM(BU.Inad_30_1pmt) AS Inad_30_1pmt,
+    SUM(BU.Val_prt_30_1pmt) AS Val_prt_30_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad30) AS Qtd_Cto_Elegiveis_Inad30,
+    SUM(BU.Inad_15_1pmt) AS Inad_15_1pmt,
+    SUM(BU.Val_prt_15_1pmt) AS Val_prt_15_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad15) AS Qtd_Cto_Elegiveis_Inad15,
+    SUM(BU.Inad_7_1pmt) AS Inad_7_1pmt,
+    SUM(BU.Val_prt_7_1pmt) AS Val_prt_7_1pmt,
+    SUM(BU.qtd_cto_elegiveis_inad7) AS Qtd_Cto_Elegiveis_Inad7,
+	SUM(PRD.VrMargem) AS VrMargemContribuicao FORMAT=num12.2,
+	SUM(PRD.VrProducao) AS VrLiberado FORMAT=num12.2
+  FROM
+    BaseUnicaRodas BU
+  LEFT JOIN
+    Originacao ORI
+    ON BU.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    Producao PRD
+	ON BU.NuContrato = PRD.NuContrato
+  LEFT JOIN
+    TbModeloMolicar MLC
+    ON MLC.NuProposta = BU.NuProposta
+  LEFT JOIN
+    AUXL.TbMolicar_SUV SUV
+    ON SUV.NuProposta = BU.NuProposta
+  LEFT JOIN
+    TbModeloMolicarMotos MT
+    ON MT.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    AUXL.TBROLLOUTMENSAGERIA MBV
+	ON MBV.CdParceiroComercial = ORI.CdParceiroComercial
+  LEFT JOIN
+    MsgProposta MSG
+	ON BU.NuProposta = MSG.NuProposta
+  LEFT JOIN
+    Leads Led
+	ON BU.NuProposta = Led.NuProposta and flagproducao = 1
+  LEFT JOIN
+    FNI ON FNI.NuProposta = ORI.NuProposta
+  LEFT JOIN TBDIGITAL TBDI
+		ON ORI.NUCONTRATOGESTAO = TBDI.NUCONTRATO
+
+  LEFT JOIN
+    BASEGRC.TbLevesNovosBVO BVO
+    ON BVO.CdParceiroComercial = ORI.CdParceiroComercial
+	and BVO.nuanomes = ORI.nuanomes
+  LEFT JOIN
+    TbOndaBVO BVOonda
+    ON BVOonda.CdParceiroComercial = ORI.CdParceiroComercial
+  LEFT JOIN
+    DadosParceiro DPA
+	ON DPA.CdParceiroComercial = ORI.CdParceiroComercial
+WHERE
+    INPUT(TRANSTRN(Safra_Proposta,'.',TRIMN('')),6.) >= &safra13M.
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,
+    11,12,13,14,15,16,17,18,19,20,
+    21,22,23,24,25,26,27,28,29,30,
+    31,32,33,34,35,36,37,38,39,40,
+	41,42,43,44,45,46,47,48,49;
+RUN;
+
+PROC SQL;
+CREATE TABLE InadHistorica AS
+  SELECT * FROM INAD.InadHistorica WHERE NuAnoMes >= 201701 AND NuAnoMes < &safra13M.;
+RUN;
+
+PROC SQL;
+CREATE TABLE Inad AS
+  SELECT * FROM Inad13M
+  OUTER UNION CORRESPONDING
+  SELECT * FROM InadHistorica;
+RUN;
+
+proc sql;create index NuAnoMes on Inad;quit;
+proc sql;create index NmGrupoProdutoMeta on Inad;quit;
+
+PROC SQL;
+CREATE TABLE InfoCliente AS
+  SELECT DISTINCT
+    NuProposta,
+    QtAnosIdadePessoa,
+    FlPAP,
+    CdSexo AS Genero,
+	UF_Cliente AS UFCliente,
+	CASE WHEN Renda = . THEN ''
+	     WHEN Renda BETWEEN 0 AND 1100 THEN 'Até R$ 1.100'
+         WHEN Renda BETWEEN 1100.01 AND 2500 THEN 'Até R$ 2.500'
+		 WHEN Renda BETWEEN 2500.01 AND 5000 THEN 'Até R$ 5.000'
+		 WHEN Renda BETWEEN 5000.01 AND 7500 THEN 'Até R$ 7.500'
+		 WHEN Renda BETWEEN 7500.01 AND 10000 THEN 'Até R$ 10.000'
+		 WHEN Renda > 10000 THEN 'Acima de R$ 10.000'
+	END AS FxRenda,
+	TipoPolitica as TipoPolitica
+  FROM BaseUnicaRodas;
+RUN;
+
+PROC SORT DATA=InfoCliente NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on InfoCliente;quit;

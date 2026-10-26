@@ -1,0 +1,267 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 06 - PDV_Originando.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 199
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBORIGINACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBORIGINACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_PDV_ORIGINANDO_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_ORIGINACAO_PDVS, BASE_PDVS_ORIGINANDO, BASE_PDV_ORIG_CANAL_TOTAL, BASE_PDV_ORIG_FILIAL_TOTAL, BASE_PDV_ORIG_GRS_TOTAL, BASE_PDV_ORIG_PDVS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**Gerar a base de PDVs de Solar Ativos**/
+
+Proc Sql;
+Create Table Base_Originacao_PDVs as
+Select
+NuAnoMes
+,NuCnpjLojaFavorecido
+,QtCorridosDiaUtilMes
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+/*,DsLoginN1C*/
+/*,DsLoginN2C*/
+/*,DsLoginN3C*/
+,Sum(Orig.FlPropostaOriginada) as FlPropostaOriginada
+,Sum(Orig.FlPropostaAprovada) as FlPropostaAprovada
+,Sum(Orig.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbOriginacao as Orig
+Where Orig.NuAnomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and
+		Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3
+;Quit;
+
+Proc Sql;
+Create Table Base_PDVs_Originando as
+Select Distinct
+Orig.NuAnomes
+,Pdvs.DsLoginN1C
+,Pdvs.DsLoginN2C
+,Pdvs.DsLoginN3C
+,Pdvs.NmAreaEstruturaComercialC
+,Pdvs.NmColaboradorC
+,Pdvs.cdParceiroComercial
+,Pdvs.NmParceiroComercial
+,Pdvs.NuCnpjLoja
+,Pdvs.FlAtivo
+
+,Max(Orig.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Case When Pdvs.FlAtivo = 'S' Then 1 Else 0 End as Qtd_PDVs
+,Case When Orig.FlPropostaOriginada >0 Then 1 Else 0 End as Qtd_PDVs_Originando
+,Case When Orig.FlPropostaAprovada  >0 Then 1 Else 0 End as Qtd_PDVs_Aprovando
+,Case When Orig.FlPropostaEfetivada >0 Then 1 Else 0 End as Qtd_PDVs_Efetivando
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From Base_Cobans_Solar_Saida as PDVs
+	Left Join Base_Originacao_PDVs as Orig On Pdvs.NuCnpjLoja = Orig.NuCnpjLojaFavorecido
+Where Orig.NuANomes >= &Base_m5. and Pdvs.FlAtivo = 'S'
+Group by 1,2,3,4,5,6,7,8,9,10
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Orig_Canal_Total as
+Select
+'PDV_Originando' as Base
+,Orig.NuAnoMes
+,"Canal" as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,Orig.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,"Canal Solar" as Dimensao2
+,"Canal Solar" as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+
+,Max(Orig.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando
+,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando
+,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and
+		Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Orig_Filial_Total as
+Select
+'PDV_Originando' as Base
+,Orig.NuAnoMes
+,"Filial" as Visao
+,"" as DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmAreaEstruturaComercialC as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+
+,Max(Orig.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando
+,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando
+,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and
+		Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Orig_GRs_Total as
+Select
+'PDV_Originando' as Base
+,Orig.NuAnoMes
+,"GRs" as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmColaboradorC as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+
+,Max(Orig.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando
+,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando
+,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and
+		Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_PDV_Orig_PDVs_Total as
+Select
+'PDV_Originando' as Base
+,Orig.NuAnoMes
+,"Cobans" as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,Orig.NmAreaEstruturaComercialC as Dimensao1
+,Orig.NmColaboradorC as Dimensao2
+,Case
+	When Orig.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Orig.CdParceiroComercial,8.) || '-' || Orig.NmParceiroComercial
+End as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+,Max(Orig.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+,Sum(Qtd_PDVs_Originando) as Qtd_PDVs_Originando
+,Sum(Qtd_PDVs_Aprovando) as Qtd_PDVs_Aprovando
+,Sum(Qtd_PDVs_Efetivando) as Qtd_PDVs_Efetivando
+,Max(DataBase) as DataBase Format DDMMYY10.
+
+From Base_PDVs_Originando as Orig
+Left Join Base_Cobans_Solar_Saida as Parc On Orig.NuCnpjLoja = Parc.NuCnpjLoja
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and
+		Orig.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Data ritosol.Base_PDV_Originando_Solar;
+Set
+	Base_PDV_Orig_PDVs_Total
+	Base_PDV_Orig_GRs_Total
+	Base_PDV_Orig_Filial_Total
+	Base_PDV_Orig_Canal_Total
+;Run;

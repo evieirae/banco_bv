@@ -1,0 +1,278 @@
+START_METADATA
+PROJECT: Rodas__super_trunfo
+FILE_SAS: 03 - Super Trunfo.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (2x | +24)
+----------------------------------------
+LINES_OF_CODE: 211
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAt
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /RISCOSBVF/BA/PROCESSOS/TMP/TBSUPERTRUNFO.CSV [SAS/Local], AUXL.TBCANALPARCEIROCOMERCIALCART [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], DWBI_DIME.TBDIMTEMPODATA [DBCON], FUNIL.ROLLOUT_V7 [SAS/Local], RISCOS.GESTAO_PDVS_CLASS_LEVES [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CLASS_LEVES
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /riscosbvf/BA/processos/tmp/TbSuperTrunfo.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_LOG_PARCEIROCOMERCIAL, WORK.CLASS_LEVES
+TABLE_READ_PROVENANCE (Flow): AUXL.TBCANALPARCEIROCOMERCIALCART [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - FROM], DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], FUNIL.ROLLOUT_V7 [PROC SQL - JOIN], RISCOS.GESTAO_PDVS_CLASS_LEVES [PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPOTENCIALRODAS [PROC SQL - FROM], WORK.BASE_LOG_PARCEIROCOMERCIAL [PROC SQL - JOIN], WORK.CLASS_LEVES [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /riscosbvf/BA/processos/tmp/TbSuperTrunfo.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.TBSUPERTRUNFO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CLASS_LEVES, TBDIASUTEIS, TBONDABVO, TBSUPERTRUNFO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/TbSuperTrunfo.csv
+
+END_METADATA
+================================================================================
+/*------------------------------------------------------*/
+/*     Criada pela área de Informações Gerencias        */
+/*     Desenvolvimento incial - Luis Gustavo            */
+/*     Data: 09/02/2021                                 */
+/*------------------------------------------------------*/
+/*     Alt.  incluido campo de predominancia PDV 	    */
+/*     Resp. Gustavo Domingues           				*/
+/*     Data: 20/03/2024                                 */
+/*------------------------------------------------------*/
+/*     Alt.  incluido campo de DsloginC				    */
+/*     Resp. Gustavo Domingues           				*/
+/*     Data: 07/05/2024                                 */
+/*------------------------------------------------------*/
+/*     Alt.  Retirado dados de simulacao			    */
+/*     Resp. Gustavo Domingues           				*/
+/*     Data: 06/10/2025                                 */
+/*------------------------------------------------------*/
+
+option compress = binary;
+%include '/infogrc/utils/all-includes.sas';
+
+PROC SQL;
+SELECT DISTINCT "'"||PUT(TBPOTENCIALRODAS.dtatualizacaocetip,yymmddn8.)||"'" INTO :DtAt FROM TMP.TBPOTENCIALRODAS;
+RUN;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDiasUteis AS SELECT * FROM connection to dbcon (
+  SELECT
+    NuAnoMes,
+    MAX(CASE WHEN DtTempo BETWEEN '20211227' AND '20211230' THEN NuDiaUtilMes - 1
+         WHEN DtTempo IN ('20211224','20211231') THEN -3
+         ELSE NuDiaUtilMes END) AS NuDiaUtilMes
+  FROM DWBI_DIME.TbDimTempoData
+  WHERE NuAnoMes >= 201901 AND DtTempo < &DtAt.
+  GROUP BY NuAnoMes
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE CLASS_LEVES AS
+  SELECT
+    CdLoja,
+    CASE WHEN CLASS = 'muito_bom'  THEN 'MUITO BOM'
+         WHEN CLASS = 'bom'        THEN 'BOM'
+         WHEN CLASS = 'interm'     THEN 'INTERMEDIARIO'
+         WHEN CLASS = 'muito_ruim' THEN 'RUIM'
+         ELSE 'SEM CLASSIFICACAO'
+         END AS ClassPDVsLeves
+  FROM
+    riscos.Gestao_pdvs_class_Leves
+  WHERE
+    UPCASE(CLASS) IN ('MUITO_BOM', 'BOM','INTERM','MUITO_RUIM');
+RUN;
+
+proc sql;
+create table TbOndaBVO as
+select
+	  cdparceirocomercial,
+	  min(nuanomes) as Nuanomes
+from BASEGRC.TbLevesNovosBVO
+group by cdparceirocomercial
+;run;
+
+PROC SQL;
+CREATE TABLE TbSuperTrunfo AS
+  SELECT
+    TBPOTENCIALRODAS.NuAnoMes
+    ,Utl.NuDiaUtilMes AS QtdDiasUteis
+    ,TBPOTENCIALRODAS.NmGrupoProduto
+    ,TBPOTENCIALRODAS.CdParceiroComercial AS CdParceiroComercialNum
+    ,STRIP(case when (TBPOTENCIALRODAS.CdParceiroComercial<>.) then put(TBPOTENCIALRODAS.CdParceiroComercial,14.)
+                when (TBPOTENCIALRODAS.CdParceiroComercial=.) then put(input(TBPOTENCIALRODAS.NuCnpjLoja,14.),14.)
+                else ''
+                end) as CdParceiroComercial
+    ,put(TBPOTENCIALRODAS.CdParceiroComercial,6.)||' - ' || ParceiroComercial.NmParceiroComercial AS NmParceiroComercial
+    ,TBPOTENCIALRODAS.RaizCnpjLoja
+    ,TBPOTENCIALRODAS.NmGrupo
+    ,TBPOTENCIALRODAS.QtdLojas
+    ,TBPOTENCIALRODAS.NuCnpjLoja
+    ,TBPOTENCIALRODAS.NmTipoParceiroComercial
+    ,TBPOTENCIALRODAS.NmAreaEstruturaComercialC
+    ,TBPOTENCIALRODAS.NmSubEstruturaComercialC
+    ,TBPOTENCIALRODAS.NmCanalEstruturaComercialC
+    ,TBPOTENCIALRODAS.nmcidade
+    ,case when (TBPOTENCIALRODAS.CdParceiroComercial<>.) then COALESCE(TBPOTENCIALRODAS.DsClassificacaoA,'Revisar Tabela de Classificação')
+          when (TBPOTENCIALRODAS.CdParceiroComercial=.) then 'Sem Cadastro na BV'
+          else ''
+          end as DsClassificacaoA
+    ,TBPOTENCIALRODAS.flAtivo
+    ,Case when NmGrupoProduto in( 'Leves','Leves-BVO') then
+	case when (TBPOTENCIALRODAS.CdParceiroComercial<>.) then COALESCE(TBPOTENCIALRODAS.FlPorteA,'Revisar Tabela de Porte')
+          when (TBPOTENCIALRODAS.CdParceiroComercial=.) then 'Sem Cadastro na BV' end
+          else case when (TBPOTENCIALRODAS.CdParceiroComercial<>.) then COALESCE(TBPOTENCIALRODAS.FlPorteMotos,'Revisar Tabela de Porte')
+          when (TBPOTENCIALRODAS.CdParceiroComercial=.) then 'Sem Cadastro na BV' end end
+	as FlPorteH
+    ,TBPOTENCIALRODAS.dtatualizacao as DtAtualizacaoProducao
+    ,TBPOTENCIALRODAS.dtatualizacaocetip as DtAtualizacaoCetip
+    ,TBPOTENCIALRODAS.fxidade
+    ,case when (TBPOTENCIALRODAS.CdParceiroComercial<>.) then 'PDVS Cadastrado na BV'
+          when (TBPOTENCIALRODAS.CdParceiroComercial=.) then 'PDVS Sem Cadastro na BV'
+          else ''
+          end as AtuaçãoBV
+    ,1 as QtdPDV
+    ,case when tbparceirocomercial.cduf in ('RO','AC','AM','RR','PA','AP','TO') then 'Região Norte'
+         when tbparceirocomercial.cduf in ('MA','PI','CE','RN','PB','PE','AL','SE','BA') then 'Região Nordeste'
+         when tbparceirocomercial.cduf in ('MG','mg','Mg','ES','RJ','SP','sp','rj') then 'Região Sudeste'
+         when tbparceirocomercial.cduf in ('PR','pr','SC','RS') then 'Região Sul'
+         when tbparceirocomercial.cduf in ('MS','MT','GO','go','DF') then 'Região Centro-Oeste'
+         end as Regiao
+    ,PDV.ClassPDVsLeves as ClassPDVsLeves
+    ,TBPOTENCIALRODAS.PredominanciaProduto
+    ,case when ParceiroComercial.DsGrupoParceiroLocadoras='LOCALIZA' then 'SIM' Else 'NÃO' end as FlagLocaliza
+    ,CASE WHEN ParceiroComercial.DsGrupoParceiroLocadoras   = 'MOVIDA' THEN ParceiroComercial.DsGrupoParceiroLocadoras
+          WHEN ParceiroComercial.DsGrupoParceiroLocadoras <> ''  AND ParceiroComercial.NmGrupoConcessionaria <> '' THEN CAT(trim(ParceiroComercial.DsGrupoParceiroLocadoras), " | ",trim(ParceiroComercial.NmGrupoConcessionaria))
+          WHEN ParceiroComercial.DsGrupoParceiroLocadoras <> ''  AND ParceiroComercial.NmGrupoConcessionaria  = '' THEN ParceiroComercial.DsGrupoParceiroLocadoras
+          WHEN ParceiroComercial.DsGrupoParceiroLocadoras = ''   AND ParceiroComercial.NmGrupoConcessionaria  <> '' THEN ParceiroComercial.NmGrupoConcessionaria
+          ELSE "" END AS FlLocadoraGrupo
+    ,Case when RankingCliente<>. then 'Sim' else 'Não' end as Ranking
+    ,CPC.DsTipoCanalProducao
+	,LPC.DSLOG
+	,LPC.DSLOG_ABREV
+	,TBPOTENCIALRODAS.DsLoginN1C
+	,case when BVOonda.CdParceiroComercial<>. then 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.) else 'Demais' end as FlGrupoBVO
+	,V7.Ondas as MotorV7
+	/* Medidas */
+/*    ,sum(QtdSimulacoes) AS QtSimulacoes*/
+	,sum(0) AS QtSimulacoes
+    ,sum(QtContrato) as QtdContratos
+    ,sum(QtGravamesMercado) as QtdGravames
+    ,avg(QtBancos) as QtBancos
+    ,avg(RankingCliente) as RankingCliente
+    ,sum(QtPropostaOriginada) as QtdpropostasOriginadas
+    ,sum(QtPropostaAprovada) as QtdpropostasAprovadas
+    ,sum(QtPropostaEfetivada) as QtdpropostasEfetivadas
+    ,sum(VpScoreProducao) format=num18.2 as VpScoreProducao
+    ,sum(VrProducao) format=num18.2 as VrProducao
+    ,sum(VpTirContabil) format=num18.2 as VpTirContabil
+    ,sum(VrComissaoParcelada) format=num18.2 as VrComissaoParcelada
+    ,sum(VrComissaoTotal) format=num18.2 as VrComissaoTotal
+    ,sum(VpScoreProposta) format=num18.2 as VpScoreProposta
+    ,sum(VpTxGerencialProducao) format=num18.2 as VptxGerencialProducao
+    ,sum(VrProducao) format=num18.2 as VrProducao
+    ,sum(Vrgravamesmercado) format=num18.2 as Vrgravamesmercado
+    ,sum(VrMargemContribuicao)  format=num18.2 as VrMargemContribuicao
+    ,sum(VpPrazo) as VpPrazo
+    ,sum(QtTxAlteradaProducao) as QtTxAlteradaProducao
+    ,sum(VpIdade) as VpIdade
+    ,sum(QtBvMais) as QtBvMais
+    ,sum(QtCap) as QtCap
+    ,sum(QtDemais) as QtDemais
+    ,sum(QtBVMaisEleg) as QtBVMaisEleg
+    ,sum(QtCapEleg) as QtCapEleg
+    ,sum(QtDemaisEleg) as QtDemaisEleg
+  FROM
+    TMP.TBPOTENCIALRODAS
+  LEFT JOIN
+    TMP.TbParceiroComercial ParceiroComercial
+    ON ParceiroComercial.cdparceirocomercial = TBPOTENCIALRODAS.cdparceirocomercial
+  LEFT JOIN WORK.CLASS_LEVES PDV
+    ON PDV.CdLoja = TBPOTENCIALRODAS.cdparceirocomercial
+/*  LEFT JOIN BASE_SIMULACAO SIMU */
+/*    ON SIMU.NuAnoMes = TBPOTENCIALRODAS.NuAnoMes*/
+/*    AND SIMU.Produto = TBPOTENCIALRODAS.NmGrupoProduto*/
+/*    AND SIMU.CdParceiroComercial = TBPOTENCIALRODAS.CdParceiroComercial*/
+/*    AND SIMU.FaixaIdade = TBPOTENCIALRODAS.FxIdade*/
+  LEFT JOIN TbDiasUteis Utl
+    ON TBPOTENCIALRODAS.NuAnoMes = Utl.NuAnoMes
+  LEFT JOIN AUXL.TBCANALPARCEIROCOMERCIALCART CPC
+    ON CPC.CdParceiroComercial = TBPOTENCIALRODAS.CdParceiroComercial
+  LEFT JOIN WORK.Base_Log_ParceiroComercial LPC
+    ON LPC.CdParceiroComercial = TBPOTENCIALRODAS.CdParceiroComercial
+  LEFT JOIN TbOndaBVO BVOonda
+    ON BVOonda.CdParceiroComercial = TBPOTENCIALRODAS.CdParceiroComercial
+  LEFT JOIN	Funil.ROLLOUT_V7 as V7
+	on V7.cod_parceiro = TBPOTENCIALRODAS.CdParceiroComercial
+  WHERE
+    NmGrupoProduto in ("Leves", "Motos", "Pesados","Leves-BVO")
+    AND FlAtualizacaoMercado = 1
+and TBPOTENCIALRODAS.NuAnoMes>=201901
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,
+    11,12,13,14,15,16,17,18,19,20,
+    21,22,23,24,25,26,27,28,29,30,
+    31,32,33,34,35;
+RUN;
+
+DATA SOLITMP.TBSUPERTRUNFO (RENAME=CdParceiroComercialNum=CdParceiroComercial);
+SET TbSuperTrunfo (DROP=CdParceiroComercial);
+RUN;
+
+filename exprt '/riscosbvf/BA/processos/tmp/TbSuperTrunfo.csv' encoding="utf-8";
+
+proc export
+data=TbSuperTrunfo
+outfile=exprt replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/TbSuperTrunfo.csv /riscosbvf/BA/processos/output/';
+
+/* Envio de Email */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("inf-gerenciais@bv.com.br")
+
+SUBJECT="Super Trunfo | Fim da atualização";
+
+DATA _NULL_;
+    FILE MAIL;
+        PUT "Prezados,";
+        PUT ;
+        PUT "Finalizado o script do Super Trunfo";
+        PUT ;
+        PUT "Favor não responder este e-mail.";
+        PUT ;
+        PUT "Atenciosamente,";
+        PUT ;
+        PUT "Equipe de informações Gerenciais";
+        PUT "Banco BV";
+        PUT ;
+RUN;

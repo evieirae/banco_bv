@@ -1,0 +1,134 @@
+START_METADATA
+PROJECT: Rodas__inad
+FILE_SAS: 01-bases-inad-historicas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 8
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (1x | +20), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 61
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (11x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: AnoAtual
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], SHMESA.BASEUNICARODAS_&ANOATUAL [SAS/Local], SHMESA.BASEUNICARODAS_2015 [SAS/Local], SHMESA.BASEUNICARODAS_2016 [SAS/Local], SHMESA.BASEUNICARODAS_2017 [SAS/Local], SHMESA.BASEUNICARODAS_2018 [SAS/Local], SHMESA.BASEUNICARODAS_2019 [SAS/Local], SHMESA.BASEUNICARODAS_2020 [SAS/Local], SHMESA.BASEUNICARODAS_2022 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2015.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2016.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2017.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2018.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2019.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2020.sas7bdat
+TABLE_READ_PROVENANCE (Flow): SHMESA.BASEUNICARODAS_&ANOATUAL [DATA Step - SET], SHMESA.BASEUNICARODAS_2015 [DATA Step - SET], SHMESA.BASEUNICARODAS_2016 [DATA Step - SET], SHMESA.BASEUNICARODAS_2017 [DATA Step - SET], SHMESA.BASEUNICARODAS_2018 [DATA Step - SET], SHMESA.BASEUNICARODAS_2019 [DATA Step - SET], SHMESA.BASEUNICARODAS_2020 [DATA Step - SET], SHMESA.BASEUNICARODAS_2022 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2015.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2016.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2017.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2018.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2019.sas7bdat, /riscosbvf/plan_mesas/comp_total/baseunicarodas_2020.sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEUNICARODAS, BASEUNICARODAS_2015, BASEUNICARODAS_20152020, BASEUNICARODAS_2016, BASEUNICARODAS_2017, BASEUNICARODAS_2018, BASEUNICARODAS_2019, BASEUNICARODAS_2020, BASEUNICARODAS_2021&ANOATUAL
+DYNAMIC REFS (Ambiguous): SHMESA.BASEUNICARODAS_{ANOATUAL}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 7 paths (sas: 1, sas7bdat: 6)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /riscosbvf/plan_mesas/comp_total/baseunicarodas_2015.sas7bdat
+[CODE REF] /riscosbvf/plan_mesas/comp_total/baseunicarodas_2016.sas7bdat
+[CODE REF] /riscosbvf/plan_mesas/comp_total/baseunicarodas_2017.sas7bdat
+[CODE REF] /riscosbvf/plan_mesas/comp_total/baseunicarodas_2018.sas7bdat
+[CODE REF] /riscosbvf/plan_mesas/comp_total/baseunicarodas_2019.sas7bdat
+[CODE REF] /riscosbvf/plan_mesas/comp_total/baseunicarodas_2020.sas7bdat
+
+END_METADATA
+================================================================================
+/* Marcar horário de início da atualização */
+%LET W_ini = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+SUBJECT="INAD Histórica | Início da atualização";
+
+DATA _NULL_;
+	FILE MAIL_INI;
+		PUT "Processamento das bases de INAD Históricas iniciado.";
+RUN;
+
+%include '/infogrc/utils/all-includes.sas';
+options compress=yes;
+
+DATA _NULL_;
+  /* Define parâmetros com base no dia atual */
+  hoje = TODAY();
+
+  /* Calcula variáveis */
+  anoAtual = YEAR(hoje);
+
+  /* Declarar macro variáveis */
+  CALL SYMPUT('anoAtual', PUT(anoAtual,4.));;
+RUN;
+
+X gunzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2015.sas7bdat.gz";
+Data baseunicarodas_2015;
+set SHMESA.baseunicarodas_2015;
+run;
+X gzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2015.sas7bdat";
+
+X gunzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2016.sas7bdat.gz";
+Data baseunicarodas_2016;
+set SHMESA.baseunicarodas_2016;
+run;
+X gzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2016.sas7bdat";
+
+X gunzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2017.sas7bdat.gz";
+Data baseunicarodas_2017;
+set SHMESA.baseunicarodas_2017;
+run;
+X gzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2017.sas7bdat";
+
+X gunzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2018.sas7bdat.gz";
+Data baseunicarodas_2018;
+set SHMESA.baseunicarodas_2018;
+run;
+X gzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2018.sas7bdat";
+
+X gunzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2019.sas7bdat.gz";
+Data baseunicarodas_2019;
+set SHMESA.baseunicarodas_2019;
+run;
+X gzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2019.sas7bdat";
+
+X gunzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2020.sas7bdat.gz";
+Data baseunicarodas_2020;
+set SHMESA.baseunicarodas_2020;
+run;
+X gzip "/riscosbvf/plan_mesas/comp_total/baseunicarodas_2020.sas7bdat";
+
+DATA BaseUnicaRodas_20152020;
+SET BaseUnicaRodas_2015 - BaseUnicaRodas_2020;
+RUN;
+
+DATA BASEUNICARODAS_2021&AnoAtual.;
+SET SHMESA.BaseUnicaRodas_2022 - SHMESA.BaseUnicaRodas_&AnoAtual.;
+RUN;
+
+DATA BaseUnicaRodas;
+SET BaseUnicaRodas_20152020  BaseUnicaRodas_2021&AnoAtual.;
+RUN;

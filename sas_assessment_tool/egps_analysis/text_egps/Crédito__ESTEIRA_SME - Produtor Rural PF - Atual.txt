@@ -1,0 +1,803 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Crédito__ESTEIRA_SME - Produtor Rural PF - Atual
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:23 UTC
+BUSINESS_AREA: Crédito
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 592
+CODE_TASKS_COUNT: 11
+DETECTED_PROCS: EXPORT, SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ATACADO = /riscosbvf/gbinfra/atacado; GCSERASA = /riscosbvf/insight/GCarteira; INSIGHT = /riscosbvf/insight; MISCRED = /riscosbv/credito/MISCREDITO; PME = /riscosbv/credito/SME; SHAREATA = /riscosbvf/plan_mesas/shared/atacado; SME = /riscosbv/credito/rgustavo/ESTRATEGIA/SME; SOCIOS = /riscosbvf/plan_mesas/comp_total
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: ANO
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_CREDITO.TBBASEFULLBVS [BIGQUERY], PLCA.TBSISTEMAPLCA [SAS/Local], SME.BASECOMPLETA_SME_FULL_PF [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: SME
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\00.InputModelo\_PRODUTOR\INFOS_SACADOS_PF.xlsx[SHEET='AGROMETRIKA']
+TEMP/DISCARDED_FILE_INPUT: WORK.INFOS_SACADOS_PF <- N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\00.InputModelo\_PRODUTOR\INFOS_SACADOS_PF.xlsx[SHEET='AGROMETRIKA']
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_CREDITO.TBBASEFULLBVS [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], PLCA.TBSISTEMAPLCA [PROC SQL - FROM], SME.BASECOMPLETA_SME_FULL_PF [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\01.OutputEsteira\_PRODUTOR\INFOS_SACADOS_PF_FINAL_.xlsx
+TEMP/DISCARDED OUTPUTS: BASE_COMPLETA_PF, BASE_COMPLETA_PF_LIMITE, BASE_COMPLETA_PF_V2, BASE_RESTR, DT_SAFRA_RESTR_PF, INFOS_SACADOS_PF_FINAL, INFOS_SACADOS_PF_FINAL_1, INFOS_SACADOS_PF_FINAL_2, INFOS_SACADOS_PF_FINAL_3, INFOS_SACADOS_PF_FINAL_4, INFOS_SACADOS_PF_V1, INFOS_SACADOS_PF_V2, INFOS_SACADOS_PF_V3, INFOS_SACADOS_PF_V4, INFOS_SACADOS_PF_V5, INFOS_SACADOS_PF_V6, OUT, TABELA_INFOS_PF_FINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.INFOS_SACADOS_PF;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\00.InputModelo\_PRODUTOR\INFOS_SACADOS_PF.xlsx[SHEET='AGROMETRIKA']|N:/DCCR/FILE SERVER GRUPOS ECONÔMICOS/00.PORTFOLIOS_PME/00.ESTEIRAPME/00.INPUTMODELO/_PRODUTOR|INFOS_SACADOS_PF.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Libname */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-lbUq3vvQIg2g92Wv/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PME         '/riscosbv/credito/SME'                     ACCESS = READONLY;
+
+LIBNAME SME 		'/riscosbv/credito/rgustavo/ESTRATEGIA/SME' ACCESS = READONLY;
+
+LIBNAME INSIGHT 	'/riscosbvf/insight'                        ACCESS = READONLY;
+
+LIBNAME GCSERASA 	'/riscosbvf/insight/GCarteira'              ACCESS = READONLY;
+
+LIBNAME SOCIOS 		'/riscosbvf/plan_mesas/comp_total'          ACCESS = READONLY;
+
+LIBNAME ATACADO		'/riscosbvf/gbinfra/atacado'                ACCESS = READONLY;
+
+LIBNAME MISCRED		'/riscosbv/credito/MISCREDITO'              ACCESS = READONLY;
+
+LIBNAME SHAREATA 	'/riscosbvf/plan_mesas/shared/atacado'      ACCESS = READONLY;
+
+
+
+DATA _NULL_;
+
+ CALL SYMPUT('ANO',COMPRESS(YEAR(TODAY())));
+
+RUN;
+
+
+
+DATA _NULL_;
+
+ CALL SYMPUT('SAFRA',COMPRESS(YEAR(TODAY())*100+MONTH(TODAY())));
+
+RUN;
+
+
+
+OPTIONS COMPRESS=BINARY;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. Agrometrika */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. Agrometrika */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-3J2ERPQTDWl2tqmA/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V1 AS SELECT
+
+		'Portfolio'n
+		,TODAY() AS DtEsteira FORMAT = DDMMYY10.
+		,'Código do Cliente'n
+		,'Código ERP'n
+		,'Nome do Cliente'n
+		,INPUT(COMPRESS(COMPRESS('CPF/CNPJ'n,'.'),'-'),BEST12.) AS CPF
+		,PUT(CALCULATED CPF,z11.) AS 'CPF11'n
+		,'Tipo do Cliente'n
+		,'Data de Envio'n
+		,'UF'n
+		,'Tempo como Cliente'n
+		,'Evolução'n as EVOLUCAO
+		,'Representante'n
+		,'Supervisor'n
+		,'Coordenador'n
+		,'Estágio Atual'n
+		,'Tipo de Proposta'n
+		,'Proposta'n
+		,'Crédito Solicitado (R$)'n
+		,'Patrimonio Total (R$)'n
+		,'Área Própria (ha)'n
+		,'Área Arrendada (ha)'n
+		,'Área Soja (ha)'n
+		,'Área Milho (ha)'n
+		,'Área Algodão (ha)'n
+		,'Áreas Demais (ha)'n
+		,'Proporção de Área Própria (%)'n
+		,'Capacidade de Armazenamento Prop'n
+		,'Ano Inicial do Atividade Agricol'n
+		,'Comercial'n
+		,'Bancario'n
+		,'Serasa'n
+		,'Tj'n
+		,'Restriçoes'n
+		,'Pontualidade'n
+		,'Receita Total (R$)'n
+		,'Custo Total (R$)'n
+		,'Saldo Safra Passada (R$)'n
+		,'Dívidas Investimento (R$)'n
+		,'Despesas Pessoais (R$)'n
+		,'Outras Despesas (R$)'n
+		,'Caixa Atual (R$)'n
+		,'Liquidez'n
+		,'Rating'n
+		,'Limite Sugerido (R$)'n
+		,'Risco Produtivo'n
+
+	FROM INFOS_SACADOS_PF;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. Agrometrika */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03. Restritivos */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03. Restritivos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hysLdwzTHYjZdcLo/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm (
+    project='bv-saop-dtm'
+    credfile='/projetos/acessos/bq/op/saop-dtm.json'
+    schema='bv-pdbd-prd'
+    READ_MODE=storage
+    ALLOW_LARGE_RESULTS=must
+    MAX_CHAR_LEN=110
+);
+
+create table dt_safra_restr_pf as
+    select * from connection to perm (
+        select safra
+        from bv-pdbd-prd.dvry_corp_credito.tbbasefullbvs
+        order by safra desc
+        limit 10
+    );
+
+disconnect from perm;
+quit;
+
+proc sql;
+connect to bigquery as perm (
+    project='bv-saop-dtm'
+    credfile='/projetos/acessos/bq/op/saop-dtm.json'
+    schema='bv-pdbd-prd'
+    READ_MODE=storage
+    ALLOW_LARGE_RESULTS=must
+    MAX_CHAR_LEN=110
+);
+
+create table BASE_RESTR as
+    select * from connection to perm (
+        select nucpfcnpj, bvs_restritivo_total, bvs_restritivo_valor_total, safra
+        from bv-pdbd-prd.dvry_corp_credito.tbbasefullbvs
+        where safra = '202509'
+    );
+
+disconnect from perm;
+quit;
+
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V2 AS SELECT
+
+		 A.*
+		,CASE WHEN B.bvs_restritivo_total > 0 THEN 1 ELSE 0 END AS FLAG_SERASA
+
+	FROM INFOS_SACADOS_PF_V1 AS A
+
+	LEFT JOIN BASE_RESTR AS B ON A.CPF11 = B.nucpfcnpj;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03. Restritivos */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 04. Flags */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 04. Flags */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Xel6cS8PUclUnuYP/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V3 AS SELECT
+
+		 A.*
+
+		,CASE WHEN A.'Restriçoes'n IN ("Com Restrições","Com Restrições Moderadas","Com Restrições Graves") THEN 1 ELSE 0 END AS FLAG_RESTRICAO
+		,CASE WHEN A.'Comercial'n IN ("Ruim") THEN 1 ELSE 0 END AS FLAG_COMERCIAL
+		,A.'Risco Produtivo'n AS RISCO_PRODUTIVO
+		,CASE WHEN A.'Proporção de Área Própria (%)'n <= 50 THEN 1 ELSE 0 END AS FLAG_AREA_PROPRIA
+		,CASE WHEN (&ANO. - A.'Ano Inicial do Atividade Agricol'n) <= 3 THEN 1 ELSE 0 END AS FLAG_TEMPO_CULTURA
+		,CASE WHEN A.'Pontualidade'n IN ('Pontual','Atraso entre 01 e 14 dias','Atraso entre 15 e 30 dias','Novo no Crédito') THEN 0 ELSE 1 END AS FLAG_HISTORICO_CREDITO
+		,CASE WHEN A.'Tempo como Cliente'n < 2 THEN 1 ELSE 0 END AS FLAG_TEMPO_CLIENTE
+		,CASE WHEN MAX(FLAG_SERASA
+
+					,CALCULATED FLAG_RESTRICAO
+					,CALCULATED FLAG_COMERCIAL
+					,CALCULATED FLAG_AREA_PROPRIA
+					,CALCULATED FLAG_TEMPO_CULTURA
+					,CALCULATED FLAG_HISTORICO_CREDITO
+					,CALCULATED FLAG_TEMPO_CLIENTE) THEN 1 ELSE 0 END AS FLAG_GERAL
+
+	FROM INFOS_SACADOS_PF_V2 AS A;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 04. Flags */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 05. Categorias */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 05. Categorias */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vre6saDB3CdeQDgH/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V4 AS SELECT
+
+		A.*
+		,CASE WHEN A.'Restriçoes'n = 'Sem Restrições' THEN 100
+			WHEN A.'Restriçoes'n = 'Com Restrições (não relevantes)' THEN 50
+			ELSE 0 END AS Peso_Restricao
+
+		,CASE WHEN A.'Comercial'n = 'Ruim' THEN 0
+			ELSE 100 END AS Peso_Comercial
+
+		,CASE WHEN A.RISCO_PRODUTIVO = "Muito Baixo" THEN 100
+			WHEN A.RISCO_PRODUTIVO = "Baixo" THEN 75
+			WHEN A.RISCO_PRODUTIVO = "Médio" THEN 50
+			WHEN A.RISCO_PRODUTIVO = "Alto" THEN 25
+			ELSE 0 END AS Peso_Risco_Produtivo
+
+		,CASE WHEN A.'Proporção de Área Própria (%)'n < 50 THEN 0
+			WHEN A.'Proporção de Área Própria (%)'n < 65 THEN 50
+			WHEN A.'Proporção de Área Própria (%)'n < 80 THEN 75
+			ELSE 100 END AS Peso_Area_Propria
+
+		,CASE WHEN (&ANO. - A.'Ano Inicial do Atividade Agricol'n) <= 3 THEN 0
+			WHEN (&ANO. - A.'Ano Inicial do Atividade Agricol'n) <= 5 THEN 50
+			WHEN (&ANO. - A.'Ano Inicial do Atividade Agricol'n) <= 10 THEN 75
+			ELSE 100 END AS Peso_Tempo_Cultura
+
+		,CASE WHEN A.EVOLUCAO = 'Entre -15% e 15%' THEN 100
+			WHEN A.EVOLUCAO = 'Crescimento superior a 15% justificado' THEN 90
+			WHEN A.EVOLUCAO = 'Crescimento superior a 15% não Justificado' THEN 0
+			WHEN A.EVOLUCAO = 'Redução superior a 15% justificado' THEN 80
+			WHEN A.EVOLUCAO = 'Redução superior a 15% não justificado' THEN 0
+			ELSE 0 END AS Peso_Evolucao_Area
+
+		,CASE WHEN A.'Pontualidade'n = 'Pontual' THEN 100
+			WHEN A.'Pontualidade'n = 'Novo no Crédito' THEN 100
+			WHEN A.'Pontualidade'n = 'Atraso entre 01 e 14 dias' THEN 100
+			WHEN A.'Pontualidade'n = 'Atraso entre 15 e 30 dias' THEN 75
+			ELSE 0 END AS Peso_Historico_Credito
+
+		,CASE WHEN A.'Tempo como Cliente'n >= 5 THEN 100
+			WHEN A.'Tempo como Cliente'n >= 2 THEN 70
+			ELSE 0 END AS Peso_Tempo_Cliente
+
+		,CASE WHEN A.'Liquidez'n >= 1.43 THEN 100
+			WHEN A.'Liquidez'n >= 1.19 THEN 75
+			WHEN A.'Liquidez'n >= 1.00 THEN 50
+			WHEN A.'Liquidez'n >= 0.85 THEN 25
+			ELSE 0 END AS Peso_Liquidez
+
+	FROM INFOS_SACADOS_PF_V3 AS A;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 05. Categorias */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 06. Score */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 06. Score */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-IWCCmXehyboseAw9/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V5 AS SELECT
+
+		 A.*
+		,(0.399*Peso_Restricao)
+		+(0.019*Peso_Comercial)
+		+(0.235*Peso_Risco_Produtivo)
+		+(0.113*Peso_Area_Propria)
+		+(0.083*Peso_Tempo_Cultura)
+		+(0.027*Peso_Evolucao_Area)
+		+(0.046*Peso_Historico_Credito)
+		+(0.046*Peso_Tempo_Cliente)
+		+(0.032*Peso_Liquidez) AS Score_BV
+
+		,CASE WHEN CALCULATED Score_BV >= 94.13 THEN "AA"
+		WHEN CALCULATED Score_BV >= 88.24 THEN "A+"
+		WHEN CALCULATED Score_BV >= 82.36 THEN "A"
+		WHEN CALCULATED Score_BV >= 76.48 THEN "A-"
+		WHEN CALCULATED Score_BV >= 70.60 THEN "B+"
+		WHEN CALCULATED Score_BV >= 64.71 THEN "B"
+		WHEN CALCULATED Score_BV >= 58.83 THEN "B-"
+		WHEN CALCULATED Score_BV >= 52.95 THEN "C+"
+		WHEN CALCULATED Score_BV >= 47.06 THEN "C"
+		WHEN CALCULATED Score_BV >= 41.18 THEN "C-"
+		WHEN CALCULATED Score_BV >= 35.30 THEN "D+"
+		WHEN CALCULATED Score_BV >= 29.41 THEN "D"
+		WHEN CALCULATED Score_BV >= 23.53 THEN "D-"
+		WHEN CALCULATED Score_BV >= 17.65 THEN "E"
+		WHEN CALCULATED Score_BV >= 11.77 THEN "F"
+		WHEN CALCULATED Score_BV >= 5.88 THEN "G"
+		ELSE "H" END AS Rating_BV
+
+		,CASE WHEN FLAG_GERAL = 1
+			OR RATING IN ("C+","C","C-","D+","D","D-","E","F","H","")
+			OR CALCULATED RATING_BV IN ("C+","C","C-","D+","D","D-","E","F","H") THEN "H"
+		ELSE CALCULATED RATING_BV END AS RATING_BV_V2
+
+		,1 AS QTD
+
+	FROM INFOS_SACADOS_PF_V4 AS A;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 06. Score */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 07. Limite */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 07. Limite */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hxVhBbtTYVCKuffw/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V6 AS SELECT
+
+		*
+
+		,CASE WHEN RATING_BV_V2 = "AA" THEN 2000000
+			WHEN RATING_BV_V2 = "A+"   THEN 2000000
+			WHEN RATING_BV_V2 = "A"    THEN 1750000
+			WHEN RATING_BV_V2 = "A-"   THEN 1750000
+			WHEN RATING_BV_V2 = "B+"   THEN 1500000
+			WHEN RATING_BV_V2 = "B"    THEN 1500000
+			WHEN RATING_BV_V2 = "B-"   THEN 1500000
+			ELSE 0 END AS LIMITE_TETO
+
+		,CASE WHEN RATING_BV_V2 = "AA" THEN 0.15
+			WHEN RATING_BV_V2 = "A+"   THEN 0.14
+			WHEN RATING_BV_V2 = "A"    THEN 0.13
+			WHEN RATING_BV_V2 = "A-"   THEN 0.12
+			WHEN RATING_BV_V2 = "B+"   THEN 0.10
+			WHEN RATING_BV_V2 = "B"    THEN 0.09
+			WHEN RATING_BV_V2 = "B-"   THEN 0.08
+			ELSE 0 END AS CUSTO_PROD
+
+		,CASE WHEN 'Receita Total (R$)'n = . THEN MIN (CALCULATED LIMITE_TETO, 'Limite Sugerido (R$)'n)
+			ELSE MIN(CALCULATED LIMITE_TETO, 'Limite Sugerido (R$)'n, 'Receita Total (R$)'n * CALCULATED CUSTO_PROD) END AS LIMITE_ESTEIRA
+
+	FROM INFOS_SACADOS_PF_V5;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 07. Limite */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 08. Final */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 08. Final */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-8LsY2OGPpg327s1o/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE BASE_COMPLETA_PF AS SELECT
+
+	     CPF11
+		,PORTFOLIO_ORIGEM
+		,SUM(LIMITE_GL) AS LIMITE_GLOBAL
+
+	FROM SME.BASECOMPLETA_SME_FULL_PF
+
+	WHERE FLAG_VIGENTE = 1
+
+	GROUP BY 1,2;
+
+RUN;
+
+PROC SQL;
+
+	CREATE TABLE BASE_COMPLETA_PF_LIMITE AS SELECT
+
+         CPF11
+		,SUM(LIMITE_GL) AS LIMITE_GLOBAL_BV
+
+	FROM SME.BASECOMPLETA_SME_FULL_PF
+
+	WHERE FLAG_VIGENTE = 1
+
+	GROUP BY 1;
+
+RUN;
+
+PROC TRANSPOSE
+
+	DATA = BASE_COMPLETA_PF OUT = BASE_COMPLETA_PF_V2 (DROP = _NAME_);
+
+	BY CPF11 NOTSORTED;
+
+	ID PORTFOLIO_ORIGEM;
+
+	VAR LIMITE_GLOBAL;
+
+RUN;
+
+PROC SQL;
+
+CREATE TABLE TABELA_INFOS_PF_FINAL AS SELECT
+
+     A.*
+		,(CASE WHEN F.LIMITE_GLOBAL >= 0 THEN F.LIMITE_GLOBAL
+			ELSE 0 END) AS LIMITE_GLOBAL_CONVENIO
+		,(CASE WHEN E.LIMITE_GLOBAL_BV >= 0 THEN E.LIMITE_GLOBAL_BV
+			ELSE 0 END) AS LIMITE_GLOBAL_BV
+
+	FROM INFOS_SACADOS_PF_V6 AS A
+
+	LEFT JOIN BASE_COMPLETA_PF_V2 AS D ON A.CPF11 = D.CPF11
+
+	LEFT JOIN BASE_COMPLETA_PF_LIMITE AS E ON A.CPF11 = E.CPF11
+
+	LEFT JOIN BASE_COMPLETA_PF AS F ON A.CPF11 = F.CPF11 AND A.PORTFOLIO = F.PORTFOLIO_ORIGEM;
+
+RUN;
+
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_FINAL_1 AS SELECT
+
+		*
+
+		,(LIMITE_GLOBAL_BV - LIMITE_GLOBAL_CONVENIO) AS LIMITE_ALOCADO
+		,CASE WHEN (LIMITE_ESTEIRA - CALCULATED LIMITE_ALOCADO) < 0 THEN 0
+			ELSE 1000*INT(MIN('Crédito Solicitado (R$)'n,(LIMITE_ESTEIRA - CALCULATED LIMITE_ALOCADO))/1000) END AS LIMITE_FINAL
+
+		,CASE WHEN
+
+
+
+
+
+
+
+
+
+			 FLAG_SERASA = 1 THEN "Restritivos"
+			WHEN FLAG_RESTRICAO = 1 THEN "Restritivos"
+			WHEN FLAG_COMERCIAL = 1 THEN "Conceito Comercial"
+			WHEN FLAG_AREA_PROPRIA = 1 THEN "Proporção de Área Própria"
+			WHEN FLAG_TEMPO_CULTURA = 1 THEN "Tempo na Cultura Principal"
+			WHEN FLAG_HISTORICO_CREDITO = 1 THEN "Histórico de Crédito"
+			WHEN FLAG_TEMPO_CLIENTE = 1 THEN "Tempo como Cliente"
+
+			WHEN RATING = "C+" THEN "Rating Agrometrika"
+			WHEN RATING = "C" THEN "Rating Agrometrika"
+			WHEN RATING = "C-" THEN "Rating Agrometrika"
+			WHEN RATING = "D+" THEN "Rating Agrometrika"
+			WHEN RATING = "D" THEN "Rating Agrometrika"
+			WHEN RATING = "D-" THEN "Rating Agrometrika"
+			WHEN RATING = "E" THEN "Rating Agrometrika"
+			WHEN RATING = "H" THEN "Rating Agrometrika"
+			WHEN LIMITE_ESTEIRA = 0 THEN "Rating Agrometrika"
+			WHEN CALCULATED LIMITE_FINAL = 0 THEN "Sem Limite Disponivel"
+			ELSE "Pré-Aprovado" END AS RETORNO_ABERTO
+
+		,CASE WHEN CALCULATED RETORNO_ABERTO = "Pré-Aprovado" THEN "Pré-Aprovado"
+			ELSE "Recusado" END AS RETORNO
+
+		,CASE WHEN 'Proporção de Área Própria (%)'n <= 0 THEN "0%"
+			WHEN 'Proporção de Área Própria (%)'n <= 10 THEN "1% - 10%"
+			WHEN 'Proporção de Área Própria (%)'n <= 20 THEN "11% - 20%"
+			WHEN 'Proporção de Área Própria (%)'n <= 30 THEN "21% - 30%"
+			WHEN 'Proporção de Área Própria (%)'n <= 40 THEN "31% - 40%"
+			WHEN 'Proporção de Área Própria (%)'n <= 50 THEN "41% - 50%"
+			ELSE "> 50%" END AS AREA_PROPRIA
+
+		,CALCULATED LIMITE_FINAL AS LIMITE_GL_AUX
+
+	FROM TABELA_INFOS_PF_FINAL;
+
+RUN;
+
+PROC SQL;
+    CREATE TABLE INFOS_SACADOS_PF_FINAL_2 AS
+    SELECT
+        A.*,
+        CASE
+            WHEN B.LIMITE_PLCA IS NULL THEN 0
+            ELSE B.LIMITE_PLCA
+        END AS LIMITE_PLCA
+    FROM
+        INFOS_SACADOS_PF_FINAL_1 AS A
+        LEFT JOIN (
+            SELECT
+                DOC_RAIZ,
+                MAX(LIMITE_CREDITO_RAIZ_NO_PROGRAMA) AS LIMITE_PLCA
+            FROM
+                PLCA.TBSISTEMAPLCA
+            GROUP BY
+                DOC_RAIZ
+        ) AS B
+        ON A.CPF11 = B.DOC_RAIZ;
+QUIT;
+
+DATA INFOS_SACADOS_PF_FINAL_3;
+
+SET INFOS_SACADOS_PF_FINAL_2;
+
+LIMITE_GL = LIMITE_GL_AUX - LIMITE_PLCA;
+
+RUN;
+
+PROC SQL;
+
+   CREATE TABLE INFOS_SACADOS_PF_FINAL_4 AS SELECT
+
+		  Portfolio,
+          DtEsteira,
+          'Código do Cliente'n,
+          'Código ERP'n,
+          'Nome do Cliente'n,
+          CPF,
+          CPF11,
+          'Tipo do Cliente'n,
+          'Data de Envio'n,
+          UF,
+          'Tempo como Cliente'n,
+          EVOLUCAO,
+          Representante,
+          Supervisor,
+          Coordenador,
+          'Estágio Atual'n,
+          'Tipo de Proposta'n,
+          Proposta,
+          'Crédito Solicitado (R$)'n,
+          'Patrimonio Total (R$)'n,
+          'Área Própria (ha)'n,
+          'Área Arrendada (ha)'n,
+          'Área Soja (ha)'n,
+          'Área Milho (ha)'n,
+          'Área Algodão (ha)'n,
+          'Áreas Demais (ha)'n,
+          'Proporção de Área Própria (%)'n,
+          'Capacidade de Armazenamento Prop'n,
+          'Ano Inicial do Atividade Agricol'n,
+          Comercial,
+          Bancario,
+          Serasa,
+          TJ,
+          'Restriçoes'n,
+          Pontualidade,
+          'Receita Total (R$)'n,
+          'Custo Total (R$)'n,
+          'Saldo Safra Passada (R$)'n,
+          'Dívidas Investimento (R$)'n,
+          'Despesas Pessoais (R$)'n,
+          'Outras Despesas (R$)'n,
+          'Caixa Atual (R$)'n,
+          Liquidez,
+          Rating,
+          'Limite Sugerido (R$)'n,
+          'Risco Produtivo'n,
+          FLAG_SERASA,
+          FLAG_RESTRICAO,
+          FLAG_COMERCIAL,
+          RISCO_PRODUTIVO,
+          FLAG_AREA_PROPRIA,
+          FLAG_TEMPO_CULTURA,
+          FLAG_HISTORICO_CREDITO,
+          FLAG_TEMPO_CLIENTE,
+          FLAG_GERAL,
+          Peso_Restricao,
+          Peso_Comercial,
+          Peso_Risco_Produtivo,
+          Peso_Area_Propria,
+          Peso_Tempo_Cultura,
+          Peso_Historico_Credito,
+          Peso_Tempo_Cliente,
+          Peso_Liquidez,
+          Score_BV,
+          Rating_BV,
+          RATING_BV_V2,
+          QTD,
+          LIMITE_TETO,
+          CUSTO_PROD,
+          LIMITE_ESTEIRA,
+          LIMITE_GLOBAL_CONVENIO,
+          LIMITE_GLOBAL_BV,
+          LIMITE_ALOCADO,
+          LIMITE_FINAL,
+		  LIMITE_GL_AUX,
+		  LIMITE_PLCA,
+          RETORNO_ABERTO,
+          RETORNO,
+          AREA_PROPRIA,
+          CASE WHEN RETORNO = 'Recusado' THEN 0 ELSE LIMITE_GL END AS LIMITE_GL
+      FROM INFOS_SACADOS_PF_FINAL_3;
+QUIT;
+
+PROC SORT
+
+DATA =  INFOS_SACADOS_PF_FINAL_4
+OUT =  INFOS_SACADOS_PF_FINAL
+
+NODUPKEY; BY CPF11;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 08. Final */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V2 AS SELECT
+
+		 A.*
+		,CASE WHEN B.bvs_restritivo_total > 0 THEN 1 ELSE 0 END AS FLAG_SERASA
+
+	FROM INFOS_SACADOS_PF_V1 AS A
+
+	LEFT JOIN BASE_RESTR_AGR AS B ON A.CPF11 = B.nucpfcnpj;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE INFOS_SACADOS_PF_V6 AS SELECT
+
+		*
+
+		,CASE WHEN RATING_BV_V2 = "AA" THEN 2000000
+			WHEN RATING_BV_V2 = "A+"   THEN 2000000
+			WHEN RATING_BV_V2 = "A"    THEN 1750000
+			WHEN RATING_BV_V2 = "A-"   THEN 1750000
+			WHEN RATING_BV_V2 = "B+"   THEN 1500000
+			WHEN RATING_BV_V2 = "B"    THEN 1500000
+			WHEN RATING_BV_V2 = "B-"   THEN 1500000
+			ELSE 0 END AS LIMITE_TETO
+
+		,CASE WHEN RATING_BV_V2 = "AA" THEN 0.15
+			WHEN RATING_BV_V2 = "A+"   THEN 0.14
+			WHEN RATING_BV_V2 = "A"    THEN 0.13
+			WHEN RATING_BV_V2 = "A-"   THEN 0.12
+			WHEN RATING_BV_V2 = "B+"   THEN 0.10
+			WHEN RATING_BV_V2 = "B"    THEN 0.09
+			WHEN RATING_BV_V2 = "B-"   THEN 0.08
+			ELSE 0 END AS CUSTO_PROD
+
+		,CASE WHEN 'Receita Total (R$)'n = . THEN 0
+			ELSE MIN(CALCULATED LIMITE_TETO,'Receita Total (R$)'n * CALCULATED CUSTO_PROD) END AS LIMITE_ESTEIRA
+
+	FROM INFOS_SACADOS_PF_V5;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.INFOS_SACADOS_PF_FINAL
+    OUTFILE='N:\DCCR\File Server Grupos Econômicos\00.Portfolios_PME\00.EsteiraPME\01.OutputEsteira\_PRODUTOR\INFOS_SACADOS_PF_FINAL_.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */

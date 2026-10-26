@@ -1,0 +1,128 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 02 - Clusters_Porte_Cobans.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 68
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: RITOSOL = /infogrc/rito_comercial_solar; RITOSOL2 = /infogrc/rito_comercial_solar/bkp
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPARCEIROCOMERCIAL [SAS/Local], RITOSOL.CLASSIFICACAO_PARCEIROS_MIS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: RITOSOL
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN], RITOSOL.CLASSIFICACAO_PARCEIROS_MIS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RITOSOL.CLASSIFICACAO_PARCEIROS_MIS
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_COBANS_SOLAR_SAIDA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_COBANS_SOLAR, BASE_COBANS_SOLAR_SAIDA, BASE_PORTE_COBANS, BASE_PORTE_COBANS_CNPJ
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+Libname ritosol '/infogrc/rito_comercial_solar';
+Libname ritosol2 '/infogrc/rito_comercial_solar/bkp';
+
+/*
+**********Para atualizar a base de Classificação Parceiros********
+Após receber a base do Time de RC, verificar os campos e formatar os números para apenas 2 casas decimais
+com o ARRED(campo,0). Baixar o arquivo que esta na nossa Lib ritosol e colar os dados do mês no final
+da base, salvar e jogar novamente na pasta da Lib RitoSol no formato xlsx.
+
+Após salvar na lib rodar o código abaixo para importar e salvar os dados na Libname como uma base do SAS
+*/
+
+/*
+PROC IMPORT DATAFILE= "/infogrc/rito_comercial_solar/Classificacao_Parceiros_MIS.xlsx"
+OUT= ritosol.Classificacao_Parceiros_MIS
+DBMS=XLSX
+REPLACE;
+SHEET="Classificacao_Parceiros";
+GETNAMES=YES;
+RUN;
+*/
+
+/*Gerando a base de Target sem o efeito da duplicidade devido migração da Sinergia para o CS*/
+Proc Sql;
+Create Table Base_Porte_Cobans as
+Select Distinct
+Target.NuAnomes
+,Parc.DsLoginN1C
+,Parc.DsLoginN2C
+,Parc.DsLoginN3C
+,Target.NuCnpjLojaFavorecido
+,Target.CdParceiroComercial
+,Target.Cluster_Final as Porte
+,Target.TipoParceiro
+,Parc.DtCadastro as DtCadastro Format DDMMYY10.
+From ritosol.Classificacao_Parceiros_MIS as Target
+Left join Bases.TbParceiroComercial as Parc On Target.CdParceiroComercial = Parc.CdParceiroComercial
+;Quit;
+
+Proc Sql;
+Create Table Base_Porte_Cobans_CNPJ as
+Select Distinct
+Target.NuAnomes
+,Target.NuCnpjLojaFavorecido
+,Target.Cluster_Final as Porte
+,Target.TipoParceiro
+
+From ritosol.Classificacao_Parceiros_MIS as Target
+;Quit;
+
+Proc Sql;
+Create Table Base_Cobans_Solar as
+Select Distinct
+TbParc.CdParceiroComercial
+,TbParc.NmParceiroComercial
+,TbParc.NmAreaEstruturaComercialC
+,TbParc.NmColaboradorC
+,TbParc.DsLoginN1C
+,TbParc.DsLoginN2C
+,TbParc.DsLoginN3C
+,TbParc.NuCnpjLoja
+,TbParc.DtCadastro
+,TbParc.FlAtivo
+,Target.Porte
+,Target.TipoParceiro
+,TbParc.DtCadastro as DtCadastro Format DDMMYY10.
+From Bases.TbParceiroComercial as TbParc
+	Left Join Base_Porte_Cobans_CNPJ as Target On TbParc.NuCnpjLoja = Target.NuCnpjLojaFavorecido
+Where TbParc.TpAtividade = 7 and TbParc.NmCanalEstruturaComercialC = 'Canal Solar'
+order by TbParc.NuCnpjLoja, TbParc.FlAtivo DESC, TbParc.DtCadastro DESC, Target.Porte Desc
+;Quit;
+
+proc Sort NoDupkey Data=Base_Cobans_Solar out=Base_Cobans_Solar_Saida; by NuCnpjLoja; Quit;
+
+Data ritosol.Base_Cobans_Solar_Saida;
+Set Base_Cobans_Solar_Saida;
+Run;

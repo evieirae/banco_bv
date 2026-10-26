@@ -1,0 +1,405 @@
+START_METADATA
+PROJECT: Rodas__Motos_Escale
+FILE_SAS: Motos_Escale.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-10-14 14:12:33 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -4
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (2x | +40), FILENAME  (2x | +24), PROC APPEND (1x | +15), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 289
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, FREQ, SORT, SQL
+HAS_DATA_STEP: Yes (8x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: LEADS_V = /infogrc/leads/leads_digitais/bases
+DETECTED_MACROS_DEFINED: _timer_start, v_leads, v_simu
+DETECTED_MACROS_USED: MaxEscale, MaxMotos, _timer_start, dt_atu, dt_corte_esc, dt_corte_gcp, dur, mes_esc, v_leads, v_simu
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BV-SAEM-DTM.MIS_VAREJO_RODAS_EMPRESTIMOS.PDEC_MOTOS [BIGQUERY], CONVSIMU.TBSIMULACOES [SAS/Local], LEADS_V.LEADS_DIGITAIS_24 [SAS/Local], LEADS_V.LEADS_DIGITAIS_25 [SAS/Local], LEADS_V.LEADS_DIGITAIS_26 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: LEADS_V
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BV-SAEM-DTM.MIS_VAREJO_RODAS_EMPRESTIMOS.PDEC_MOTOS [Pass-Through Native (BIGQUERY) - BQ inferred 3-part identifier; Pass-Through Native (BIGQUERY) - FROM], CONVSIMU.TBSIMULACOES [DATA Step - SET], LEADS_V.LEADS_DIGITAIS_24 [DATA Step - SET], LEADS_V.LEADS_DIGITAIS_25 [DATA Step - SET], LEADS_V.LEADS_DIGITAIS_26 [DATA Step - SET], SOLITMP.BOLSAO_ESCALE [PROC FREQ - DATA=; PROC SQL - FROM], SOLITMP.MOTOS_SIT_CREDITO [PROC FREQ - DATA=; PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): SOLITMP.BOLSAO_ESCALE, SOLITMP.MOTOS_SIT_CREDITO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): LEADS_V.LEADS_DIGITAIS_24, LEADS_V.LEADS_DIGITAIS_25, LEADS_V.LEADS_DIGITAIS_26
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.BOLSAO_ESCALE, SOLITMP.MOTOS_SIT_CREDITO
+APPEND_ONLY_OUTPUTS: SOLITMP.BOLSAO_ESCALE, SOLITMP.MOTOS_SIT_CREDITO
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): SOLITMP.BOLSAO_ESCALE, SOLITMP.MOTOS_SIT_CREDITO
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ESCALE, ESCALE_PARCIAL, MOTOS_PARCIAL, NEGC_RODAS_PDEC_MOTOS, PROP_ESCALE, SIMU_ESCALE, TESTE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/*============================================================================================*/
+/* Tema: 	 Pré-Recusa Motos				          	                               		  */
+/* Autor:    Ramon Sales Soares - Tribo Veículos	                                          */
+/* Solicitante:    Fernanda Varani - Pricing		                                          */
+/* Versão:   001																			  */
+/* Dta: 18/12/2024                															  */
+/*============================================================================================*/
+/* 	Atualizacao:	11/02/2026													 		*/
+/* 	Responsavel: 	Gustavo Domingues | MIS IGE										 		*/
+/* 	Alt. Realizada:	- Incluido Base de leads 2026								 		*/
+/* ====================================================================================== 	*/
+
+/*********************************************/
+/* LibName e parametros 					*/
+/*********************************************/
+
+/* Start timer */
+%let _timer_start = %sysfunc(datetime());
+
+%include '/infogrc/utils/all-includes.sas';
+
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 ERRORABEND ;
+OPTIONS COMPRESS=BINARY REUSE=YES;
+
+proc freq data=solitmp.motos_sit_credito;
+	table DT_SIMULACAO_PROPOSTA;
+run;
+
+/*%let anomes_corte = 202312;*/
+/*%let dt_corte = 03apr2024;*/
+
+/* Busca data máxima da tabela funil parceiros final */
+PROC SQL ;
+	SELECT max(DT_SIMULACAO_PROPOSTA)-1 format date9. INTO: MaxMotos
+	FROM solitmp.motos_sit_credito;
+;QUIT;
+
+%put &MaxMotos.;
+
+/* Cria variáveis utilizadas no processo */
+data _null_;
+
+	dt_atu = today()-1;
+	dt_corte = intnx('day',intnx('day',"&MaxMotos."d,1),0);
+	mes_atu = put(year(intnx('month',dt_atu,0)),4.)||put(month(intnx('month',dt_atu,0)),z2.);
+	dt_corte_gcp = "'"||put(year(dt_corte),4.)||"-"||put(month(dt_corte),z2.)||"-"||put(day(dt_corte),z2.)||"'";
+
+	call symputx('dt_corte_gcp',dt_corte_gcp);
+
+run;
+
+%put &dt_corte_gcp.;
+
+/***********************************************************************************************|
+|					GERA INFOS DE DSSITUACAOCREDITO DA PDEC MOTOS -  Fernanda Varani			|
+|***********************************************************************************************/
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table negc_rodas_pdec_motos as
+   select * from connection to perm
+     (
+		SELECT DISTINCT
+			   dt_simulacao_proposta,
+			   cd_simulacao_proposta	as _cd_simulacao_proposta,
+			   ds_situacao_credito_pre  as  _ds_situacao_credito_pre
+		FROM bv-saem-dtm.mis_varejo_rodas_emprestimos.pdec_motos	a
+		WHERE a.dt_simulacao_proposta >= &dt_corte_gcp.
+
+		);
+   disconnect from perm;
+quit;
+
+data motos_parcial;
+	retain dt_simulacao_proposta cd_simulacao_proposta;
+	set negc_rodas_pdec_motos (where=(_cd_simulacao_proposta ne ""));
+
+	format ds_situacao_credito_pre $20.;
+
+	cd_simulacao_proposta = input(_cd_simulacao_proposta,20.);
+	ds_situacao_credito_pre = _ds_situacao_credito_pre;
+
+	drop _cd_simulacao_proposta _ds_situacao_credito_pre;
+
+	anomes = compress(put(year(dt_simulacao_proposta),4.)||put(month(dt_simulacao_proposta),z2.));
+
+run;
+
+proc sort data=motos_parcial out=teste dupout=dup nodupkey;
+	by cd_simulacao_proposta;
+run;
+
+proc append data=motos_parcial
+			base=solitmp.motos_sit_credito force;
+run;
+
+proc freq data=solitmp.motos_sit_credito;
+	table DT_SIMULACAO_PROPOSTA;
+run;
+
+/* Stop timer */
+data teste;
+  format dur time13.0;
+  dur = datetime() - &_timer_start;
+  put 30*'-' / ' TOTAL DURATION:' dur time13.0 / 30*'-';
+  call symputx('dur',put(dur,time13.0));
+run;
+
+%put &dur.;
+
+/* Envia email informando o término do processo */
+OPTIONS
+		EMAILHOST=smtprelay.bvnet.bv
+		EMAILPORT=25
+		EMAILAUTHPROTOCOL=NONE
+		EMAILID="ramon.sales@bv.com.br"
+	;
+	FILENAME MAIL EMAIL
+	CONTENT_TYPE="text/html"
+	TO=("ramon.sales@bv.com.br","valter.morais@bv.com.br")
+/*	CC=("valter.morais@bv.com.br","luis.santos@bv.com.br","gustavo.santos@bv.com.br")*/
+
+	SUBJECT="Base Motos atualizada - &dt_atu.";
+
+			ods html3
+			body=MAIL
+			style=SASWEB
+			rs=none;
+
+			TITLE;
+
+			ods text="Prezado(a),";
+			ods text=' ';
+			ods text="O Processo que gera a base de Motos está finalizado.";
+			ods text=' ';
+			ods text="Tempo de Execução em h:mm:ss => &dur. ";
+			ods text=' ';
+			ods text='Att,';
+			ods text=' ';
+			ods text='Equipe de Dados';
+			ods text='Tribo Veículos';
+
+ods html3 close;
+
+/*============================================================================================*/
+/* Tema: 	 Base Escale				  	        	                               		  */
+/* Autor:    Ramon Sales Soares - Tribo Veículos	                                          */
+/* Solicitante:    Mariana Cardoso - Pricing		                                          */
+/* Versão:   001																			  */
+/* Dta: 26/12/2024                															  */
+/*============================================================================================*/
+
+/*********************************************/
+/* LibName e parametros 					*/
+/*********************************************/
+
+/* Start timer */
+%let _timer_start = %sysfunc(datetime());
+
+%include '/infogrc/utils/all-includes.sas';
+libname leads_v '/infogrc/leads/leads_digitais/bases';
+
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 ERRORABEND ;
+OPTIONS COMPRESS=BINARY REUSE=YES;
+
+/* Busca data máxima da tabela funil parceiros final */
+PROC SQL ;
+	SELECT max(dtsimulacaoinicial)+1 format date9. INTO: MaxEscale
+	FROM solitmp.bolsao_escale;
+;QUIT;
+
+%put &MaxEscale.;
+
+/* Cria variáveis utilizadas no processo */
+data _null_;
+
+	dt_atu = today()-1;
+	dt_corte = intnx('month',"&MaxEscale."d,0,'b');
+	mes_esc = put(year(dt_corte),4.)||put(month(dt_corte),z2.);
+	dt_corte_esc = "'"||put(year(dt_corte),4.)||"-"||put(month(dt_corte),z2.)||"-"||put(day(dt_corte),z2.)||"'";
+
+	call symputx('dt_corte_esc',dt_corte_esc);
+	call symputx('mes_esc',mes_esc);
+	call symputx('dt_atu',put(dt_atu,date9.));
+
+run;
+
+/*%LET dt_corte_esc = '2024-01-01';*/
+/*%LET mes_esc = 202401;*/
+
+%put &dt_corte_esc.;
+%put &mes_esc.;
+%put &dt_atu.;
+
+%LET v_leads = nuanomes_simu cdsimulacao dssistemainicial cdparceirocomercialsimulacao FlContratoC2c
+		      nmparceirocomercialsimulacao FlBolsaoEscale DsMensageria nuproposta DsProduto dtsimulacao;
+%LET v_simu = CdSimulacaoInicial NuProposta Mensageria Mensageria2 EntradaMinima NuAnoMes NuProposta
+	        Regional Filial FxIdade ProbabilidadeAprovacao StatusSimulacao DtInclusaoGravame DtEntradaProposta
+			FlConcorrente nucpfcnpj flcard DtSimulacaoInicial FlPropostaOriginada VrProposta TxInicioFinanciamento
+			TxTirContabil FlPropostaAprovada FlPropostaEfetivada DtContrato Banco Produto TpPessoa SistemaInicial
+			Canal FlSimuValidaDiaEfet CdParceiroComercial PcEntradaMinima FlPap CdTabelaFinanciamento FxPrazo
+		    PcVariacaoTabelaFinanciamento NuContrato FlPagoLoja;
+
+/* Busca infos do Bolsão Escale */
+data escale;
+	set leads_v.leads_digitais_24
+		(where=(nuanomes_simu >= &mes_esc. and FlBolsaoEscale = 'ESCALE')
+		 keep=&v_leads.)
+		leads_v.leads_digitais_25
+		(where=(nuanomes_simu >= &mes_esc. and FlBolsaoEscale = 'ESCALE')
+		 keep=&v_leads.)
+		leads_v.leads_digitais_26
+		(where=(nuanomes_simu >= &mes_esc. and FlBolsaoEscale = 'ESCALE')
+		 keep=&v_leads.);
+run;
+
+/* Busca infos de simulacao da Escale */
+DATA SIMU_ESCALE;
+	SET CONVSIMU.TBSIMULACOES
+	(WHERE=(Produto in ('Leves','Motos') and NuAnoMes >= &mes_esc.
+			and SistemaInicial in ('SITE BV','APP') )
+	KEEP = &v_simu.);
+RUN;
+
+DATA PROP_ESCALE;
+	SET CONVSIMU.TBSIMULACOES
+	(WHERE=(Produto in ('Leves','Motos') and NuAnoMes >= &mes_esc. AND NuProposta ne .
+			and SistemaInicial in ('PPAR','PPAR','APAR','ACOM'))
+	KEEP = &v_simu.);
+RUN;
+/*NOTE: The data set WORK.PROP_ESCALE has 127406 observations and 36 variables.*/
+/*      real time           16:06.69*/
+
+PROC SQL;
+
+	CREATE TABLE escale_parcial AS
+	SELECT
+		A.CdSimulacao,
+		A.NuAnoMes_Simu,
+/*		a.DsProduto,*/
+/*	 	B.CdSimulacaoInicial,*/
+		C.NuProposta,
+		C.NuContrato,
+		A.DsMensageria,
+		A.FlContratoC2c,
+		COALESCE(C.Mensageria2,B.Mensageria2) AS Mensageria2,
+		COALESCE(C.EntradaMinima,B.EntradaMinima) as EntradaMinima,
+		COALESCE(C.NuAnoMes,B.NuAnoMes) AS NuAnoMes,
+		COALESCE(C.Regional,B.Regional) AS Regional,
+		COALESCE(C.Filial,B.Filial) AS Filial,
+		COALESCE(C.FxIdade,B.FxIdade) as FxIdade,
+		COALESCE(C.ProbabilidadeAprovacao,B.ProbabilidadeAprovacao ) as ProbabilidadeAprovacao,
+		COALESCE(C.StatusSimulacao,B.StatusSimulacao) as StatusSimulacao,
+		COALESCE(C.DtInclusaoGravame,B.DtInclusaoGravame) as DtInclusaoGravame format date9.,
+		COALESCE(C.DtEntradaProposta,B.DtEntradaProposta) as DtEntradaProposta format date9.,
+		COALESCE(C.FlConcorrente,B.FlConcorrente) as FlConcorrente,
+		COALESCE(C.FlPagoLoja,B.FlPagoLoja) as FlPagoLoja,
+		COALESCE(C.nucpfcnpj,B.nucpfcnpj) as nucpfcnpj,
+		B.flcard ,
+		COALESCE(C.DtSimulacaoInicial,B.DtSimulacaoInicial) AS DtSimulacaoInicial format date9.,
+		COALESCE(C.FlPropostaOriginada,B.FlPropostaOriginada) AS FlPropostaOriginada,
+		COALESCE(C.VrProposta,B.VrProposta) AS VrProposta,
+		COALESCE(C.TxInicioFinanciamento,B.TxInicioFinanciamento) AS TxInicioFinanciamento,
+		COALESCE(C.TxTirContabil,B.TxTirContabil) AS TxTirContabil,
+		COALESCE(C.FlPropostaAprovada,B.FlPropostaAprovada) AS FlPropostaAprovada,
+		COALESCE(C.FlPropostaEfetivada,B.FlPropostaEfetivada) AS FlPropostaEfetivada,
+		COALESCE(C.DtContrato,B.DtContrato) AS DtContrato format date9.,
+		COALESCE(C.Banco,B.Banco) AS Banco,
+		COALESCE(C.Produto,B.Produto) AS Produto,
+		COALESCE(C.TpPessoa,B.TpPessoa) AS TpPessoa,
+		COALESCE(C.SistemaInicial,B.SistemaInicial) AS SistemaInicial,
+		COALESCE(C.Canal,B.Canal) AS Canal ,
+		COALESCE(C.FlSimuValidaDiaEfet,B.FlSimuValidaDiaEfet) AS FlSimuValidaDiaEfet,
+		COALESCE(C.CdParceiroComercial,B.CdParceiroComercial) AS CdParceiroComercial,
+		COALESCE(C.PcEntradaMinima,B.PcEntradaMinima) AS PcEntradaMinima,
+		COALESCE(C.FlPap,B.FlPap) AS FlPap,
+		COALESCE(C.CdTabelaFinanciamento,B.CdTabelaFinanciamento) AS CdTabelaFinanciamento,
+		COALESCE(C.FxPrazo,B.FxPrazo) AS FxPrazo,
+		COALESCE(C.PcVariacaoTabelaFinanciamento,B.PcVariacaoTabelaFinanciamento) AS PcVariacaoTabelaFinanciamento
+
+	FROM escale AS A LEFT JOIN SIMU_ESCALE AS B
+			  		 ON A.CdSimulacao=B.CdSimulacaoInicial
+					 LEFT JOIN PROP_ESCALE AS C
+					 ON A.NuProposta=C.NuProposta
+	WHERE COALESCE(C.DtSimulacaoInicial,B.DtSimulacaoInicial) <= "&dt_atu."d;
+quit;
+
+proc freq data=escale_parcial;
+	table DtSimulacaoInicial / MISSING;
+run;
+
+/*data solitmp.bolsao_escale;*/
+/*	set escale_parcial;*/
+/*run;*/
+
+/* Exclui o período indicado da base histórica BKP */
+proc sql;
+	delete from solitmp.bolsao_escale
+		where NuAnoMes_Simu >= &mes_esc.
+	;
+quit;
+
+proc sql;
+	insert into solitmp.bolsao_escale
+	select * from escale_parcial;
+quit;
+
+proc freq data=solitmp.bolsao_escale;
+	table DtSimulacaoInicial / MISSING;
+run;
+
+/* Stop timer */
+data teste;
+  format dur time13.0;
+  dur = datetime() - &_timer_start;
+  put 30*'-' / ' TOTAL DURATION:' dur time13.0 / 30*'-';
+  call symputx('dur',put(dur,time13.0));
+run;
+
+%put &dur.;
+
+/* Envia email informando o término do processo */
+OPTIONS
+		EMAILHOST=smtprelay.bvnet.bv
+		EMAILPORT=25
+		EMAILAUTHPROTOCOL=NONE
+		EMAILID="ramon.sales@bv.com.br"
+	;
+	FILENAME MAIL EMAIL
+	CONTENT_TYPE="text/html"
+	TO=("ramon.sales@bv.com.br","valter.morais@bv.com.br")
+/*	CC=("valter.morais@bv.com.br","luis.santos@bv.com.br","gustavo.santos@bv.com.br")*/
+
+	SUBJECT="Base Escale atualizada - &dt_atu.";
+
+			ods html3
+			body=MAIL
+			style=SASWEB
+			rs=none;
+
+			TITLE;
+
+			ods text="Prezado(a),";
+			ods text=' ';
+			ods text="O Processo que gera a base da Escale está finalizado.";
+			ods text=' ';
+			ods text="Tempo de Execução em h:mm:ss => &dur. ";
+			ods text=' ';
+			ods text='Att,';
+			ods text=' ';
+			ods text='Equipe de Dados';
+			ods text='Tribo Veículos';
+
+ods html3 close;

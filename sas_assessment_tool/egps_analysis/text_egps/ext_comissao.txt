@@ -1,0 +1,253 @@
+START_METADATA
+PROJECT: SAS_UC4__ext_comissao
+FILE_SAS: ext_comissao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:04 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -15
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 164
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], DBA.FV_RETORNO_PGTO [DBCON], DBA.TBPESSOA [DBCON], DBPAGAMENTO.TBPAGAMENTO [DBCON], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local], TMP.TBSITUACAOPAGAMENTO [SAS/Local], TMP.TBTIPOPAGAMENTORETENCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES, TMP
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - FROM], BASES.TBCOMISSAO [DATA Step - SET; PROC EXPORT - DATA=], BASES.TBEXTCONTRATO [PROC SQL - JOIN], DBA.FV_RETORNO_PGTO [Pass-Through Native (DBCON) - FROM], DBA.TBPESSOA [Pass-Through Native (DBCON) - FROM], DBPAGAMENTO.TBPAGAMENTO [Pass-Through Native (DBCON) - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPRODUCAO [PROC SQL - JOIN], TMP.TBRETORNOPGTO [PROC SQL - FROM], TMP.TBSITUACAOPAGAMENTO [PROC SQL - JOIN], TMP.TBTIPOPAGAMENTORETENCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbComissao.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASES.TBCOMISSAO, TMP.TBRETORNOPGTO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBCOMISSAO, TMP.TBRETORNOPGTO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbComissao.csv
+TEMP/DISCARDED OUTPUTS: TBCOMISSAO, TBFOCAL, TBPESSOABENEFICIARIO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbComissao.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_originacao.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	ext_comissao.sas													| */
+/* |	Descricao: 	Programa para extrair informacoes de comissoes e pagamentos.		| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableau utilizados pela		| */
+/* |				area comercial.														| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de MIS Varejo						 */
+/* |	Criador: 	Raquel Nascimento - MIS Varejo										| */
+/* |	Data:		28/01/2021															| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = PTA);
+create table tmp.TbRetornoPgto as
+select * from connection to dbcon
+(
+	SELECT
+
+		DATE(RetornoPgto.DT_INTERFACE) AS DtInterface
+		,DATE(Pagamento.DtPagamento) AS DtLiquidacao
+		,Pagamento.CdSituacaoPagamento
+		,RetornoPgto.cpf_cgc AS NuCnpjBeneficiario
+		,RetornoPgto.Tipo_Operacao AS TpOperacao
+		,RetornoPgto.Nr_Origem AS NrOrigem
+
+ 		,RetornoPgto.VLR_BRUTO AS VrBruto
+		,RetornoPgto.VLR_IR AS VrIR
+		,RetornoPgto.VLR_ISS AS VrIss
+		,RetornoPgto.VLR_LIQUIDO AS VrLiquido
+
+		,RetornoPgto.cod_retencao AS CdRetencao
+		,RetornoPgto.vlr_retencao As VrRetencao
+
+		,RetornoPgto.FlBloqueado
+		,RetornoPgto.StPendente
+		,RetornoPgto.CdPagamento
+		,RetornoPgto.CdParceiroComercial
+		,RetornoPgto.CdVeiculoLegal
+		,RetornoPgto.CdProdutoCorporativo AS CdProduto
+		,RetornoPgto.CdModalidadeProduto
+		,RetornoPgto.NuContratoGestao as NuContrato
+		,RetornoPgto.SqContratoFinanceiro
+		,RetornoPgto.FlRejeitado
+		,RetornoPgto.NuParcela
+		,RetornoPgto.Usuario
+		,RetornoPgto.CdAgendaComissao
+		,RetornoPgto.TsReplicacao
+
+	FROM DBA.FV_RETORNO_PGTO RetornoPgto
+		LEFT JOIN DBPAGAMENTO.TbPagamento Pagamento
+			ON RetornoPgto.CdPagamento = Pagamento.CdPagamento
+			AND RetornoPgto.CdPagamento is not null
+
+	WHERE date(RetornoPgto.DT_PGTO) >= '20230101'
+)
+;quit;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server = PTA);
+create table TbPessoaBeneficiario as
+select * from connection to dbcon
+(
+	SELECT
+		NuCpfCnpj
+		,NmPessoa
+		,DtPrimeiroCadastro
+	FROM DBA.TbPessoa
+	where
+        TpPessoa = 'J' and
+		NuCpfCnpj is not null
+	ORDER BY DtPrimeiroCadastro DESC
+)
+;quit;
+
+proc sort data=TbPessoaBeneficiario   nodupkey; by NuCpfCnpj;run;
+
+PROC SQL;
+CREATE TABLE TbFocal AS
+SELECT
+	CdFilial
+	,LstColaboradorFocal
+FROM basegrc.TbColaboradorFocal ColaboradorFocal
+WHERE ColaboradorFocal.NmGrupoProdutoMeta = 'ProgQualida'
+;RUN;
+
+PROC SQL;
+CREATE TABLE bases.TbComissao AS
+	SELECT
+
+		 RetornoPgto.DtLiquidacao
+		,RetornoPgto.DtInterface
+		,Producao.DtContrato AS DtContrato format date9.
+		,COALESCE(SituacaoPagamento.DsSituacaoPagamento, CASE WHEN RetornoPgto.NrOrigem = 'BLOQ' THEN 'Bloqueado' END) AS DsSituacaoPagamento
+		,RetornoPgto.NrOrigem
+		,Producao.DsLoginOriginador
+		,TipoPagamentoRetencao.CdTipoPagamentoRetencao
+		,TipoPagamentoRetencao.DsTipoPagamentoRetencao
+
+		,RetornoPgto.StPendente
+		,RetornoPgto.FlBloqueado
+		,RetornoPgto.CdPagamento
+		,RetornoPgto.CdParceiroComercial
+		,ParceiroComercial.NmParceiroComercial
+		,ParceiroComercial.DsRazaoSocial
+		,ParceiroComercial.NuCnpjLoja
+		,ParceiroComercial.NmTipoParceiroComercial
+
+		,Contrato.CdParceiroComercialCoban
+		,ParceiroComercialCoban.NuCnpjLoja AS NuCnpjPromotora
+		,ParceiroComercialCoban.NmPromotora
+		,RetornoPgto.NuCnpjBeneficiario
+		,PessoaBeneficiario.NmPessoa AS DsRazaoSocialBeneficiario
+
+		,ParceiroComercial.NmCanalEstruturaComercialC
+		,ParceiroComercial.NmSubEstruturaComercialC
+		,ParceiroComercial.NmAreaEstruturaComercialC
+		,ParceiroComercial.NmColaboradorC
+
+		,ParceiroComercial.DsLoginN1C
+		,ParceiroComercial.DsLoginN2C
+		,ParceiroComercial.DsLoginN3C
+		,ParceiroComercial.LstSubstituicaoC
+
+		,Producao.NmGrupoProdutoMeta
+		,RetornoPgto.NuContrato
+		,RetornoPgto.FlRejeitado
+		,RetornoPgto.Usuario
+		,RetornoPgto.CdAgendaComissao
+		,RetornoPgto.TsReplicacao
+		,SUBSTR(Contrato.NmPessoa,1,15) as NmPessoaContrato
+		,SUBSTR(INPUT(Contrato.NuCpfCnpj,$30.),1,2) || 'xxxx'
+         || SUBSTR(INPUT(Contrato.NuCpfCnpj,$30.),7,1) || 'x'
+         ||SUBSTR(PUT(Contrato.NuCpfCnpj,$30.),9,21) as NuCpfCnpjContrato
+		 ,TbFocal.LstColaboradorFocal
+
+		,SUM(RetornoPgto.VrBruto) AS VrBruto format 18.2
+		,SUM(RetornoPgto.VrIR) AS VrIR format 18.2
+		,SUM(RetornoPgto.VrIss) AS VrIss format 18.2
+		,SUM(RetornoPgto.VrRetencao) AS VrRetencao format 18.2
+		,SUM(RetornoPgto.VrLiquido) AS VrLiquido format 18.2
+
+	FROM tmp.TbRetornoPgto RetornoPgto
+
+		LEFT JOIN tmp.TbProducao Producao
+			ON RetornoPgto.NuContrato = Producao.NuContrato
+
+		LEFT JOIN tmp.TbParceiroComercial ParceiroComercial
+			ON RetornoPgto.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+		LEFT JOIN tmp.TbSituacaoPagamento SituacaoPagamento
+			ON RetornoPgto.CdSituacaoPagamento = SituacaoPagamento.CdSituacaoPagamento
+
+		LEFT JOIN tmp.TbTipoPagamentoRetencao TipoPagamentoRetencao
+			ON RetornoPgto.TpOperacao = TipoPagamentoRetencao.DsTipoRetencaoComissao
+
+		LEFT JOIN TbPessoaBeneficiario PessoaBeneficiario
+			ON RetornoPgto.NuCnpjBeneficiario = PessoaBeneficiario.NuCpfCnpj
+
+		LEFT JOIN bases.TbExtContrato Contrato
+			ON RetornoPgto.NuContrato = Contrato.NuContrato
+			AND RetornoPgto.SqContratoFinanceiro = Contrato.SqContratoFinanceiro
+
+/*			LEFT JOIN basegrc.TbGrupoProdutoMeta GrupoProdutoMeta*/
+/*				ON  Contrato.CdGrupoSubProduto = GrupoProdutoMeta.CdGrupoSubProduto*/
+
+			LEFT JOIN tmp.TbParceiroComercial ParceiroComercialCoban
+				ON  Contrato.CdParceiroComercialCoban = ParceiroComercialCoban.CdParceiroComercial
+
+				LEFT JOIN TbFocal TbFocal
+					ON Contrato.CdFilial = TbFocal.CdFilial
+
+	WHERE RetornoPgto.DtInterface >= intnx('month',today(),-13)
+
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38
+;run;
+
+data TbComissao; set bases.TbComissao (where=(DtInterface >= intnx('month',today(),-5)));run;
+
+proc export
+data=bases.TbComissao
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbComissao.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbComissao.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados';

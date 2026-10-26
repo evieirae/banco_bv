@@ -1,0 +1,151 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 002-rank-bancos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: RETAIN (2x | +20)
+----------------------------------------
+LINES_OF_CODE: 92
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BANCOSRANKINPDV, BANCOSRANKINPDVREC, BANCOSRANKIN_TOPPDV, BANCOSRANKIN_TOPPDVREC, TBRITOPDV_A001
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*Busca bancos de mensageria positiva Visao PDV*/
+
+proc sql;
+create table BancosRankinPDV as
+Select
+ NuAnoMes
+,CdParceiroComercial
+,FxEntradaMinima
+,FxIdade
+,Banco
+,Sum(Qtd_APNP_Conco_MesmaLoja) + Sum(Qtd_Sem_Prop_MesmaLoja)  as TotalConcorrencia
+from ResumoSimulacoesRito as cb
+where 1=1
+and banco not in ('N/A','BV')
+/*and CdParceiroComercial = 9695*/
+/*and safra = 202407*/
+group by 1,2,3,4,5
+ORDER by 1,2,3,4 , 6 asc,5 desc
+;quit;
+
+data BancosRankin_TopPDV;
+    set BancosRankinPDV (Where=(TotalConcorrencia > 0));
+    by  NuAnoMes CdParceiroComercial FxEntradaMinima FxIdade;
+    retain Top 0;
+    if first.FxEntradaMinima then Top = 0;
+    Top + 1;
+	BancoQtd = strip(Banco)||'('||strip(TotalConcorrencia)||')'; /* Nova coluna concatenada */
+	TopBanco = 'Banco'||strip(Top);
+run;
+
+/*Busca bancos de mensageria recusada Visao PDV*/
+proc sql;
+create table BancosRankinPDVRec as
+Select
+ NuAnoMes
+,CdParceiroComercial
+/*,FxEntradaMinima	*/
+,FxIdade
+,Banco
+,Sum(Qtd_Sem_Prop_MesmaLojaRec)  as TotalConcorrencia
+from ResumoSimulacoesRito as cb
+where 1=1
+and banco not in ('N/A','BV')
+/*and CdParceiroComercial = 9695*/
+/*and safra = 202407*/
+group by 1,2,3,4
+ORDER by 1,2,3 , 5 asc
+;quit;
+
+data BancosRankin_TopPDVRec;
+    set BancosRankinPDVRec (Where=(TotalConcorrencia > 0));
+    by  NuAnoMes CdParceiroComercial FxIdade ;
+    retain Top 0;
+    if first.FxIdade then Top = 0;
+    Top + 1;
+	BancoQtd = strip(Banco)||'('||strip(TotalConcorrencia)||')'; /* Nova coluna concatenada */
+	TopBanco = 'Banco'||strip(Top);
+run;
+
+/*base simu com ranking de bancos*/
+proc sql;
+create table TbRitoPDV_A001 as
+select
+	 B.NuAnoMes
+	,B.CdParceiroComercial
+/*	,B.NmParceiroComercial*/
+	,B.FxIdade
+	,B.FxEntradaMinima
+	,C.Banco  as Banco
+	,D.Banco  as BancoRec
+
+	,coalesce(sum(B.Qtd_APNP_Conco_MesmaLoja),0)  	as Qtd_APNP_Conco_MesmaLj
+	,coalesce(sum(B.Qtd_Sem_Prop_MesmaLoja),0)  	as Qtd_Sem_Prop_MesmaLj
+	,coalesce(sum(B.Qtd_Efetivadas),0)  			as Qtd_Efetivadas
+/*	,coalesce(sum(B.Qtd_APNP),0)  					as Qtd_APNP		*/
+/*	,coalesce(sum(B.Qtd_APNP_Conco),0)  			as Qtd_APNP_Conco	*/
+/*	,coalesce(sum(B.Qtd_Aprovadas),0)  				as Qtd_Aprovadas	*/
+/*	,coalesce(sum(B.Qtd_Originadas),0)  			as Qtd_Originadas	*/
+/*	,coalesce(sum(B.Qtd_Sem_Prop),0)  				as Qtd_Sem_Prop*/
+/*	,coalesce(sum(B.Qtd_Simulacoes),0)  			as Qtd_Simulacoes	*/
+/*	,coalesce(sum(B.VrPropostaEfetivada),0)  		as VrPropostaEfetivada*/
+
+	,coalesce(sum(B.Qtd_Sem_Prop_MesmaLojaREC),0)  	as Qtd_Sem_Prop_MesmaLjRec
+	,coalesce(SUM(B.QtdSimuRG),0) AS QtdSimuRG
+
+from  ResumoSimulacoesRito B
+	LEFT JOIN BancosRankin_TopPDV C
+		on B.CdParceiroComercial = C.CdParceiroComercial
+		and B.NuAnoMes = C.NuAnoMes
+		and B.FxEntradaMinima = c.FxEntradaMinima
+		and B.FxIdade = c.FxIdade
+		and B.Banco = c.Banco
+
+	LEFT JOIN BancosRankin_TopPDVRec D
+		on B.CdParceiroComercial = D.CdParceiroComercial
+		and B.NuAnoMes = D.NuAnoMes
+		and B.FxIdade = D.FxIdade
+		and B.Banco = D.Banco
+/*where b.cdparceirocomercial in (9695,365991,394451)*/
+GROUP BY 1,2,3,4,5,6
+;run;

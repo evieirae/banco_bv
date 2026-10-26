@@ -1,0 +1,292 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 012-exporta_base.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -21
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 218
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAt, DtAtCetip2, a0, a1, safraM0, safraM13, safraM3, safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBBVRELACIONAR [SAS/Local], BASEGRC.TBCARTAPDV_CN [SAS/Local], BASEGRC.TBFEIRAOARQUIVOS [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPESSOA [SAS/Local], LEADS.ABANDONO [SAS/Local], TMP.TBORIGINACAO&A0 [SAS/Local], TMP.TBORIGINACAO&A1 [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC, SOLITMP
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBBVRELACIONAR [PROC SQL - FROM], BASEGRC.TBCARTAPDV_CN [PROC SQL - JOIN], BASEGRC.TBFEIRAOARQUIVOS [PROC SQL - FROM], BASEGRC.TBRITOFINALCN [DATA Step - SET], BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], BASES.TBPESSOA [PROC SQL - JOIN], LEADS.ABANDONO [PROC SQL - JOIN], TMP.TBORIGINACAO&A0 [DATA Step - SET], TMP.TBORIGINACAO&A1 [DATA Step - SET], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): BASEGRC.TBRITOFINALCN
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBRITOFINALCN, BASEGRC.TBRITOFINALCN_BKP, SOLITMP.TBCONVERSAOC6RITOCN
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASECAMPANHASCN, BASECAMPANHAS_V01, BASEFEIRAO, CONVERSAOC6_DADOSCLIENTEII, CONVERSAOC6_DADOSCLIENTETMP, CONVSIMU, CONVSIMU002, ORIGINACAO, PDVSEMCAMPANHA, TBBVRELACIONAR, TBCOLABORADOR, TBCOLABORADORPDV, TBRITOFINALCN_PERFIL
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{A0}, TMP.TBORIGINACAO{A1}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE TbRitoFinalCN_Perfil AS
+  SELECT
+		A.*,
+		b.FlAutoShopping,
+		b.Perf_MktShareBV,
+		b.Perf_MktShareCNHBV,
+		b.Perf_Over30,
+		b.Perf_PartJogo3M,
+		b.Perf_VirouBV3M
+FROM TbRitoFinal AS A
+  	left join basegrc.TbCartaPDV_CN as B
+		on b.CdParceiroComercial = a.CdParceiroComercial
+		and b.nuanomes = a.nuanomes
+ ;RUN;
+
+ %ExportaCsv(TbRitoComercialV2_CN,TbRitoFinalCN_Perfil);
+
+data basegrc.TbRitoFinalCN_BKP;
+set basegrc.TbRitoFinalCN
+;run;
+
+data basegrc.TbRitoFinalCN;
+set TbRitoFinalCN_Perfil
+;run;
+
+/* ======================================================== */
+/* ====EXPORTA BASE DE CAMPANHA PARA FILTRAR NO DASH======= */
+/* ======================================================== */
+
+proc sql;
+create table BaseFeirao as
+select distinct
+AnoMes as NuAnomes,
+CdParceiroComercial,
+NmModeloEvento as NmEvento,
+'Campanha RC' as NmTipoEvento
+from basegrc.TbFeiraoArquivos
+where 1=1
+and AnoMes >= &safraM3.
+and CdParceiroComercial <> .
+;run;
+
+proc sql;
+create table TBBVRELACIONAR as
+select distinct
+    NuAnoMes,
+    CdParceiroComercial,
+    NmCampanha as NmEvento,
+	NmTipoEvento
+from basegrc.TBBVRELACIONAR
+where 1=1
+and NmGrupo = 'Grupo Ação'
+and NuAnoMes >= &safraM3.
+and upcase(NmCampanha) not like '%MOTOS%'
+and upcase(NmCampanha) not like '%TESTE%'
+;quit;
+
+Data BaseCampanhas_V01;
+set TBBVRELACIONAR
+	BaseFeirao
+;run;
+
+proc sql;
+create table PdvSemCampanha as
+select distinct
+    CdParceiroComercial,
+	'Sem Campanha' as NmTipoEvento
+from tmp.TbParceiroComercial
+where CdParceiroComercial not in (select distinct CdParceiroComercial from BaseCampanhas_V01)
+;quit;
+
+Data BaseCampanhasCN;
+set BaseCampanhas_V01
+	PdvSemCampanha
+;run;
+
+%ExportaCsv(BaseCampanhaRitoV2_CN,BaseCampanhasCN);
+
+/* ======================================================== */
+/* ==============ANALITICO ABANDONO RITO=================== */
+/* ======================================================== */
+
+PROC SQL;
+CREATE TABLE Convsimu AS
+  SELECT *
+  FROM SimulacoesRito AS CONVSIMU
+ WHERE
+ 	NuAnoMes between &safraM6. and &safraM0.
+	AND CONVSIMU.GrupoMsg in ('P')
+;RUN;
+
+/* Busca dados de GF e GR */
+PROC SQL;
+CREATE TABLE TbColaboradorPDV AS
+  SELECT DISTINCT
+    CdColaboradorC AS CdColaborador,
+    NmColaboradorC,
+    CdParceiroComercial,
+    NmParceiroComercial,
+    LstSubstituicaoC
+  FROM BASES.TbParceiroComercial
+  WHERE
+    CdParceiroComercial <> .
+    AND CdColaboradorC <> .;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbColaborador AS
+  SELECT
+    A.DsLoginN1 AS CdGR,
+    A.DsLoginN2A AS CdGF,
+    B.LstSubstituicaoC AS LstFocais,
+    B.CdParceiroComercial
+  FROM
+    BASES.TbEstruturaComercial A
+  INNER JOIN
+    TbColaboradorPDV B
+    ON A.CdColaboradorAtivo = B.CdColaborador
+  WHERE
+    TODAY() BETWEEN A.DtInicioVigencia AND A.DtFimVigencia
+    AND A.DsLoginN1 IS NOT NULL
+    AND A.DsLoginN2A IS NOT NULL;
+RUN;
+
+PROC SQL;
+  SELECT MAX(DtAtualizacaoCetip) format date9. INTO :DtAtCetip2 FROM TMP.TBPOTENCIALRODAS;
+RUN;
+
+PROC SQL;
+CREATE TABLE Convsimu002 AS
+  SELECT
+    A.NuAnoMes,
+    CASE WHEN TODAY() - A.DtInclusaoGravame < 8 AND FlConcorrente = 1 THEN 'Converteu' ELSE A.Banco END AS Banco,
+    A.CdParceiroComercial,
+    A.NmParceiroComercial,
+    A.Regional,
+    A.Filial,
+    B.CdGF,
+    B.CdGR,
+    B.LstFocais,
+    A.CdSimulacaoInicial,
+    0 AS NuTelefone,
+    A.StatusSimulacao,
+    A.Mensageria,
+    A.NuCpfCnpj,
+    A.NuProposta,
+    A.DtInclusaoGravame,
+    A.FxIdade,
+    A.StPagoLoja,
+	A.DtSimulacaoInicial,
+	Case when A.DtSimulacaoInicial < "&DtAtCetip2."d then 'Sim' else 'Não' End as Cetip,
+	A.FxEntrada
+  FROM
+    Convsimu A
+  LEFT JOIN
+    TbColaborador B
+    ON A.CdParceiroComercial = B.CdParceiroComercial;
+RUN;
+
+DATA Originacao (KEEP=NuProposta FlTxAlterada);
+SET TMP.TbOriginacao&a1. - TMP.TbOriginacao&a0.;
+  WHERE NuAnoMes >= &safraM13.
+    AND NmGrupoProdutoMeta = 'Leves'
+    AND DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS');
+RUN;
+
+PROC SQL;
+SELECT MAX(DtSimulacaoInicial) INTO :DtAt FROM SimulacoesRito;
+RUN;
+
+PROC SQL;
+/*CREATE TABLE ConversaoC6_DadosCliente AS*/
+CREATE TABLE ConversaoC6_DadosClienteTMP AS
+  SELECT
+    A.NuAnoMes,
+    A.Banco,
+    A.CdParceiroComercial,
+    A.NmParceiroComercial,
+    A.Regional,
+    A.Filial,
+    A.CdGF,
+    A.CdGR,
+    A.LstFocais,
+    A.CdSimulacaoInicial,
+    A.StatusSimulacao,
+    A.Mensageria,
+    A.NuCpfCnpj,
+    COALESCE(B.NmPessoa, 'DESCONHECIDO') AS NmPessoa,
+    B.NuTelefone1,
+    B.NuTelefone2,
+    B.NuTelefone3,
+    B.DsEmail,
+    A.NuProposta,
+    C.FlTxAlterada AS FlPA,
+    A.DtInclusaoGravame,
+    A.StPagoLoja,
+    A.FxIdade,
+    PUT(&DtAt.,DATE9.) AS DtAtualizacao,
+	A.Cetip,
+	Case when D.NuCpfCnpj is null then 'N' else 'S' end as Efetivos,
+	A.FxEntrada
+  FROM
+    Convsimu002 A
+  LEFT JOIN
+/*    AUXL.TbContatoPessoa B*/
+    Bases.TbPessoa B
+    ON A.NuCpfCnpj = B.NuCpfCnpj
+  LEFT JOIN
+    Originacao C
+    ON A.NuProposta = C.NuProposta
+
+  LEFT JOIN TbAbandonoSumarizadaMes02 D
+	on  A.NuCpfCnpj = D.NuCpfCnpj
+	and A.DtSimulacaoInicial = D.DT_SIMULACAO_PROPOSTA
+	and A.CdParceiroComercial = D.CdParceiroComercial
+;
+RUN;
+
+proc sql;
+create table ConversaoC6_DadosClienteII as
+	select
+		TMP.*
+		,ABANDONO.DS_CLASSIFICACAO as Preenchimento
+		,ABANDONO.FL_ABANDONADA as FlAbandono
+		,ABANDONO.DS_CONCORRENCIA as BancoRetornoAbandono
+		,CASE WHEN ABANDONO.CD_GRUPO_HOMOGENIO IN (4,5,6,7) THEN 'Prioridade 1'
+			  WHEN ABANDONO.CD_GRUPO_HOMOGENIO IN (8,9,10) 	THEN 'Prioridade 2'
+			  WHEN ABANDONO.CD_GRUPO_HOMOGENIO IN (1,2,3) 	THEN 'Prioridade 3'
+			  end as Prioridade
+		,ABANDONO.PC_PROPENSAO AS PcPropensao
+	from ConversaoC6_DadosClienteTMP as TMP
+			left join Leads.ABANDONO as APROSIMU
+			on TMP.CdSimulacaoInicial = APROSIMU.CD_SIMULACAO_PROPOSTA
+;run;
+
+%ExportaCSV(ConversaoC6_DadosClienteRito_CN,ConversaoC6_DadosClienteII);
+
+DATA SOLITMP.TbConversaoC6RitoCN;
+SET ConversaoC6_DadosClienteII;
+RUN;

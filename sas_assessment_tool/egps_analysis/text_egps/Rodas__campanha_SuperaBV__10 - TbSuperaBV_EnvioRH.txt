@@ -1,0 +1,117 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 10 - TbSuperaBV_EnvioRH.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 95)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -9
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 50
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CSBV = /infogrc/Campanha_SuperaBV
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes, Max_Estrutura_RH
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CSBV.ESTRUTURA_COMERCIAL_01 [SAS/Local], CSBV.TBSUPERABV_RESUMO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.MAX_DATA, WORK.TBSUPERABV_ENVIORH
+IMPORTED_LIBNAMES: CSBV
+EXPORTED_LIBNAMES: CSBV
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.MAX_DATA, WORK.TBSUPERABV_ENVIORH
+TABLE_READ_PROVENANCE (Flow): CSBV.ESTRUTURA_COMERCIAL_01 [PROC SQL - JOIN], CSBV.TBSUPERABV_ENVIORH [PROC SQL - FROM], CSBV.TBSUPERABV_RESUMO [PROC SQL - FROM], WORK.MAX_DATA [DATA Step - SET], WORK.TBSUPERABV_ENVIORH [PROC APPEND - DATA=; PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): CSBV.TBSUPERABV_ENVIORH
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CSBV.ESTRUTURA_COMERCIAL_01, CSBV.TBSUPERABV_ENVIORH, CSBV.TBSUPERABV_RESUMO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CSBV.TBSUPERABV_ENVIORH
+APPEND_ONLY_OUTPUTS: CSBV.TBSUPERABV_ENVIORH
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CSBV.TBSUPERABV_ENVIORH
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbSuperaBV_EnvioRH.csv
+TEMP/DISCARDED OUTPUTS: MAX_DATA, TBSUPERABV_ENVIORH
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+LIBNAME CSBV '/infogrc/Campanha_SuperaBV';
+/********************************************************/
+/*CRIA A BASE DE ENVIO DOS VALORES DE APURAÇÃO PARA O RH*/
+/********************************************************/
+
+PROC SQL;
+CREATE TABLE TBSUPERABV_ENVIORH AS
+SELECT
+
+A.NUANOMES,
+A.DsLoginN1,
+B.CdColaboradorAtivo,
+B.IdMatricula,
+B.NmColaborador,
+A.VrRecompensa
+
+FROM CSBV.TBSUPERABV_RESUMO A
+
+LEFT JOIN CSBV.ESTRUTURA_COMERCIAL_01 B ON B.NUANOMES = A.NUANOMES AND B.DSLOGINN1 = A.DSLOGINN1
+
+WHERE A.NUANOMES = &Base_Mes
+
+ORDER BY 1,2
+
+;RUN;
+
+/*****************************/
+/*SALVA A ESTRUTURA COMERCIAL*/
+/*****************************/
+
+/*DATA CSBV.TBSUPERABV_ENVIORH;*/
+/*SET WORK.TBSUPERABV_ENVIORH;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_Estrutura_RH
+FROM CSBV.TBSUPERABV_ENVIORH
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_Estrutura_RH',Max_Estrutura_RH);
+;run;
+%PUT &Max_Estrutura_RH;
+
+PROC SQL;
+DELETE FROM CSBV.TBSUPERABV_ENVIORH
+WHERE NUANOMES = &Max_Estrutura_RH.;
+;RUN;
+
+PROC APPEND BASE=CSBV.TBSUPERABV_ENVIORH DATA=WORK.TBSUPERABV_ENVIORH FORCE;RUN;
+
+/**************************/
+/*BASE CAMPANHA - ENVIO RH*/
+/**************************/
+
+proc export
+data=work.TBSUPERABV_ENVIORH
+file='/riscosbvf/BA/processos/output/TbSuperaBV_EnvioRH.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

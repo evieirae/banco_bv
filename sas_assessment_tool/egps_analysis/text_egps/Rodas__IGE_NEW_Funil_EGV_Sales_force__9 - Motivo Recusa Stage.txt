@@ -1,0 +1,124 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 9 - Motivo Recusa Stage.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -27
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 62
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: PRIVADO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.MOTIVORECUSA
+TABLE_READ_PROVENANCE (Flow): PRIVADO.DGT_CTA_MOTIVO_STAGE [PROC SQL - FROM], WORK.MOTIVORECUSA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): PRIVADO.DGT_CTA_MOTIVO_STAGE
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): PRIVADO.DGT_CTA_MOTIVO_STAGE
+COMMENT-ONLY QUALIFIED READS (SAS comments only, not executable scan): PRIVADO.DGT_CTA_GR_RAW
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): PRIVADO.DGT_CTA_GR_RAW
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PRIVADO.DGT_CTA_MOTIVO_STAGE
+APPEND_ONLY_OUTPUTS: PRIVADO.DGT_CTA_MOTIVO_STAGE
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): PRIVADO.DGT_CTA_MOTIVO_STAGE
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: KEY_MOTIVO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	6 - Motivo Recusa Stage.sas														| */
+/* | Descricao: Programa para importar arquivo dos motvios de recusa dos atendimentos realizados pelos GRs via salesforce canal de négocios egv.					| */
+/* |		Arquivo extraído manualmente de:						| */
+/* |	 https://bancobv.lightning.force.com/lightning/r/Report/00OTT000007Nzd32AC/view?queryScope=userFoldersCreatedByMe		| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de MOTIVOS DE RECUSAS atualizada=========================*/
+/* ======================================================================================*/
+
+/*PROC SQL;*/
+/**/
+/*DELETE * FROM PRIVADO.DGT_CTA_GR_RAW WHERE 'Hora de início'n >= '01Feb2025:00:0:0'dt;QUIT;*/
+
+proc sql;
+CREATE TABLE KEY_MOTIVO AS
+select DISTINCT COMPRESS(IdOportunidade) AS KEY_MOTIVO
+FROM PRIVADO.DGT_CTA_MOTIVO_STAGE;quit;
+
+PROC SQL;
+/*CREATE TABLE teste AS */
+/*CREATE TABLE PRIVADO.DGT_CTA_GR_RAW AS */
+   INSERT INTO PRIVADO.DGT_CTA_MOTIVO_STAGE
+/*PROC SQL;*/
+/*CREATE TABLE teste AS */
+/*CREATE TABLE PRIVADO.DGT_CTA_MOTIVO_STAGE AS */
+   SELECT t1.Fase,
+          t1.'Data de fechamento'n as DtFechamento,
+          t1.'Data de criação'n as DtCriacao,
+          t1.'Origem do lead'n as OrigemLead,
+          t1.'CPF/CNPJ'n as CpfCnpj,
+          t1.'Nome do Cliente/Grupo comercial'n as NmCliente,
+          t1.'Lead/Conta'n as Conta,
+		  length(compress(compress(compress(t1.Telefone),'()'),'-')) AS TAMANHO,
+		  compress(compress(compress(t1.Telefone),'()'),'-') as Telefone,
+		  CASE WHEN length(compress(compress(compress(t1.Telefone),'()'),'-'))=22 THEN
+		INPUT(substr(substr(compress(compress(compress(t1.Telefone),'()'),'-'),length(compress(compress(compress(t1.Telefone),'()'),'-'))-9,0),length(substr(compress(compress(compress(t1.Telefone),'()'),'-'),length(compress(compress(compress(t1.Telefone),'()'),'-'))-9,13))-9,13),BEST.)
+		WHEN length(compress(compress(compress(t1.Telefone),'()'),'-'))=23 THEN
+		INPUT(substr(substr(compress(compress(compress(t1.Telefone),'()'),'-'),length(compress(compress(compress(t1.Telefone),'()'),'-'))-10,0),length(substr(compress(compress(compress(t1.Telefone),'()'),'-'),length(compress(compress(compress(t1.Telefone),'()'),'-'))-10,14))-10,14),BEST.)
+		WHEN length(compress(compress(compress(t1.Telefone),'()'),'-')) =11 THEN
+		INPUT(substr(compress(compress(compress(t1.Telefone),'()'),'-'),length(compress(compress(compress(t1.Telefone),'()'),'-'))-10,0),12.)
+		WHEN length(compress(compress(compress(t1.Telefone),'()'),'-')) =12 THEN
+		INPUT(substr(compress(compress(compress(t1.Telefone),'()'),'-'),length(compress(compress(compress(t1.Telefone),'()'),'-'))-9,0),13.)
+		WHEN length(compress(compress(compress(compress(compress(compress(t1.Telefone),'()'),'-')),'()'),'-')) =13 THEN
+		INPUT(substr(compress(compress(compress(compress(compress(compress(t1.Telefone),'()'),'-')),'()'),'-'),length(compress(compress(compress(compress(compress(compress(t1.Telefone),'()'),'-')),'()'),'-'))-10,0),13.)
+
+		END AS TEL,
+          t1.'ID da oportunidade'n as IdOportunidade,
+          t1.'ID da conta'n as IdConta,
+          t1.'Motivo da perda'n as MotivoPerda,
+          t1.'Comentários'n as Comentarios
+      FROM WORK.MOTIVORECUSA t1
+where compress(compress(compress(t1.Telefone),'()'),'-') is not null
+AND COMPRESS(t1.'ID da oportunidade'n) NOT IN (SELECT KEY_MOTIVO FROM KEY_MOTIVO)
+;
+QUIT;

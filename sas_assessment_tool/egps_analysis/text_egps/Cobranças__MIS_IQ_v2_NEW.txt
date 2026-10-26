@@ -1,0 +1,1541 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__MIS_IQ_v2_NEW
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:21 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -128
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), INFILE  (2x | +20), RETAIN (4x | +40), %MACRO (3x | +15)
+----------------------------------------
+LINES_OF_CODE: 1283
+CODE_TASKS_COUNT: 21
+DETECTED_PROCS: DELETE, EXPORT, SQL
+HAS_DATA_STEP: Yes (20x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CARTEIRA = /riscosbv/cobranca/carteiras; JAVERT = /riscosbv/cobranca/jmoghrabi
+DETECTED_MACROS_DEFINED: S_Consulta
+DETECTED_MACROS_USED: AnoMesCarga, MesCarga, NmCampo, S_Consulta, Safra_Consulta
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: NMCAMPO
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CARTEIRA.TBCOBRANCA_&ANOMESCARGA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CARTEIRA
+EXPORTED_LIBNAMES: JAVERT
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\Agente.xls[SHEET='Planilha1'], N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\GDOC.csv, N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\TSA.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.Agente <- N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\Agente.xls[SHEET='Planilha1'], WORK.GDOC <- N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\GDOC.csv, WORK.TSA_0000 <- N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\TSA.csv
+TABLE_READ_PROVENANCE (Flow): CARTEIRA.TBCOBRANCA_&ANOMESCARGA [PROC SQL - FROM], JAVERT.IQTBRELATORIO [DATA Step - SET; PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): JAVERT.IQTBRELATORIO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): JAVERT.IQTBRELATORIO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\IQTBRELATORIO_EXPORT.xlsx, N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\IQTBRELATORIO_EXPORT_PARCIAL.xlsx
+TEMP/DISCARDED OUTPUTS: STAGENTE, TBCARGAGDOC, TBCARGATSA, TBCARTEIRAAGENTE, TBFLINATIVO, TBGDOC, TBGDOCREC, TBINCLUSAO, TBMONITORIASLA, TBOCORRENCIA, TBOCORRENCIAGDOC, TBOCORRENCIATSA, TBRESUMOCARTEIRA, TBSLAGDOC, TBTSA, WORK.QUERY_FOR_IQTBRELATORIO, WORK.QUERY_FOR_IQTBRELATORIO1, WORK.QUERY_FOR_IQTBRELATORIO_0000
+DYNAMIC REFS (Ambiguous): CARTEIRA.TBCOBRANCA_{ANOMESCARGA}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.TSA_0000;
+%LET S_Consulta=&Safra_Consulta.;
+%LET Safra_Consulta=102025;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\Agente.xls[SHEET='Planilha1']|N:/DVMD/COBRANÇA/MIS/ROTINAS/IQ/02-OCORRENCIAS|AGENTE.XLS||ok
+IN|N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\GDOC.csv|N:/DVMD/COBRANÇA/MIS/ROTINAS/IQ/02-OCORRENCIAS|GDOC.CSV||suspeito
+IN|N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\TSA.csv|N:/DVMD/COBRANÇA/MIS/ROTINAS/IQ/02-OCORRENCIAS|TSA.CSV||suspeito
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Parametros */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Parametros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-RuybOi4kn3gPsOy2/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CARTEIRA 	BASE '/riscosbv/cobranca/carteiras';
+LIBNAME JAVERT BASE '/riscosbv/cobranca/jmoghrabi';
+
+%LET S_Consulta	= &Safra_Consulta.;
+
+
+DATA _NULL_;
+Safra =  PUT(&S_Consulta.,Z6.);
+CALL SYMPUT('Safra'	  		,Safra);
+CALL SYMPUT('MesCarga'		,INPUT('01'|| Safra,DDMMYY8.));
+RUN;
+
+DATA _NULL_;
+CALL SYMPUT('DtFim'	  		,INTNX ('MONTH',&MesCarga., 0 ,'E'));
+CALL SYMPUT('AnoMesCarga' 	,PUT(&MesCarga.,YYMMN6.));
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Parametros */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_GpIQ */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_GpIQ */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-io8VrnPJ35kLi86d/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO R_GpIQ (NmCampo);
+LENGTH 		GpIQ $50.;
+FORMAT 		GpIQ $50.;
+INFORMAT	GpIQ $50.;
+
+&NmCampo. = TRIM(&NmCampo.);
+
+IF GpIQ IN ( "" , "SEM GRUPO")	THEN DO;
+
+	IF FIND (&NmCampo. ,"SEM RODAS", "I") > 0	THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+	IF &NmCampo. = "DESAVERBADO"				THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+	IF &NmCampo. = "IPF-MASS"					THEN GpIQ = "ADM SEM RODAS"	;ELSE
+	IF &NmCampo. = "SALDO"						THEN GpIQ = "ADM SEM RODAS"	;ELSE
+	IF &NmCampo. = "SALDO REMANESCENTE"			THEN GpIQ = "ADM SEM RODAS"	;ELSE
+	IF &NmCampo. = "SALDO_REMENSC"				THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+
+	IF &NmCampo. = "COB_MASSIF"					THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+
+	IF &NmCampo. = "MASSIFICADO"				THEN GpIQ = "ADM SEM RODAS"	;ELSE
+	IF &NmCampo. = "COB_MASSIF"					THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+	IF &NmCampo. = "SALDO"						THEN GpIQ = "ADM SEM RODAS"	;ELSE
+	IF &NmCampo. = "SALDO_REMENSC"				THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+
+
+	IF &NmCampo. = "COBRANÇA ADMINISTRATIVA"	THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+	IF &NmCampo. = "ADMINISTRATIVA"				THEN GpIQ = "ADM SEM RODAS"	;ELSE
+
+	IF FIND (&NmCampo. ,"ADM"	, "I")	> 0 	THEN GpIQ = "ADM"			;ELSE
+	IF FIND (&NmCampo. ,"ADMINISTRATIVO"	, "I")	> 0 	THEN GpIQ = "ADM"			;ELSE
+
+	IF FIND (&NmCampo. , "CP"	,"I")	> 0		THEN GpIQ = "CP"			;ELSE
+	IF &NmCampo. = "CONSIGPF"					THEN GpIQ = "CP"			;ELSE
+	IF &NmCampo. = "INSS"						THEN GpIQ = "CP"			;ELSE
+	IF &NmCampo. = "CONSIGNADO"					THEN GpIQ = "CP"			;ELSE
+	IF &NmCampo. = "INSS"						THEN GpIQ = "CP"			;ELSE
+	IF &NmCampo. = "PF"							THEN GpIQ = "CP"			;ELSE
+
+	IF FIND (&NmCampo. , "RENEG_CONSIGNADO"	,"I")	> 0		THEN GpIQ = "RENEG_CONSIGNADO"			;ELSE
+	IF FIND (&NmCampo. , "CONSIG_RENEG"	,"I")	> 0			THEN GpIQ = "RENEG_CONSIGNADO"			;ELSE
+
+	IF FIND (&NmCampo. ,"ATIVA-DIGITAL"	, "I")	> 0 	THEN GpIQ = 'ATIVA_DIGITAL'			;ELSE
+	IF FIND (&NmCampo. ,"ATIVA_DIGITAL"	, "I")	> 0 	THEN GpIQ = 'ATIVA_DIGITAL'			;ELSE
+
+	IF FIND (&NmCampo. ,"ATIVA"	, "I")	> 0 	THEN GpIQ = 'ATIVA'			;ELSE
+	IF &NmCampo. = "ATTIVA"						THEN GpIQ = 'ATIVA'			;ELSE
+
+	IF FIND (&NmCampo. ,"Bom Pagador"	, "I")	> 0 	THEN GpIQ = 'BOM_PAGADOR'			;ELSE
+	IF FIND (&NmCampo. ,"BOM_PAGADOR"	, "I")	> 0 	THEN GpIQ = 'BOM_PAGADOR'			;ELSE
+
+	IF FIND (&NmCampo. ,"CONTE"	, "I")	> 0		THEN GpIQ = "CONTENCIOSA"	;ELSE
+	IF &NmCampo. = "NA"							THEN GpIQ = "CONTENCIOSA"	;ELSE
+	IF &NmCampo. = "IPF-CONT"					THEN GpIQ = "CONTENCIOSA"	;ELSE
+	IF &NmCampo. = "WO"							THEN GpIQ = "CONTENCIOSA"	;ELSE
+
+	IF FIND (&NmCampo. ,"AMIG"	, "I")	> 0 	THEN GpIQ = "AMIGAVEL"		;ELSE
+	IF FIND (&NmCampo. ,"AMIGAVEL" , "I")		THEN GpIQ = "AMIGAVEL"		;ELSE
+	IF FIND (&NmCampo. ,"AMIGÁVEL" , "I")		THEN GpIQ = "AMIGAVEL"		;ELSE
+	IF FIND (&NmCampo. ,"AMIGAVÉL" , "I")		THEN GpIQ = "AMIGAVEL"		;ELSE
+
+	IF &NmCampo. = "CL"							THEN GpIQ = "CL"			;ELSE
+
+	IF FIND (&NmCampo. ,"CARTOES"	, "I")		THEN GpIQ = "CARTÕES"		;ELSE
+	IF FIND (&NmCampo. ,"CARTÕES"	, "I")		THEN GpIQ = "CARTÕES"		;ELSE
+
+	IF &NmCampo. = "ATIVO"						THEN GpIQ = "CARTÕES"		;ELSE
+	IF &NmCampo. = "CARTÃO"						THEN GpIQ = "CARTÕES"		;ELSE
+	IF &NmCampo. = "CARTÃO DE CRÉDITO"			THEN GpIQ = "CARTÕES"		;ELSE
+	IF &NmCampo. = "CARTOES"					THEN GpIQ = "CARTÕES"		;ELSE
+	IF &NmCampo. = "CARTÕES"					THEN GpIQ = "CARTÕES"		;ELSE
+	IF &NmCampo. = "CARTAO"						THEN GpIQ = "CARTÕES"		;ELSE
+
+												 	 GpIQ = "SEM GRUPO";
+END;
+%MEND R_GpIQ;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_GpIQ */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_GpAgente */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_GpAgente */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-F8nuTaX1WyYdq2M4/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO R_GpAgente (NmCampo);
+LENGTH 		GpAgente $50.;
+FORMAT 		GpAgente $50.;
+INFORMAT	GpAgente $50.;
+
+&NmCampo. = trim(&NmCampo.);
+IF &NmCampo. = "A. COSTA" 									THEN GpAgente = "A COSTA" 			;ELSE
+IF &NmCampo. = "ANGELIS - MONACO & ERKERT - ADVOGADOS AS"	THEN GpAgente = "LM_ANGELIS"		;ELSE
+IF &NmCampo. = "LM_ANGELIS"									THEN GpAgente = "LM_ANGELIS"		;ELSE
+IF &NmCampo. = "ANTONIO BRAZ & VANYA MAIA" 					THEN GpAgente = "ANTONIO BRAZ"		;ELSE
+IF &NmCampo. = "BELLINATI" 									THEN GpAgente = "BELLINATI" 		;ELSE
+IF &NmCampo. = "BONATTO" 									THEN GpAgente = "BONATTO" 			;ELSE
+IF &NmCampo. = "CARVALHO" 									THEN GpAgente = "CARVALHO" 			;ELSE
+IF &NmCampo. = "CRC" 										THEN GpAgente = "CRC" 				;ELSE
+IF &NmCampo. = "HERMES RATHIER E ADVOGADOS ASSOCIADOS"		THEN GpAgente = "HERMES RATHIER"	;ELSE
+IF &NmCampo. = "MARCONDES" 									THEN GpAgente = "MARCONDES" 		;ELSE
+IF &NmCampo. = "MEDINA" 									THEN GpAgente = "MEDINA" 			;ELSE
+IF &NmCampo. = "MANDALITI" 									THEN GpAgente = "MANDALITI" 			;ELSE
+IF FIND (&NmCampo. ,"PORTINHO" , "I") > 0					THEN GpAgente = "PORTINHO" 			;ELSE
+IF &NmCampo. = "REALE" 										THEN GpAgente = "REALE" 			;ELSE
+IF &NmCampo. = "RN" 										THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "PASCHOALOTTO" 								THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "RN_ADV" 									THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "SALDO REMANESC - RN" 						THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "SCHULZE" 									THEN GpAgente = "SCHULZE" 			;ELSE
+IF &NmCampo. = "TE ATENDE.COM - LTDA"						THEN GpAgente = "FLEX" 				;ELSE
+IF &NmCampo. = "RR"											THEN GpAgente = "FLEX" 				;ELSE
+IF &NmCampo. = "FLEX"										THEN GpAgente = "FLEX" 				;ELSE
+IF &NmCampo. = "TEIXEIRA E TARGINO ADVOGADOS ASSOCIADOS"	THEN GpAgente = "INTERVALOR" 		;ELSE
+IF &NmCampo. = "TOLEDO"										THEN GpAgente = "TOLEDO" 			;ELSE
+IF &NmCampo. = "SALDO REMANESC - TOLEDO"					THEN GpAgente = "TOLEDO" 			;ELSE
+IF &NmCampo. = "ZANCHI SOCIEDADE DE ADVOGADOS"				THEN GpAgente = "ZANC"				;ELSE
+IF &NmCampo. = "MELHADO"									THEN GpAgente = "MELHADO"			;ELSE
+IF &NmCampo. = "ME/LOCALCRED"								THEN GpAgente = "MELHADO"			;ELSE
+IF &NmCampo. = "GASPARIM"									THEN GpAgente = "GASPARIM"			;ELSE
+IF &NmCampo. = "CARDOSO"									THEN GpAgente = "CARDOSO"			;ELSE
+IF &NmCampo. = "COIMBRA"									THEN GpAgente = "COIMBRA"			;ELSE
+IF &NmCampo. = "MUTANT"										THEN GpAgente = "MUTANT"			;ELSE
+IF &NmCampo. = "ZANC"										THEN GpAgente = "ZANC"				;ELSE
+IF &NmCampo. = "WAY BACK"									then GpAgente = "WAY BACK"			;ELSE
+IF &NmCampo. = "PG MAIS"									then GpAgente = "PG VIRTUAL"		;ELSE
+IF &NmCampo. = "SERVICES"									then GpAgente = "SERVICES"			;ELSE
+IF &NmCampo. = "SERVICE"									then GpAgente = "SERVICES"			;ELSE
+IF &NmCampo. = "MENDES E CUNHA"								then GpAgente = "MENDES E CUNHA"	;ELSE
+IF &NmCampo. = "CONCILIG"									then GpAgente = "CONCILIG"			;ELSE
+
+ 																 GpAgente = "SEM INFORMACAO"
+%MEND R_GpAgente;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_GpAgente */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_CargaTSA */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_CargaTSA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-MyGLIhDbUNVMgv6z/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbCargaTSA AS
+SELECT DISTINCT
+ 'Canal/Fila'n												AS Canal
+,'Monitoria'n												AS NuMonitoria
+,'Assessoria'n												AS NmAssessoria
+,'Fase'n													AS DsFase
+,'Data Liberação'n											AS DtLiberacaoTXT
+,INPUT(PUT(INPUT(PUT('Data Liberação'n,$10.),DDMMYY10.),DATE9.)
+ ||" " ||
+ SUBSTR('Data Liberação'n,12,8),DATETIME22.)
+ 															AS DtLiberacao			FORMAT  DATETIME22.
+,'Mês'n														AS Mes
+,'Ano'n														AS Ano
+,'Demanda Contábil SLA?'n									AS StSLA
+,'Demanda Contábil Procedência?'n							AS StProcedencia
+,'Classificação'n											AS Classificacao
+,'Contrato'n												AS NuContrato
+,INPUT(PUT('DataMonitoria'n	,$10.),DDMMYY10.)				AS DtMonitoria			FORMAT 	DDMMYY8.
+,'Primeira Manifestação Assessoria'n						AS DtPriManifestacao	FORMAT 	DDMMYY8.
+,'Última Manifestação Assessoria'n							AS DtUltManifestacao	FORMAT 	DDMMYY8.
+,'TempoTratativa'n											AS TempoTratativa
+,'Canal BV'n												AS CanalBV
+,'Solicitação'n												AS NuSolicitacao
+,'FeedBack'n												AS FeedBack
+,'Total Rechamada'n										AS TTRechamadas
+,'Rechamada'n												AS Rechamada
+,'Procedencia_Final'n										AS ProcedenciaFinal
+,'SLA Assessoria (Dentro ou Fora)'n							AS FlSLAAssessoria
+
+
+
+FROM TSA
+
+;QUIT;RUN;
+
+DATA TbCargaTSA;
+RETAIN MesCompetencia;
+SET TbCargaTSA ;
+FORMAT 	MesCompetencia DDMMYY8.	;
+MesCompetencia = INTNX('MONTH',DtMonitoria ,0 ,'B');
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_CargaTSA */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_Agente */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_Agente */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5xWELf2iblASqB7c/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE StAgente AS
+SELECT
+ RF.DtInclusao				AS DtInclusao			FORMAT DDMMYY8.
+,UPCASE(TRIM(RF.GpAgente))	AS GpAgente
+,UPCASE(TRIM(RF.GpIQ))		AS GpIQ
+,RF.FlInativo				AS StInativo
+,CASE WHEN UPCASE(RF.FlInativo) = 'SIM'	THEN 1
+ ELSE 0 END 	AS FlInativo
+,CASE WHEN CALCULATED GpIQ <> "TODOS"	THEN CALCULATED FlInativo
+	  END 					AS FlGpIq
+,CASE WHEN CALCULATED GpIQ = "TODOS"	THEN CALCULATED FlInativo
+	  END 					AS FlGpTT
+
+FROM AGENTE  RF
+
+WHERE DtInclusao IS NOT NULL
+
+;QUIT;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_Agente */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_CargaGDoc */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_CargaGDoc */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-w8MXeTCuDKiPCIes/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbCargaGdoc AS
+SELECT DISTINCT
+ &MesCarga.								AS MesCompetencia		FORMAT DDMMYY8.
+,'Nr. solic. BV'n						AS NuSolicitacao
+,'Tarefa'n								AS Tarefa
+,'Contrato'n							AS NuContrato
+,INPUT('Dt. SLA'n,DDMMYY10.)			AS DtSLA				FORMAT DDMMYY8.
+,INPUT('Dt. encerramento'n,DDMMYY10.)	AS DtEncerramento		FORMAT DDMMYY8.
+
+,'Assessoria'n							AS NmAssessoria
+,'Fila'n								AS Fila
+,'Data hora entrada'n					AS DtEntradaTXT
+,INPUT(PUT(INPUT(PUT('Data hora entrada'n,$10.),DDMMYY10.),DATE9.)
+ ||" " ||
+ SUBSTR('Data hora entrada'n,12,8),DATETIME22.)
+										AS DtEntrada			FORMAT  DATETIME22.
+
+,'Data hora saída'n						AS DtSaidaTXT
+,INPUT(PUT(INPUT(PUT('Data hora saída'n	,$10.),DDMMYY10.),DATE9.)
+ ||" " ||
+ SUBSTR('Data hora saída'n,12,8),DATETIME22.)
+										AS DtSaida				FORMAT  DATETIME22.
+,'Situação atual'n						AS Situacao
+,'Usuário atendimento'n					AS UsuarioAtendimento
+,'Observação'n							AS Observacao
+,'Canal'n								AS Canal
+,'Fase'n								AS DsFase
+,'Cód. legado'n							AS CdLegado
+,'Cliente'n								AS Ciente
+,INPUT('Dt. envio para EPS'n,DDMMYY10.)	AS DtEnvio				FORMAT DDMMYY8.
+,'Região'n								AS Regiao
+,'Nome do solicitante'n					AS NmSolicitante
+,'Área responsável'n					AS AreaResponsavel
+,'Histórico'n							AS Historico
+FROM GDOC
+
+;QUIT;RUN;
+
+
+DATA TBCARGAGDOC;
+ SET TBCARGAGDOC;
+Observacao 	 = TRIM(UPCASE(Observacao));
+Fila	   	 = TRIM(UPCASE(Fila));
+DsFase	   	 = TRIM(UPCASE(DsFase));
+NmAssessoria = TRIM(UPCASE(NmAssessoria));
+RUN;
+
+
+DATA TBCARGAGDOC;
+ SET TBCARGAGDOC;
+FORMAT NmAssessoriaNovo $100.;
+
+IF NmAssessoria = "ANTONIO BRAZ"		THEN NmAssessoriaNovo = "ANTONIO BRAZ & VANYA MAIA"	;ELSE
+IF NmAssessoria = "CONSULCRED"			THEN NmAssessoriaNovo = "A. COSTA";ELSE
+
+IF NmAssessoria = "ORCOZOL ASSESSORIA E CONSULTORIA DE COBR"
+										THEN NmAssessoriaNovo = "MEDINA"		;ELSE
+IF NmAssessoria = "PASCHOALOTTO"		THEN NmAssessoriaNovo = "RN"			;ELSE
+											 NmAssessoriaNovo = NmAssessoria;
+RUN;
+
+
+DATA TBCARGAGDOC;
+ SET TBCARGAGDOC;
+
+IF FIND (Canal ,"QUALIDADE"		, "I")	> 0 THEN NvCanal = "CONTROLE E QUALIDADE"		;ELSE
+IF FIND (Canal ,"SUBSÍDIOS"		, "I")	> 0 THEN NvCanal = "SUBSIDIOS"		;ELSE
+												 NvCanal = Canal;
+NvCanal = TRIM(UPCASE(NvCanal));
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_CargaGDoc */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_CargaTSA - Copy */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_CargaTSA - Copy */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ntsMAd1k7JnYWJ7u/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbCargaTSA AS
+SELECT DISTINCT
+ 'Canal/Fila'n												AS Canal
+,'Monitoria'n												AS NuMonitoria
+,'Assessoria'n												AS NmAssessoria
+,'Fase'n													AS DsFase
+,'Data Liberação'n											AS DtLiberacaoTXT
+
+
+
+
+,'Data Liberação'n											AS DtLiberacao			FORMAT  DATETIME22.
+
+,'Mês'n														AS Mes
+,'Ano'n														AS Ano
+,'Demanda Contábil SLA?'n									AS StSLA
+,'Demanda Contábil Procedência?'n							AS StProcedencia
+,'Classificação'n											AS Classificacao
+,'Contrato'n												AS NuContrato
+,'DataMonitoria'N									AS DtMonitoria FORMAT DDMMYY8.
+,INPUT(PUT('Primeira Manifestação Assessoria'n,$10.),DDMMYY10.)	AS DtPriManifestacao	FORMAT 	DDMMYY8.
+,INPUT(PUT('Última Manifestação Assessoria'n,$10.),DDMMYY10.)	AS DtUltManifestacao	FORMAT 	DDMMYY8.
+
+
+
+
+
+,'TempoTratativa'n											AS TempoTratativa
+,'Canal BV'n												AS CanalBV
+,'Solicitação'n												AS NuSolicitacao
+,'FeedBack'n												AS FeedBack
+,'Total Rechamada'n											AS TTRechamadas
+,'Rechamada'n												AS Rechamada
+,'Procedencia_Final'n										AS ProcedenciaFinal
+,'SLA Assessoria (Dentro ou Fora)'n							AS FlSLAAssessoria
+
+
+
+FROM TSA_0000
+
+;QUIT;RUN;
+
+DATA TbCargaTSA;
+RETAIN MesCompetencia;
+SET TbCargaTSA ;
+FORMAT 	MesCompetencia DDMMYY8.	;
+MesCompetencia = INTNX('MONTH',DtMonitoria ,0 ,'B');
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_CargaTSA - Copy */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Code For Query Builder_Parcial */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Code For Query Builder_Parcial */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-7bwPWv7WzLQIOdsL/code.sas */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_IQTBRELATORIO_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_IQTBRELATORIO_0000 AS
+   SELECT t1.Ano,
+          t1.SAFRA,
+          t1.MesCompetencia,
+          t1.NmOrigem,
+          t1.DtEntrada,
+          t1.NuMonitoria,
+          t1.NuSolicitacao,
+          t1.NuContratoCpfCnpj,
+          t1.Tarefa,
+          t1.CanalBV,
+          t1.Fila,
+          t1.GpCanal,
+          t1.NmAssessoria,
+          t1.GpAgente,
+          t1.DsFase,
+          t1.GpIQ,
+          t1.FlReclamacao,
+          t1.FlProcedente,
+          t1.FlSLA,
+          t1.FlForaSLA,
+          t1.FlSLAGDoc,
+          t1.DtSLA,
+          t1.CdUF,
+          t1.QdCarteira,
+          t1.QdOcorrencia,
+          t1.FlInativo
+      FROM JAVERT.IQTBRELATORIO t1
+      WHERE t1.SAFRA = ' 07-2025';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Code For Query Builder_Parcial */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: OcorrenciaTSA */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: OcorrenciaTSA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-G36RVVdV9rNKeIjT/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA TbOcorrenciaTSA ;
+ SET TBCARGATSA;
+
+
+IF StProcedencia = "Contábil"										THEN FlReclamacao = 1;ELSE
+IF StProcedencia = "Contábil - Volume Ranking Abordagem"			THEN FlReclamacao = 1;ELSE
+IF StProcedencia = "Contábil - Volume Ranking Abordagem (Excesso)"	THEN FlReclamacao = 1;ELSE
+  																		 FlReclamacao = 0;
+
+
+IF FlReclamacao = 1 	THEN DO;
+	IF ProcedenciaFinal = "PROCEDENTE"										THEN FlProcedente = 1;ELSE
+	IF ProcedenciaFinal = "Procedente"										THEN FlProcedente = 1;ELSE
+																				 FlProcedente = 0;
+	END;
+ELSE FlProcedente = 0;
+
+
+IF StSLA =	'Contábil'	THEN FlSLA = 1;	ELSE FlSLA = 0;
+
+IF FlSLA = 1 			THEN FlForaSLA = FlSLAAssessoria; ELSE FlForaSLA = 0;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE TbSLAGDoc as
+SELECT
+ RF.NuMonitoria
+,RF.NuSolicitacao
+,RF.NmAssessoria
+,RF.NuContrato
+,GDOC.DtSLA
+,MAX(CASE WHEN GDOC.Fila = "CANCELADO"	THEN 1 ELSE 0 END ) 		AS FlCancelado
+
+,MIN(CASE WHEN GDOC.Fila = "RESPONDIDA"	THEN GDOC.DtEntrada END )	AS MinDtEntrada	FORMAT  DATETIME22.
+
+,DATEPART(CALCULATED MinDtEntrada )									AS DtResposta	FORMAT  DDMMYY8.
+,CASE
+  WHEN CALCULATED DtResposta  = .
+   AND TODAY() <= GDOC.DtSLA				THEN 0
+
+  WHEN CALCULATED DtResposta  <> .
+   AND CALCULATED DtResposta <= GDOC.DtSLA	THEN 0
+  ELSE 1 END 														AS FlForaSLA
+
+FROM TbOcorrenciaTSA	AS RF
+	 ,TBCARGAGDOC	AS GDOC
+
+WHERE RF.NuSolicitacao = GDOC.NuSolicitacao
+  AND RF.NmAssessoria  = GDOC.NmAssessoriaNovo
+  AND RF.NuContrato	   = GDOC.NuContrato
+  AND RF.FlSLA = 0
+
+GROUP BY  RF.NuMonitoria,RF.NuSolicitacao,RF.NmAssessoria,RF.NuContrato,GDOC.DtSLA
+ORDER BY NuSolicitacao, NmAssessoria
+;QUIT;RUN;
+
+
+PROC SQL;
+CREATE TABLE TbMonitoriaSLA as
+SELECT NuMonitoria
+,NuSolicitacao
+,NmAssessoria
+,MAX(FlForaSLA) AS FlForaSLA
+FROM TbSLAGDoc
+WHERE FlCancelado = 0 								
+GROUP BY  NuMonitoria,NuSolicitacao,NmAssessoria
+;QUIT; RUN;
+
+
+PROC SQL;
+CREATE TABLE TbTSA AS
+SELECT
+ MesCompetencia
+,'TSA'				AS NmOrigem			FORMAT $10.
+,A.DtLiberacao		AS DtEntrada		FORMAT DDMMYY10.
+,A.NuMonitoria
+,A.NuSolicitacao
+,A.NuContrato		AS NuContratoCpfCnpj
+,A.Classificacao	AS Tarefa
+,A.CanalBV
+,A.Canal			AS Fila
+,A.NmAssessoria
+,A.DsFase
+,A.FlReclamacao
+,A.FlProcedente
+,CASE
+	WHEN B.NuMonitoria IS NOT NULL 	THEN 1
+	ELSE 0 END 				AS FlSLAGDoc
+,CASE
+	WHEN B.NuMonitoria IS NOT NULL 	THEN 1
+	ELSE A.FlSLA END 		AS FlSLA
+,CASE
+	WHEN B.NuMonitoria IS NOT NULL	THEN B.FlForaSLA
+	ELSE A.FlForaSLA END 	AS FlForaSLA
+
+FROM TbOcorrenciaTSA 		AS A
+LEFT JOIN TbMonitoriaSLA	AS B
+  ON A.NuMonitoria = B.NuMonitoria
+
+;QUIT;RUN;
+
+DATA TbTSA;
+RETAIN MesCompetencia NmOrigem DtEntrada NuMonitoria NuSolicitacao NuContratoCpfCnpj Tarefa
+	   CanalBV Fila NmAssessoria	DsFase FlReclamacao	FlProcedente FlSLA FlForaSLA;
+LENGTH 		NmOrigem	$10.
+			Tarefa		$100.
+			CanalBV 	$100.;
+
+FORMAT 		NmOrigem	$10.
+			Tarefa		$100.
+			CanalBV 	$100.;
+
+INFORMAT	NmOrigem	$10.
+			Tarefa		$100.
+			CanalBV 	$100.;
+ SET TbTSA;
+RUN;
+
+PROC DELETE DATA= TbSLAGDoc 		;RUN;
+PROC DELETE DATA= TbMonitoriaSLA	;RUN;
+PROC DELETE DATA= TbOcorrenciaTSA	;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: OcorrenciaTSA */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: OcorrenciaGDO */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: OcorrenciaGDO */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-8omwSrt4V8w2oykO/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbOcorrenciaGDOC AS
+ SELECT DISTINCT
+  A.MesCompetencia
+ ,'GDOC'											AS NmOrigem
+ ,A.NuSolicitacao
+ ,A.Tarefa
+ ,A.NuContrato
+ ,A.DtEncerramento
+ ,A.NmAssessoriaNovo								AS NmAssessoria
+ ,A.Fila
+ ,Observacao
+ ,CASE	WHEN  A.Fila = 'PENDENTE'
+		 AND (Observacao LIKE 'REC.%'
+ 		  OR  Observacao LIKE 'REC %')		THEN 1
+		ELSE 0	END 								AS  FlReclamacao
+ ,CASE WHEN CALCULATED FlReclamacao = 1
+ 		AND Observacao LIKE '%PROCEDENTE%'	THEN 1
+		ELSE 0	END									AS	FlProcedente
+ ,A.DtEntrada
+ ,A.DtSaida
+ ,A.Situacao
+ ,A.NvCanal											AS Canal
+ ,A.DsFase
+ ,A.CdLegado
+ ,A.DtEnvio
+ ,A.DtSLA
+ ,CASE WHEN A.Fila = "RESPONDIDA"	THEN
+		A.DtEntrada END 							AS DtReferencia	FORMAT  DATETIME22.
+ ,CASE WHEN B.NuSolicitacao IS NOT NULL THEN 1
+  ELSE 0	 END 									AS FlJaExiste
+
+,CASE WHEN A.Fila = "CANCELADO"  THEN 1
+  ELSE 0	 END 									AS FlCancelado
+
+ FROM TBCARGAGDOC	AS A
+ LEFT JOIN TbTsa	AS B
+  ON A.NuSolicitacao 	 = B.NuSolicitacao
+ AND A.NmAssessoriaNovo	 = B.NmAssessoria
+ AND B.FlSLAGDoc = 1
+;QUIT;RUN;
+
+PROC SQL;
+CREATE TABLE TbGDOC AS
+ SELECT
+  MesCompetencia
+ ,NmOrigem
+ ,MIN(DtEntrada)									AS DtEntrada			FORMAT  DATETIME22.
+ ,NuSolicitacao
+ ,NmAssessoria
+ ,Tarefa
+ ,Canal												AS CanalBv
+ ,DsFase
+ ,NuContrato										AS NuContratoCpfCnpj
+ ,DtSLA
+ ,DATEPART(MIN(DtReferencia))						AS DtResposta
+ ,MAX(FlCancelado)									AS FlCancelado
+ ,1													AS FlSLA
+ ,CASE
+  WHEN CALCULATED DtResposta  = .
+   AND TODAY() <= DtSLA					THEN 0
+  WHEN CALCULATED DtResposta  <> .
+   AND CALCULATED DtResposta <= DtSLA	THEN 0
+  ELSE 1 END 										AS FlForaSLA
+
+FROM TbOcorrenciaGDOC
+
+WHERE FlJaExiste = 0
+
+GROUP BY MesCompetencia , NmOrigem ,NuSolicitacao,NmAssessoria ,Tarefa
+		,Canal ,DsFase ,NuContrato ,DtSLA
+;QUIT; RUN;
+
+DATA TbGDOC;
+ SET TbGDOC;
+IF FlCancelado = 0 ;
+DROP DtReferencia DtResposta FlCancelado ;
+ RUN;
+
+
+PROC SQL;
+CREATE TABLE TbGDOCRec AS
+SELECT
+  NuSolicitacao
+ ,NmAssessoria
+ ,NuContrato
+ ,max(DtEntrada)		AS DtEntrada		FORMAT  DATETIME22.
+
+FROM TbOcorrenciaGDOC
+
+WHERE FlJaExiste = 0
+  AND FlReclamacao = 1
+GROUP BY   NuSolicitacao ,NmAssessoria,NuContrato
+;QUIT; RUN;
+
+PROC SQL;
+CREATE TABLE TbGDOCRec AS
+SELECT
+ RF.NuSolicitacao
+,RF.NmAssessoria
+,RF.NuContrato
+,RF.DtEntrada
+,MAX(A.FlReclamacao)	AS FlReclamacao
+,MAX(A.FlProcedente)	AS FlProcedente
+FROM TbGDOCRec			AS RF
+	,TbOcorrenciaGDOC	AS A
+WHERE RF.NuSolicitacao	= A.NuSolicitacao
+  AND RF.NmAssessoria	= A.NmAssessoria
+  AND RF.NuContrato		= A.NuContrato
+  AND RF.DtEntrada		= A.DtEntrada
+  AND A.FlJaExiste		= 0
+  AND A.FlReclamacao 	= 1
+GROUP BY  RF.NuSolicitacao,RF.NmAssessoria,RF.NuContrato,RF.DtEntrada
+;QUIT; RUN;
+
+
+PROC SQL;
+CREATE TABLE TbGDOC AS
+SELECT RF.*
+,CASE WHEN A.FlReclamacao = .	THEN 0
+	  ELSE A.FlReclamacao END 					AS FlReclamacao
+,CASE WHEN A.FlProcedente = .	THEN 0
+	  ELSE A.FlProcedente END 	  				AS FlProcedente
+
+from TbGDOC			AS RF
+LEFT JOIN TbGDOCRec	AS A
+  ON RF.NuSolicitacao	  = A.NuSolicitacao
+ AND RF.NmAssessoria	  = A.NmAssessoria
+ AND RF.NuContratoCpfCnpj = A.NuContrato
+;QUIT;RUN;
+
+PROC DELETE DATA=TbOcorrenciaGDOC	;RUN;
+PROC DELETE DATA=TbGDOCRec			;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: OcorrenciaGDO */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: I_Ocorrencia */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: I_Ocorrencia */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-cBBllU4js5oVbVU2/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA TbOcorrencia ;
+ SET TbTSA
+ 	 TbGDOC;
+%R_GpAgente(NmAssessoria);
+
+%R_GpIQ(DsFase);
+
+QdOcorrencia = 1 ;
+RUN;
+
+
+DATA  TbOcorrencia;
+RETAIN MesCompetencia NmOrigem DtEntrada NuMonitoria NuSolicitacao NuContratoCpfCnpj
+	   Tarefa CanalBV Fila GpCanal NmAssessoria GpAgente DsFase GpIQ FlReclamacao FlProcedente FlSLA
+	   FlForaSLA FlSLAGDoc DtSLA QdOcorrencia Ano Safra;
+
+LENGTH 		GpCanal	$30.;
+FORMAT 		GpCanal	$30.;
+INFORMAT	GpCanal	$30.;
+SET TbOcorrencia;
+FORMAT SAFRA $8.;
+Ano 	= YEAR(MesCompetencia) ;
+Safra	= PUT(MesCompetencia, MMYYD8.);
+
+CanalBv = TRIM(CanalBv);
+Fila 	= TRIM(Fila);
+
+IF FIND (Fila	 ,"1º Nível" 		, "I")	> 0 	THEN GpCanal = "1ºNível"	;ELSE
+IF FIND (Fila	 ,"CARTÃO" 			, "I")	> 0 	THEN GpCanal = "1ºNível"	;ELSE
+IF FIND (Fila	 ,"BV - Cobrança"	, "I")	> 0 	THEN GpCanal = "1ºNível"	;ELSE
+
+IF FIND (CanalBv ,"ATENDIMENTO"		, "I")	> 0 	THEN GpCanal = "1ºNível"	;ELSE
+IF FIND (CanalBv ,"CARTÕES"			, "I")	> 0		THEN GpCanal = "1ºNível"	;ELSE
+IF FIND (CanalBv ,"QUALIDADE"		, "I")	> 0		THEN GpCanal = "1ºNível"	;ELSE
+IF FIND (CanalBv ,"VEÍCULOS"		, "I")	> 0		THEN GpCanal = "1ºNível"	;ELSE
+
+IF FIND (Fila	 ,"2º Nível" 		, "I")	> 0 	THEN GpCanal = "2ºNível"	;ELSE
+IF FIND (CanalBv ,"BACEN"			, "I")	> 0		THEN GpCanal = "2ºNível"	;ELSE
+IF FIND (CanalBv ,"CONSUMIDOR"		, "I")	> 0		THEN GpCanal = "2ºNível"	;ELSE
+IF FIND (CanalBv ,"OUVIDORIA"		, "I")	> 0		THEN GpCanal = "2ºNível"	;ELSE
+IF FIND (CanalBv ,"PROCON"			, "I")	> 0		THEN GpCanal = "2ºNível"	;ELSE
+IF FIND (CanalBv ,"CARTA CONVITE"	, "I")	> 0		THEN GpCanal = "2ºNível"	;ELSE
+
+IF FIND (Fila	 ,"FAZER"			, "I")	> 0		THEN GpCanal = "OBF"		;ELSE
+IF FIND (CanalBv ,"OBF"				, "I")	> 0		THEN GpCanal = "OBF"		;ELSE
+
+IF FIND (Fila	 ,"VEX"				, "I")	> 0		THEN GpCanal = "SUBSIDIOS"	;ELSE
+IF FIND (CanalBv ,"SUBS"			, "I")	> 0		THEN GpCanal = "SUBSIDIOS"	;ELSE
+														 GpCanal = "SEM GRUPO";
+RUN;
+
+
+DATA JAVERT.IQTbRelatorio;
+ SET JAVERT.IQTbRelatorio;
+IF	 MesCompetencia = &MesCarga.
+ AND NmOrigem IN ("TSA","GDOC")	THEN DELETE;
+RUN;
+
+
+DATA JAVERT.IQTbRelatorio;
+ SET JAVERT.IQTbRelatorio
+     TbOcorrencia;
+RUN;
+
+PROC DELETE DATA= TbOcorrencia	;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: I_Ocorrencia */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: I_Carteira */
+/* ORDEM EXECUÇÃO: 012 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: I_Carteira */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-btmbggNkG2kagtEa/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbCarteiraAgente	AS
+SELECT A.*
+
+FROM CARTEIRA.TBCOBRANCA_&AnoMesCarga.	AS A
+
+;QUIT;RUN;
+
+PROC SQL;
+CREATE TABLE TbResumoCarteira	AS
+SELECT
+ MesCompetencia
+,"CARTEIRA"		AS NmOrigem
+,NmAssessoria
+,GpAgente
+,Case when NmAssessoria like '%_BOM_PAGADOR%' THEN 'BOM_PAGADOR'
+ELSE DsFase END AS DsFase
+,CASE WHEN CdUF = "" THEN "ND" ELSE CdUF END 	AS CdUF
+,count(*)		AS QdCarteira
+
+FROM TbCarteiraAgente
+GROUP BY MesCompetencia	, CdAssessoria, NmAssessoria ,GpAgente ,DsFase ,CdUF
+;QUIT;RUN;
+
+
+
+DATA TbResumoCarteira;
+ SET TbResumoCarteira;
+
+Ano 	= YEAR(MesCompetencia) ;
+Safra	= PUT(MesCompetencia, MMYYD8.);
+%R_GpIQ(DsFase);
+RUN;
+
+
+DATA JAVERT.IQTbRelatorio;
+ SET JAVERT.IQTbRelatorio;
+IF	 MesCompetencia = &MesCarga.
+ AND NmOrigem IN ("CARTEIRA")	THEN DELETE;
+RUN;
+
+DATA JAVERT.IQTbRelatorio;
+ SET JAVERT.IQTbRelatorio
+     TbResumoCarteira;
+RUN;
+
+PROC DELETE DATA= TbCarteiraAgente		;RUN;
+PROC DELETE DATA= TbResumoCarteira		;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: I_Carteira */
+/* ORDEM EXECUÇÃO: 012 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_Inativo */
+/* ORDEM EXECUÇÃO: 013 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_Inativo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-v3XqkVYxZiF3AJjn/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbInclusao AS
+SELECT
+ A.MesCompetencia
+,A.GpAgente
+,A.GpIq
+,MAX(B.DtInclusao)	as DtInclusao	FORMART DDMMYY8.
+
+FROM JAVERT.IQTbRelatorio	AS A
+LEFT JOIN STAGENTE			AS B
+  ON B.GpAgente    = A.GpAgente
+ AND B.DtInclusao <= A.MesCompetencia
+
+GROUP BY A.MesCompetencia , A.GpAgente , A.GpIq
+;QUIT; RUN;
+
+PROC SQL;
+CREATE TABLE TbFlInativo AS
+SELECT
+ RF.MesCompetencia
+,RF.GpAgente
+,RF.GpIq
+,RF.DtInclusao
+,MIN(GpIq.FlInativo)											AS FlGpIq
+,MIN(GpTT.FlInativo)											AS FlGpTT
+,CASE
+ WHEN MIN( CALCULATED FlGpIq , CALCULATED FlGpTT) = . THEN 0
+ ELSE MIN( CALCULATED FlGpIq , CALCULATED FlGpTT) END 			AS  FlInativo
+
+FROM TbInclusao 	AS RF
+
+LEFT JOIN STAGENTE	AS GpIq
+  ON RF.GpAgente 	= GpIq.GpAgente
+ AND RF.DtInclusao	= GpIq.DtInclusao
+ AND RF.GpIq	 	= GpIq.GpIq
+
+LEFT JOIN STAGENTE	AS GpTT
+  ON RF.GpAgente 	= GpTT.GpAgente
+ AND RF.DtInclusao	= GpTT.DtInclusao
+ AND GpTT.GpIq = 'TODOS'
+
+GROUP BY RF.MesCompetencia,RF.GpAgente,RF.GpIq,RF.DtInclusao
+
+;QUIT; RUN;
+
+
+PROC SQL;
+UPDATE JAVERT.IQTBRELATORIO	RF
+SET FlInativo = (	SELECT SA.FlInativo FROM TbFlInativo	AS SA
+					WHERE RF.MesCompetencia	= SA.MesCompetencia
+  				 	  AND RF.GpAgente		= SA.GpAgente
+  				  	  AND RF.GpIq			= SA.GpIq)
+
+;QUIT;
+
+DATA JAVERT.IQTBRELATORIO;
+ SET JAVERT.IQTBRELATORIO;
+IF FlInativo = . THEN FlInativo = 0 ;
+RUN;
+
+PROC DELETE DATA=TbInclusao		;RUN;
+PROC DELETE DATA= TbFlInativo	;RUN;
+
+PROC SQL;
+CREATE TABLE JAVERT.IQTBRELATORIO AS (
+SELECT
+	Ano,
+	Safra,
+	MesCompetencia,
+	NmOrigem,
+	DtEntrada,
+	NuMonitoria,
+	NuSolicitacao,
+	NuContratoCpfCnpj,
+	Tarefa,
+	CanalBV,
+	Fila,
+	GpCanal,
+	NmAssessoria,
+	GpAgente,
+	DsFase,
+	GpIQ,
+	FlReclamacao,
+	FlProcedente,
+	FlSLA,
+	FlForaSLA,
+	FlSLAGDoc,
+	DtSLA,
+	CdUF,
+	QdCarteira,
+	QdOcorrencia,
+	FlInativo
+
+FROM JAVERT.IQTBRELATORIO
+);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_Inativo */
+/* ORDEM EXECUÇÃO: 013 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 014 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_IQTBRELATORIO_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_IQTBRELATORIO_0000 AS
+   SELECT t1.Ano,
+          t1.SAFRA,
+          t1.MesCompetencia,
+          t1.NmOrigem,
+          t1.DtEntrada,
+          t1.NuMonitoria,
+          t1.NuSolicitacao,
+          t1.NuContratoCpfCnpj,
+          t1.Tarefa,
+          t1.CanalBV,
+          t1.Fila,
+          t1.GpCanal,
+          t1.NmAssessoria,
+          t1.GpAgente,
+          t1.DsFase,
+          t1.GpIQ,
+          t1.FlReclamacao,
+          t1.FlProcedente,
+          t1.FlSLA,
+          t1.FlForaSLA,
+          t1.FlSLAGDoc,
+          t1.DtSLA,
+          t1.CdUF,
+          t1.QdCarteira,
+          t1.QdOcorrencia,
+          t1.FlInativo
+      FROM JAVERT.IQTBRELATORIO t1
+      WHERE t1.SAFRA = ' 05-2025';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 014 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 015 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%MACRO R_GpAgente (NmCampo);
+LENGTH 		GpAgente $50.;
+FORMAT 		GpAgente $50.;
+INFORMAT	GpAgente $50.;
+
+&NmCampo. = trim(&NmCampo.);
+IF &NmCampo. = "A. COSTA" 									THEN GpAgente = "A COSTA" 			;ELSE
+IF &NmCampo. = "ANGELIS - MONACO & ERKERT - ADVOGADOS AS"	THEN GpAgente = "LM_ANGELIS"		;ELSE
+IF &NmCampo. = "LM_ANGELIS"									THEN GpAgente = "LM_ANGELIS"		;ELSE
+IF &NmCampo. = "ANTONIO BRAZ & VANYA MAIA" 					THEN GpAgente = "ANTONIO BRAZ"		;ELSE
+IF &NmCampo. = "BELLINATI" 									THEN GpAgente = "BELLINATI" 		;ELSE
+IF &NmCampo. = "BONATTO" 									THEN GpAgente = "BONATTO" 			;ELSE
+IF &NmCampo. = "CARVALHO" 									THEN GpAgente = "CARVALHO" 			;ELSE
+IF &NmCampo. = "CRC" 										THEN GpAgente = "CRC" 				;ELSE
+IF &NmCampo. = "HERMES RATHIER E ADVOGADOS ASSOCIADOS"		THEN GpAgente = "HERMES RATHIER"	;ELSE
+IF &NmCampo. = "MARCONDES" 									THEN GpAgente = "MARCONDES" 		;ELSE
+IF &NmCampo. = "MEDINA" 									THEN GpAgente = "MEDINA" 			;ELSE
+IF FIND (&NmCampo. ,"OLIVEIRA" , "I") > 0					THEN GpAgente = "OLIVEIRA" 			;ELSE
+IF &NmCampo. = "OLIVEIRA E RAMOS"							THEN GpAgente = "OLIVEIRA"			;ELSE
+IF &NmCampo. = "PASQUALI" 									THEN GpAgente = "PASQUALI" 			;ELSE
+IF FIND (&NmCampo. ,"PORTINHO" , "I") > 0					THEN GpAgente = "PORTINHO" 			;ELSE
+IF &NmCampo. = "REALE" 										THEN GpAgente = "REALE" 			;ELSE
+IF &NmCampo. = "RN" 										THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "PASCHOALOTTO" 								THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "RN_ADV" 									THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "SALDO REMANESC - RN" 						THEN GpAgente = "RN_ADV" 			;ELSE
+IF &NmCampo. = "SCHULZE" 									THEN GpAgente = "SCHULZE" 			;ELSE
+IF &NmCampo. = "TE ATENDE.COM - LTDA"						THEN GpAgente = "FLEX" 				;ELSE
+IF &NmCampo. = "RR"											THEN GpAgente = "FLEX" 				;ELSE
+IF &NmCampo. = "FLEX"										THEN GpAgente = "FLEX" 				;ELSE
+IF &NmCampo. = "TEIXEIRA E TARGINO ADVOGADOS ASSOCIADOS"	THEN GpAgente = "INTERVALOR" 		;ELSE
+IF &NmCampo. = "TOLEDO"										THEN GpAgente = "TOLEDO" 			;ELSE
+IF &NmCampo. = "SALDO REMANESC - TOLEDO"					THEN GpAgente = "TOLEDO" 			;ELSE
+IF &NmCampo. = "ZANCHI SOCIEDADE DE ADVOGADOS"				THEN GpAgente = "ZANC"				;ELSE
+IF &NmCampo. = "MELHADO"									THEN GpAgente = "MELHADO"			;ELSE
+IF &NmCampo. = "ME/LOCALCRED"								THEN GpAgente = "MELHADO"			;ELSE
+IF &NmCampo. = "GASPARIM"									THEN GpAgente = "GASPARIM"			;ELSE
+IF &NmCampo. = "CARDOSO"									THEN GpAgente = "CARDOSO"			;ELSE
+IF &NmCampo. = "COIMBRA"									THEN GpAgente = "COIMBRA"			;ELSE
+IF &NmCampo. = "MUTANT"										THEN GpAgente = "MUTANT"			;ELSE
+IF &NmCampo. = "ZANC"										THEN GpAgente = "ZANC"				;ELSE
+IF &NmCampo. = "WAY BACK"									then GpAgente = "WAY BACK"			;ELSE
+IF &NmCampo. = "PG MAIS"									then GpAgente = "PG VIRTUAL"		;ELSE
+IF &NmCampo. = "SERVICES"									then GpAgente = "SERVICES"			;ELSE
+IF &NmCampo. = "SERVICE"									then GpAgente = "SERVICES"			;ELSE
+IF &NmCampo. = "MENDES E CUNHA"								then GpAgente = "MENDES E CUNHA"	;ELSE
+IF &NmCampo. = "CONCILIG"									then GpAgente = "CONCILIG"			;ELSE
+
+ 																 GpAgente = "SEM INFORMACAO"
+%MEND R_GpAgente;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 015 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 016 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA WORK.GDOC;
+    LENGTH
+        'Nr. solic. BV'n $ 10
+        Tarefa           $ 19
+        Contrato         $ 8
+        'Dt. SLA'n       $ 10
+        'Dt. encerramento'n $ 1
+        Assessoria       $ 40
+        Fila             $ 10
+        'Data hora entrada'n $ 16
+        'Data hora saída'n $ 16
+        'Situação atual'n $ 22
+        'Usuário atendimento'n $ 15
+        'Observação'n    $ 122
+        Canal            $ 9
+        Fase             $ 7
+        'Cód. legado'n   $ 11
+        Cliente          $ 16
+        'Dt. envio para EPS'n $ 11
+        'Região'n        $ 32
+        'Nome do solicitante'n $ 24
+        'Área responsável'n $ 8
+        'Histórico'n     $ 284 ;
+    FORMAT
+        'Nr. solic. BV'n $CHAR10.
+        Tarefa           $CHAR19.
+        Contrato         $CHAR8.
+        'Dt. SLA'n       $CHAR10.
+        'Dt. encerramento'n $CHAR1.
+        Assessoria       $CHAR40.
+        Fila             $CHAR10.
+        'Data hora entrada'n $CHAR16.
+        'Data hora saída'n $CHAR16.
+        'Situação atual'n $CHAR22.
+        'Usuário atendimento'n $CHAR15.
+        'Observação'n    $CHAR122.
+        Canal            $CHAR9.
+        Fase             $CHAR7.
+        'Cód. legado'n   $CHAR11.
+        Cliente          $CHAR16.
+        'Dt. envio para EPS'n $CHAR11.
+        'Região'n        $CHAR32.
+        'Nome do solicitante'n $CHAR24.
+        'Área responsável'n $CHAR8.
+        'Histórico'n     $CHAR284. ;
+    INFORMAT
+        'Nr. solic. BV'n $CHAR10.
+        Tarefa           $CHAR19.
+        Contrato         $CHAR8.
+        'Dt. SLA'n       $CHAR10.
+        'Dt. encerramento'n $CHAR1.
+        Assessoria       $CHAR40.
+        Fila             $CHAR10.
+        'Data hora entrada'n $CHAR16.
+        'Data hora saída'n $CHAR16.
+        'Situação atual'n $CHAR22.
+        'Usuário atendimento'n $CHAR15.
+        'Observação'n    $CHAR122.
+        Canal            $CHAR9.
+        Fase             $CHAR7.
+        'Cód. legado'n   $CHAR11.
+        Cliente          $CHAR16.
+        'Dt. envio para EPS'n $CHAR11.
+        'Região'n        $CHAR32.
+        'Nome do solicitante'n $CHAR24.
+        'Área responsável'n $CHAR8.
+        'Histórico'n     $CHAR284. ;
+    INFILE '/saswork/SAS_workDB07000399A8_srv-sasprd05n1/#LN00013'
+        LRECL=711
+        ENCODING="LATIN1"
+        TERMSTR=CRLF
+        DLM='7F'x
+        MISSOVER
+        DSD ;
+    INPUT
+        'Nr. solic. BV'n : $CHAR10.
+        Tarefa           : $CHAR19.
+        Contrato         : $CHAR8.
+        'Dt. SLA'n       : $CHAR10.
+        'Dt. encerramento'n : $CHAR1.
+        Assessoria       : $CHAR40.
+        Fila             : $CHAR10.
+        'Data hora entrada'n : $CHAR16.
+        'Data hora saída'n : $CHAR16.
+        'Situação atual'n : $CHAR22.
+        'Usuário atendimento'n : $CHAR15.
+        'Observação'n    : $CHAR122.
+        Canal            : $CHAR9.
+        Fase             : $CHAR7.
+        'Cód. legado'n   : $CHAR11.
+        Cliente          : $CHAR16.
+        'Dt. envio para EPS'n : $CHAR11.
+        'Região'n        : $CHAR32.
+        'Nome do solicitante'n : $CHAR24.
+        'Área responsável'n : $CHAR8.
+        'Histórico'n     : $CHAR284. ;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 016 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 017 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_IQTBRELATORIO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_IQTBRELATORIO AS
+   SELECT DISTINCT t1.SAFRA,
+          
+            (SUM(t1.QdCarteira)) AS SUM_of_QdCarteira,
+          
+            (SUM(t1.QdOcorrencia)) AS SUM_of_QdOcorrencia
+      FROM JAVERT.IQTBRELATORIO t1
+      GROUP BY t1.SAFRA;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 017 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 018 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_IQTBRELATORIO1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_IQTBRELATORIO1 AS
+   SELECT t1.SAFRA,
+          t1.DsFase,
+          t1.GpIQ,
+          
+            (SUM(t1.QdCarteira)) AS SUM_of_QdCarteira
+      FROM JAVERT.IQTBRELATORIO t1
+      WHERE t1.SAFRA NOT IN
+           (
+           ' 01-2022',
+           ' 02-2022',
+           ' 03-2022',
+           ' 04-2022',
+           ' 05-2022',
+           ' 06-2022',
+           ' 07-2022',
+           ' 08-2022',
+           ' 09-2022',
+           ' 10-2022',
+           ' 11-2022',
+           ' 12-2022'
+           )
+      GROUP BY t1.SAFRA,
+               t1.DsFase,
+               t1.GpIQ
+      HAVING (CALCULATED SUM_of_QdCarteira) NOT = .
+      ORDER BY t1.SAFRA DESC,
+               t1.DsFase;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 018 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 019 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA WORK.TSA_0000;
+    LENGTH
+        'Canal/Fila'n    $ 39
+        Monitoria          8
+        Assessoria       $ 15
+        Fase             $ 13
+        'Data Liberação'n   8
+        'Mês'n           $ 8
+        Ano                8
+        'Demanda Contábil SLA?'n $ 12
+        'Demanda Contábil Procedência?'n $ 12
+        'Classificação'n $ 52
+        Contrato         $ 23
+        DataMonitoria      8
+        'Primeira Manifestação Assessoria'n $ 1
+        'Última Manifestação Assessoria'n $ 1
+        TempoTratativa     8
+        'Canal BV'n      $ 17
+        'Solicitação'n   $ 33
+        FeedBack           8
+        Rechamada          8
+        'Total Rechamada'n   8
+        Procedencia_Final $ 26
+        'SLA Assessoria (Dentro ou Fora)'n   8
+        DataAbertura1NV  $ 10
+        'Procede Resumo'n $ 1 ;
+    FORMAT
+        'Canal/Fila'n    $CHAR39.
+        Monitoria        BEST8.
+        Assessoria       $CHAR15.
+        Fase             $CHAR13.
+        'Data Liberação'n DDMMYY10.
+        'Mês'n           $CHAR8.
+        Ano              BEST4.
+        'Demanda Contábil SLA?'n $CHAR12.
+        'Demanda Contábil Procedência?'n $CHAR12.
+        'Classificação'n $CHAR52.
+        Contrato         $CHAR23.
+        DataMonitoria    DDMMYY10.
+        'Primeira Manifestação Assessoria'n $CHAR1.
+        'Última Manifestação Assessoria'n $CHAR1.
+        TempoTratativa   BEST12.
+        'Canal BV'n      $CHAR17.
+        'Solicitação'n   $CHAR33.
+        FeedBack         BEST1.
+        Rechamada        BEST1.
+        'Total Rechamada'n BEST1.
+        Procedencia_Final $CHAR26.
+        'SLA Assessoria (Dentro ou Fora)'n BEST1.
+        DataAbertura1NV  $CHAR10.
+        'Procede Resumo'n $CHAR1. ;
+    INFORMAT
+        'Canal/Fila'n    $CHAR39.
+        Monitoria        BEST8.
+        Assessoria       $CHAR15.
+        Fase             $CHAR13.
+        'Data Liberação'n DDMMYY10.
+        'Mês'n           $CHAR8.
+        Ano              BEST4.
+        'Demanda Contábil SLA?'n $CHAR12.
+        'Demanda Contábil Procedência?'n $CHAR12.
+        'Classificação'n $CHAR52.
+        Contrato         $CHAR23.
+        DataMonitoria    DDMMYY10.
+        'Primeira Manifestação Assessoria'n $CHAR1.
+        'Última Manifestação Assessoria'n $CHAR1.
+        TempoTratativa   BEST12.
+        'Canal BV'n      $CHAR17.
+        'Solicitação'n   $CHAR33.
+        FeedBack         BEST1.
+        Rechamada        BEST1.
+        'Total Rechamada'n BEST1.
+        Procedencia_Final $CHAR26.
+        'SLA Assessoria (Dentro ou Fora)'n BEST1.
+        DataAbertura1NV  $CHAR10.
+        'Procede Resumo'n $CHAR1. ;
+    INFILE '/saswork/SAS_workDB07000399A8_srv-sasprd05n1/#LN00015'
+        LRECL=294
+        ENCODING="LATIN1"
+        TERMSTR=CRLF
+        DLM='7F'x
+        MISSOVER
+        DSD ;
+    INPUT
+        'Canal/Fila'n    : $CHAR39.
+        Monitoria        : ?? BEST8.
+        Assessoria       : $CHAR15.
+        Fase             : $CHAR13.
+        'Data Liberação'n : ?? DDMMYY10.
+        'Mês'n           : $CHAR8.
+        Ano              : ?? BEST4.
+        'Demanda Contábil SLA?'n : $CHAR12.
+        'Demanda Contábil Procedência?'n : $CHAR12.
+        'Classificação'n : $CHAR52.
+        Contrato         : $CHAR23.
+        DataMonitoria    : ?? DDMMYY10.
+        'Primeira Manifestação Assessoria'n : $CHAR1.
+        'Última Manifestação Assessoria'n : $CHAR1.
+        TempoTratativa   : ?? COMMA12.
+        'Canal BV'n      : $CHAR17.
+        'Solicitação'n   : $CHAR33.
+        FeedBack         : ?? BEST1.
+        Rechamada        : ?? BEST1.
+        'Total Rechamada'n : ?? BEST1.
+        Procedencia_Final : $CHAR26.
+        'SLA Assessoria (Dentro ou Fora)'n : ?? BEST1.
+        DataAbertura1NV  : $CHAR10.
+        'Procede Resumo'n : $CHAR1. ;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 019 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 020 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.IQTBRELATORIO
+    OUTFILE='N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\IQTBRELATORIO_EXPORT.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 020 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 021 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.QUERY_FOR_IQTBRELATORIO_0000
+    OUTFILE='N:\DVMD\Cobrança\MIS\Rotinas\IQ\02-Ocorrencias\IQTBRELATORIO_EXPORT_PARCIAL.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 021 */
+/* =========================FIM TASK=========================== */

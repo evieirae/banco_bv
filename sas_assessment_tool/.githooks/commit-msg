@@ -1,0 +1,33 @@
+#!/bin/sh
+# commit-msg — remove o trailer `Co-Authored-By` das mensagens de commit.
+#
+# Por que existe: a regra "commits sem Co-Authored-By" (ONBOARDING.md § Regras duras)
+# vivia SÓ em prosa. Agentes de IA recebem, por padrão, uma instrução de atribuição de
+# sessão que manda adicionar o trailer — então a regra dependia do agente lembrar de
+# desobedecer a própria instrução, a cada sessão. Falhou: 9 commits entraram na main
+# com o trailer, custando rewrite + force-push.
+#
+# Estratégia: remover avisando no stderr, em vez de rejeitar, para não criar loop de
+# retry em sessões automatizadas. Bypassável com --no-verify, como qualquer hook — é
+# uma rede de segurança, não um portão.
+
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+
+grep -qiE '^[[:space:]]*co-authored-by:' "$msg_file" || exit 0
+
+n_removidos=$(grep -ciE '^[[:space:]]*co-authored-by:' "$msg_file")
+tmp_file="$msg_file.no-coauthor"
+
+awk '
+  tolower($0) ~ /^[[:space:]]*co-authored-by:/ { next }
+  { linhas[++n] = $0 }
+  END {
+    # descarta linhas em branco no fim, órfãs do bloco de trailer removido
+    while (n > 0 && linhas[n] ~ /^[[:space:]]*$/) { n-- }
+    for (i = 1; i <= n; i++) { print linhas[i] }
+  }
+' "$msg_file" > "$tmp_file" && mv "$tmp_file" "$msg_file"
+
+echo "commit-msg: trailer Co-Authored-By removido ($n_removidos linha(s)) — regra do repo, ver ONBOARDING.md." >&2
+exit 0

@@ -1,0 +1,209 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_TbVulnerabilidade
+FILE_SAS: 01 - TbVulnerabilidade.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 60)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 137
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM12, safraM3
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DVRYATND
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], DVRYATND.TBVULNERABILIDADE [SQLSVR], OUV.PBI_BASEOUVIDORIA_ [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DVRYATND
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM], DVRYATND.TBVULNERABILIDADE [PROC SQL - FROM], OUV.PBI_BASEOUVIDORIA_ [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/tmp/TbVulnerabilidade.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/tmp/TbVulnerabilidade.csv
+TEMP/DISCARDED OUTPUTS: TBPRODUCAO, TBRECLAMACAOOUVIDORIA, TBVULNERABILIDADE, TBVULNERABILIDADEFINAL, TBVULNERABILIDADERECLAMACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 1, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/TbVulnerabilidade.csv
+
+END_METADATA
+================================================================================
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+LIBNAME DVRYATND SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_data_atnd USER=_SAS_CRM PASSWORD="{sas002}DF101A2C5B303A50386416621272918E204F119D4D5679B9";
+
+PROC SQL;
+CREATE TABLE TbVulnerabilidade as
+SELECT DISTINCT
+	 safra
+	,nucpfcnpj
+	,risco_cliente
+	,risco_instituicao
+	,priorizacao
+	,Prob1
+FROM DVRYATND.tbVulnerabilidade as Vulnerabilidade
+WHERE Safra >= &safraM3.
+;QUIT;
+
+proc sort data=TbVulnerabilidade nodupkey;by nucpfcnpj;run;
+
+PROC SQL;
+CREATE TABLE TbProducao AS
+SELECT
+	 TbProducao.NuAnoMes
+	,TbProducao.NuContrato
+	,TbProducao.NmCanalEstruturaComercial
+	,TbProducao.NmAreaEstruturaComercial
+	,TbProducao.NmSubEstruturaComercialA
+	,INPUT(nucpfcnpj,NUM14.) AS nucpfcnpj
+	,TbProducao.nucpfcnpj
+	,TbProducao.CdParceiroComercial
+	,TbProducao.NmParceiroComercial
+	,TbProducao.TpPessoa
+	,TbProducao.NmGrupoProdutoMeta
+	,TbProducao.CdColaborador
+	,TbProducao.NmColaborador
+	,TbProducao.DsLoginN1
+	,TbProducao.DsLoginN2A
+	,TbProducao.DsLoginN3A
+FROM Bases.TbProducao
+;run;
+
+PROC SQL;
+CREATE TABLE TbReclamacaoOuvidoria AS
+SELECT
+	input(substr('Número de contrato'n,1,14),14.) AS NuContrato format 18.
+	,SubMotivo
+FROM ouv.PBI_BASEOUVIDORIA_
+WHERE Motivo IN ('Seguro','Seguros','Lojista/Correspondente')
+
+AND SubMotivo IN ('Venda Casada','Cancelamento','Não contratado','Ausência de pagamento áo vendedor/proprietário do veículo',
+				 'Demora na entrega de documentos','Demora na entrega do bem ao Financiado','Entrega de produto diverso do contratado',
+				 'Equipamentos entregues, mas não instalados','Má conduta do parceiro','Postura','Recusa Cancelamento do contrato',
+				 'Vício na documentação','Vício no produto')
+
+AND calculated NuContrato is not null
+AND 'Motivo do Encerramento'N IN ('PROCEDENTE ATENDIDO','PROCEDENTE NÃO ATENDIDO')
+AND Canal IN('0800','BACEN','Consumidor.GOV','PROCON AUD','PROCON CIP','Procon Fone','Reclame Aqui')
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbVulnerabilidadeFinal AS
+SELECT
+	'Sem Reclamação' As DsBaseReclamacao
+	,Vulnerabilidade.safra
+	,Put(Vulnerabilidade.nucpfcnpj,z14.) As nucpfcnpj
+	,Vulnerabilidade.risco_cliente
+	,Vulnerabilidade.risco_instituicao
+	,Vulnerabilidade.priorizacao
+	,Vulnerabilidade.Prob1
+	,TbProducao.NuAnoMes
+	,TbProducao.NuContrato
+	,TbProducao.NmCanalEstruturaComercial
+	,TbProducao.NmAreaEstruturaComercial
+	,TbProducao.NmSubEstruturaComercialA
+	,Put(TbProducao.nucpfcnpj,z14.) As PNuCpfCnpj
+	,TbProducao.CdParceiroComercial
+	,TbProducao.NmParceiroComercial
+	,TbProducao.TpPessoa
+	,TbProducao.NmGrupoProdutoMeta
+	,TbProducao.CdColaborador
+	,TbProducao.NmColaborador
+	,TbProducao.DsLoginN1
+	,TbProducao.DsLoginN2A
+	,TbProducao.DsLoginN3A
+
+FROM TbVulnerabilidade Vulnerabilidade
+	LEFT JOIN TbProducao TbProducao
+		ON Vulnerabilidade.nucpfcnpj = TbProducao.nucpfcnpj
+
+	WHERE NuContrato <> .
+	AND NmSubEstruturaComercialA <> ''
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbVulnerabilidadeReclamacao AS
+SELECT
+	'Reclamação' As DsBaseReclamacao
+	,Vulnerabilidade.safra
+	,Put(Vulnerabilidade.nucpfcnpj,z14.) As nucpfcnpj
+	,Vulnerabilidade.risco_cliente
+	,Vulnerabilidade.risco_instituicao
+	,Vulnerabilidade.priorizacao
+	,Vulnerabilidade.Prob1
+	,TbProducao.NuAnoMes
+	,TbProducao.NuContrato
+	,TbProducao.NmCanalEstruturaComercial
+	,TbProducao.NmAreaEstruturaComercial
+	,TbProducao.NmSubEstruturaComercialA
+	,Put(TbProducao.nucpfcnpj,z14.) As PNuCpfCnpj
+	,TbProducao.CdParceiroComercial
+	,TbProducao.NmParceiroComercial
+	,TbProducao.TpPessoa
+	,TbProducao.NmGrupoProdutoMeta
+	,TbProducao.CdColaborador
+	,TbProducao.NmColaborador
+	,TbProducao.DsLoginN1
+	,TbProducao.DsLoginN2A
+	,TbProducao.DsLoginN3A
+	,SubMotivo
+
+FROM TbVulnerabilidade Vulnerabilidade
+	LEFT JOIN TbProducao TbProducao
+		ON Vulnerabilidade.nucpfcnpj = TbProducao.nucpfcnpj
+
+	LEFT JOIN TbReclamacaoOuvidoria TbReclamacaoOuvidoria
+		ON TbProducao.NuContrato = TbReclamacaoOuvidoria.NuContrato
+
+	WHERE TbProducao.NuContrato <> .
+	AND TbProducao.NmSubEstruturaComercialA <> ''
+;RUN;
+
+data TbVulnerabilidade;
+set
+	TbVulnerabilidadeFinal
+	TbVulnerabilidadeReclamacao
+;run;
+
+PROC SQL;
+CREATE TABLE TbVulnerabilidade AS
+SELECT * FROM TbVulnerabilidade
+WHERE NuAnoMes >= &safraM12.
+;RUN;
+
+proc export
+data=TbVulnerabilidade
+file='/riscosbvf/BA/processos/tmp/TbVulnerabilidade.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /riscosbvf/BA/processos/tmp/TbVulnerabilidade.csv  /riscosbvf/BA/processos/output/ ";

@@ -1,0 +1,385 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Atacado__ativos_recorrentes_pipe
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:45 UTC
+BUSINESS_AREA: Atacado
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 294
+CODE_TASKS_COUNT: 10
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: ANOMES_EXTRATO
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): EXTRATO.EXTRATO_202508 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.ATIVOS_RECORRENTES
+TABLE_READ_PROVENANCE (Flow): EXTRATO.EXTRATO_202508 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], WORK.ATIVOS_RECORRENTES [DATA Step - SET; PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DCIB\SUPORTECOMERCIAL\Bases\PIPELINE\ATIVOS_RECORRENTES.xlsx
+TEMP/DISCARDED OUTPUTS: WORK.ATIVOS_RECORRENTES, WORK.QUERY_FOR_ATIVOS_RECORRENTES, WORK.QUERY_FOR_ATIVOS_RECORRENTES1, WORK.QUERY_FOR_ATIVOS_RECORRENTES2, WORK.QUERY_FOR_ATIVOS_RECORRENTES3, WORK.QUERY_FOR_ATIVOS_RECORRENTES4, WORK.QUERY_FOR_ATIVOS_RECORRENTE_0000, WORK.QUERY_FOR_ATIVOS_RECORRENTE_0001, WORK.QUERY_FOR_ATIVOS_RECORRENTE_0002
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET ANOMES_EXTRATO=202508;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Mn8VRhSjqD7OeQ6Z/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.ATIVOS_RECORRENTES AS
+   SELECT 
+            (YEAR(t1.ANOMES)) AS ANO,
+          
+            (month(t1.ANOMES)) AS MES,
+          t1.'DIVISAO COMERCIAL'n,
+          t1.SEGMENTO,
+          t1.'AREA PRODUTO'n,
+          t1.PRODUTO,
+          t1.VL_PRODUCAO_YTD,
+          t1.Receita,
+          t1.ESTOQUE_PRODUCAO,
+          t1.'Tipo Res'n
+      FROM EXTRATO.EXTRATO_&ANOMES_EXTRATO. t1;
+QUIT;
+
+DATA WORK.ATIVOS_RECORRENTES (COMPRESS=YES);
+	SET WORK.ATIVOS_RECORRENTES;
+FORMAT AREA_PRODUTO_AJ $CHAR100.;
+
+IF PRODUTO IN ('CESSÃO ANTECIPA BV - ISENTO',
+'CESSÃO ANTECIPA BV - sem IOF',
+'CESSÃO DE REC S/ COOB MAND COB',
+'Cessão  Antecipa BV VNP IPCA',
+'Cessão Antecipa BV',
+'Cessão Mand Cob TM',
+'Cessão Dir. Credit. S/ Coobr. Mandatário Cobrança',
+'Cessão Risco BV Emissor',
+'Cessão de Direitos Creditórios sem Coobrigação',
+'Cessão de Rec S/ Coob IF',
+'Cessão de Rec S/ Coob Mand Cob',
+'Cessão de Recebíveis S/ Coobrigação',
+"CESSÃO ANTECIPA BV - SEM IOF",
+"CESSÃO DE DIREITOS CREDITÓRIOS SEM COOBRIGAÇÃO",
+"CESSÃO DIR. CREDIT. S/ COOBR. MANDATÁRIO COBRANÇA",
+"CESSÃO DE RECEBÍVEIS S/ COOBRIGAÇÃO")
+THEN AREA_PRODUTO_AJ = "CESSÃO";
+
+IF 'AREA PRODUTO'n IN ("CESSAO ANTECIPA BV","CESSAO FI") THEN AREA_PRODUTO_AJ = "CESSÃO";
+
+RUN;
+DATA WORK.ATIVOS_RECORRENTES (COMPRESS=YES);
+	SET WORK.ATIVOS_RECORRENTES;
+
+IF 'AREA PRODUTO'n IN ("AML")
+	AND AREA_PRODUTO_AJ ^= "CESSÃO"
+		AND INDEX(UPCASE(PRODUTO),"CESSAO")=0
+			AND INDEX(UPCASE(PRODUTO),"CESSÃO")=0
+					THEN AREA_PRODUTO_AJ = "AML";
+
+IF 'AREA PRODUTO'n IN ("AME")
+	AND AREA_PRODUTO_AJ ^= "CESSÃO"
+		AND INDEX(UPCASE(PRODUTO),"CESSAO")=0
+			AND INDEX(UPCASE(PRODUTO),"CESSÃO")=0
+					THEN AREA_PRODUTO_AJ = "AME";
+
+RUN;
+
+PROC SQL;
+   CREATE TABLE WORK.ATIVOS_RECORRENTES (COMPRESS=YES) AS
+   SELECT t1.ANO,
+          t1.MES,
+          t1.'DIVISAO COMERCIAL'n,
+          t1.SEGMENTO,
+          t1.PRODUTO,
+          t1.AREA_PRODUTO_AJ,
+          t1.VL_PRODUCAO_YTD,
+          t1.Receita,
+          t1.ESTOQUE_PRODUCAO,
+          t1.'Tipo Res'n
+      FROM WORK.ATIVOS_RECORRENTES t1
+      WHERE t1.AREA_PRODUTO_AJ NOT IS MISSING;
+QUIT;
+
+DATA WORK.ATIVOS_RECORRENTES (COMPRESS=YES);
+SET WORK.ATIVOS_RECORRENTES;
+
+IF PRODUTO = "FIANÇA - PERFORMANCE" THEN DELETE;
+
+RUN;
+PROC SQL;
+   CREATE TABLE WORK.ATIVOS_RECORRENTES AS
+   SELECT t1.ANO,
+          t1.MES,
+          t1.'DIVISAO COMERCIAL'n,
+          t1.SEGMENTO,
+          t1.AREA_PRODUTO_AJ,
+          t1.VL_PRODUCAO_YTD,
+          t1.Receita,
+          t1.ESTOQUE_PRODUCAO,
+          t1.'Tipo Res'n
+      FROM WORK.ATIVOS_RECORRENTES t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTE_0001);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTE_0001 AS
+   SELECT t1.MES,
+          t1.AREA_PRODUTO_AJ,
+          
+            (SUM(t1.VL_PRODUCAO_YTD)) FORMAT=COMMAX22.2 AS SUM_of_VL_PRODUCAO_YTD
+      FROM WORK.ATIVOS_RECORRENTES t1
+      GROUP BY t1.MES,
+               t1.AREA_PRODUTO_AJ;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTES);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTES AS
+   SELECT DISTINCT t1.'AREA PRODUTO'n,
+          t1.PRODUTO
+      FROM WORK.ATIVOS_RECORRENTES t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTES1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTES1 AS
+   SELECT t1.ANO,
+          t1.MES,
+          t1.'DIVISAO COMERCIAL'n,
+          t1.SEGMENTO,
+          t1.AREA_PRODUTO_AJ,
+          t1.VL_PRODUCAO_YTD,
+          t1.Receita,
+          t1.ESTOQUE_PRODUCAO,
+          t1.'Tipo Res'n
+      FROM WORK.ATIVOS_RECORRENTES t1
+      WHERE t1.AREA_PRODUTO_AJ NOT IS MISSING;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTE_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTE_0000 AS
+   SELECT DISTINCT t1.AREA_PRODUTO_AJ
+      FROM WORK.ATIVOS_RECORRENTES t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTE_0002);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTE_0002 AS
+   SELECT DISTINCT t1.AREA_PRODUTO_AJ,
+          t1.PRODUTO
+      FROM WORK.ATIVOS_RECORRENTES t1
+      WHERE t1.AREA_PRODUTO_AJ NOT IS MISSING;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTES2);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTES2 AS
+   SELECT DISTINCT t1.PRODUTO,
+          t1.AREA_PRODUTO_AJ
+      FROM WORK.ATIVOS_RECORRENTES t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTES3);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTES3 AS
+   SELECT DISTINCT t1.PRODUTO,
+          
+            (SUM(t1.Receita)) FORMAT=COMMAX22.2 AS SUM_of_Receita
+      FROM WORK.ATIVOS_RECORRENTES t1
+      WHERE t1.MES = 7 AND t1.AREA_PRODUTO_AJ = 'AML'
+      GROUP BY t1.PRODUTO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATIVOS_RECORRENTES4);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATIVOS_RECORRENTES4 AS
+   SELECT DISTINCT 
+                     (SUM(t1.VL_PRODUCAO_YTD)) FORMAT=COMMAX22.2 AS SUM_of_VL_PRODUCAO_YTD
+      FROM WORK.ATIVOS_RECORRENTES t1
+      WHERE t1.MES = 7 AND t1.AREA_PRODUTO_AJ = 'AML';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.ATIVOS_RECORRENTES
+    OUTFILE='N:\DCIB\SUPORTECOMERCIAL\Bases\PIPELINE\ATIVOS_RECORRENTES.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */

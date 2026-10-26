@@ -1,0 +1,275 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - Vagas v2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 219
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPOTENCIALRODAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBPOTENCIALRODAS [PROC SQL - FROM], BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.QUERY_FOR_TBPOTENCIALRODAS, WORK.QUERY_FOR_TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-MdZGan3xc6gwBKpS/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.QUERY_FOR_TBPOTENCIALRODAS AS
+   SELECT
+      t1.NuAnoMes,
+      t1.NmGrupoProdutoMeta,
+      t1.CdParceiroComercial,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmCidade,
+      t1.CdUF,
+      t1.CdColaborador,
+      t1.NmColaborador,
+      t1.NmAreaEstruturaComercial,
+      t1.NmSubEstruturaComercial,
+      t1.NmCanalEstruturaComercial,
+      CASE
+         WHEN t1.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+      END AS Estado_bem,
+      COUNT(t1.NuContrato) AS COUNT_of_NuContrato,
+      SUM(t1.VrProducao) AS SUM_of_VrProducao,
+   FROM BASES.TBPRODUCAO t1
+   WHERE t1.CdParceiroComercial IS NOT MISSING
+     AND t1.NuAnoMes BETWEEN 202401 AND 202504
+     AND t1.NmCanalEstruturaComercialC = 'Canal Veiculos'
+   GROUP BY
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      t1.CdParceiroComercial,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmCidade,
+      t1.CdUF,
+      t1.CdColaboradorC,
+      t1.NmColaboradorC,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      t1.NuCnpjLoja,
+      CALCULATED Estado_bem;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ceY9qbOagHGWCJCv/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+	   CREATE TABLE WORK.QUERY_FOR_TBPRODUCAO AS
+	   SELECT t1.NuAnoMes,
+	          t1.NmCanalEstruturaComercial,
+	          t1.NmAreaEstruturaComercialC,
+	          t1.NmSubEstruturaComercialC,
+	          t1.NmGrupoProdutoMeta,
+	          t1.FxIdade,
+			  t1.CdParceiroComercial,
+	          t1.CdColaborador,
+	          t1.NmColaborador,
+	          t1.DsLoginN1,
+	          t1.DsLoginN1CartPDV,
+	          
+	            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+	          
+	            (SUM(t1.VrProducao)) FORMAT=21.2 AS SUM_of_VrProducao,
+	          
+	            (SUM(t1.VrMargemContribuicao)) FORMAT=20.2 AS SUM_of_VrMargemContribuicao
+	              FROM BASES.TBPRODUCAO t1
+	      WHERE t1.NmGrupoProdutoMeta IN
+	           (
+	           'CVG Leves',
+	           'CVG Pesados',
+	           'Leves',
+	           'Motos',
+	           'Pesados'
+	           ) AND t1.NuAnoMes BETWEEN 202501 AND 202507
+	      GROUP BY 1,2,3,4,5,6,7,8,9,10,11;
+	QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.QUERY_FOR_TBPOTENCIALRODAS AS
+   SELECT
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      t1.CdParceiroComercial,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmCidade,
+      t1.CdUF,
+      t1.CdColaboradorC,
+      t1.NmColaboradorC,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      t1.NuCnpjLoja,
+      CASE
+         WHEN t1.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+      END AS Estado_bem,
+      SUM(t1.QtContrato) AS SUM_of_QtContrato,
+      SUM(t1.VrProducao) AS SUM_of_VrProducao,
+      SUM(t1.QtGravamesMercado) AS SUM_of_QtGravamesMercado,
+      SUM(t1.VrGravamesMercado) AS SUM_of_VrGravamesMercado
+   FROM BASES.TBPOTENCIALRODAS t1
+   WHERE t1.CdParceiroComercial IS NOT MISSING
+     AND t1.NuAnoMes BETWEEN 202401 AND 202504
+     AND t1.NmGrupoProduto = 'Leves'
+     AND t1.FxIdade <> 'ZeroKM'
+     AND t1.NmCanalEstruturaComercialC = 'Canal Veiculos'
+   GROUP BY
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      t1.CdParceiroComercial,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmCidade,
+      t1.CdUF2,
+      t1.CdColaboradorC,
+      t1.NmColaboradorC,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      t1.NuCnpjLoja,
+      CALCULATED Estado_bem;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.QUERY_FOR_TBPOTENCIALRODAS AS
+   SELECT
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      t1.CdParceiroComercial,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmCidade,
+      t1.CdUF,
+      t1.CdColaboradorC,
+      t1.NmColaboradorC,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      t1.NuCnpjLoja,
+      CASE
+         WHEN t1.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+      END AS Estado_bem,
+      SUM(t1.QtContrato) AS SUM_of_QtContrato,
+      SUM(t1.VrProducao) AS SUM_of_VrProducao,
+      SUM(t1.QtGravamesMercado) AS SUM_of_QtGravamesMercado,
+      SUM(t1.VrGravamesMercado) AS SUM_of_VrGravamesMercado
+   FROM BASES.TBPOTENCIALRODAS t1
+   WHERE t1.CdParceiroComercial IS NOT MISSING
+     AND t1.NuAnoMes BETWEEN 202401 AND 202507
+     AND t1.NmSubEstruturaComercialC IN (
+         'Canal Rodas e EGV - Regional I',
+         'Canal Rodas e EGV - Regional II',
+         'Canal Rodas e EGV - Regional III',
+         'Canal Rodas e EGV - Regional IV',
+         'Canal Rodas e EGV - Regional V',
+         'Canal Rodas e EGV - Regional VI'
+     )
+   GROUP BY
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      t1.CdParceiroComercial,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmCidade,
+      t1.CdUF,
+      t1.CdColaboradorC,
+      t1.NmColaboradorC,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      t1.NuCnpjLoja,
+      CALCULATED Estado_bem;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

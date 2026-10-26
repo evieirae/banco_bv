@@ -1,0 +1,99 @@
+START_METADATA
+PROJECT: Rodas__Rito_RC-Tatico
+FILE_SAS: 2 - Gera Output dColaborador.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 40
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBMETAPRODUCAOFINAL_DASH [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBMETAPRODUCAOFINAL_DASH [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./d_colaborador_RITO_RC_TATICO.csv
+TEMP/DISCARDED OUTPUTS: D_COLABORADOR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Gera Output dColaborador.sas														| */
+/* | Descricao: Programa gerar o output dColaborador para Rito RC Tatico.					| */
+/* | Objetivo: 	Apuração do Rito RC Tatico					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera dColaborador =========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+   CREATE TABLE d_colaborador AS
+   SELECT
+		DISTINCT
+/*			t1.nuanomes,*/
+			t1.DsLoginN1,
+			t1.DsLoginN2A,
+			t1.DsLoginN3A,
+			t1.LstSubstituicao,
+			t1.LstColaboradorFocal,
+			t1.NmAreaEstruturaComercial as Filial,
+			t1.NmSubEstruturaComercialA as Regional,
+			t1.NmCanalEstruturaComercial as Canal,
+			t1.NmColaborador as Nm_Colaborador,
+			CATS(t1.NmCanalEstruturaComercial,"-",t1.NmSubEstruturaComercialA,"-",t1.NmAreaEstruturaComercial,"-",t1.NmColaborador) as Key_dimensoes,
+			CATS(t1.NmSubEstruturaComercialA,"-",t1.NmAreaEstruturaComercial,"-",t1.NmColaborador) as Key_Rito
+
+      FROM BASES.TBMETAPRODUCAOFINAL_DASH t1;
+
+QUIT;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= d_colaborador
+		outfile="&dir_csv./d_colaborador_RITO_RC_TATICO.csv" REPLACE
+		DBMS=DLM;
+	DELIMITER=';';
+RUN;

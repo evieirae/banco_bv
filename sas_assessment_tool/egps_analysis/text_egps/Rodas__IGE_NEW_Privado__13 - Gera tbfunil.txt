@@ -1,0 +1,153 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Privado
+FILE_SAS: 13 - Gera tbfunil.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 89
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISV = /projetos/MISV/data/bases; TEMP = /projetos/MISV/data/bases/tmp; TEMPW = &swork; TRIBO = /riscosbv/consignado
+DETECTED_MACROS_DEFINED: TIMESTAMP, TIMESTAMPDATA, TIMESTAMPHORA, database, database_fim, database_fim_lead, database_ini, database_ini_lead, databse, dir_csv
+DETECTED_MACROS_USED: dir_csv, swork
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], TEMPW.PRIVADO_LEADTIME [SAS/Local], TEMPW.PRIVADO_LOG [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: TEMPW
+EXPORTED_LIBNAMES: TEMPW
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): TEMPW.PRIVADO_LEADTIME [PROC SQL - FROM], TEMPW.PRIVADO_LOG [PROC SQL - FROM], TEMPW.PRIVADO_LOG_1 [PROC SQL - FROM], TEMPW.PRIVADO_LOG_2 [PROC SQL - FROM], TEMPW.PRIVADO_LOG_3 [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): TEMPW.PRIVADO_LOG_1, TEMPW.PRIVADO_LOG_2, TEMPW.PRIVADO_LOG_3
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TEMPW.PRIVADO_LEADTIME, TEMPW.PRIVADO_LOG, TEMPW.PRIVADO_LOG_1, TEMPW.PRIVADO_LOG_2, TEMPW.PRIVADO_LOG_3
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TEMPW.PRIVADO_LOG_1, TEMPW.PRIVADO_LOG_2, TEMPW.PRIVADO_LOG_3
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./Privado_FUNIL.csv
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	13 - Gera tbfunil.sas														| */
+/* | Descricao: Programa para gerar a tbfunil					| */
+/* | Objetivo: 	Dash Consignado Privado					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+libname tribo "/riscosbv/consignado";
+libname misv "/projetos/MISV/data/bases";
+libname temp "/projetos/MISV/data/bases/tmp";
+libname tempw "&swork";
+
+%let database = '2021/01/01';
+%let database_ini = '2022/01/01';
+%let database_fim = '2023/06/30';
+%let database_ini_lead = '2023/05/30';
+%let database_fim_lead = '2023/06/01';
+%let databse = %sysfunc(date(),ddmmyy10.);
+OPTIONS COMPRESS=BINARY;
+%LET TIMESTAMP = %SYSFUNC(DATE(),ddmmyy10.);
+%LET TIMESTAMPDATA = %SYSFUNC(date(),YYMMDDN8.);
+%LET TIMESTAMPHORA = %sysfunc(TIME(),hour4.);
+
+/* ======================================================================================*/
+/* =====================Gera tbfunil=========================*/
+/* ======================================================================================*/
+
+proc sql;
+	create table tempw.Privado_Log_1 as
+	SELECT
+		put(stproposta.dtstatusproposta_ddmmyyy,mmyys10.) AS mesano_log,
+		stproposta.stproposta,
+		stproposta.nuproposta,
+		Proposta.NuCpfCnpj_SobAnalise AS NuCpfCnpj,
+		Proposta.SistemaOrigem,
+		case when proposta.nmpessoa = 'PAKETA SERVICOS FINANCEIROS SA' then 'Paketa' else 'Outros' end as coban,
+		case when proposta.convenio  = 'PAKETA SERVICOS FINANCEIROS SA' then 'Paketa' else 'Outros' end as convenio
+	from
+		(select * FROM tempw.PRIVADO_LEADTIME
+			WHERE stproposta = 'AV') stproposta
+				INNER JOIN tempw.CONSIGNADO_PRIVADO Proposta
+					ON stproposta.nuproposta = Proposta.nuproposta
+/*and stproposta.dtsituacaoaverbacao between  &database_ini. and &database_fim.*/;
+RUN;
+
+proc sql;
+	create table tempw.Privado_Log_2 as
+
+	SELECT
+		mesano_log,
+		stproposta,
+		SistemaOrigem,
+		coban,
+		convenio,
+		count(nuproposta) as ttl_proposta,
+		count(distinct(NuCpfCnpj)) as ttl_cpf
+	from tempw.Privado_Log_1
+		group by mesano_log, stproposta, SistemaOrigem,	coban, convenio;
+RUN;
+
+PROC SQL;
+	CREATE TABLE tempw.Privado_Log_3 AS
+		SELECT mesano_log AS mesano_log,
+			stproposta,
+			SistemaOrigem,
+			coban,
+			convenio,
+			ttl_proposta,
+			ttl_cpf
+		FROM tempw.PRIVADO_LOG
+
+			UNION
+
+		SELECT t1.mesano_log as mesano_log,
+			t1.stproposta,
+			t1.SistemaOrigem,
+			t1.coban,
+			t1.convenio,
+			/* SUM_of_ttl_proposta */
+	(SUM(t1.ttl_proposta)) FORMAT=11. AS ttl_proposta,
+	/* SUM_of_ttl_cpf */
+	(SUM(t1.ttl_cpf)) FORMAT=11. AS ttl_cpf
+FROM tempw.PRIVADO_LOG_2 t1
+GROUP BY t1.mesano_log, t1.stproposta, t1.SistemaOrigem, t1.coban, t1.convenio;
+RUN;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+proc export
+	data=tempw.Privado_Log_3
+	dbms=csv
+	OUTFILE= "&dir_csv./Privado_FUNIL.csv"
+	replace;
+run;

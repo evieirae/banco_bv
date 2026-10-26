@@ -1,0 +1,136 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Saldo_PDD
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-10-14 14:10:44 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 15)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (3x | +15)
+----------------------------------------
+LINES_OF_CODE: 77
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: _MISCRED = /riscosbv/credito/MISCREDITO
+DETECTED_MACROS_DEFINED: CMACRO_FOREACH_PCT, END, START
+DETECTED_MACROS_USED: END, MNAME, SAFRA, SEQ, START, _i_, i
+MACRO_SCOPE_GLOBALS: CMACRO_FOREACH_PCT
+MACRO_SCOPE_PARAMS: END, MNAME, SAFRA, SEQ, START
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): _MISCRED.BASE_UNICA_ATACADO_&SAFRA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: _MISCRED
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.AUX_PDD_20
+TABLE_READ_PROVENANCE (Flow): WORK.AUX_PDD_20 [DATA Step - SET], _MISCRED.BASE_UNICA_ATACADO_&SAFRA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PDD_202301_202412, SAIDA, WORK.AUX_PDD_&SAFRA
+DYNAMIC REFS (Ambiguous): _MISCRED.BASE_UNICA_ATACADO_{SAFRA}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET CMACRO_FOREACH_PCT=%SYSFUNC(PUTN(%SYSEVALF((&_i_.-1)/%SYSFUNC(COUNTW(&SEQ.,%STR( )))),PERCENT8.1));
+%LET START=%SYSFUNC(INPUTN(&START.,YYMMN6.));
+%LET END=%SYSFUNC(INPUTN(&END.,YYMMN6.));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Extrai PDD */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 27 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Extrai PDD */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gh3jiFBMirZyU2JZ/code.sas */
+/* =========================INÍCIO TASK========================= */
+%macro EXTRAI_PDD(SAFRA);
+	proc sql;
+		create table work.aux_pdd_&SAFRA. as
+			select
+				&SAFRA. as SAFRA,
+				case
+					when DsGrupoProduto in ('BNDES','Convênio Flex','Crédito Rural','Créditos do Agronegócio','Empréstimos','External Loans','External Trade Finance','Leasing','Operações de Garantias','Trade Finance') then 'PDD'
+					when DsGrupoProduto in ('External Credit Derivatives','External Hedge','Hedge') then 'DERIVATIVO'
+					when DsGrupoProduto in ('TVM') then 'AJUSTE PRUDENCIAL E IMPAIRMENT'
+					else DsGrupoProduto
+				end as Segmentacao length 50,
+				sum(VrSaldo) as Saldo format commax30.,
+				sum(VrProvisao) as PDD format commax30.,
+				sum(VrAjustePrudencial) as Ajuste_Prudencial format commax30.,
+				sum(VrImpairment) as Impairment format commax30.
+			from _miscred.base_unica_atacado_&SAFRA.
+			WHERE AnoMes_Referencia = &SAFRA.
+				AND VrProvisao > 0
+				AND DtInicioOperacao NE .
+				AND DsGrupoProduto NE ''
+			group by 1,2;
+	quit;
+%mend;
+%FOREACH(%REFVECM(202301,202412),EXTRAI_PDD);
+
+DATA BASE_PDD_202301_202412;
+	SET WORK.aux_pdd_20:;
+RUN;
+
+proc sql;
+create table SAIDA as
+select safra,
+PDD/Saldo as SDPDD
+from BASE_PDD_202301_202412 (where=(Segmentacao="PDD"));
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Extrai PDD */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Macros & Libs */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 27 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Macros & Libs */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-q6G82hruQ4NLzUq6/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME _MISCRED "/riscosbv/credito/MISCREDITO" ACCESS = READONLY;
+
+%MACRO FOREACH(SEQ,MNAME);
+	%LOCAL _i_;
+	%GLOBAL CMACRO_FOREACH_PCT;
+	%DO _i_ = 1 %TO %SYSFUNC(COUNTW(&SEQ.,%STR( )));
+		%LET CMACRO_FOREACH_PCT = %SYSFUNC(PUTN(%SYSEVALF((&_i_.-1)/%SYSFUNC(COUNTW(&SEQ.,%STR( )))),PERCENT8.1));
+%&MNAME.(%SCAN(&SEQ.,&_i_.,%STR( )))
+	%END;
+%MEND FOREACH;
+
+%MACRO REFVECM(START,END);
+	%LOCAL i;
+	%IF &START. = &END. %THEN &START. %RETURN;
+	%LET START = %SYSFUNC(INPUTN(&START.,YYMMN6.));
+	%LET END = %SYSFUNC(INPUTN(&END.,YYMMN6.));
+	%DO i = 0 %TO %SYSFUNC(INTCK(MONTH,&START.,&END.)) %BY %SYSFUNC(SIGN(&END.-&START.));
+%SYSFUNC(PUTN(%SYSFUNC(INTNX(MONTH,&START.,&i.)),YYMMN6.))
+	%END;
+%MEND REFVECM;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Macros & Libs */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

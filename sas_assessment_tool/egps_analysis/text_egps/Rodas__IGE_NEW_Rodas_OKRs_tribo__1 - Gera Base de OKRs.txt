@@ -1,0 +1,541 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_OKRs_tribo
+FILE_SAS: 1 - Gera Base de OKRs.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 460
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv, nuanomes
+DETECTED_MACROS_USED: dir_csv, nuanomes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], CONTRATO.CONTRATACAO_C2C [SAS/Local], SOLITMP.TBVISIBILIDADEPOTENCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local], TRIBO.CUBOSIMULACAOLEVES_ANALISE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.KPI_PRODUCAO
+IMPORTED_LIBNAMES: TRIBO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.KPI_PRODUCAO
+TABLE_READ_PROVENANCE (Flow): BASES.TBEXTCONTRATO [PROC SQL - FROM], CONTRATO.CONTRATACAO_C2C [PROC SQL - JOIN], SOLITMP.TBVISIBILIDADEPOTENCIAL [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM], TRIBO.CUBOSIMULACAOLEVES_ANALISE [PROC SQL - FROM], WORK.KPI_PRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TRIBO.CUBOSIMULACAOLEVES_ANALISE
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./Rodas_BaseOkrs.csv
+TEMP/DISCARDED OUTPUTS: BASEOKRS, KPI_PRODUCAO, PRODUCAO01, SIMUPOSITIVACONSOLIDADO, SIMUPOSITIVAV6EV7, SPREADCONTRATO, SPREADCONTRATO01, VISIBILIDADEPOTENCIAL, VISIBILIDADEPOTENCIAL_1, WORK.KPI_PRODUCAO_SUM, XSELL_ORIGEM, XSELL_SUM
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Gera Base de OKRs.sas														| */
+/* | Descricao: Programa gerar o output de OKRs para o de OKRs da Tribo Rodas.					| */
+/* | Objetivo: 	Apuração do Dash OKRs Tribo Rodas					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+%let nuanomes = (YEAR(TODAY())-1)*100+1;
+
+/* ======================================================================================*/
+/* =====================Gera Base de OKRs=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+	CREATE TABLE SimuPositivaV6eV7 AS
+		SELECT
+			t1.Safra,
+			t1.NuVersaoMotor,
+			t1.MxDtSimu,
+			SUM(t1.QtdPreAnalise_Unico) AS QtdeSimuPositiva,
+			SUM(t1.QtdOriginadas) AS QtdeOriginada,
+			SUM(t1.QtdPagas) AS QtdePropostaEfetivada,
+			CASE
+		  		WHEN SUM(t1.QtdPreAnalise_Unico) = 0
+					THEN 0
+		  				ELSE (SUM(t1.QtdOriginadas)/SUM(t1.QtdPreAnalise_Unico))
+							END
+								AS PropxSimuPositiva format commax12.3,
+			CASE
+		  		WHEN SUM(t1.QtdPreAnalise_Unico) = 0
+					THEN 0
+		  				ELSE (SUM(t1.QtdPagas)/SUM(t1.QtdPreAnalise_Unico))
+							END
+								AS CttxSimuPositiva format commax12.3
+			FROM TRIBO.CUBOSIMULACAOLEVES_ANALISE t1
+				WHERE t1.SistemaInicial IN
+					(
+						'PPAR'
+							) AND t1.Canal = 'MULTIMARCAS' AND t1.Mensageria IN
+								(
+									'0. Aprovado',
+									'0. Aprovado 100%',
+									'1. Alta chance',
+									'1. Aprovado com rastreador',
+									'1. Muita chance >85%',
+									'2. Grande chance >70%'
+										) AND t1.TpPessoa = 'PF'
+										  AND t1.Safra >= &nuanomes.
+										  AND t1.Produto = 'Leves'
+			GROUP BY t1.Safra
+			,t1.NuVersaoMotor
+			,t1.MxDtSimu
+		/*				,t1.MOBConvContrato*/
+	;
+QUIT;
+
+proc sql;
+	create table SimuPositivaConsolidado as
+
+	select
+		Safra,
+		MxDtSimu as DtAtualizacaoSimu,
+		SUM(QtdeSimuPositiva) AS QtdeSimuPositiva,
+		SUM(QtdeOriginada) AS QtdeOriginada,
+		SUM(QtdePropostaEfetivada) AS QtdePropostaEfetivada,
+		CASE
+			WHEN SUM(QtdeSimuPositiva) = 0
+				THEN 0
+		  			ELSE (SUM(QtdeOriginada)/SUM(QtdeSimuPositiva))
+						END
+							AS PropxSimuPositiva format commax12.3,
+		CASE
+			WHEN SUM(QtdeSimuPositiva) = 0
+				THEN 0
+	  				ELSE (SUM(QtdePropostaEfetivada)/SUM(QtdeSimuPositiva))
+						END
+							AS CttxSimuPositiva format commax12.3
+
+	from SimuPositivaV6eV7
+group by Safra,MxDtSimu;
+quit;
+
+PROC SQL;
+	CREATE TABLE VISIBILIDADEPOTENCIAL as
+		SELECT
+			'VISIBILIDADEPOTENCIAL' as TpDataBase,
+			Safra,
+			DtAtualizacaoSimu,
+			Status,
+			sum(QuantidadePgtoLoja) as ttl
+	FROM
+		SOLITMP.TbVisibilidadePotencial
+			WHERE 1=1
+				AND Safra >= &nuanomes.
+				AND UPPER(PRODUTO) IN ('LEVES')
+				AND FLCARTEIRA = 'S'
+				AND UPPER(Canal) IN ('MULTIMARCAS', 'CONCESSIONARIAS')
+				group by 1,2,3,4;
+QUIT;
+
+proc sql;
+	create table visibilidadepotencial_1 as
+
+		select
+			total_por_safra.safra,
+			total_por_safra.DtAtualizacaoSimu as DtAtualizacaoVisibilidade,
+			total_por_safra.ttl as VisibilidadeP_Ttl,
+			nao_passou_bv.ttl as VisibilidadeP_NpassouBv,
+			1-((nao_passou_bv.ttl)/(total_por_safra.ttl)) format commax12.3 as PercVisibilidadeP
+		from
+			/*-- Total por safra*/
+		(select
+			SAFRA,
+			DtAtualizacaoSimu,
+			SUM(ttl) AS ttl
+			from VISIBILIDADEPOTENCIAL
+				GROUP BY
+					SAFRA,
+					DtAtualizacaoSimu)
+						total_por_safra
+		inner join
+				/*-- Total por safra onde Status = 'NaoPassouBV'*/
+		(select
+			SAFRA,
+			DtAtualizacaoSimu,
+			SUM(ttl) AS ttl
+		from VISIBILIDADEPOTENCIAL
+			Where Status = 'NaoPassouBV'
+				GROUP BY
+					SAFRA,
+					DtAtualizacaoSimu)
+						nao_passou_bv
+							on total_por_safra.safra = nao_passou_bv.safra
+	;
+quit;
+proc sql;
+    connect to bigquery as perm (
+        project = 'bv-saem-dtm'
+        credfile = '/projetos/acessos/bq/em/saem-dtm.json'
+        schema = 'bv-pdbd-prd'
+        READ_MODE = storage
+        ALLOW_LARGE_RESULTS = must
+        MAX_CHAR_LEN = 100
+    );
+
+    /* Criação da tabela utilizando CTE */
+    Create table XSELL_ORIGEM as
+    select * from connection to perm
+        (
+        WITH TB_CONTA_OI AS (
+            SELECT
+                EXTRACT(YEAR FROM a.dt_safra_conta) * 100 + EXTRACT(MONTH FROM a.dt_safra_conta) AS Safra,
+                a.dt_safra_conta,
+                a.dt_abertura_conta,
+				a.ts_alteracao_analitico,
+                a.ds_origem_nova,
+                a.cd_cpf_cnpj,
+                a.cd_conta_corrente,
+                MAX(
+                    CASE
+                        WHEN b.cd_cpf_cnpj IS NOT NULL THEN 1
+                        ELSE 0
+                    END
+                ) AS flcontacartao,
+                MAX(b.dt_abertura_conta_cartao) AS MxDtContaCartao
+
+            FROM bv-pdbd-prd.dvry_clie_ddv.contadigital_origemabertura_fato a
+            LEFT JOIN bv-pdbd-prd.dvry_negc_cartao.cartao_emissaoconta_fato b
+            ON a.cd_cpf_cnpj = b.cd_cpf_cnpj
+
+/*                ON TO_BASE64(SHA256(a.cd_cpf_cnpj)) = b.cd_cpf_cnpj*/
+                AND b.ds_meio_venda = 'APPFINANC'
+                AND b.dt_abertura_conta_cartao >= DATE(a.dt_abertura_conta)
+                AND DATE_DIFF(DATE(b.dt_abertura_conta_cartao), DATE(a.dt_abertura_conta), DAY) <= 7
+                AND a.vr_limite_cartao = b.vr_limite_emissao
+            WHERE EXTRACT(YEAR FROM a.dt_safra_conta) * 100 + EXTRACT(MONTH FROM a.dt_safra_conta) >= 202501
+                AND a.ds_origem_nova IN (
+                    'EGV Estoque Oferta Integrada',
+                    'Veículo Leve Estoque Oferta Integrada',
+                    'Moto Estoque Oferta Integrada',
+                    'Veículo Pesado Estoque Oferta Integrada',
+
+					'EGV Novo Oferta Integrada',
+                    'Veículo Leve Novo Oferta Integrada',
+                    'Moto Novo Oferta Integrada',
+                    'Veículo Pesado Novo Oferta Integrada'
+                )
+                AND a.cd_conta_corrente IS NOT NULL
+            GROUP BY 1, 2, 3, 4, 5, 6, 7
+        )
+        SELECT
+            Safra,
+            dt_safra_conta,
+            ds_origem_nova,
+            MAX(date(ts_alteracao_analitico)) as DtAtualizacaoXsell,
+            COUNT(DISTINCT cd_conta_corrente) AS qtcontatotal,
+            COUNT(DISTINCT CASE WHEN flcontacartao = 1 THEN cd_conta_corrente END) AS qtcontacartao
+        FROM TB_CONTA_OI
+        GROUP BY 1, 2, 3
+        ORDER BY SAFRA
+        );
+
+    disconnect from perm;
+quit;
+
+PROC SQL;
+	CREATE TABLE XSELL_SUM AS
+		SELECT
+			Safra,
+			max(DtAtualizacaoXsell) format ddmmyy10. as DtAtualizacaoXsell,
+			SUM(qtcontatotal) as ContaCorrente,
+			SUM(qtcontacartao) as ContaCartao,
+			SUM(qtcontatotal)+SUM(qtcontacartao) AS TtlVendaContaCartao
+		from XSELL_ORIGEM
+			group by Safra;
+quit;
+
+/* Buscar dados de produção */
+PROC SQL;
+	CREATE TABLE SpreadContrato01 AS
+		SELECT DISTINCT
+			NuContrato,
+			VrRetencao,
+			VrPrestacao,
+			VrIof
+		FROM BASES.TBEXTCONTRATO
+		WHERE NuAnoMes >= &nuanomes.;
+RUN;
+
+PROC SORT DATA=SpreadContrato01 OUT=SpreadContrato NODUPKEY;
+	BY NuContrato;
+RUN;
+
+/* Buscar dados de produção */
+PROC SQL;
+	CREATE TABLE PRODUCAO01 AS
+		SELECT
+			a.DtAtualizacao as DtAtualizacaoProd,
+			a.NuAnoMes AS Safra,
+			CASE
+				WHEN a.NmGrupoProdutoMeta = 'Leves-BVO' THEN 'Leves'
+				else a.NmGrupoProdutoMeta
+					end
+						AS Produto,
+			CASE
+				WHEN a.FxIdade = 'ZeroKM' THEN 'Novos'
+					ELSE 'Usados'
+						END
+							AS StVeiculo,
+			a.NmSubEstruturaComercialA AS Regional,
+			CASE
+				WHEN a.NmGrupoProdutoMeta = 'FGTS' THEN 'FGTS'
+				WHEN a.NmGrupoProdutoMeta = 'Leves-BVO' THEN 'BVO'
+					ELSE a.DsTipoCanalProducao
+						END
+							AS Canal,
+				a.FxIdade,
+				a.QtCorridosDiaUtilMesSab,
+				a.QtTotalDiaUtilMesSab,
+				CASE
+					WHEN A.NuProposta = C2C.NuProposta
+						THEN 'S'
+							ELSE 'N'
+								END
+									AS FlC2C,
+			'N' as Origem,
+			COUNT(A.NuContrato) AS QtdContrato,
+			sum(A.QTSEGUROS) AS QtdSeguros,
+			SUM(VrProducao) AS VrProducao FORMAT=num18.2,
+			SUM(VrProducaoProjetado) AS VrProducaoProjetado FORMAT=num18.2,
+			SUM(VrProducaoDiaUtil) AS VrProducaoDiaUtil FORMAT=num18.2,
+			SUM(VrFinanciamento) AS VrFinanciamento FORMAT=num18.2,
+			SUM(VrMargemContribuicao) AS VrMC FORMAT=num18.2,
+			SUM(VrMargemContribuicao * VrProducao) AS VpMC FORMAT=num18.2,
+			SUM(VpTxGerencial) AS VpTaxa FORMAT=num18.2,
+			SUM(VpTirContabil) AS VpTir FORMAT=num18.2,
+			SUM(
+					(
+						(1+(VpTxGerencial/VrProducao))
+							/(1+(((TxTirContabil/100) * (VrProducao))/VrProducao)) -1
+								) * VrProducao
+									)
+										AS VpSpread FORMAT=num18.2,
+			SUM(
+					(
+						(1+
+							(
+								(
+									case
+										when B.VrRetencao > 1
+											then (Finance('RATE', A.QtParcelas, B.VrPrestacao, -((A.VrContrato-B.VrRetencao)+B.VrIof+coalesce(A.VrTarifaCadastro,0)))*A.VrProducao)
+												ELSE A.VpTxGerencial
+													END)
+														/A.VrProducao)
+															)/(1+(((A.TxTirContabil/100) * (A.VrProducao))/A.VrProducao)) -1
+																) * A.VrProducao
+																	)
+																		AS VpSpreadRebate FORMAT=num18.2,
+		SUM(VrComissaoParcelada) AS VrComissaoParcelada FORMAT=num18.2,
+		SUM(VrComissaoTotal) AS VrComissaoTotal FORMAT=num18.2,
+		SUM(VrCapProjetado) AS VrCap FORMAT=num18.2,
+		SUM(VrDemaisSemCompletoMaxProjetado) AS VrAuto FORMAT=num18.2,
+		SUM(VrBVMaisProjetado) AS VrSPF FORMAT=num18.2,
+		SUM(VrCompletoProjetado) AS VrCompleto FORMAT=num18.2,
+		COALESCE(
+			SUM
+				(
+					CASE
+						WHEN VrTarifaAvaliacaoBem > 0
+							THEN 1
+								END
+									),0
+										) AS QtdTAB,
+		COALESCE(
+			SUM
+				(CASE
+					WHEN VrTarifaCadastro > 0
+						THEN 1
+							END)
+								,0)
+									AS QtdTC,
+		SUM(VrPerdaEstimada) AS VrPerdaEstimada FORMAT=num18.2
+		FROM TMP.TBPRODUCAO A
+			LEFT JOIN SpreadContrato B
+				ON A.NuContrato = B.NuContrato
+					LEFT JOIN CONTRATO.CONTRATACAO_C2C C2C
+						ON A.NuProposta = C2C.NuProposta
+		/*	LEFT JOIN Tbsimulacoes s*/
+
+			/*    	ON s.NuProposta = C2C.NuProposta*/
+		WHERE a.NuAnoMes >= &nuanomes.
+			AND NmGrupoProdutoMeta IN
+				(
+					'Leves',
+					'Leves-BVO',
+					'Motos',
+					'Pesados',
+					'CVG Leves',
+					'CVG Pesados'
+				)/*,'Privado','CP','CIG','FGTS','Estudantil','Saude','Solar')*/
+		GROUP BY 1,2,3,4,5,6,7,8,9,10,11
+			;
+RUN;
+
+PROC SQL;
+	CREATE TABLE KPI_PRODUCAO AS
+		SELECT
+			DtAtualizacaoProd,
+			Safra,
+			Produto,
+			StVeiculo,
+			Regional,
+			Canal,
+			FxIdade,
+			QtdContrato,
+			QtdSeguros,
+			FlC2C,
+			Origem,
+			VrProducao,
+			case
+				when Produto in (
+									'Leves','Leves-BVO'
+									)
+										then (VrProducao)
+											else 0
+												end
+													as VrProducaoLeves,
+			case
+				when Produto in (
+									'Motos','Pesados'
+									)
+										then (VrProducao)
+											else 0
+												end
+													as VrProducaoMotosPesados,
+			VrProducaoProjetado,
+			VrProducaoDiaUtil,
+			VrFinanciamento,
+			VrMC,
+			(VrMC / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS VrMCProjetado,
+			case
+				when Produto in (
+									'Leves','Leves-BVO'
+									)
+										then (VrMc)
+											else 0
+												end
+													as MCLeves,
+			case
+				when Produto in (
+									'Motos','Pesados'
+									)
+										then (VrMc)
+											else 0
+												end
+													as MCMotosPesados,
+			VpMC,
+			VpTaxa,
+			VpTir,
+			VpSpread,
+			VpSpreadRebate,
+			VrComissaoParcelada,
+			VrComissaoTotal,
+			VrCap,
+			VrAuto,
+			VrSPF,
+			VrCompleto,
+			QtdTAB,
+			QtdTC,
+			VrPerdaEstimada
+	FROM PRODUCAO01
+
+;
+RUN;
+
+PROC SQL;
+	CREATE TABLE WORK.KPI_PRODUCAO_SUM AS
+		SELECT
+			t1.Safra,
+			t1.DtAtualizacaoProd,
+			SUM(t1.VrProducao) as VrProducao,
+			SUM(VrProducaoLeves) as VrProducaoLeves,
+			SUM(VrProducaoMotosPesados) as VrProducaoMotosPesados,
+			SUM(t1.VrMC) AS VrMC,
+			SUM(MCLeves) AS MCLeves,
+			SUM(MCMotosPesados) AS MCMotosPesados,
+			SUM(t1.QtdContrato) AS QtdContrato,
+			SUM(t1.QtdSeguros) AS QtdSeguros
+		FROM WORK.KPI_PRODUCAO t1
+		GROUP BY t1.Safra,t1.DtAtualizacaoProd ;
+QUIT;
+
+proc sql;
+	Create table BaseOkrs as
+
+	Select
+		a.Safra,
+		a.DtAtualizacaoSimu,
+		b.DtAtualizacaoVisibilidade,
+		c.DtAtualizacaoXsell,
+		d.DtAtualizacaoProd,
+		a.QtdeSimuPositiva,
+		a.QtdeOriginada,
+		a.QtdePropostaEfetivada,
+		a.PropxSimuPositiva,
+		a.CttxSimuPositiva,
+		b.VisibilidadeP_Ttl,
+		b.VisibilidadeP_NpassouBv,
+		b.PercVisibilidadeP,
+		c.ContaCorrente,
+		c.ContaCartao,
+		d.QtdContrato as cttXsell,
+		d.QtdSeguros,
+		(c.TtlVendaContaCartao+d.QtdContrato+d.QtdSeguros)/d.QtdContrato format commax12.3 as XSellIndex,
+		d.VrProducao format commax12.3,
+		d.VrProducaoLeves format commax12.3,
+		d.VrProducaoMotosPesados format commax12.3,
+		d.VrMc format commax12.3,
+		d.MCLeves format commax12.3,
+		d.MCMotosPesados format commax12.3
+
+	from SimuPositivaConsolidado a
+		left join visibilidadepotencial_1 b
+			on a.safra = b.safra
+		left join XSELL_SUM c
+			on a.safra = c.safra
+		left join
+ 		 KPI_PRODUCAO_SUM  d
+			on a.safra = d.safra
+	;
+quit;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+	DATA= BaseOkrs
+	FILE="&dir_csv./Rodas_BaseOkrs.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

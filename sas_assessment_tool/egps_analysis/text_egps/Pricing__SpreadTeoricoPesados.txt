@@ -1,0 +1,386 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Pricing__SpreadTeoricoPesados
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:24 UTC
+BUSINESS_AREA: Pricing
+TARGET_ARCH: DATABRICKS (Score: 80)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (4x | +80)
+----------------------------------------
+LINES_OF_CODE: 304
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: INFCVS = /infogrc/convsimu; INFOGRC = /infogrc/precoxrisco; PROJETOS = /projetos/MISV/data/bases; SHMESA = /riscosbvf/plan_mesas/comp_total; SOLITMP = /infogrc/solicitacaopontual/tmp; TEMP = /projetos/MISV/data/bases/tmp
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/FUNCOES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], INFCVS.TBSIMULACOES [SAS/Local], INFOGRC.PPR_ANALITICO [SAS/Local], PROJETOS.TBINAD [SAS/Local], PROJETOS.TBPARCEIROCOMERCIAL [SAS/Local], SOLITMP.TBVISIBILIDADEPOTENCIAL [SAS/Local], TEMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASEPRODUCAO
+IMPORTED_LIBNAMES: INFCVS, INFOGRC, PROJETOS, SOLITMP, TEMP
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASEPRODUCAO
+TABLE_READ_PROVENANCE (Flow): INFCVS.TBSIMULACOES [PROC SQL - FROM; PROC SQL - JOIN], INFOGRC.PPR_ANALITICO [PROC SQL - FROM], PROJETOS.TBINAD [DATA Step - SET], PROJETOS.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], SOLITMP.TBVISIBILIDADEPOTENCIAL [PROC SQL - FROM], TEMP.TBPOTENCIALRODAS [PROC SQL - FROM], WORK.BASEPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASEFINAL, BASEPRODUCAO, BASESHAREPDV, BASESIMULACAO, BASEVISIBILIDADE, INAD, WORK.QUERY_FOR_BASEPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|/infogrc/utils/IQ.sas|/INFOGRC/UTILS|IQ.SAS||suspeito
+IN|/infogrc/utils/funcoes.sas|/INFOGRC/UTILS|FUNCOES.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-4IkZScTAmamGZ3FS/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+LIBNAME INFCVS '/infogrc/convsimu';
+Libname SHMESA '/riscosbvf/plan_mesas/comp_total';
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+
+DATA inad;
+SET PROJETOS.TBINAD;RUN;
+
+PROC SQL;
+CREATE TABLE BaseProducao AS
+SELECT
+A.NuProposta,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Safra,
+A.DsFilial as Filial,
+A.Regional as Regional,
+A.FxIdade,
+B.DsLoginN1 AS GR,
+A.DtEntradaProposta,
+A.DtContrato,
+CASE WHEN D.PredominanciaProduto = 'Pesados' THEN 'PDV dedicado' ELSE 'Demais' END AS FlPDVDedicado,
+CASE
+WHEN A.VrProducao BETWEEN 0 AND 100000 THEN '0 A 100 Mil'
+WHEN A.VrProducao BETWEEN 100000 AND 200000 THEN '100 A 200 Mil'
+WHEN A.VrProducao BETWEEN 200000 AND 300000 THEN '200 A 300 Mil'
+WHEN A.VrProducao BETWEEN 300000 AND 400000 THEN '300 A 400 Mil'
+WHEN A.VrProducao > 400000 THEN 'Maior 400 Mil'
+ELSE '' END AS FxTicket,
+
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VpSpread) as SpreadPnd,
+SUM(A.FlTxAlterada) as QntdPA,
+SUM(A.VarTaxaAlterada/100*A.VrProducao) as VariacaoTaxaSolicitada,
+SUM(A.FlPropostaEfetivada) as QtdContratos,
+SUM(A.VrMargem) as VrMargem,
+SUM(A.RUPE*A.VrFinanciamento) as PEPnd,
+SUM(A.VrFinanciamento) as VrFinaciamento,
+SUM(A.QtParcelas*A.VrProducao) as PrazoPnd,
+SUM(A.QtAnosIdade*A.VrProducao) as IdadePnd,
+SUM(A.PcEntrada*A.VrProducao) as EntradaPnd,
+SUM(A.VpTirContabil) as VpTirContabil,
+SUM(VrParcelaInad30) AS VrParcelaInad30,
+SUM(C.VrParcelaElegivelInad30) AS VrParcelaElegivelInad30
+
+FROM INFOGRC.PPR_ANALITICO as A
+LEFT JOIN INFCVS.TBSIMULACOES AS B ON A.NuProposta = B.NuProposta
+LEFT JOIN INAD AS C ON A.NuProposta = C.NuProposta
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS D ON A.CdConvenio = D.CdParceiroComercial
+WHERE A.DtContrato BETWEEN '01jul2025'D and '28Feb2026'D AND A.VrProducao > 0
+AND A.Produto IN ('Pesados')
+AND A.DsFilial NOT IN ('Canal Motos','Canal Alto do Tietê','Canal Ipatinga','Canal Maringá','Canal Natal','Canal Tatuapé II','Canal Privado e FGTS','Canal Solar Sul','Desconhecido','Negócios Centralizados','Canal Solar ES, MG e RJ','Canal Solar SP II','Canal Solar N / NE','Canal Solar NE')
+GROUP BY 1,2,3,4,5,6,7,8,9,10;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: SharePDV */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: SharePDV */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-kFigQ6ojspZJ1e4k/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME TEMP '/projetos/MISV/data/bases/tmp';
+PROC SQL;
+CREATE TABLE BaseSharePDV AS
+SELECT
+A.NuAnoMes as Safra,
+A.NmAreaEstruturaComercialC as Filial,
+A.NmSubEstruturaComercialC as Regional,
+A.FxIdade,
+A.DsLoginN1C as GR,
+SUM(A.QtContrato) as QtGravamesBV,
+SUM(A.QtGravamesMercado) AS QtGravamesMercado,
+SUM(A.VrGravamesMercado) AS VrGravamesMercado
+FROM TEMP.TBPOTENCIALRODAS AS A
+WHERE NuAnoMes >= 202507 AND NuAnoMes <= 202602 AND A.NmGrupoProduto in ('Pesados') AND A.FlAtivo = 'S' AND A.FlAtualizacaoMercado  = 1
+AND A.NmAreaEstruturaComercialC not in ('Canal Motos','Canal Alto do Tietê''Canal Ipatinga','Canal Maringá','Canal Natal','Canal Tatuapé II','Canal Privado e FGTS','Canal Solar Sul','Desconhecido','Negócios Centralizados','Canal Solar ES, MG e RJ','Canal Solar SP II','Canal Solar N / NE','Canal Solar NE')
+GROUP BY 1,2,3,4,5;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: SharePDV */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Simulação */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Simulação */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-w8CY1VTVM1HkQIVH/code.sas */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/funcoes.sas';
+%include '/infogrc/utils/IQ.sas';
+%CRIAVARDB;
+%MarcaDU('20250101','20260228',3);
+%MarcaDU('20250101','20260228',5);
+%MarcaDU('20250101','20260228',10);
+%MarcaDU('20250101','20260228',15);
+%Gerar_TbSemanas_InicioSegunda('20250101','20260228');
+
+LIBNAME INFCVS '/infogrc/convsimu';
+
+PROC SQL;
+CREATE TABLE BaseSimulacao AS
+SELECT
+A.NuProposta,
+A.NuAnoMes as Safra,
+A.Filial as Filial,
+A.Regional as Regional,
+A.FxIdade,
+A.DsLoginN1 AS GR,
+A.DtEntradaProposta,
+A.DtContrato,
+
+SUM(FlPropostaOriginada) as FlPropostaOriginada,
+SUM(FlPropostaAprovada) as FlPropostaAprovada,
+SUM(FlPropostaEfetivada) as FlPropostaEfetivada,
+SUM(CASE WHEN A.DtContrato <= D3 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD3,
+SUM(CASE WHEN A.DtContrato <= D5 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD5,
+SUM(CASE WHEN A.DtContrato <= D10 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD10,
+SUM(CASE WHEN A.DtContrato <= D15 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD15,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) as FlConversaoAPNP,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END))  as FlConversaoNegada
+
+FROM INFCVS.TBSIMULACOES AS A
+LEFT JOIN TBD3 AS H ON A.DtSimulacaoInicial=H.DtTempo
+LEFT JOIN TBD5 AS I ON A.DtSimulacaoInicial=I.DtTempo
+LEFT JOIN TBD10 AS J ON A.DtSimulacaoInicial=J.DtTempo
+LEFT JOIN TBD15 AS K ON A.DtSimulacaoInicial=K.DtTempo
+
+WHERE NuAnoMes >= 202507 AND NuAnoMes <= 202602 AND Produto in ('Pesados') AND FlSimuValidaEfet = 1
+and A.Filial not in ('Canal Motos','Canal Alto do Tietê','Canal Ipatinga','Canal Maringá','Canal Natal','Canal Tatuapé II','Canal Privado e FGTS','Canal Solar Sul','Desconhecido','Negócios Centralizados','Canal Solar ES, MG e RJ','Canal Solar SP II','Canal Solar N / NE','Canal Solar NE')
+and FlPropostaOriginada <> 0
+group by 1,2,3,4,5,6,7,8;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Simulação */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Visibilidade */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Visibilidade */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-nGiOlVpkndFH9bcU/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME SOLITMP '/infogrc/solicitacaopontual/tmp';
+PROC SQL;
+CREATE TABLE BaseVisibilidade AS
+select
+Safra,
+Filial,
+Regional,
+FxIdade,
+CdGR AS GR,
+SUM(QuantidadePgtoLoja) as Mercado,
+SUM(CASE WHEN Status = 'NaoPassouBV' then QuantidadePgtoLoja else 0 end) as Qtd_ForaBV,
+SUM(CASE WHEN Status = 'ContratoBV' then QuantidadePgtoLoja else 0 end) as Qtd_ContratoBV,
+SUM(CASE WHEN Status = 'APNPD' then QuantidadePgtoLoja
+         WHEN Status = 'APNPP' then QuantidadePgtoLoja
+ 		 WHEN Status = 'APNPR' then QuantidadePgtoLoja else 0 end) as Qtd_APNP,
+SUM(CASE WHEN Status = 'NegadaD' then QuantidadePgtoLoja
+         WHEN Status = 'NegadaP' then QuantidadePgtoLoja
+ 		 WHEN Status = 'NegadaR' then QuantidadePgtoLoja else 0 end) as Qtd_Negada,
+SUM(CASE WHEN Status = 'CanceladaD' then QuantidadePgtoLoja
+         WHEN Status = 'CanceladaP' then QuantidadePgtoLoja
+ 		 WHEN Status = 'CanceladaR' then QuantidadePgtoLoja else 0 end) as Qtd_Cancelada,
+SUM(CASE WHEN Status = 'CardD' then QuantidadePgtoLoja
+         WHEN Status = 'CardP' then QuantidadePgtoLoja
+ 		 WHEN Status = 'CardR' then QuantidadePgtoLoja else 0 end) as Qtd_Card
+FROM SOLITMP.TBVISIBILIDADEPOTENCIAL AS A
+
+WHERE Produto in ('Pesados') and Safra>=202501 and Safra<=202601 and FlCadastroBV = 'S'
+and FlAtivo = 'S'
+AND A.Regional not in ('Canal Motos') AND
+    A.Filial not in ('Canal Alto do Tietê','Canal Ipatinga','Canal Maringá','Canal Natal','Canal Tatuapé II','Canal Privado e FGTS','Canal Solar Sul','Desconhecido','Negócios Centralizados','Canal Solar ES, MG e RJ','Canal Solar SP II','Canal Solar N / NE','Canal Solar NE')
+group by 1,2,3,4,5;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Visibilidade */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BaseFinal */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BaseFinal */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-AFwafdYlclMzp1se/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA BaseFinal;
+SET BaseProducao BaseSimulacao BaseSharePDV BaseVisibilidade;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BaseFinal */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME TEMP '/projetos/MISV/data/bases/tmp';
+PROC SQL;
+CREATE TABLE BaseSharePDV AS
+SELECT
+A.NuAnoMes as Safra,
+A.NmAreaEstruturaComercialC as Filial,
+A.NmSubEstruturaComercialC as Regional,
+A.FxIdade,
+A.DsLoginN1C as GR,
+SUM(A.QtContrato) as QtGravamesBV,
+SUM(A.QtGravamesMercado) AS QtGravamesMercado,
+SUM(A.VrGravamesMercado) AS VrGravamesMercado
+FROM TEMP.TBPOTENCIALRODAS AS A
+WHERE NuAnoMes >= 202501 AND NuAnoMes <= 202601 AND A.NmGrupoProduto in ('Pesados') AND A.FlAtivo = 'S' AND A.FlAtualizacaoMercado  = 1
+AND A.NmAreaEstruturaComercialC not in ('Canal Motos','Canal Alto do Tietê''Canal Ipatinga','Canal Maringá','Canal Natal','Canal Tatuapé II','Canal Privado e FGTS','Canal Solar Sul','Desconhecido','Negócios Centralizados','Canal Solar ES, MG e RJ','Canal Solar SP II','Canal Solar N / NE','Canal Solar NE')
+GROUP BY 1,2,3,4,5;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/funcoes.sas';
+%include '/infogrc/utils/IQ.sas';
+%CRIAVARDB;
+%MarcaDU('20250101','20260131',3);
+%MarcaDU('20250101','20260131',5);
+%MarcaDU('20250101','20260131',10);
+%MarcaDU('20250101','20260131',15);
+%Gerar_TbSemanas_InicioSegunda('20250101','20260131');
+
+LIBNAME INFCVS '/infogrc/convsimu';
+
+PROC SQL;
+CREATE TABLE BaseSimulacao AS
+SELECT
+A.NuProposta,
+A.NuAnoMes as Safra,
+A.Filial as Filial,
+A.Regional as Regional,
+A.FxIdade,
+A.DsLoginN1 AS GR,
+A.DtEntradaProposta,
+A.DtContrato,
+
+SUM(FlPropostaOriginada) as FlPropostaOriginada,
+SUM(FlPropostaAprovada) as FlPropostaAprovada,
+SUM(FlPropostaEfetivada) as FlPropostaEfetivada,
+SUM(CASE WHEN A.DtContrato <= D3 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD3,
+SUM(CASE WHEN A.DtContrato <= D5 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD5,
+SUM(CASE WHEN A.DtContrato <= D10 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD10,
+SUM(CASE WHEN A.DtContrato <= D15 and A.DtContrato >= A.DtEntradaProposta THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivadaD15,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) as FlConversaoAPNP,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END))  as FlConversaoNegada
+
+FROM INFCVS.TBSIMULACOES AS A
+LEFT JOIN TBD3 AS H ON A.DtSimulacaoInicial=H.DtTempo
+LEFT JOIN TBD5 AS I ON A.DtSimulacaoInicial=I.DtTempo
+LEFT JOIN TBD10 AS J ON A.DtSimulacaoInicial=J.DtTempo
+LEFT JOIN TBD15 AS K ON A.DtSimulacaoInicial=K.DtTempo
+
+WHERE NuAnoMes >= 202501 AND NuAnoMes <= 202601 AND Produto in ('Pesados') AND FlSimuValidaEfet = 1
+and A.Filial not in ('Canal Motos','Canal Alto do Tietê','Canal Ipatinga','Canal Maringá','Canal Natal','Canal Tatuapé II','Canal Privado e FGTS','Canal Solar Sul','Desconhecido','Negócios Centralizados','Canal Solar ES, MG e RJ','Canal Solar SP II','Canal Solar N / NE','Canal Solar NE')
+and FlPropostaOriginada <> 0
+group by 1,2,3,4,5,6,7,8;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASEPRODUCAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASEPRODUCAO AS
+   SELECT DISTINCT t1.Regional
+      FROM WORK.BASEPRODUCAO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

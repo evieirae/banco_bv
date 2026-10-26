@@ -1,0 +1,95 @@
+START_METADATA
+PROJECT: Rodas__PainelBVCompensa
+FILE_SAS: 04 - Agregacoes.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 40
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBPRODUCAOPRICING_AGGREGATED
+TABLE_READ_PROVENANCE (Flow): WORK.TBPRODUCAOPRICING_AGGREGATED [DATA Step - SET; PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: WORK.TBPRODUCAOPRICING_AGGREGATED, WORK.TBPRODUCAOPRICING_WITHPREV, WORK.TBPRODUCAOPRICING_WITHTRIAVG
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* Criação da tabela agregada */
+PROC SQL;
+   CREATE TABLE WORK.TbProducaoPricing_Aggregated AS
+   SELECT AnoMes,
+          CdParceiroComercial,
+          SUM(VrProducaoBVCompensa) AS VrProducaoLiquidaTotal
+   FROM TbProducao
+   GROUP BY AnoMes, CdParceiroComercial;
+QUIT;
+
+DATA WORK.TbProducaoPricing_Aggregated;
+   SET WORK.TbProducaoPricing_Aggregated;
+   AnoMesNum = INPUT(AnoMes, 6.);
+   AnoMesPrev = AnoMesNum - 1;
+   IF MOD(AnoMesPrev, 100) = 0 THEN AnoMesPrev = AnoMesPrev - 88; /* Ajuste para transição de ano */
+   FORMAT AnoMesPrev 6.;
+   AnoMesPrevChar = PUT(AnoMesPrev, 6.);
+RUN;
+
+/* Junção para obter os valores do mês atual e anterior */
+PROC SQL;
+   CREATE TABLE WORK.TbProducaoPricing_WithPrev AS
+   SELECT a.AnoMes,
+          a.CdParceiroComercial,
+          a.VrProducaoLiquidaTotal,
+          b.VrProducaoLiquidaTotal AS VrProducaoLiquidaPrev
+   FROM WORK.TbProducaoPricing_Aggregated a
+   LEFT JOIN WORK.TbProducaoPricing_Aggregated b
+   ON a.CdParceiroComercial = b.CdParceiroComercial AND a.AnoMesPrevChar = b.AnoMes;
+QUIT;
+
+/* Cálculo da média dos últimos três meses para cada AnoMes e CdParceiroComercial */
+PROC SQL;
+   CREATE TABLE WORK.TbProducaoPricing_WithTriAvg AS
+   SELECT a.AnoMes,
+          a.CdParceiroComercial,
+          a.VrProducaoLiquidaTotal,
+          (SELECT MEAN(b.VrProducaoLiquidaTotal)
+           FROM WORK.TbProducaoPricing_Aggregated b
+           WHERE b.CdParceiroComercial = a.CdParceiroComercial
+             AND INTCK('month', INPUT(b.AnoMes, yymmn6.), INPUT(a.AnoMes, yymmn6.)) BETWEEN -3 AND -1) AS VrProducaoLiquidaTriAvg
+   FROM WORK.TbProducaoPricing_Aggregated a;
+QUIT;

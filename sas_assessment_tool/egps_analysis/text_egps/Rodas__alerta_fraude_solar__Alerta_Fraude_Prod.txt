@@ -1,0 +1,804 @@
+START_METADATA
+PROJECT: Rodas__alerta_fraude_solar
+FILE_SAS: Alerta_Fraude_Prod.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -8
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (1x | +20), FILENAME  (3x | +36), PROC APPEND (1x | +15), RETAIN (1x | +10), PROC TRANSPOSE (1x | +10), %MACRO (3x | +15)
+----------------------------------------
+LINES_OF_CODE: 603
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, EXPORT, FREQ, SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (14x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: FRAUDE = /infogrc/alerta_fraude/Base
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: NmGF, QtdGFs, dia_semana, dt_atu, emailgf, emailteste, fraude_hist, i, mes_atu, mes_ini, ref, var
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: REF, VAR
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], AUXL.TBORIGINACAOTOTAL [SAS/Local], BASEGRC.TBMETANAOISONOMICA [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], BASES.TBPOTENCIALRODAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], DWBI_DIME.TBDIMTEMPODATA [DBCON], FRAUDE.BASE_FRAUDERODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ALERTA_FRAUDE_&I, WORK.ENVIO_EMAIL_GF
+IMPORTED_LIBNAMES: FRAUDE
+EXPORTED_LIBNAMES: EMAIL_&VAR, FRAUDE
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.ALERTA_FRAUDE_&I, WORK.ENVIO_EMAIL_GF
+TABLE_READ_PROVENANCE (Flow): AUXL.TBORIGINACAOTOTAL [DATA Step - SET], BASEGRC.TBMETANAOISONOMICA [DATA Step - SET], BASES.TBCOLABORADOR [PROC SORT - DATA=], BASES.TBPOTENCIALRODAS [DATA Step - SET], BASES.TBPRODUCAO [DATA Step - SET], DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], EMAIL_&VAR._00 [PROC TRANSPOSE - DATA=], EMAIL_&VAR._01 [DATA Step - SET], FRAUDE.BASE_FRAUDERODAS [PROC SQL - FROM], FRAUDE.ENVIO_ALERTA_HIST [PROC EXPORT - DATA=], WORK.ALERTA_FRAUDE_&I [PROC EXPORT - DATA=], WORK.ENVIO_EMAIL_GF [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/alerta_fraude/Base/envio_alerta_hist.csv, /infogrc/alerta_fraude/Base/painel_saude_&amp;i..csv, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): EMAIL_&VAR._00, EMAIL_&VAR._01, FRAUDE.ENVIO_ALERTA_HIST
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): FRAUDE.BASE_FRAUDERODAS, FRAUDE.ENVIO_ALERTA_HIST
+COMMENT-ONLY QUALIFIED READS (SAS comments only, not executable scan): FRAUDE.FRAUDE_HIST2
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): FRAUDE.FRAUDE_HIST, FRAUDE.FRAUDE_HIST2
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): EMAIL_&VAR._00, EMAIL_&VAR._01, EMAIL_&VAR._02, FRAUDE.ENVIO_ALERTA_HIST
+APPEND_ONLY_OUTPUTS: FRAUDE.ENVIO_ALERTA_HIST
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): FRAUDE.ENVIO_ALERTA_HIST
+EXPORTED FILES (Artifacts): /infogrc/alerta_fraude/Base/envio_alerta_hist.csv, /infogrc/alerta_fraude/Base/painel_saude_&i..csv
+TEMP/DISCARDED OUTPUTS: ALERTA_FRAUDE_&I, ALERTA_FRAUDE_PGTO_EXCECAO, ALERTA_FRAUDE_PROPOSTA, BASEDNE, BASE_EMAIL, BASE_EMAIL_00, EMAIL_00, EMAIL_FRAUDE_PROPOSTA, ENVIO_ALERTA_ATU, ENVIO_EMAIL_GF, LAYOUT_ALERTA, PARC_CARTEIRA, POTENCIAL_00, POTENCIAL_00_ND, PRODUCAO_00, PROPOSTAS_00, PROPOSTAS_01, PROPOSTAS_02, PROPOSTAS_6MESES, PROPOSTAS_ANT, PROPOSTAS_ATU, PROPOSTAS_ATU_00, PROPOSTAS_FINAL, PROPOSTAS_FINAL_01, PROPOSTAS_HIST, PROPOSTAS_MAXDIAUTIL, SUM_CARTEIRA, SUM_FRAUDE_6MESES, SUM_POTENCIAL, TBCOLABORADOR, TBDIMTEMPODATA
+DYNAMIC REFS (Ambiguous): {I}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 2, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/alerta_fraude/Base/envio_alerta_hist.csv
+[CODE REF] /infogrc/alerta_fraude/Base/painel_saude_&amp;i..csv
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/*============================================================================================*/
+/* Programa: AlertaFraude.sas                   	                               			  */
+/* Autor:    Ramon Sales Soares - Tribo Veículos	                                          */
+/* Versão:   001																			  */
+/* Dta: 06/06/2023                 															  */
+/*============================================================================================*/
+
+/*********************************************/
+/* LibName e parametros 					*/
+/*********************************************/
+
+%include '/infogrc/utils/all-includes.sas';
+libname fraude '/infogrc/alerta_fraude/Base';
+
+/*********************************************/
+/* 	Cria macro variáveis de data global 	 */
+/*********************************************/
+data _null_;
+
+	dt_atu = today()-1;
+/*	dt_ini_bi = "'"||put(year("&MinLeads."d),4.)||put(month("&MinLeads."d),z2.)||put(day("&MinLeads."d),z2.)||"'";*/
+/*	dt_ini_ga = put(year("&MinLeads."d),4.)||put(month("&MinLeads."d),z2.)||put(day("&MinLeads."d),z2.);*/
+	mes_ini = put(year(intnx('month',dt_atu,-6)),4.)||put(month(intnx('month',dt_atu,-6)),z2.);
+	mes_atu = put(year(intnx('month',dt_atu,0)),4.)||put(month(intnx('month',dt_atu,0)),z2.);
+
+	dia_semana = weekday(today());
+
+/*	call symputx('dt_ini_bi',dt_ini_bi);*/
+/*	call symputx('dt_ini',put(dt_ini,date9.));*/
+/*	call symputx('dt_ini_ga',dt_ini_ga);*/
+	call symputx('mes_ini',mes_ini);
+	call symputx('mes_atu',mes_atu);
+	call symputx('dt_atu',put(dt_atu,date9.));
+	call symputx('dia_semana',dia_semana);
+
+run;
+
+/*%put &dt_ini.;*/
+/*%put &dt_ini_bi.;*/
+/*%put &dt_ini_ga.;*/
+%put &mes_ini.;
+%put &mes_atu.;
+%put &dt_atu.;
+%put &dia_semana.;
+
+/********************************************************/
+/* Monta base de alerta de fraude com devidos criterios */
+/********************************************************/
+/* Busca Potencial Rodas para pegar gravames do mercado */
+data potencial_00;
+	set BASES.TBPOTENCIALRODAS (where=(Nuanomes = &mes_atu.));
+
+	if NmGrupoProduto = 'Leves' then Categoria = 1;
+	else if NmGrupoProduto = 'Motos' then Categoria = 2;
+	else if NmGrupoProduto = 'Pesados' then Categoria = 3;
+
+run;
+
+proc sort data=potencial_00;
+	by Nuanomes CdParceiroComercial Categoria FlPorteA DsClassificacaoA;
+run;
+
+proc sort data=potencial_00 out=potencial_00_nd dupout=dup nodupkey;;
+	by Nuanomes CdParceiroComercial;
+run;
+
+proc sql;
+	create table sum_potencial as
+	select t1.Nuanomes, t1.CdParceiroComercial, t1.DtAtualizacaoDiario, t1.DtAtualizacaoCetip,
+		   sum(t1.QtGravamesMercado) as QtGravamesMercado
+
+	from potencial_00 t1
+	where t1.CdParceiroComercial ne .
+	group by 1,2,3,4
+;
+quit;
+
+/* Busca Estrutura Comercial pra trazer e-mail do GF (DsEmailFinanceiraN2a) */
+/*data estrutura_00;*/
+/*	set BASES.TBESTRUTURACOMERCIAL (where=(Nuanomes = &mes_atu.));*/
+/*run;*/
+/**/
+/*proc sort data=BASES.TBESTRUTURACOMERCIAL (where=(CdColaboradorAtivo ne .)) out=estrutura_00;*/
+/*	by CdColaboradorAtivo descending NuAnoMes;*/
+/*run;*/
+/**/
+/*proc sort data=estrutura_00 out=estrutura_01 nodupkey;*/
+/*	by CdColaboradorAtivo;*/
+/*run;*/
+
+/*data fraude.FRAUDE_HIST;*/
+/*	set FRAUDE_HIST;*/
+/*run;*/
+
+/*Arquivo enviado pelo Guilherme Gondariz em Dezembro-23*/
+/*data fraude.FRAUDE_HIST2;*/
+/*	set WORK.Cobans_Fraude_Rodas;*/
+/*run;*/
+
+/* Fraude últimos 6 meses
+data fraude_6meses;
+	set fraude.FRAUDE_HIST2;
+/*	nuanomes = input(put(year(Data_Base),4.)||put(month(Data_Base),Z2.),6.);
+run;
+*/
+/*GERANDO A BASE DE FRAUDE DOS ÚLTIMOS 6 MESES*/
+proc sql;
+	create table sum_fraude_6meses as
+	select distinct t1.cdparceirocomercial as CdParceiroComercial,
+		   			t1.QtdFraudes as Qtfraude_hist,
+		   			"S" as fraude_hist
+	from Fraude.Base_FraudeRodas t1
+;quit;
+
+/*GERANDO A BASE DE DNE*/
+proc sql;
+	create table BaseDNE as
+	select distinct t1.cdparceirocomercial as CdParceiroComercial,
+					t1.QtdCtrs as QtdCtrs,
+		   			t1.QtdDNE as QtDNE_hist,
+					t1.Perc_DNE as PercDNE_6M,
+		   			"S" as DNE_hist
+	from Base_DNE_Final t1
+;quit;
+
+/* Busca contratos dos últimos 6 meses */
+data propostas_00;
+	set AUXL.tboriginacaototal
+	(where=(nuanomes>=&mes_ini. and NuProposta ne . and
+			NmGrupoProdutoMeta in ('Leves','Motos','Pesados','CVG Leves','CVG Pesados')
+			and DsTipoCanalProducao = 'MULTIMARCAS' and DsTipoCanalProducaoMeta='CANAL VEICULOS')
+	keep=nuanomes Nuproposta CdFilialC NmFilialC NmAreaEstruturaComercialC NmGrupoProdutoMeta
+		 CdParceiroComercial NmParceiroComercial StProposta DtEntradaProposta DtStatusProposta
+		 CdColaborador DsLoginN1 DsLoginN2A DsLoginN2C DsLoginN3A DsLoginN3C NmFilialC
+		 NmAreaEstruturaComercialC NuContratoGestao DsTipoCanalProducao DsTipoSubCanalProducao
+		 DsTipoCanalProducaoMeta);
+
+	if DtEntradaProposta > "&dt_atu."d then delete;
+
+run;
+
+data producao_00;
+	set bases.tbproducao
+	(where=(nuanomes>=&mes_ini.)
+	keep=dtContrato nuanomes NuContrato FlContratoExcecao NuProposta);
+
+run;
+
+proc freq data=producao_00;
+	table nuanomes * FlContratoExcecao / missing nocol norow nopercent;
+run;
+
+/*PROC SQL;*/
+/**/
+/*	%CONECTADB(server=CTR);*/
+/*	CREATE TABLE contratos_excecao AS */
+/*		SELECT * FROM CONNECTION TO DBCON*/
+/*		(*/
+/*		SELECT DISTINCT*/
+/*		    a.DtContrato, A.NuContrato*/
+/*		  FROM */
+/*		    DBGESTAOCDCCG..TbContrato a*/
+/*		  INNER JOIN */
+/*		    DBGESTAOCDCCG..TbObjGarantiaBemVeiculo b*/
+/*		    ON a.NuContrato = b.NuContrato*/
+/*		  INNER JOIN */
+/*		    DBCRED..TbProposta c*/
+/*		    ON a.NuContrato = c.NuContratoGestao*/
+/*		  INNER JOIN */
+/*		    DBCRED..TbPropGarantiaMaqEquip d*/
+/*		    ON c.NuProposta = d.NuProposta*/
+/*		  WHERE a.CdSituacaoContrato = 1*/
+/*		    AND d.CdDocumentoAlienacao IN (83,86) and DtContrato >= '2023-08-01'*/
+/*		)*/
+/**/
+/*;QUIT;*/
+
+/* Busca na TBORIGINACAO o e-mail do GF e Regional (DsLoginN2A DsLoginN2C DsLoginN3A DsLoginN3C) */
+data email_00;
+	set propostas_00
+	(where=(nuanomes=&mes_atu.)
+	keep=nuanomes Nuproposta NmFilialC NmAreaEstruturaComercialC CdParceiroComercial
+		 NmParceiroComercial DsLoginN1 DsLoginN2A DsLoginN2C DsLoginN3A DsLoginN3C);
+
+	/* Ajusta e-mail */
+	login_gf = coalescec(DsLoginN2A,DsLoginN2C);
+	login_regional = coalescec(DsLoginN3A,DsLoginN3C);
+
+	if login_gf ne '' then email_gf = compress(login_gf||'@bv.com.br');
+	if login_regional ne '' then email_regional = compress(login_regional||'@bv.com.br');
+
+run;
+
+%Macro Email(var,ref);
+	/* Separa email do GF por Cod_Parceiro */
+	proc sort data=email_00
+		(where=(email_&var. ne '') keep=email_&var. Nuanomes CdParceiroComercial)
+		out=email_&var._00 nodupkey;
+		by CdParceiroComercial email_&var.;
+	run;
+	/*NOTE: The data set WORK.EMAIL_GF_00 has 20569 observations and 3 variables.*/
+
+	/* Transpose email_gf */
+	proc transpose data=email_&var._00
+		out=email_&var._01 (drop= _name_)
+		prefix=&var.;
+		by Nuanomes CdParceiroComercial;
+		var email_&var.;
+	run;
+	/*NOTE: The data set WORK.EMAIL_GF_01 has 20556 observations and 15 variables.*/
+
+	data email_&var._02;
+		set email_&var._01;
+
+		length email_&var._final $400.;
+
+		email_&var._final = compress(CATX(";", of &var.1-&var.&ref.));
+	run;
+
+%Mend Email;
+
+%Email(gf,13);
+
+%Email(regional,4);
+
+proc sort data=bases.tbcolaborador (where=(dslogin ne '')) out=tbcolaborador dupout=dup nodupkey;
+	by dslogin;
+run;
+
+/* Base com email GF e Regional por Cod_Parceiro */
+proc sql;
+	create table base_email as
+	select distinct t1.nuanomes, t1.CdParceiroComercial, t1.NmFilialC, t6.NmColaborador as NmGR, t6.NmGrupoCargoColaborador as CargoGR,
+					t2.gf1 as email_gf, t4.NmColaborador as NmGF, t4.NmGrupoCargoColaborador as CargoGF,
+					t3.regional1 as email_regional, t5.NmColaborador as NmRegional, t5.NmGrupoCargoColaborador as CargoRegional
+	from email_00 t1 left join email_gf_02 t2
+					 on t1.CdParceiroComercial = t2.CdParceiroComercial
+					 left join email_regional_02 t3
+					 on t1.CdParceiroComercial = t3.CdParceiroComercial
+					 left join TBCOLABORADOR t4
+					 on t1.login_gf = t4.DsLogin
+					 left join TBCOLABORADOR t5
+					 on t1.login_regional = t5.DsLogin
+					 left join TBCOLABORADOR t6
+					 on t1.DsLoginN1 = t6.DsLogin
+;
+quit;
+/*NOTE: Table WORK.BASE_EMAIL created, with 22673 rows and 4 columns.*/
+
+proc sort data=base_email nodupkey;
+	by CdParceiroComercial;
+run;
+
+/* Inclui o nome quando não encontra na base TBCOLABORADOR */
+data base_email_00;
+	set base_email;
+	nome_gf = upcase(scan(email_gf,1,'.'))||' '||upcase(scan(email_gf,2,'.@'));
+	NmGF = coalescec(NmGF,nome_gf);
+	nome_regional = upcase(scan(email_regional,1,'.'))||' '||upcase(scan(email_regional,2,'.@'));
+	NmRegional = coalescec(NmRegional,nome_regional);
+
+run;
+
+/* Busca tabela de dias úteis no BI */
+PROC SQL;
+	%CONECTADB(server=BI);
+	CREATE TABLE TbDimTempoData AS
+		SELECT *
+		FROM CONNECTION TO DBCON
+		(
+			SELECT
+					*
+					FROM DWBI_DIME.TbDimTempoData AS A
+		)
+;QUIT;
+
+/* Agrega flag de dias úteis e email do GF*/
+/* Agrega pagamento de exceção de gravames*/
+proc sql;
+	create table propostas_01 as
+	select t1.*,
+		   t2.FlDiaUtil, t2.QtTotalDiaUtilMes, t2.NuDiaUtilMes, t3.FlContratoExcecao
+	from propostas_00 t1 left join TbDimTempoData t2
+						 on t1.DtEntradaProposta = t2.DtTempo
+						 left join producao_00 t3
+						 on t1.nuproposta = t3.nuproposta
+;
+quit;
+
+/* Separa MaxDiautil do mes atual */
+proc sql;
+	create table propostas_maxdiautil as
+	select t1.nuanomes,
+		   max(t1.DtEntradaProposta) as MAxDtProposta format date9.,
+		   max(t1.NuDiaUtilMes) as MaxDiaUtil
+
+	from propostas_01 t1
+	where nuanomes = &mes_atu.
+	group by 1
+;
+quit;
+
+/* Contabiliza contratos por loja/mes, média nos dias úteis e FlContratoExcecao */
+proc sql;
+	create table propostas_02 as
+	select  t1.CdParceiroComercial, t1.NmParceiroComercial, t1.nuanomes, t1.QtTotalDiaUtilMes,
+		   count(t1.NuProposta) as qtd_ppo,
+		   calculated qtd_ppo/t1.QtTotalDiaUtilMes as media format commax10.2,
+		   count(t1.NuContratoGestao) as qtd_ctt,
+		   sum(Coalesce(t1.FlContratoExcecao,0)) as QtdContratoExcecao
+
+	from propostas_01 t1
+	group by 1,2,3,4
+;
+quit;
+
+/* Separa mes atual */
+data propostas_atu propostas_hist;
+	set propostas_02;
+
+	if nuanomes = &mes_atu. then output propostas_atu;
+	else output propostas_hist;
+
+run;
+
+/*proc sort data=propostas_atu out=teste dupout=dup nodupkey;*/
+/*	by CdParceiroComercial;*/
+/*run;*/
+
+/* Cria média atual de acordo com os dias úteis do mês */
+proc sql;
+	create table propostas_atu_00 as
+	select t1.*,
+		   t1.qtd_ppo/t2.MaxDiaUtil as media_du format commax10.2,
+		   t2.MaxDiaUtil
+
+	from propostas_atu t1 left join propostas_maxdiautil t2
+						  on t1.nuanomes = t2.nuanomes
+;
+quit;
+
+/* Ordena para separar mes anterior */
+proc sort data=propostas_hist;
+	by CdParceiroComercial descending nuanomes;
+run;
+
+/* Separa mes anterior */
+proc sort data=propostas_hist out=propostas_ant nodupkey;
+	by CdParceiroComercial;
+run;
+
+/* Calcula média dos últimos 6 meses */
+proc sql;
+	create table propostas_6meses as
+	select t1.CdParceiroComercial, t1.NmParceiroComercial,
+		   count(t1.CdParceiroComercial) as qtd_meses,
+		   sum(Coalesce(t1.QtTotalDiaUtilMes,0)) as tot_diautil,
+		   sum(Coalesce(t1.qtd_ppo,0)) as qtd_ppo_6meses,
+		   calculated qtd_ppo_6meses/calculated tot_diautil as media_6meses format commax10.2,
+		   sum(Coalesce(t1.qtd_ctt,0)) as qtd_ctt_6meses,
+		   sum(Coalesce(QtdContratoExcecao,0)) as QtdCttExcecao_6meses,
+		   calculated QtdCttExcecao_6meses/calculated qtd_ctt_6meses as Perc_CttExcecao_6meses format percent10.0
+
+	from propostas_hist t1
+	group by 1,2
+;
+quit;
+
+/* Base Visão Carteira */
+data parc_carteira;
+	set basegrc.TBMETANAOISONOMICA (where=(NuAnoMes = &mes_atu.));
+	anomes = put(NuAnoMes,6.);
+run;
+
+proc sql;
+	create table sum_carteira as
+	select t1.NuAnoMes, t1.CdParceiroComercial,
+		   sum(Coalesce(t1.Qtd_Ctts_Mercado,0)) as Qtd_Ctts_Mercado
+	from parc_carteira t1
+	group by 1,2;
+quit;
+
+/* Agrega todas colunas na base final */
+proc sql;
+	create table propostas_final as
+	select t1.CdParceiroComercial, t1.NmParceiroComercial, t1.Nuanomes, t1.QtTotalDiaUtilMes,
+		   t4.MaxDiaUtil,
+		   t1.qtd_ppo, t1.media_du as media_atu,
+		   t2.NuAnoMes as NuAnoMes_ant,
+		   t2.media as media_ant,
+		   t3.qtd_meses as qtd_6meses,
+		   t3.media_6meses,
+		   t5.QtGravamesMercado,
+		   t5.QtGravamesMercado/t1.MaxDiaUtil as media_mercado format commax10.2,
+		   t6.FlPorteA, t6.DsClassificacaoA,
+		   t7.fraude_hist,
+		   t1.qtd_ctt,
+		   t1.QtdContratoExcecao as QtdCttExcecao,
+		   t8.Qtd_Ctts_Mercado,
+		   (t1.QtdContratoExcecao/t1.qtd_ctt) as Perc_CttExcecao format percent10.0,
+		   Over.Perc_Saldo_Over90 as Over90 Format percent10.2,
+		   DNE.PercDNE_6M Format percent10.2
+
+	from propostas_atu_00 t1  left join propostas_ANT t2
+							  	on t1.CdParceiroComercial = t2.CdParceiroComercial
+							  left join propostas_6MESES t3
+							  	on t1.CdParceiroComercial = t3.CdParceiroComercial
+							  left join propostas_maxdiautil t4
+							  	on t1.nuanomes = t4.nuanomes
+							  left join sum_potencial t5
+							  	on t1.CdParceiroComercial = t5.CdParceiroComercial
+							  left join potencial_00_nd t6
+							  	on t1.CdParceiroComercial = t6.CdParceiroComercial
+							  left join sum_fraude_6meses t7
+								on t1.CdParceiroComercial = t7.CdParceiroComercial
+							  left join sum_carteira t8
+						      	on t1.CdParceiroComercial = t8.CdParceiroComercial
+							  left join BASE_OVER_LEVES_SAIDA Over
+							  	on t1.CdParceiroComercial = Over.CdParceiroComercial
+							  left join BaseDNE DNE
+							  	on t1.CdParceiroComercial = DNE.CdParceiroComercial
+;
+quit;
+
+/* Cria flag de alerta de fraude */
+data propostas_final_01;
+	set propostas_final;
+
+	media_ant_du = media_ant * MaxDiaUtil;
+	media_6meses_du = media_6meses * MaxDiaUtil;
+
+	format alerta_ant alerta_6meses alerta_mercado commax10.2;
+
+	alerta_ant = media_ant_du * 1.5;
+	alerta_6meses = media_6meses_du * 1.5;
+	alerta_mercado = media_mercado * 1.5;
+
+	if media_atu > alerta_ant and media_atu > alerta_6meses and media_atu > alerta_mercado
+	then flag_fraude = 1; else flag_fraude = 0;
+
+	/* Considera Mercado caso seja terça-feira */
+/*	if &dia_semana. = 3 then do;*/
+/**/
+/*		if media_atu > alerta_ant and media_atu > alerta_6meses and media_atu > alerta_mercado*/
+/*		then flag_fraude = 1; else flag_fraude = 0;*/
+/**/
+/*	end;*/
+
+	/* Ajuste Lojas Novas */
+	if NuAnoMes_ant = . then flag_fraude = 0;
+
+	/* Alerta Pagamento em Exceção */
+	flag_pgto_excecao = 0;
+/*	if Qtd_Ctts_Mercado ne . then do;*/
+		if QtdCttExcecao/qtd_ctt > Qtd_Ctts_Mercado then flag_pgto_excecao = 1;
+/*	end;*/
+
+run;
+
+data alerta_fraude_proposta;
+	set propostas_final_01 (where=(flag_fraude = 1));
+run;
+
+data alerta_fraude_pgto_excecao;
+	set propostas_final_01 (where=(flag_pgto_excecao = 1));
+run;
+
+proc sql;
+	create table email_fraude_proposta as
+	select 	t1.CdParceiroComercial as CdParceiro,
+			t1.NmParceiroComercial as NmParceiro,
+			t2.NmFilialC,
+		   	t1.MaxDiaUtil as DiasUteis,
+			t1.qtd_ppo as PropMesAtual format COMMAX10.,
+			t1.media_atu as PropMesAtualDU format COMMAX10.2,
+		   	t1.alerta_ant as PropMesAnteriorDU format COMMAX10.2,
+			t1.alerta_6meses as Prop6MesesDU format COMMAX10.2,
+		   	t1.alerta_mercado as PropMercadoDU format COMMAX10.2,
+			t1.QtGravamesMercado as PropostasMercado format COMMAX10.,
+		   	t1.flag_fraude,
+			t1.fraude_hist,
+			t1.Over90, /*Inclusão do Over 90 - 05-12-23*/
+			t1.PercDNE_6M Format 9.2, /*Inclusão do %DNE - 23-01-24*/
+/*		   	Upcase(scan(t2.email_gf,1,'.'))||' '||Upcase(scan(t2.email_gf,2,'.@')) as NmGF,*/
+		   	t2.NmGR,
+			t2.NmGF,
+			t2.email_gf,
+/*		   	Upcase(scan(t2.email_regional,1,'.'))||' '||Upcase(scan(t2.email_regional,2,'.@')) as NmRegional,*/
+		   	t2.NmRegional,
+			t2.email_regional,
+		   	'marcio.shiroma@bv.com.br' as email_teste
+
+	from alerta_fraude_proposta t1 left join base_email_00 t2
+								   on t1.CdParceiroComercial = t2.CdParceiroComercial
+;
+quit;
+
+data layout_alerta;
+	set email_fraude_proposta (drop=flag_fraude email_gf email_regional email_teste);
+run;
+
+/*********************************************/
+/* Variavel para condição de envio de email */
+/*********************************************/
+
+/* Retira duplicidade da base por GF */
+proc sort data=email_fraude_proposta out=envio_email_gf
+	(keep=email_gf email_teste NmGF) nodupkey;
+	by email_gf;
+run;
+
+PROC SQL;
+	SELECT COUNT(NmGF) INTO :QtdGFs
+	FROM WORK.envio_email_gf;
+QUIT;
+
+/*RODAR ATÉ AQUI E VERIFICAR SE ESTA COERENTE A QUANTIDADE DE FRAUDES POR LOJAS*/
+
+/*%let QtdGFs = 1;*/
+
+%put &QtdGFs.;
+
+%Macro GFs();
+
+	%IF &QtdGFs. ge 1 %THEN %DO;
+
+		x 'rm /infogrc/alerta_fraude/Base/*.csv';
+
+		%DO i = 1 %TO &QtdGFs.;
+
+			data _null_;
+				set envio_email_gf (firstobs=&i. obs=&i.);
+
+				call symputx('NmGF',NmGF);
+				call symputx('emailgf',email_gf);
+				call symputx('emailteste',email_teste);
+/*				call symputx('pdv',CdParceiro);*/
+
+			run;
+
+			%put &NmGF.;
+			%put &emailgf.;
+			%put &emailteste.;
+/*			%put &pdv.;*/
+
+			data alerta_fraude_&i. (drop=fraude_hist);
+				set layout_alerta (where=(NmGF = "&NmGF."));
+
+/*				fraude_hist = 1;*/
+
+				call symputx('fraude_hist',fraude_hist);
+
+			run;
+
+			%put &fraude_hist.;
+
+			/*********************************************/
+			/* Exporta CSV para anexar ao email */
+			/*********************************************/
+
+			PROC EXPORT
+			        DATA=work.alerta_fraude_&i.
+			        OUTFILE= "/infogrc/alerta_fraude/Base/painel_saude_&i..csv"
+			        DBMS=DLM
+			        REPLACE;
+			        DELIMITER=";";
+			        PUTNAMES=YES;
+			RUN;
+
+			/****************************************/
+			/* Condição de envio de email */
+			/****************************************/
+
+			OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+			 FILENAME MAIL EMAIL
+			    FROM=("inf-gerenciais@bv.com.br")
+/*			    TO=("&emailteste.")*/
+			    TO=("&emailgf.")
+				CC=("bvf-programadequalidade@bv.com.br","#BVF-SenioresPrevencaoaFraude@bv.com.br", "luis.mendes@bv.com.br", "cleber.martins@bv.com.br", "jose.santos@bv.com.br")
+			    BCC = ("ramon.sales@bv.com.br", "marcio.shiroma@bv.com.br")
+
+				Type    = 'text/html'
+
+				%IF &fraude_hist. = 1 %THEN %DO;
+
+					Attach=("/infogrc/alerta_fraude/Base/LayoutFraudeHist.jpg" inlined='Fraude')
+					attach="/infogrc/alerta_fraude/Base/painel_saude_&i..csv"
+
+				%END;
+
+				%ELSE %DO;
+
+					Attach=("/infogrc/alerta_fraude/Base/LayoutFraude.jpg" inlined='Fraude')
+					attach="/infogrc/alerta_fraude/Base/painel_saude_&i..csv"
+
+				%END;
+
+				SUBJECT= "Painel de Saúde das Lojas Rodas";
+
+/**/
+/*			DATA _NULL_;*/
+/*			    FILE MAIL;*/
+/*					PUT "<html>*/
+/*			     			<body>		*/
+/*					<img src=cid:Fraude>*/
+/*			    			</body>*/
+/*						</html>"*/
+/*			;RUN;*/
+
+			DATA _NULL_;
+			    FILE MAIL;
+					PUT "<html>
+			     			<body>
+					<img src=cid:Fraude>
+			    			</body>
+						<body>
+							<br>
+							<p><b>Importante:</b> O conteúdo compartilhado neste e-mail é meramente informativo e baseia-se em premissas previamente adotadas para geração dos alertas, assim, devem ser considerados para atuação preventiva do Comercial e não garantem a confirmação de uma fraude.</p> <br>
+						</body>
+
+						</html>"
+			;RUN;
+
+		%END;
+
+	%END;
+	%ELSE %DO;
+
+		%PUT NÃO EXISTEM ALERTAS DE FRAUDES EM &dt_atu.;
+
+	%END;
+
+%Mend GFs;
+
+%GFs();
+
+/*data fraude.envio_alerta_hist;*/
+/*	set envio_alerta_hist;*/
+/*run;*/
+
+%Macro Hist();
+
+	%IF &QtdGFs. ge 1 %THEN %DO;
+
+		data envio_alerta_atu;
+			retain dt_envio;
+			set layout_alerta;
+
+			format dt_envio date9.;
+
+			dt_envio = today();
+
+		run;
+
+		proc append data=envio_alerta_atu
+			base=fraude.envio_alerta_hist force;
+		run;
+
+		PROC EXPORT
+		        DATA=fraude.envio_alerta_hist
+		        OUTFILE= "/infogrc/alerta_fraude/Base/envio_alerta_hist.csv"
+		        DBMS=DLM
+		        REPLACE;
+		        DELIMITER=";";
+		        PUTNAMES=YES;
+		RUN;
+
+		OPTIONS
+			EMAILHOST=smtprelay.bvnet.bv
+			EMAILPORT=25
+			EMAILAUTHPROTOCOL=NONE
+			EMAILID="marcio.shiroma@bv.com.br"
+		;
+		FILENAME MAIL EMAIL
+		CONTENT_TYPE="text/html"
+		attach=("/infogrc/alerta_fraude/Base/envio_alerta_hist.csv" ct = 'binary/application')
+	    FROM=("inf-gerenciais@bv.com.br")
+/*		TO=("ramon.sales@bv.com.br")*/
+	    TO=("renata.farina@bv.com.br", "luis.mendes@bv.com.br", "cleber.martins@bv.com.br", "jose.santos@bv.com.br")
+		CC = ("ramon.sales@bv.com.br", "marcio.shiroma@bv.com.br")
+
+		SUBJECT="Base Histórica Alertas Fraude";
+
+				ods html3
+				body=MAIL
+				style=SASWEB
+				rs=none;
+
+				TITLE;
+
+				ods text="Prezado(a),";
+				ods text=' ';
+				ods text="Segue base histórica contendo os alertas de fraude enviados.";
+				ods text=' ';
+				ods text=' ';
+				ods text='Att,';
+				ods text=' ';
+				ods text='IGE';
+				ods text='Banco BV';
+
+		ods html3 close;
+
+	%END;
+	%ELSE %DO;
+
+		%PUT NÃO EXISTEM ALERTAS DE FRAUDES EM &dt_atu.;
+
+			OPTIONS
+			EMAILHOST=smtprelay.bvnet.bv
+			EMAILPORT=25
+			EMAILAUTHPROTOCOL=NONE
+			EMAILID="marcio.shiroma@bv.com.br"
+		;
+		FILENAME MAIL EMAIL
+		CONTENT_TYPE="text/html"
+/*		attach=("/infogrc/alerta_fraude/Base/envio_alerta_hist.csv" ct = 'binary/application')*/
+	    FROM=("inf-gerenciais@bv.com.br")
+/*		TO=("ramon.sales@bv.com.br")*/
+	    TO=("renata.farina@bv.com.br", "luis.mendes@bv.com.br", "cleber.martins@bv.com.br", "jose.santos@bv.com.br")
+		CC = ("ramon.sales@bv.com.br", "marcio.shiroma@bv.com.br")
+
+		SUBJECT="Base Histórica Alertas Fraude";
+
+				ods html3
+				body=MAIL
+				style=SASWEB
+				rs=none;
+
+				TITLE;
+
+				ods text="Prezado(a),";
+				ods text=' ';
+				ods text="Para o envio semanal de &dt_atu. não tivemos nenhum alerta de fraudes com as regras atuais.";
+				ods text=' ';
+				ods text=' ';
+				ods text='Att,';
+				ods text=' ';
+				ods text='IGE';
+				ods text='Banco BV';
+
+		ods html3 close;
+
+	%END;
+
+%Mend Hist;
+
+%Hist();

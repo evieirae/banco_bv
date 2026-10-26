@@ -1,0 +1,138 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_cubo_estudo
+FILE_SAS: 01-simulacoes.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 78
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM1, safraXM
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.TBRATINGSIMULACAO [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], CRM.SIMU_PROP_AQUISICAO [SAS/Local], CRM.SIMU_PROP_LEADS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.TBRATINGSIMULACAO [DATA Step - SET], CONVSIMU.TBSIMULACOES [PROC SQL - FROM], CRM.SIMU_PROP_AQUISICAO [PROC SQL - FROM], CRM.SIMU_PROP_LEADS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CONVSIMU, LEADS, MSGPROPOSTA, TBRATINGSIMULACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* |	Atualizacao:	11/07/2023  													| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Incluido karvi, dryve E escale No step "Leads"				| */
+/* ====================================================================================== */
+/* |	Atualizacao:	19/09/2023  													| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Incluido Origem no step 'Leads'								| */
+/* ====================================================================================== */
+/* |	Atualizacao:	25/04/2024 														| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Incluido mensagerias V7										| */
+/* ====================================================================================== */
+
+/* Buscar dados de mensageria */
+PROC SQL;
+CREATE TABLE MsgProposta AS
+  SELECT DISTINCT
+    Num_Proposta AS NuProposta,
+    CASE WHEN COALESCE(msg_v7,Msg_Dash) = '9. Sem CdSimuPrazofnnco' THEN '9. Não houve mensageria' ELSE COALESCE(msg_v7,Msg_Dash) END AS Mensageria,
+    Msg_2 AS Mensageria2,
+    Msg_ent_min AS MsgEntradaMinima,
+    fx_ent_min AS EntradaMinima,
+	DsPzFaixaMotivoRecusaPDEC AS MotivoRecusa
+  FROM CRM.SIMU_PROP_AQUISICAO
+  WHERE
+    AnoMes >= PUT(&safraXM.,6.)
+    AND Num_Proposta <> .
+    AND (calculated Mensageria || Msg_2) IS NOT NULL;
+RUN;
+
+PROC SORT DATA=MsgProposta NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC SQL; CREATE INDEX NuProposta ON MsgProposta; QUIT;
+
+/* Buscar informações de leads  */
+PROC SQL;
+CREATE TABLE Leads AS
+  SELECT DISTINCT
+    num_proposta as NuProposta,
+    Sistema_Origem as CompraLeads,
+	CASE WHEN flag_comissao = 1 AND Sistema_Origem IN ('DRYVE','Dryve sem Simul.','Escale sem Simul.','KARVI','ICARROS','MERCADO_LIVRE','MOBIAUTO','USADOSBR','SO_CARRAO') THEN 1
+		 WHEN Sistema_Origem IN ('SITE_BV','MEU_CARRO_NOVO') THEN 1
+		 ELSE 0
+    END AS FlagProducao,
+	campanha_agrup as Origem
+  FROM
+    CRM.SIMU_PROP_LEADS
+  WHERE
+    num_proposta <> .
+    AND Sistema_Origem IS NOT NULL
+    AND AnoMes >= PUT(&safraXM.,6.);
+RUN;
+
+PROC SORT DATA=Leads NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC SQL; CREATE INDEX NuProposta ON Leads; QUIT;
+
+/* Busca dados de rating de simulação */
+DATA TbRatingSimulacao;
+SET AUXL.TbRatingSimulacao;
+  WHERE NuAnoMes >= &safraM1.;
+RUN;
+
+options DLDMGACTION=REPAIR;
+
+PROC SQL;
+CREATE TABLE Convsimu AS
+  SELECT
+    A.NuProposta,
+	A.VrProposta AS VrSimulacao,
+    CASE WHEN COALESCE(A.RatingCliente, B.RatingCliente) <> . THEN 1 ELSE 0 END AS FlRatingC,
+	CASE WHEN COALESCE(A.RatingSimulacao, B.RatingSimulacao) <> . THEN 1 ELSE 0 END AS FlRatingS,
+    COALESCE(A.RatingCliente, B.RatingCliente) * A.VrProposta AS VpRatingCliente,
+	COALESCE(A.RatingSimulacao, B.RatingSimulacao) * A.VrProposta AS VpRatingSimulacao
+  FROM
+    CONVSIMU.tbsimulacoes A
+  LEFT JOIN TbRatingSimulacao B
+    ON A.DtSimulacaoInicial = B.DtSimulacao
+    AND A.NuCpfCnpj = B.NuCpfCnpj
+  WHERE
+    A.NuProposta <> .
+    AND STRIP(TRANSTRN(A.Produto,"CVG ",TRIMN(''))) IN ('Leves','Motos','Pesados');
+RUN;

@@ -1,0 +1,143 @@
+START_METADATA
+PROJECT: Rodas__fenabrave
+FILE_SAS: 04-exportar-base-tableau.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 0
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 82
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraFim, safraIni
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBTEMPODATA [SAS/Local], MIS.TB_FENABRAVE_MKTSHARE_00 [SAS/Local], RELEXC.MARKETSHAREFENABRAVE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: GRAVAMES
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBTEMPODATA [PROC SQL - FROM], MIS.TB_FENABRAVE_MKTSHARE_00 [PROC SQL - FROM], RELEXC.MARKETSHAREFENABRAVE [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): GRAVAMES.NUANOMES
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBFENABRAVE, TBFENABRAVE_02, TBGRAVAMES_01, TBGRAVAMES_02, TBMKTSHAREMENSAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+options compress=yes;
+
+DATA _NULL_;
+  dtRef = INTNX('MONTH',TODAY(),-1);
+  dtInicio = INTNX('YEAR',dtRef,-1);
+
+  safraIni = (YEAR(dtInicio) * 100) + MONTH(dtInicio);
+  safraFim = (YEAR(dtRef) * 100) + MONTH(dtRef);
+
+  CALL SYMPUT('safraIni', safraIni);
+  CALL SYMPUT('safraFim', safraFim);
+RUN;
+
+PROC SQL;
+  SELECT DISTINCT NuAnoMes, QtTotalDiaUtilMes
+  FROM bases.TbTempoData
+  WHERE NuAnoMes BETWEEN &safraIni. AND &safraFim.
+  ORDER BY NuAnoMes DESC;
+RUN;
+
+PROC SQL;
+CREATE TABLE tbGravames_01 AS
+  SELECT
+    base as nuAnoMes,
+	UF as cdUF,
+	stVeiculo,
+	tpVeiculo,
+	SUM(qtGravames) AS qtGravames
+  FROM RELEXC.MarketShareFenabrave
+  WHERE base BETWEEN &safraIni. AND &safraFim.
+    AND AjusteManual = 'N'
+  GROUP BY 1,2,3,4;
+RUN;
+
+PROC SQL;
+CREATE TABLE tbFenabrave AS
+  SELECT
+    Fenabrave.base,
+    Fenabrave.cdUf,
+    Fenabrave.stVeiculo,
+    Fenabrave.tpVeiculo,
+    SUM(Fenabrave.qtd) - SUM(Gravames.qtGravames) AS qtTotal
+  FROM
+    mis.tb_fenabrave_mktshare_00 Fenabrave
+  INNER JOIN tbGravames_01 Gravames
+    ON Fenabrave.base = Gravames.nuAnoMes
+    AND Fenabrave.cdUf = Gravames.CdUf
+    AND Fenabrave.StVeiculo = Gravames.StVeiculo
+    AND Fenabrave.TpVeiculo = Gravames.TpVeiculo
+  WHERE
+    Fenabrave.Qtd > Gravames.qtGravames
+  GROUP BY 1,2,3,4;
+QUIT;
+
+PROC SQL;
+CREATE TABLE tbFenabrave_02 AS
+  SELECT
+    base,
+    TRIM(UPCASE(TpVeiculo)) AS dsTpVeiculo,
+    TRIM(UPCASE(StVeiculo))||'S' AS dsStVeiculo,
+	SUM(qtTotal) AS qtd
+  FROM tbFenabrave
+  WHERE base BETWEEN &safraIni. AND &safraFim.
+  GROUP BY 1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE tbGravames_02 AS
+  SELECT
+    base,
+    grupo,
+    subGrupo,
+    TRIM(UPCASE(TpVeiculo)) AS dsTpVeiculo,
+    TRIM(UPCASE(StVeiculo))||'S' AS dsStVeiculo,
+    fxIdade as dsFxIdade,
+    COALESCE(tpAgenteProduto,'1') AS tpAgenteProduto,
+    SUM(qtGravames) AS qtd
+  FROM RELEXC.MarketShareFenabrave
+  WHERE base BETWEEN &safraIni. AND &safraFim.
+    AND AjusteManual = 'N'
+  GROUP BY 1,2,3,4,5,6,7;
+RUN;
+
+PROC SQL;
+CREATE TABLE tbMktShareMensal AS
+  SELECT * FROM tbGravames_02
+  OUTER UNION CORRESPONDING
+  SELECT * FROM tbFenabrave_02;
+RUN;
+
+%ExportaCSV(TbMarketShare_Fenabrave,tbMktShareMensal);

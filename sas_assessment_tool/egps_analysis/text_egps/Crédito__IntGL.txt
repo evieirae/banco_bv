@@ -1,0 +1,295 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Crédito__IntGL
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:22 UTC
+BUSINESS_AREA: Crédito
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 213
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: DELETE, EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: INSIGHT = /riscosbvf/insight
+DETECTED_MACROS_DEFINED: S_CTR, U_CTR
+DETECTED_MACROS_USED: S_CTR, U_CTR
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: SYBASE
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DBGERENCIADORLIMITE.TBLINHACREDITO [SYBASE], DBGERENCIADORLIMITE.TBLINHACREDITOEFETIVO [SYBASE], DBGERENCIADORLIMITE.TBOPERACAOLIMITECREDITO [SYBASE], DBGERENCIADORLIMITE.TBTIPOEVENTOOPERACAO [SYBASE], DBGERENCIADORLIMITE.TBTRANSACAOPLATAFORMACOMERCIAL [SYBASE], DBGLOBAL.VWSISTEMA [SYBASE], DBGLOBALPRODUTO.TBMODALIDADECATALOGOPRODUTO [SYBASE]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): DBGERENCIADORLIMITE.TBLINHACREDITO [Pass-Through Native (SYBASE) - FROM], DBGERENCIADORLIMITE.TBLINHACREDITOEFETIVO [Pass-Through Native (SYBASE) - FROM], DBGERENCIADORLIMITE.TBOPERACAOLIMITECREDITO [Pass-Through Native (SYBASE) - FROM], DBGERENCIADORLIMITE.TBTIPOEVENTOOPERACAO [Pass-Through Native (SYBASE) - FROM], DBGERENCIADORLIMITE.TBTRANSACAOPLATAFORMACOMERCIAL [Pass-Through Native (SYBASE) - FROM], DBGLOBAL.VWSISTEMA [Pass-Through Native (SYBASE) - FROM], DBGLOBALPRODUTO.TBMODALIDADECATALOGOPRODUTO [Pass-Through Native (SYBASE) - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): \\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\11.Intervenções_Estratégia\TbIntGL.xlsx
+TEMP/DISCARDED OUTPUTS: TBINTGL, TBINTGL_AUX, TBLINHACREDITO, TBLINHACREDITOEFETIVO, TBLINHACREDITO_FINAL, TBMODALIDADE, TBMODALIDADE_FINAL, TBOPERACAO, TBSISTEMA, TBTIPOEVENTOOPERACAO, TBTRANSACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET U_CTR=mnto_insight;
+%LET S_CTR='n68w5i9x8hSg';
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00.Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00.Libname */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-GThQngwonpTNGsVT/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET U_CTR= mnto_insight;
+%LET S_CTR= 'n68w5i9x8hSg';
+
+LIBNAME INSIGHT 	'/riscosbvf/insight' access=readonly;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00.Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01.IntGL */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01.IntGL */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Ogq11thRtEPP9jFc/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CONNECT TO SYBASE (SERVER=MORSYBCTR USER=&U_CTR. PASSWORD=&S_CTR.);
+CREATE TABLE TbTransacao AS SELECT
+
+A.DtTransacao,
+A.CdTransacaoPlataformaComercial,
+A.DsUsuarioTransacao,
+(CASE A.tptransacaoplataforma
+WHEN 'A' THEN 'PRE_ALOCACAO'
+WHEN 'R' THEN 'Reenquadramento'
+WHEN 'C' THEN 'Cancelamento Total'
+WHEN 'E' THEN 'Efetivação'
+WHEN 'P' THEN 'Baixa Parcial'
+WHEN 'T' THEN 'Baixa Total'
+WHEN 'L' THEN 'Realocar'
+WHEN 'S' THEN 'Consulta'
+WHEN 'I' THEN 'Cancelamento Parcial'
+WHEN 'O' THEN 'Alterar Operação'
+WHEN 'V' THEN 'Reativar Operação'
+ELSE 'Unknown'
+END) as TpTransacaoPlataforma,
+A.tptransacaoplataforma as CodTpTransacaoPlataforma,
+A.CdPessoaClienteEmitente,
+A.CdPessoaClienteOperacao,
+A.CdTipoEventoOperacao,
+A.CdPessoaClienteRisco,
+A.CdOperacaoLimiteCredito,
+A.CdLinhaCreditoTransacao,
+A.TpResultadoTransacao,
+A.TpOrigemTransacao,
+A.VrPrincipal,
+A.VrEncargos,
+A.VrFuturo,
+A.CdSistema,
+A.NuChamadaServico
+FROM CONNECTION TO SYBASE
+(SELECT
+A.DtTransacao,
+A.CdTransacaoPlataformaComercial,
+A.DsUsuarioTransacao,
+A.TpTransacaoPlataforma,
+A.CdPessoaClienteEmitente,
+A.CdPessoaClienteOperacao,
+A.CdTipoEventoOperacao,
+A.CdPessoaClienteRisco,
+A.CdOperacaoLimiteCredito,
+A.CdLinhaCreditoTransacao,
+A.TpResultadoTransacao,
+A.TpOrigemTransacao,
+A.VrPrincipal,
+A.VrEncargos,
+A.VrFuturo,
+A.CdSistema,
+A.NuChamadaServico
+FROM dbGerenciadorLimite..TbTransacaoPlataformaComercial AS A WHERE DtTransacao > '2025-01-01' AND A.TpTransacaoPlataforma <> 'S' AND A.DsUsuariotransacao in ('claudia.andrade','guilherme.cristino','rogerio.seiberlich','rosana.lopes','rosilene.santo','talita.loula','talita.martins','wendel.cruz','raquel.silva','aurea.angelo'))
+
+AS A
+;QUIT;RUN;
+
+PROC SQL;
+CONNECT TO SYBASE (SERVER=MORSYBCTR USER=&U_CTR. PASSWORD=&S_CTR.);
+CREATE TABLE TbTipoEventoOperacao AS
+SELECT A.CdTipoEventoOperacao, A.NmTipoEventoOperacao
+FROM CONNECTION TO SYBASE
+(SELECT A.CdTipoEventoOperacao, A.NmTipoEventoOperacao FROM dbGerenciadorLimite..TbTipoEventoOperacao AS A)
+
+AS A
+;QUIT;RUN;
+
+PROC SQL;
+CONNECT TO SYBASE (SERVER=MORSYBCTR USER=&U_CTR. PASSWORD=&S_CTR.);
+CREATE TABLE TbLinhaCreditoEfetivo	AS
+SELECT A.Cdlimitecredito, A.CdLinhaCredito
+FROM CONNECTION TO SYBASE
+(SELECT A.Cdlimitecredito, A.CdLinhaCredito FROM dbGerenciadorLimite..TbLinhaCreditoEfetivo AS A)
+
+AS A
+;QUIT;RUN;
+PROC SQL;
+CONNECT TO SYBASE (SERVER=MORSYBCTR USER=&U_CTR. PASSWORD=&S_CTR.);
+CREATE TABLE TbLinhaCredito	AS
+SELECT A.CdLinhaCredito, A.NmLinhaCredito
+FROM CONNECTION TO SYBASE
+(SELECT A.CdLinhaCredito, A.NmLinhaCredito  FROM dbGerenciadorLimite..TbLinhaCredito AS A)
+
+AS A
+;QUIT;RUN;
+PROC SQL;
+CONNECT TO SYBASE (SERVER=MORSYBCTR USER=&U_CTR. PASSWORD=&S_CTR.);
+CREATE TABLE TbOperacao	AS
+SELECT A.NuObjetoNegociacao, A.CdOperacaoLimiteCredito, A.CdModalidadeCatalogoProduto
+FROM CONNECTION TO SYBASE
+(SELECT A.NuObjetoNegociacao, A.CdOperacaoLimiteCredito, A.CdModalidadeCatalogoProduto  FROM dbGerenciadorLimite..TbOperacaoLimiteCredito AS A)
+
+AS A
+;QUIT;RUN;
+PROC SQL;
+CONNECT TO SYBASE (SERVER=MORSYBCTR USER=&U_CTR. PASSWORD=&S_CTR.);
+CREATE TABLE TbSistema	AS
+SELECT A.DsSistema, A.CdSistema
+FROM CONNECTION TO SYBASE
+(SELECT A.DsSistema, A.CdSistema  FROM dbglobal..VwSistema AS A)
+
+AS A
+;QUIT;RUN;
+PROC SQL;
+CONNECT TO SYBASE (SERVER=MORSYBCTR USER=&U_CTR. PASSWORD=&S_CTR.);
+CREATE TABLE TbModalidade	AS
+SELECT A.DsModalidadeCatalogoProduto, A.CdModalidadeCatalogoProduto
+FROM CONNECTION TO SYBASE
+(SELECT A.DsModalidadeCatalogoProduto, A.CdModalidadeCatalogoProduto  FROM DBGLOBALPRODUTO..TbModalidadeCatalogoProduto AS A)
+
+AS A
+;QUIT;RUN;
+PROC SQL;
+CREATE TABLE TbLinhaCredito_FINAL AS SELECT
+A.*,
+B.NmLinhaCredito
+
+FROM TbLinhaCreditoEfetivo AS A LEFT JOIN TbLinhaCredito AS B ON A.CdLinhaCredito = B.CdLinhaCredito;
+
+QUIT;
+PROC SQL;
+CREATE TABLE TbModalidade_FINAL AS SELECT
+A.*,
+B.DsModalidadeCatalogoProduto
+
+FROM TbOperacao AS A LEFT JOIN TbModalidade AS B ON A.CdModalidadeCatalogoProduto = B.CdModalidadeCatalogoProduto;
+
+QUIT;
+PROC SQL;
+
+CREATE TABLE TBINTGL_AUX AS SELECT
+
+A.*,
+B.NmLinhaCredito,
+C.NuObjetoNegociacao,
+C.DsModalidadeCatalogoProduto as DsMotivo,
+D.DsSistema,
+E.NmTipoEventoOperacao
+
+FROM TbTransacao AS A LEFT JOIN TbLinhaCredito_FINAL AS B ON A.CdLinhaCreditoTransacao = B.CdLimiteCredito
+LEFT JOIN TbModalidade_FINAL AS C ON A.CdOperacaoLimiteCredito = C.CdOperacaoLimiteCredito
+LEFT JOIN TbSistema AS D ON A.CdSistema = D.CdSistema
+LEFT JOIN TbTipoEventoOperacao AS E ON A.CdTipoEventoOperacao = E.CdTipoEventoOperacao
+
+WHERE DsUsuarioTransacao NOT IN ('BAIXA_AUTOMATICA', 'PLCA', 'RoboAlocacaoBatch.sh', 'alocacao_oper_prd','rotina batch');
+
+QUIT;
+
+PROC SQL;
+
+   CREATE TABLE TBINTGL AS SELECT
+
+  		  DtTransacao,
+          CdTransacaoPlataformaComercial,
+          DsUsuarioTransacao,
+          TpTransacaoPlataforma,
+          CodTpTransacaoPlataforma,
+          CdPessoaClienteEmitente,
+          CdPessoaClienteOperacao,
+          CdTipoEventoOperacao,
+          CdPessoaClienteRisco,
+          CdOperacaoLimiteCredito,
+          CdLinhaCreditoTransacao,
+		  NmLinhaCredito,
+          TpResultadoTransacao,
+          TpOrigemTransacao,
+          VrPrincipal,
+          VrEncargos,
+          VrFuturo,
+          CdSistema,
+          NuChamadaServico,
+          NmTipoEventoOperacao,
+		  DsSistema,
+          DsMotivo
+
+      FROM TBINTGL_AUX;
+
+QUIT;
+
+PROC DELETE DATA = TbTransacao
+				   TbLinhaCreditoEfetivo
+				   TbLinhaCredito
+				   TbOperacao
+				   TbSistema
+				   TbModalidade
+				   TbLinhaCredito_FINAL
+				   TBTIPOEVENTOOPERACAO
+				   TbModalidade_FINAL
+				   TBINTGL_AUX
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01.IntGL */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TBINTGL
+    OUTFILE='\\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\11.Intervenções_Estratégia\TbIntGL.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

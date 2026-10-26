@@ -1,0 +1,384 @@
+START_METADATA
+PROJECT: Rodas__contratacao_veiculos
+FILE_SAS: contratacao_leadtime.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 30
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 286
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MIS = /projetos/MISV/data/bases
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: DT_SAS, DT_SQL, dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/COACHING/TRIBO_VEICULOS/SAS/CONECTADB.SAS [SAS/Local], DBCOR.DBO.TBSUBPRODUTO [DBCON], DBCRED.DBO.TBCONTROLEGERACAOCCB [DBCON], DBCRED.DBO.TBPROPOSTA [DBCON], MIS.TBMETAPRODUCAOFINAL [SAS/Local], MIS.TBORIGINACAO [SAS/Local], STGASE_DBACESSOPARCEIRO.TBBASEPORTALVIVERE [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: MIS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): DBCOR.DBO.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBCONTROLEGERACAOCCB [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], MIS.TBMETAPRODUCAOFINAL [PROC SQL - FROM], MIS.TBORIGINACAO [PROC SQL - FROM], STGASE_DBACESSOPARCEIRO.TBBASEPORTALVIVERE [Pass-Through Native (DBCON) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): MIS.TBMETAPRODUCAOFINAL, MIS.TBORIGINACAO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./leadtime_pope.csv, &dir_csv./meta_filial.csv, &dir_csv./meta_gr.csv
+TEMP/DISCARDED OUTPUTS: LEADTIME_POPE, META_FILIAL, META_GR, META_PRODUCAO, POPE_01, POPE_02, POPE_03, PROPOSTAS_CCB, PROPOSTAS_LEVES, PROPOSTAS_LEVES_CCB
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+
+END_METADATA
+================================================================================
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 VALIDVARNAME=ANY;
+OPTIONS NOERRORABEND;
+OPTIONS COMPRESS=BINARY REUSE=YES;
+
+/*LIBNAME CONTRATO '/infogrc/contratacao_veiculos/bases';*/
+LIBNAME MIS 	 '/projetos/MISV/data/bases';
+
+%INCLUDE '/riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas';
+
+%LET dir_csv = /infogrc/contratacao_veiculos/csv;
+
+/*%let dir_csv = /riscosbvf/BA/processos/output;*/
+
+DATA _NULL_;
+
+DT_SAS = INTNX('Month',TODAY()-1,-6,'B' );
+DT_SQL = "'"||put(year(DT_SAS),4.)||put(month(DT_SAS),z2.)||put(day(DT_SAS),z2.)||"'";
+
+CALL symputx('DT_SAS', put(DT_SAS,date9.));
+CALL symputx('DT_SQL', DT_SQL);
+
+RUN;
+/*
+%let DT_SAS = '01jul2022'd;
+%let DT_SQL = '20220701';
+*/
+
+%put &DT_SAS;
+%put &DT_SQL;
+
+PROC SQL;
+CREATE TABLE META_PRODUCAO AS
+SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,StVeiculo
+	,DsTipoCanalProducao
+	,CdFilial
+	,NmAreaEstruturaComercial
+	,NmCanalEstruturaComercial
+	,DsLoginN2H
+	,VrMetaN1
+	,VrMetaNIN1
+	,VrMetaN2
+	,VrMetaNIN2
+	,VrMedida
+	,VrMedidaNI
+FROM MIS.TBMETAPRODUCAOFINAL
+WHERE NuAnoMes >= INPUT(PUT("&DT_SAS."D ,yymmn6.),6.)
+AND NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados')
+AND NmCanalEstruturaComercial = 'Canal Veiculos'
+AND TpValor = 'VrProducao'
+;RUN;
+
+PROC SQL;
+CREATE TABLE META_GR AS
+SELECT
+NuAnoMes
+,DsLoginN1
+,CdColaborador
+,NmColaborador
+/*,CdFilial*/
+/*,NmAreaEstruturaComercial*/
+
+,SUM(CASE WHEN NmGrupoProdutoMeta = 'Leves' AND StVeiculo = 'Usado'
+          THEN VrMetaNIN1
+          WHEN NmGrupoProdutoMeta  = 'Motos'
+          THEN VrMetaNIN1
+          ELSE VrMetaN1 END) as VrMeta
+
+,SUM(CASE WHEN NmGrupoProdutoMeta = 'Leves' AND StVeiculo = 'Usado'
+          THEN VrMedidaNI
+          WHEN NmGrupoProdutoMeta  = 'Motos'
+          THEN VrMedidaNI
+          ELSE VrMedida END) as vrProd
+FROM META_PRODUCAO
+WHERE DsLoginN1 NE ''
+GROUP BY 1,2,3,4
+;RUN;
+
+PROC SQL;
+CREATE TABLE META_FILIAL AS
+SELECT
+NuAnoMes
+,CdFilial
+,NmAreaEstruturaComercial
+
+,SUM(CASE WHEN NmGrupoProdutoMeta = 'Leves' AND StVeiculo = 'Usado'
+          THEN VrMetaNIN2
+          WHEN NmGrupoProdutoMeta  = 'Motos'
+          THEN VrMetaNIN2
+          ELSE VrMetaN2 END) as VrMeta
+
+,SUM(CASE WHEN NmGrupoProdutoMeta = 'Leves' AND StVeiculo = 'Usado'
+          THEN VrMedidaNI
+          WHEN NmGrupoProdutoMeta  = 'Motos'
+          THEN VrMedidaNI
+          ELSE VrMedida END) as vrProd
+
+FROM META_PRODUCAO
+WHERE cdfilial NE .
+GROUP BY 1,2,3
+;RUN;
+
+PROC SQL;
+CREATE TABLE PROPOSTAS_LEVES AS
+SELECT
+	 NuProposta
+	,DtEntradaProposta
+	,NuAnoMes
+	,NmGrupoProdutoMeta
+	,CdFilial
+	,DsFilial
+	,CdParceiroComercial
+	,NmAreaEstruturaComercial
+	,NmParceiroComercial
+	,DsLoginN1
+	,CdColaborador
+	,NmColaborador
+	,NmCanalEstruturaComercial
+	,NmSubEstruturaComercialA
+	,TpPessoa
+FROM
+	MIS.TBORIGINACAO
+WHERE
+	StProposta = 'AP'
+AND
+	DtEntradaProposta >= "&DT_SAS."D
+AND
+	NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados')
+AND
+	NmCanalEstruturaComercial = 'Canal Veiculos';
+QUIT;
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE PROPOSTAS_CCB AS
+SELECT * FROM CONNECTION TO DBCON(
+SELECT
+	 T1.NuProposta
+	,MAX(T3.NuVersaoGeracaoCCB) AS NuVersaoGeracaoCCB
+FROM
+	DBCRED.DBO.TbProposta T1
+INNER JOIN
+	DBCOR.DBO.TbSubProduto T2
+	ON T1.CdSubproduto = t2.CdSubProduto
+	AND t2.CdProduto = 12 /* 12 = RODAS */
+LEFT JOIN
+	DBCRED.DBO.TbControleGeracaoCCB t3
+	ON T1.NuProposta = T3.NuProposta
+WHERE
+	T1.StProposta = 'AP'
+AND
+	T1.DtEntradaProposta >= &DT_SQL
+GROUP BY
+	T1.NuProposta
+)
+;RUN;
+
+PROC SQL;
+CREATE TABLE PROPOSTAS_LEVES_CCB AS
+SELECT
+	 T1.NuProposta
+	,T1.DtEntradaProposta
+	,T1.NuAnoMes
+	,T1.NmGrupoProdutoMeta
+	,T1.CdFilial
+	,T1.DsFilial
+	,T1.CdParceiroComercial
+	,T1.NmParceiroComercial
+	,T1.NmAreaEstruturaComercial
+	,T1.DsLoginN1
+	,T1.CdColaborador
+	,T1.NmColaborador
+	,T1.TpPessoa
+	,T1.NmCanalEstruturaComercial
+	,T1.NmSubEstruturaComercialA
+	,CASE WHEN T2.NuVersaoGeracaoCCB > 1 THEN 1 ELSE 0 END AS FlCcbEditada
+FROM
+	PROPOSTAS_LEVES T1
+LEFT JOIN
+	PROPOSTAS_CCB T2
+	ON T1.NuProposta = T2.NuProposta
+;RUN;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE POPE_01 AS
+SELECT * FROM CONNECTION TO DBCON(
+SELECT
+	 CdPropostaLegado
+	,IdFase
+	,DsFaseTarefa
+	,DtAtuacaoIni
+	,HhAtuacaoIni
+	,DtAtuacaoFim
+	,HhAtuacaoFim
+FROM
+	STGASE_DBACESSOPARCEIRO.TbBasePortalVivere
+WHERE
+	DtProposta >= &DT_SQL
+AND
+	DsProduto = 'VEICULOS CDC'
+AND
+	IdFase IN (12, 124, 302, 126, 127, 128, 115, 203, 121, 82, 300, 78, 79, 80, 95, 160 )
+AND
+	TpAcao = 'APROVADA'
+AND
+	(CdPropostaLegado IS NOT NULL OR CdPropostaLegado <> '')
+
+)
+;QUIT;
+
+/*
+-- 1.ANALISE DE CREDITO
+12 ANALISE DE CREDITO,
+
+-- 2.GERAR CCB
+124 GERAR CCB(LOP),
+302 ESCOLHER ASSINATURA(LOP),
+126 UPLOAD DE DOCUMENTOS(LOP),
+127 SOLICITAR PAGAMENTO(LOP),
+
+-- 3.VALIDAR DADOS CCB
+128 VALIDAR DADOS DA CCB(GRP),
+115 VALIDAR DOCUMENTOS INDEXADOS(GRP),
+203 LAUDO DO VEICULO(GRP),
+121 VALIDAR OU INSERIR DADOS DE PGTO(GRP) ,
+
+-- 4.PRÉ FORMALIZAÇÃO
+
+-- 5.DECISÃO DE PAGAMENTO
+300 DECISAO DE PAGAMENTO,
+
+-- 6.ALIENAÇÃO
+
+-- 7.EXPORTAÇÃO
+
+-- 8.AJUSTE E REGULARIZAÇÃO
+
+-- 9.EFETIVAÇÃO DO PAGAMENTO
+82 EFETIVACAO DO PAGAMENTO,
+130 ANEXAR DOCS DE FORMALIZACAO(GRF),
+
+*/
+
+DATA POPE_02; SET POPE_01;
+
+FORMAT NuProposta 9.;
+FORMAT dthorarioinicio dthorariofim DATETIME.;
+FORMAT leadtime_min leadtime_hh 11.2;
+
+Nuproposta = INPUT(CdPropostaLegado, 9.);
+
+IF Nuproposta = . THEN DELETE;
+
+horas = substr(compress(HhAtuacaoIni),1,2);
+minutos = substr(compress(HhAtuacaoIni),4,2);
+segundos = substr(compress(HhAtuacaoIni),7,2);
+
+horas2 = substr(compress(HhAtuacaoFim),1,2);
+minutos2 = substr(compress(HhAtuacaoFim),4,2);
+segundos2 = substr(compress(HhAtuacaoFim),7,2);
+
+dthorarioinicio = dhms(DtAtuacaoIni,horas,minutos,segundos);
+dthorariofim 	= dhms(DtAtuacaoFim,horas2,minutos2,segundos2);
+
+leadtime_min 	= (dthorariofim - dthorarioinicio)/60;
+leadtime_hh  	= leadtime_min/60;
+
+DROP  DtAtuacaoIni HhAtuacaoIni DtAtuacaoFim HhAtuacaoFim
+horas minutos segundos horas2 minutos2 segundos2 CdPropostaLegado;
+RUN;
+
+PROC SORT DATA=POPE_02; BY Nuproposta IdFase DESCENDING dthorarioinicio;RUN;
+
+PROC SORT DATA=POPE_02 NODUPKEY OUT=POPE_03; BY Nuproposta IdFase; RUN;
+
+PROC SQL;
+CREATE TABLE LEADTIME_POPE AS
+SELECT
+	 T1.NuProposta
+	,T1.DtEntradaProposta
+	,T1.NuAnoMes
+	,T1.NmGrupoProdutoMeta
+	,T1.CdFilial
+	,T1.DsFilial
+	,T1.CdParceiroComercial
+	,T1.NmParceiroComercial
+	,T1.DsLoginN1
+	,T1.CdColaborador
+	,T1.NmColaborador
+	,T1.TpPessoa
+	,T1.NmAreaEstruturaComercial
+	,T1.NmCanalEstruturaComercial
+	,T1.NmSubEstruturaComercialA
+	,T1.FlCcbEditada
+	,T2.IdFase
+	,T2.DsFaseTarefa
+	,T2.dthorarioinicio
+	,T2.dthorariofim
+	,T2.leadtime_min
+	,T2.leadtime_hh
+FROM
+	PROPOSTAS_LEVES_CCB T1
+INNER JOIN
+	POPE_03 T2
+	ON T1.NuProposta = T2.Nuproposta
+;QUIT;
+
+PROC EXPORT
+DATA= LEADTIME_POPE
+FILE="&dir_csv./leadtime_pope.csv" REPLACE
+DBMS=DLM;
+DELIMITER=';';
+RUN;
+
+PROC EXPORT
+DATA= META_GR
+FILE="&dir_csv./meta_gr.csv" REPLACE
+DBMS=DLM;
+DELIMITER=';';
+RUN;
+
+PROC EXPORT
+DATA= META_FILIAL
+FILE="&dir_csv./meta_filial.csv" REPLACE
+DBMS=DLM;
+DELIMITER=';';
+RUN;

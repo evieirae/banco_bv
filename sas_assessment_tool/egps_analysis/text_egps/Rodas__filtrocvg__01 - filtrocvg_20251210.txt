@@ -1,0 +1,244 @@
+START_METADATA
+PROJECT: Rodas__filtrocvg
+FILE_SAS: 01 - filtrocvg_20251210.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 155
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], AUXL.EGV_DEPARABALCAODIGITAL [SAS/Local], AUXL.EGV_DEPARAPARCEIROSDIGITAIS [SAS/Local], BASEGRC.TBGRUPOPRODUTOMETA [SAS/Local], BASES.TBTIPOCANALPRODUCAOPROPOSTA [SAS/Local], DBA.TBPROPOSTA [DBCON], DBA.TBSUBPRODUTO [DBCON], DBCRED.TBPROPOSTAFINANCEIRO [DBCON], EGVBALCDIG.FILIAL [SAS/Local], EGVBALCDIG.NOME [SAS/Local], FSSOLAR.BASE_PROPOSTAS_LEADS [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): AUXL.EGV_DEPARABALCAODIGITAL [PROC SQL - FROM; PROC SQL - JOIN], AUXL.EGV_DEPARAPARCEIROSDIGITAIS [PROC SQL - FROM], BASEGRC.TBGRUPOPRODUTOMETA [PROC SQL - JOIN], BASES.TBTIPOCANALPRODUCAOPROPOSTA [PROC SQL - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBA.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTAFINANCEIRO [Pass-Through Native (DBCON) - JOIN], EGVBALCDIG.FILIAL [PROC SQL - FROM], EGVBALCDIG.NOME [PROC SQL - FROM], FSSOLAR.BASE_PROPOSTAS_LEADS [DATA Step - SET], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBFILTROCVG
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: EXTRACAO_PTA_PROPOSTA, FILTROCVG
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	ext_FiltroCVG.sas														| */
+/* | Descricao: Programa para claddificar os tipos de propostas de CVG.					| */
+/* | Objetivo: 	Implantar o Filtro CVG npara facilitar a manutenção 					| */
+/* |			do proprio filtro e de todos os dash que ele alimenta					| */
+/* ====================================================================================== */
+/* | Criador: 	Gustavo Domingues - MIS IGE												| */
+/* | Data:		19/05/2023																| */
+/* ====================================================================================== */
+/* | Dt Resp: 	17/04/2024 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Incluidos Cd 468957,469033 e retirado 433956,450421,451257 de PCdigitral| */
+/* |			e regra de Balcao e Gr CONSULTOR										| */
+/* ====================================================================================== */
+/* | Dt Resp: 	22/04/2024 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Retirado filtro de Produto												| */
+/* ====================================================================================== */
+/* | Dt Resp: 	24/04/2024 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Incluido TATOS nos parceiros digitaias									| */
+/* ====================================================================================== */
+/* | Dt Resp: 	24/04/2024 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Incluido 469213 – Meliuz. nos parceiros digitaias						| */
+/* ====================================================================================== */
+/* | Dt Resp: 	08/05/2024 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Incluido 468126	STRADA –												| */
+/* ====================================================================================== */
+/* | Dt Resp: 	31/05/2024 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Incluido 'BV PARTICULAR%' no BALCAO										| */
+/* ====================================================================================== */
+/* | Dt Resp: 	19/02/2025 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Incluido CanalFinalizador e origem solar								| */
+/* ====================================================================================== */
+/* | Dt Resp: 	12/06/2025 - Flávio Pereira - MIS IGE									| */
+/* | Descricao:	Incluido: 																| */
+/*				EGV_FLBalcaoDigital, 													| */
+/*				EGV_FilialBalcaoDigital,												| */
+/*				EGV_NomeBalcaoDIgital													| */
+/* | e alterado o depara de parceiros digitais para auxl.EGV_DEPARAPARCEIROSDIGITAIS	| */
+/* ====================================================================================== */
+/* | Dt Resp: 	07/07/2025 - Gustavo Domingues - MIS IGE								| */
+/* | Descricao:	Retirado Cod 472272 de telemkt e criado banco digital					| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+
+/* ======================================================================================*/
+/* =====================Gera base de propostas de CVG atualizada=========================*/
+/* ======================================================================================*/
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE extracao_pta_PROPOSTA AS
+SELECT * FROM connection to dbcon
+(
+
+	SELECT
+			 year(DATE(Proposta.DtEntradaProposta))*100+month(DATE(Proposta.DtEntradaProposta)) NuAnoMes
+			,Proposta.NuProposta
+			,DATE(Proposta.DtEntradaProposta) DtEntradaProposta
+			,Proposta.CdLoja CdParceiroComercial
+			,SubProduto.CdProduto*1000000 + SubProduto.CdModalidadeProduto*1000 + coalesce(SubProduto.CdTipoBem,0) CdGrupoSubProduto
+			,Proposta.CdSubProduto
+			,SubProduto.DsSubProduto
+	FROM DBA.TbProposta Proposta
+
+		LEFT JOIN DBA.TbSubProduto SubProduto
+			ON Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+		LEFT JOIN DBCRED.TbPropostaFinanceiro PropostaFinanceiro
+			on Proposta.NuProposta = PropostaFinanceiro.NuProposta
+
+	WHERE 1=1
+	and year(DATE(Proposta.DtEntradaProposta))*100+month(DATE(Proposta.DtEntradaProposta)) >= 201801
+    /*and SubProduto.CdProduto*1000000 + SubProduto.CdModalidadeProduto*1000 + coalesce(SubProduto.CdTipoBem,0)
+		in (12006010,12027010,12079010,12078010,12006001,12028001,12079001,12078001)*/
+ORDER BY Proposta.NuProposta
+)
+;RUN;
+
+/* ======================================================================================*/
+/* =====================BUSCAR ORIGENS DO SOLAR==============================*/
+/* ======================================================================================*/
+
+Data TbFunilSimulacao_Solar (Where=(Nuproposta <> .));
+set FSSolar.BASE_PROPOSTAS_LEADS (Keep= Nuproposta Canal_Originação)
+;run;
+
+PROC SORT DATA=TbFunilSimulacao_Solar NODUPKEY;
+BY NuProposta;
+RUN;
+
+/* ======================================================================================*/
+/* =====================Adiciona coluna com o filtro de CVG==============================*/
+/* ======================================================================================*/
+
+PROC SQL;
+CREATE TABLE FiltroCVG AS
+SELECT  DISTINCT
+		Proposta.nuproposta,
+/*		CASE WHEN GrupoProdutoMeta.NmGrupoProdutoMeta LIKE 'CVG%' THEN */
+				CASE    WHEN compress(ParceiroComercial.NmParceiroComercial,' ')  LIKE '%GRCONSUL%' OR ParceiroComercial.NmParceiroComercial LIKE '%COCKPIT%'
+					AND TipoCanalProducao.DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS')
+						THEN 'GR CONSULTOR'
+
+				    WHEN compress(ParceiroComercial.NmParceiroComercial,' ')  LIKE '%CPGARANTIA%' OR compress(ParceiroComercial.NmParceiroComercial,' ')  LIKE '%BVPARTICULAR%'
+					 OR compress(ParceiroComercial.NmParceiroComercial,' ')  LIKE '%BVBALCAO%'
+					AND TipoCanalProducao.DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS')
+						THEN 'BALCÃO'
+
+				    WHEN Proposta.CdParceiroComercial in (select distinct INPUT(Codigos,BEST.) from AUXL.EGV_DEPARAPARCEIROSDIGITAIS)
+						THEN 'PARCEIRO DIGITAL'
+
+					WHEN (Proposta.CdParceiroComercial = 407516 AND Proposta.DtEntradaProposta  BETWEEN '01JUL2020'd AND '31AUG2020'd)
+                         OR (Proposta.CdParceiroComercial = 416382 AND Proposta.DtEntradaProposta  >= '01AUG2020'd)
+                         THEN 'JUST'
+
+					WHEN compress(ParceiroComercial.NmParceiroComercial,' ') LIKE '%CPGARANTMLKT%'
+						OR ParceiroComercial.CdParceiroComercial IN(466807,418607,468271) THEN 'TELEMARKETING'
+
+					WHEN Proposta.CdParceiroComercial in(472272,474057,474058)
+						THEN 'BANCO DIGITAL'
+
+					WHEN Proposta.CdParceiroComercial = 414643
+						THEN 'MINHA BV'
+
+					WHEN Proposta.CdParceiroComercial in(424584,452470,465399)
+						THEN 'CVG ÁREA ABERTA SITE'
+
+					WHEN TipoCanalProducao.DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS','PROMOTORA','BV FINANCEIRA - OPERACAO ESPECIAL')
+						 AND (ParceiroComercial.NmParceiroComercial NOT LIKE '%FINANZERO%' OR compress(ParceiroComercial.NmParceiroComercial,' ') NOT LIKE '%QUEROFINANCIAR%')
+                         AND (Proposta.CdParceiroComercial not in (407516) AND Proposta.DtEntradaProposta  BETWEEN '01JUL2020'd AND '31AUG2020'd)
+                        THEN 'CANAL NEGOCIOS'
+
+                    WHEN TipoCanalProducao.DsTipoCanalProducao IN ('MULTIMARCAS','CONCESSIONARIAS')
+						THEN 'CANAL VEICULOS'
+
+					WHEN TbFunilSimulacao_Solar.nuproposta is not null THEN UPPER(TbFunilSimulacao_Solar.Canal_Originação)   /*ORIGENS DO SOLAR*/
+
+                    ELSE 'CANAL NEGOCIOS'
+/*                    END ELSE 'OUTROS PRODUTOS'*/
+		   END AS FiltroCVG,
+
+		CASE
+			WHEN Proposta.CdParceiroComercial in (select distinct INPUT(cdparceiro,BEST.) from AUXL.EGV_DEPARABALCAODIGITAL) THEN 'S'
+		END AS EGV_FLBalcaoDigital,
+
+		   	EGVBALCDIG.FILIAL AS EGV_FilialBalcaoDigital,
+			EGVBALCDIG.NOME AS EGV_NomeBalcaoDIgital,
+
+		CASE
+			WHEN Proposta.CdParceiroComercial IN (418607,424584,471098,472245,414643,452470,475580,477503,471164,474057,461648,465399,477433,474058,467954,468906,461648,472272,472263,466807) THEN 'CX'
+			 WHEN TipoCanalProducao.DsTipoCanalProducao IN ('MULTIMARCAS','CONCESSIONARIAS') THEN 'CANAL VEICULOS'
+			 WHEN TbFunilSimulacao_Solar.nuproposta is not null THEN 'CANAL SOLAR'
+			 ELSE 'CANAL NEGOCIOS'
+		END AS CanalFinalizador
+
+			,TODAY() format=date9. as DtAtualizacao
+		    ,TIME() format= time5.  as HrAtualizacao
+
+FROM extracao_pta_PROPOSTA Proposta
+
+left join bases.TbTipoCanalProducaoProposta TipoCanalProducao
+		on Proposta.NuProposta = TipoCanalProducao.NuProposta
+
+left join tmp.TbParceiroComercial ParceiroComercial
+		on  Proposta.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+left join basegrc.TbGrupoProdutoMeta GrupoProdutoMeta
+		on  Proposta.CdGrupoSubProduto = GrupoProdutoMeta.CdGrupoSubProduto
+
+left join TbFunilSimulacao_Solar as TbFunilSimulacao_Solar
+		on TbFunilSimulacao_Solar.nuproposta = Proposta.nuproposta
+
+LEFT JOIN AUXL.EGV_DEPARABALCAODIGITAL EGVBALCDIG
+ON Proposta.CdParceiroComercial = INPUT(EGVBALCDIG.CDPARCEIRO,BEST.)
+
+/*where GrupoProdutoMeta.NmGrupoProdutoMeta in ('CVG Leves','CVG Pesados')*/
+/*and Proposta.NUproposta in (40260695, 40260728)*/
+;run;
+
+/* ======================================================================================*/
+/* =====================Cria bsae final na lib BASEGRC===================================*/
+/* ======================================================================================*/
+
+data BASEGRC.TbFiltroCVG;
+set FiltroCVG
+;run;

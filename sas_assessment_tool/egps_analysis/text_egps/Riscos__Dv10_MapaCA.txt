@@ -1,0 +1,304 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Dv10_MapaCA
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:18 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 204
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: DV10AUTO = /projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10; RM_TBPOS = /projetos/riscosmercado/dados/rmone/posicao
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DV10AUTO.FLUXODV10PTA_20250930 [SAS/Local], RM_TBPOS.TBPOSICAOMOR_20250930 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.DV10_SEMG5_FINAL
+IMPORTED_LIBNAMES: DV10AUTO, RM_TBPOS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.DV10_SEMG5_FINAL
+TABLE_READ_PROVENANCE (Flow): DV10AUTO.FLUXODV10PTA_20250930 [PROC SQL - FROM; PROC SQL - JOIN], RM_TBPOS.TBPOSICAOMOR_20250930 [PROC SQL - FROM], WORK.DV10_SEMG5_FINAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: DV10G5_AUX, DV10G5_AUX2, DV10G5_AUX3, DV10G5_AUX4, DV10G5_AUX5, DV10G5_FINAL, DV10_SEMG5_AUX, DV10_SEMG5_AUX2, DV10_SEMG5_AUX3, DV10_SEMG5_FINAL, WORK.FILTER_FOR_DV10_SEMG5_FINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Dv10_FINANCEIRA_G5 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 12 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Dv10_FINANCEIRA_G5 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-452YmN3gzhImdMn6/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname RM_TBPOS '/projetos/riscosmercado/dados/rmone/posicao';
+libname DV10AUTO '/projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10';
+
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPOSICAOPTA_2018);
+
+PROC SQL;
+   CREATE TABLE Dv10G5_Aux AS
+   SELECT *
+
+      FROM DV10AUTO.FLUXODV10PTA_20250930 t1
+      WHERE Fator_de_Risco not contains ("Gerencial") AND Veiculo = "BV FINANCEIRA SA CREDITO FINANCIAMENTO E INVESTIME"  ;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE Dv10G5_Aux2 AS
+   SELECT *,
+          CASE
+             WHEN BookGerencial IN ("517 - HA KG", "540 - HA FINANCEIRA", "789 - HA LF") THEN "VJR"
+             WHEN TpPNL = "T" THEN "CA"
+             WHEN TpPNL = "P" THEN "VJORA"
+             WHEN TpPNL = "R" THEN "VJR"
+             ELSE TpPNL
+          END AS TpPNLContabil
+   FROM Dv10G5_Aux;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE Dv10G5_Aux3 AS
+   SELECT *,
+      CASE
+
+     
+         WHEN MesaOperacao IN ('14 - BSM ESTRUTURADOS') THEN "Estruturado"
+         WHEN MesaOperacao IN ('1 - BSM GESTOR','1 - BSM ADICIONAL OPORTUNIDADES','1 - BSM GESTAO MACRO') THEN "Gestão"
+         WHEN MesaOperacao IN ('4 - BSM CAIXA OFFSHORE','19 - BSM CUPOM CAMBIAL') THEN "Gestão de Caixa Offshore e Cupom Cambial"
+         WHEN MesaOperacao IN ('5 - BSM CAIXA') THEN "Gestão de Caixa Local"
+         WHEN MesaOperacao IN ('24 - BSM RENDA FIXA','X - NAO INFORMADO','2 - FICC RENDA FIXA') THEN "Gestão PRÉ e ìndices de Preço"
+
+    
+       WHEN MesaOperacao IN ('18 - FICC GESTOR') THEN "Gestor"
+         WHEN MesaOperacao IN ('3 - FICC CAMBIO','9 - FICC OFFSHORE') THEN "Gestão Cupom Cambial e Offshore"
+         WHEN MesaOperacao IN ('6 - VOLATILIDADE','6 - FICC VOLATILIDADE') THEN "Volatilidade (*)"
+         WHEN BookGerencial IN ('10 - HEDGE INV. EXTERIOR','528 - HEDGE INV. EXTERIOR','567 - HEDGE INV. EXTERIOR') THEN "Hedge do Investimento no Exterior"
+
+	
+
+         WHEN MesaOperacao = '23 - ALM' AND BookGerencial = '630 - HEDGE C T BRANCH' THEN "Hedge CT PF Branch"
+         WHEN MesaOperacao = '23 - ALM' AND BookGerencial IN ('10 - HEDGE INV. EXTERIOR','528 - HEDGE INV. EXTERIOR','567 - HEDGE INV. EXTERIOR','660 - BANVOR 2024') THEN "Hedge do Investimento no Exterior"
+         WHEN MesaOperacao = '23 - ALM' AND BookGerencial NOT IN ('10 - HEDGE INV. EXTERIOR','528 - HEDGE INV. EXTERIOR','567 - HEDGE INV. EXTERIOR','630 - HEDGE C T BRANCH','660 - BANVOR 2024') THEN "Receitas Operacionais ALM"
+         ELSE "NÃO CLASSIFICADO"
+      END AS NomeMesaMapaCA
+   FROM Dv10G5_Aux2;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE Dv10G5_Aux4 AS
+   SELECT *,
+      CASE
+         WHEN MesaOperacao contains ('BSM')or MesaOperacao in ('X - NAO INFORMADO') THEN "BSM"
+         WHEN MesaOperacao contains ('FICC')or MesaOperacao in ('6 - VOLATILIDADE') THEN "FICC"
+		 WHEN MesaOperacao IN ('23 - ALM')  THEN "ALM"
+
+      END AS GrupoMesas
+   FROM Dv10G5_Aux3;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE Dv10G5_Aux5 AS
+   SELECT *,
+      CASE
+         WHEN Fator_de_Risco IN ('Pre-Fixado','Cupom IPCA','Cupom USD','Cupom Libor','Cupom TJLP','Cupom EUR')THEN Fator_de_Risco
+         WHEN Fator_de_Risco NOT IN ('Pre-Fixado','Cupom IPCA','Cupom USD','Cupom Libor','Cupom TJLP','Cupom EUR')THEN "Demais"
+
+      END AS GrupoFatorRisco
+   FROM Dv10G5_Aux4;
+QUIT;
+
+
+PROC SQL;
+   CREATE TABLE Dv10G5_Final AS
+   SELECT
+      DtReferencia,
+      Fator_de_Risco,
+      MesaOperacao,
+      CarteiraGerencial,
+      BookGerencial,
+      Modalidade,
+	  ProdutoGerencial,
+      TpPNLContabil,
+      TipoDeNegociacao,
+      Veiculo,
+      PresenteBase,
+      FuturoBase,
+      vrDV10,
+      NomeMesaMapaCA,
+      GrupoMesas,
+      GrupoFatorRisco
+   FROM Dv10G5_Aux5;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Dv10_FINANCEIRA_G5 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Dv10_Sem_G5 */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 12 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Dv10_Sem_G5 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-tCQbe24dq3ayF8e6/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname RM_TBPOS '/projetos/riscosmercado/dados/rmone/posicao';
+libname DV10AUTO '/projetos/riscosmercado/rmsas/dados/datamart/rskm/sensibilidade/dv10';
+
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPOSICAOPTA_2018);
+
+PROC SQL;
+   CREATE TABLE Dv10_semG5_aux AS
+   SELECT t2.DtReferencia,
+          t2.Fator_de_Risco,
+		  t2.MesaOperacao,
+		  t2.CarteiraGerencial,
+		  t2.BookGerencial,
+          t2.Modalidade,
+          t2.ProdutoGerencial,
+      	  t1.TpPNLContabil,
+          t2.TipoDeNegociacao,
+          t2.Veiculo,
+          t2.PresenteBase,
+          t2.FuturoBase,
+          t2.vrDV10
+      FROM RM_TBPOS.TBPOSICAOMOR_20250930 t1
+           INNER JOIN DV10AUTO.FLUXODV10PTA_20250930 t2 ON (t1.PosID = t2.PosId)
+      WHERE t1.GrupoDeConciliacao in (1,2,3,7,8,9,10,11,12,13,14,15,16,999) and t2.Fator_de_Risco not contains ("Gerencial") and t2.Fator_de_Risco not in ('Spread Titulos Publicos') ;
+
+	  QUIT;
+
+	  
+
+PROC SQL;
+   CREATE TABLE Dv10_semG5_aux2 AS
+   SELECT *,
+      CASE
+
+     
+         WHEN MesaOperacao IN ('14 - BSM ESTRUTURADOS') THEN "Estruturado"
+         WHEN MesaOperacao IN ('1 - BSM GESTOR','1 - BSM ADICIONAL OPORTUNIDADES','1 - BSM GESTAO MACRO') THEN "Gestão"
+         WHEN MesaOperacao IN ('4 - BSM CAIXA OFFSHORE','19 - BSM CUPOM CAMBIAL') THEN "Gestão de Caixa Offshore e Cupom Cambial"
+         WHEN MesaOperacao IN ('5 - BSM CAIXA') THEN "Gestão de Caixa Local"
+         WHEN MesaOperacao IN ('24 - BSM RENDA FIXA','X - NAO INFORMADO','2 - FICC RENDA FIXA') THEN "Gestão PRÉ e ìndices de Preço"
+
+    
+       WHEN MesaOperacao IN ('18 - FICC GESTOR') THEN "Gestor"
+         WHEN MesaOperacao IN ('3 - FICC CAMBIO','9 - FICC OFFSHORE') THEN "Gestão Cupom Cambial e Offshore"
+         WHEN MesaOperacao IN ('6 - VOLATILIDADE','6 - FICC VOLATILIDADE') THEN "Volatilidade (*)"
+         WHEN BookGerencial IN ('10 - HEDGE INV. EXTERIOR','528 - HEDGE INV. EXTERIOR','567 - HEDGE INV. EXTERIOR') THEN "Hedge do Investimento no Exterior"
+
+	
+
+         WHEN MesaOperacao = '23 - ALM' AND BookGerencial = '630 - HEDGE C T BRANCH' THEN "Hedge CT PF Branch"
+         WHEN MesaOperacao = '23 - ALM' AND BookGerencial IN ('10 - HEDGE INV. EXTERIOR','528 - HEDGE INV. EXTERIOR','567 - HEDGE INV. EXTERIOR','660 - BANVOR 2024') THEN "Hedge do Investimento no Exterior"
+         WHEN MesaOperacao = '23 - ALM' AND BookGerencial NOT IN ('10 - HEDGE INV. EXTERIOR','528 - HEDGE INV. EXTERIOR','567 - HEDGE INV. EXTERIOR','630 - HEDGE C T BRANCH','660 - BANVOR 2024') THEN "Receitas Operacionais ALM"
+         ELSE "NÃO CLASSIFICADO"
+      END AS NomeMesaMapaCA
+   FROM Dv10_semG5_aux;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE Dv10_semG5_aux3 AS
+   SELECT *,
+      CASE
+         WHEN MesaOperacao contains ('BSM')or MesaOperacao in ('X - NAO INFORMADO') THEN "BSM"
+         WHEN MesaOperacao contains ('FICC')or MesaOperacao in ('6 - VOLATILIDADE') THEN "FICC"
+		 WHEN MesaOperacao IN ('23 - ALM')  THEN "ALM"
+
+      END AS GrupoMesas
+   FROM Dv10_semG5_aux2;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE Dv10_semG5_Final AS
+   SELECT *,
+      CASE
+         WHEN Fator_de_Risco IN ('Pre-Fixado','Cupom IPCA','Cupom USD','Cupom Libor','Cupom TJLP','Cupom EUR')THEN Fator_de_Risco
+         WHEN Fator_de_Risco NOT IN ('Pre-Fixado','Cupom IPCA','Cupom USD','Cupom Libor','Cupom TJLP','Cupom EUR')THEN "Demais"
+
+      END AS GrupoFatorRisco
+   FROM Dv10_semG5_aux3;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Dv10_Sem_G5 */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_DV10_SEMG5_FINAL);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_DV10_SEMG5_FINAL AS
+   SELECT t1.DtReferencia,
+          t1.Fator_de_Risco,
+          t1.MesaOperacao,
+          t1.CarteiraGerencial,
+          t1.BookGerencial,
+          t1.Modalidade,
+          t1.ProdutoGerencial,
+          t1.TpPNLContabil,
+          t1.TipoDeNegociacao,
+          t1.Veiculo,
+          t1.PresenteBase,
+          t1.FuturoBase,
+          t1.vrDV10,
+          t1.NomeMesaMapaCA,
+          t1.GrupoMesas,
+          t1.GrupoFatorRisco
+      FROM WORK.DV10_SEMG5_FINAL t1
+      WHERE t1.GrupoFatorRisco = 'Demais';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,263 @@
+START_METADATA
+PROJECT: Rodas__Base_Sinergia_Solar
+FILE_SAS: 02 - tbparceirosinergiasolar.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 55)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 192
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: SNS = /infogrc/Base_Sinergia_Solar/Bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], DBCOR.TBFAVORECIDOAUTORIZADO [DBCON], DBCRED.TBPROPOSTA [DBCON], DBPAGAMENTO.TBINFORMACAOBANCARIAPAGAMENTO [DBCON], DBPAGAMENTO.TBPAGAMENTO [DBCON], DBPAGAMENTO.TBPESSOAPAGAMENTO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SNS
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN], DBCOR.TBFAVORECIDOAUTORIZADO [Pass-Through Native (DBCON) - FROM], DBCRED.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBPAGAMENTO.TBINFORMACAOBANCARIAPAGAMENTO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.TBPAGAMENTO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.TBPESSOAPAGAMENTO [Pass-Through Native (DBCON) - JOIN], SNS.BASESINERGIAHIST [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): SNS.BASESINERGIAHIST
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): SNS.BASESINERGIAHIST
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SNS.BASESINERGIAHIST
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASESINERGIAHIST, BASESINERGIAHIST_HIERARQUIA, BASE_SINERGIA_ATUAL, LOJAS_SEM_SINERGIA, LOJAS_SEM_SINERGIA2, NOVAS_LOJAS, NOVA_BASE_SINERGIA_HIST, TBFAVORECIDOAUTORIZADO, TBPARCEIROAUTORIZADO, WORK.TBPARC_FAVORECIDO_SAIDA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/*##############################################################################################*/
+/* Programa: TbParceiroAutorizado_Solar.sas															*/
+/* Autor:    Tribo de Dados - Squad MIS Comercial												*/
+/* Versão:   16.07.2020 - Implementar o processo TbParceiroAutorizadoSolar no diretório governado	*/
+/*																								*/
+/*##############################################################################################*/
+
+/* ======================================================== */
+/* ====================== PARAMETROS ====================== */
+/* ======================================================== */
+/*##############################################################################################*/
+/* Programa: TbSinergia_Solar.sas																*/
+/* Autor:    Guilherme Mendes / Marcio Shiroma													*/
+/* Versão:   15.09-2023 - Implementar o processo TbParceiroSinergiaSolar no diretório governado	*/
+/*																								*/
+/*##############################################################################################*/
+option compress = binary;
+options FULLSTIMER source source2;
+options mprint mlogic symbolgen;
+
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+LIBNAME SNS '/infogrc/Base_Sinergia_Solar/Bases';
+
+/*CÓDIGO PARA GERAR FAVORECIDOS MEU PARCEIRO SOLAR*/
+Proc Sql;
+%CONECTADB (server=CTR);
+Create Table TBPARCEIROAUTORIZADO as
+SELECT NuProposta
+		,NuContratoGestao
+		,DatePart(DtPagamento) as DtPagamento Format DDMMYY10.
+		,CdPagamento
+		,VrLiberado
+    	,NuCpfCnpj
+from connection to dbcon
+(
+SELECT  P.NuProposta
+		, P.NuContratoGestao
+		, PGTO.DtPagamento
+		, PGTO.CdPagamento
+		, PGTO.VrLiberado
+    	, PEPGTO.NuCpfCnpj
+FROM DBCRED..TbProposta P
+	INNER JOIN DBPAGAMENTO..TbPagamento PGTO
+		ON PGTO.NuContratoGestao = P.NuContratoGestao
+    INNER JOIN DBPAGAMENTO..TbInformacaoBancariaPagamento INFOPGTO
+    	ON INFOPGTO.CdInformacaoBancariaPagto = pgto.CdInforBancariaPagtoFavorecido
+    INNER JOIN DBPAGAMENTO..TbPessoaPagamento PEPGTO
+    	ON PEPGTO.CdPessoaPagamento = infopgto.CdPessoaPagamento
+WHERE P.CdSubProduto = 70
+  AND P.CdLoja = 418254
+  AND P.DtStatusProposta > '09oct2017'
+  AND P.NuContratoGestao IS NOT NULL)
+  ;
+  QUIT;
+
+Proc Sql;
+%CONECTADB (server=CTR);
+Create Table TbFavorecidoAutorizado as
+SELECT
+		NuCpfCnpj,
+		NmTitular,
+		FlAtivo,
+		TpPessoa,
+		DatePart(DtCadastro) as DtCadastro Format DDMMYY10.
+from connection to dbcon
+(
+SELECT DISTINCT NuCpfCnpj, NmTitular, FlAtivo, TpPessoa, DtCadastro
+
+FROM DBCOR..TbFavorecidoAutorizado
+WHERE cdParceiroComercial = 418254)
+;
+QUIT;
+
+Proc Sql;
+Create Table Work.TbParc_Favorecido_Saida as
+Select
+	  Favorecido.NmTitular
+	, Favorecido.FlAtivo
+	, Favorecido.TpPessoa
+	, Favorecido.DtCadastro
+	, Favorecido.NuCpfCnpj
+	, Max(ParceriroAutorizado.DtPagamento) as ULTIMO_PAGAMENTO Format DDMMYY10.
+	, Count(ParceriroAutorizado.CdPagamento) as QTD
+	, Sum(ParceriroAutorizado.VrLiberado) as TOTAL_VALOR
+
+From TbFavorecidoAutorizado as Favorecido
+Left Join TBPARCEIROAUTORIZADO as ParceriroAutorizado ON Favorecido.NuCpfCnpj = ParceriroAutorizado.NuCpfCnpj
+Group by 1,2,3,4,5;
+Quit;
+
+/*BASE PARCEIROS SINERGIA*/
+/*Partimos da base de todos parceiros cadastrados no MFS e cruzamos com nossa base de Parceiros BV, se estiver ativo em ambas as bases é um parceiro Sinergia*/
+Proc Sql;
+Create Table BASE_SINERGIA_ATUAL as
+Select
+     BaseMFS.NmTitular
+    ,BaseMFS.FlAtivo as FlAtivo_MFS
+    ,BaseMFS.TpPessoa
+    ,BaseMFS.DtCadastro as DtCadastro_MFS
+    ,BaseMFS.NuCpfCnpj
+    ,DatePart(ParceirosSolar.DtCadastro) as DtCadastro_BV Format DDMMYY10.
+    ,ParceirosSolar.CdParceiroComercial
+    ,ParceirosSolar.FlAtivo as FlAtivo_BV
+    ,Case When BaseMFS.FlAtivo = 'S' and ParceirosSolar.FlAtivo = 'S' Then "S" Else "N" End as ParceiroSinergia
+	,TODAY() AS DtAtualizacao format date9.
+	,. as DtCancelamento format date9.
+From TbParc_Favorecido_Saida as BaseMFS
+     Left Join ( Select * From Bases.TbParceiroComercial Where TpAtividade = 7 ) as ParceirosSolar
+		ON BASEMFS.NuCpfCnpj = ParceirosSolar.NuCnpjLoja
+Where
+BaseMFS.NmTitular NE ""
+and Calculated ParceiroSinergia = 'S'
+ORDER BY CdParceiroComercial
+;Quit;
+
+/*LOJAS NOVAS*/
+/*TODAS AS LOJAS QUE ESTÃO NA BASE ATUAL E QUE NÃO ESTÃO NA BASE SINERGIA HISTORICA*/
+
+Data BASESINERGIAHIST;
+SET SNS.BASESINERGIAHIST;
+RUN;
+
+PROC SQL;
+CREATE TABLE NOVAS_LOJAS AS
+SELECT
+B.*
+FROM BASESINERGIAHIST A
+RIGHT JOIN BASE_SINERGIA_ATUAL B ON B.CdParceiroComercial = A.CdParceiroComercial
+WHERE B.CdParceiroComercial <> A.CdParceiroComercial
+;RUN;
+
+/*APPENDA AS NOVAS LOJAS NA BASE HISTORICA*/
+PROC APPEND BASE=SNS.BASESINERGIAHIST DATA=NOVAS_LOJAS;RUN;
+
+/*TODAS AS LOJAS QUE ESTAVAM NA BASE HISTORICA E QUE AGORA NÃO SÃO MAIS SINERGIA*/
+PROC SQL;
+CREATE TABLE LOJAS_SEM_SINERGIA AS
+SELECT
+A.*,
+Today() as DtCancelamento2 Format DDMMYY10.,/*DATA DE CANCELAMENTO É A ÚLTIMA DATA DE ATUALIZACAO QUE ESTAVA NA BASE HISTORICA*/
+'N' as ParceiroSinergia_Novo /*ATUALIZA O FLAG DE SINERGIA PARA N*/
+FROM BASESINERGIAHIST A
+LEFT JOIN BASE_SINERGIA_ATUAL B ON A.CdParceiroComercial = B.CdParceiroComercial
+WHERE B.CdParceiroComercial <> A.CdParceiroComercial and A.ParceiroSinergia NE 'N'
+;RUN;
+
+Proc Sql;
+Create Table LOJAS_SEM_SINERGIA2 as
+Select
+NmTitular
+,FlAtivo_MFS
+,TpPessoa
+,DtCadastro_MFS
+,NuCpfCnpj
+,DtCadastro_BV
+,CdParceiroComercial
+,FlAtivo_BV
+,ParceiroSinergia_Novo as ParceiroSinergia
+,DtAtualizacao
+,DtCancelamento2 as DtCancelamento
+From LOJAS_SEM_SINERGIA
+;Quit;
+
+/*CRIA UMA NOVA BASE HISTORICA COM AS ATUALIZACOES*/
+
+PROC SQL;
+CREATE TABLE NOVA_BASE_SINERGIA_HIST AS
+SELECT
+A.NmTitular,
+A.FlAtivo_MFS,
+A.TpPessoa,
+A.DtCadastro_MFS,
+A.NuCpfCnpj,
+A.DtCadastro_BV,
+A.CdParceiroComercial,
+A.FlAtivo_BV,
+CASE WHEN B.ParceiroSinergia = 'N' THEN 'N' ELSE A.ParceiroSinergia END AS ParceiroSinergia,
+A.DtAtualizacao,
+B.DtCancelamento
+FROM BASESINERGIAHIST A
+LEFT JOIN LOJAS_SEM_SINERGIA2 B ON B.CDPARCEIROCOMERCIAL = A.CDPARCEIROCOMERCIAL
+;RUN;
+
+/*INCLUINDO A HIERARQUIA DO MES VIGENTE*/
+PROC SQL;
+CREATE TABLE BASESINERGIAHIST_HIERARQUIA AS
+SELECT
+A.NmTitular,
+A.FlAtivo_MFS,
+A.TpPessoa,
+A.DtCadastro_MFS,
+A.NuCpfCnpj,
+A.DtCadastro_BV,
+A.CdParceiroComercial,
+A.FlAtivo_BV,
+A.ParceiroSinergia,
+A.DtAtualizacao,
+A.DtCancelamento,
+B.NmCanalEstruturaComercialC,
+B.NmSubEstruturaComercialC,
+B.NmAreaEstruturaComercialC,
+B.NmColaboradorC
+
+FROM NOVA_BASE_SINERGIA_HIST AS A
+LEFT JOIN BASES.TBPARCEIROCOMERCIAL AS B ON A.CdParceiroComercial = B.CdParceiroComercial
+;QUIT;
+
+DATA SNS.BASESINERGIAHIST;
+SET BASESINERGIAHIST_HIERARQUIA;
+;RUN;

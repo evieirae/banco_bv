@@ -1,0 +1,122 @@
+START_METADATA
+PROJECT: Rodas__Bases_Planejamento_motos
+FILE_SAS: 04 - Ticket.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 51
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.POTENCIAL_RODAS_03_M
+TABLE_READ_PROVENANCE (Flow): WORK.POTENCIAL_RODAS_03_M [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_TICKET_1_M, BASE_TICKET_2_M, BASE_TICKET_FINAL_M
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE BASE_TICKET_1_M AS
+SELECT distinct
+
+CdParceiroComercial,
+COALESCE(SUM(VrProducao_ProjSab) / SUM(QtdContratos_ProjSab),0) AS Ticket_BV_ProjSab FORMAT COMMAX20.2,
+COALESCE(SUM(Vrgravamesplayers_ProjSab) / SUM(qtgravamesplayers_ProjSab),0) AS Ticket_Mercado_ProjSab FORMAT COMMAX20.2
+
+FROM WORK.POTENCIAL_RODAS_03_M A
+/*where ChaveCdParceiro_FxIdade = '127868 a 10 anos'*/
+GROUP BY 1
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_TICKET_2_M AS
+SELECT distinct
+
+strip(NmAreaEstruturaComercialC) || FxIdade as Chave,
+COALESCE(SUM(VrProducao_ProjSab) / SUM(QtdContratos_ProjSab),0) AS Ticket_BV_ProjSab FORMAT COMMAX20.2,
+COALESCE(SUM(Vrgravamesplayers_ProjSab) / SUM(qtgravamesplayers_ProjSab),0) AS Ticket_Mercado_ProjSab FORMAT COMMAX20.2
+
+FROM WORK.POTENCIAL_RODAS_03_M A
+/*where ChaveCdParceiro_FxIdade = '127868 a 10 anos'*/
+GROUP BY 1
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_TICKET_FINAL_M AS
+SELECT distinct
+
+strip(a.NmAreaEstruturaComercialC)||a.FxIdade as Chave,
+a.NmAreaEstruturaComercialC,
+a.ChaveCdParceiro_FxIdade,
+a.CdParceiroComercial,
+a.FxIdade,
+
+COALESCE(SUM(a.VrProducao_ProjSab) / SUM(a.QtdContratos_ProjSab),0) AS Ticket_BV_ProjSab FORMAT COMMAX20.2,
+COALESCE(SUM(a.Vrgravamesplayers_ProjSab) / SUM(a.qtgravamesplayers_ProjSab),0) AS Ticket_Mercado_ProjSab FORMAT COMMAX20.2,
+
+case when CALCULATED Ticket_BV_ProjSab <=0 then max(b.Ticket_BV_ProjSab)
+			else CALCULATED Ticket_BV_ProjSab end as Passo1,
+
+CAse when CALCULATED Passo1 <=0 then CALCULATED Ticket_Mercado_ProjSab
+	 when CALCULATED Ticket_Mercado_ProjSab <=0 then max(b.Ticket_BV_ProjSab)
+	 else CALCULATED Passo1 end as V1,  /*valida*/
+
+coalesce( max(C.Ticket_BV_ProjSab),max(c.Ticket_Mercado_ProjSab))  as TicketRegional,
+
+CALCULATED V1 / CALCULATED TicketRegional as Multiplo,
+
+Case when
+		CALCULATED Ticket_BV_ProjSab <= 0 AND CALCULATED Multiplo >=3 <=0 then CALCULATED TicketRegional
+	  else
+		case when CALCULATED Multiplo >=3 and CALCULATED Ticket_BV_ProjSab <= 0 then CALCULATED TicketRegional else CALCULATED V1 end
+		End as ValorFinal
+
+FROM WORK.POTENCIAL_RODAS_03_M A
+
+	LEFT JOIN BASE_TICKET_1_M as B
+		ON A.CdParceiroComercial = B.CdParceiroComercial
+
+	LEFT JOIN BASE_TICKET_2_M as c
+		ON strip(a.NmAreaEstruturaComercialC)||a.FxIdade = c.Chave
+
+/*where a.CdParceiroComercial = 7728*/
+
+/*ChaveCdParceiro_FxIdade = '127868 a 10 anos'*/
+GROUP BY 1,2,3,4,5
+
+;RUN;

@@ -1,0 +1,264 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 102 - APNP_CartaPDV.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -5
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 177
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: APNP = /infogrc/apnp/propostas; BASESRC = /riscosbvf/mis_varejo/integracao; RITOSOL = /infogrc/rito_comercial_solar
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], AUTOMATI.TBSEG_PRODUTOSEGURO [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASES.TBPESSOA [SAS/Local], DBA.TBPROPOSTA [DBCON], DBCONTRATOSEGURO.TBPRODUTOSEGURO [DBCON], DBCRED.TBPROPOSTASEGURO [DBCON], TMP.TBORIGINACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): AUTOMATI.TBSEG_PRODUTOSEGURO [PROC SQL - JOIN], BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], BASES.TBPESSOA [PROC SQL - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], DBCONTRATOSEGURO.TBPRODUTOSEGURO [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTASEGURO [Pass-Through Native (DBCON) - FROM], RITOSOL.TBPROPOSTAAPNPSOLAR [PROC EXPORT - DATA=], TMP.TBORIGINACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/output/cartapdv_apnp_solar.csv
+INTERNAL READS (Temp/Local): RITOSOL.TBPROPOSTAAPNPSOLAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RITOSOL.TBPROPOSTAAPNPSOLAR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.TBPROPOSTAAPNPSOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/cartapdv_apnp_solar.csv
+TEMP/DISCARDED OUTPUTS: TBEXTPROPOSTASEGUROS, TBPROPOSTASEGURO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/output/cartapdv_apnp_solar.csv
+
+END_METADATA
+================================================================================
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+Libname BASESRC '/riscosbvf/mis_varejo/integracao'; /*Caminho compartilhado com demais áreas para salvar arquivos para MIS Varejo utilizar*/
+/**Libname OneSolar '/infogrc/one_one_solar';**/
+Libname APNP '/infogrc/apnp/propostas';
+Libname ritosol '/infogrc/rito_comercial_solar';
+
+option compress = binary;
+/*%include '/infogrc/utils/all-includes.sas';   */
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+/*%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';*/
+
+/*Gera base de Seguros no momento da proposta*/
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+	CREATE TABLE TbPropostaSeguro AS
+	SELECT * FROM connection to dbcon
+	(
+			SELECT
+				 PropostaSeguro.NuProposta
+				,ProdutoSeguro.CdTipoSeguro
+				,ProdutoSeguro.CdProdutoSeguro
+				,ProdutoSeguro.NmProdutoSeguro
+				,PropostaSeguro.VrSeguro
+
+			FROM DBCRED.TbPropostaSeguro PropostaSeguro
+
+				INNER JOIN DBA.TbProposta Proposta
+					ON  PropostaSeguro.NuProposta = Proposta.NuProposta
+					AND Proposta.StProposta IN ('A','PA')
+
+				LEFT JOIN DBCONTRATOSEGURO.TbProdutoSeguro ProdutoSeguro
+					ON  PropostaSeguro.CdProdutoSeguro = ProdutoSeguro.CdProdutoSeguro
+		)
+;QUIT;
+
+proc sql;
+create table TbExtPropostaSeguros as
+select
+	 PropostaSeguro.NuProposta
+	,count(*) as QtSeguros
+
+	,max(case when PropostaSeguro.CdTipoSeguro = 4 then 1 else 0 end) as FlDFI
+	,max(case when PropostaSeguro.CdTipoSeguro = 2 then 1 else 0 end) as FlBVMais
+	,max(case when PropostaSeguro.CdTipoSeguro in (3,5) then 1 else 0 end) as FlCap
+	,max(case when PropostaSeguro.CdTipoSeguro = 6 then 1 else 0 end) as FlPlacaSolar
+
+	,sum(case when PropostaSeguro.CdTipoSeguro = 1 then 1 else 0 end) as QtDemais
+	,max(case when PropostaSeguro.CdTipoSeguro = 1 then 1 else 0 end) as FlDemais
+	,sum(case when PropostaSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro <> 11 then 1 else 0 end) as QtDemaisSemCompleto
+	,max(case when PropostaSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro <> 11 then 1 else 0 end) as FlDemaisSemCompleto
+
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 33 then 1 else 0 end) as FlCap03
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 35 then 1 else 0 end) as FlCap05
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 37 then 1 else 0 end) as FlCap07
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 30 then 1 else 0 end) as FlCap10
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 38 then 1 else 0 end) as FlCap12
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 39 then 1 else 0 end) as FlCap15
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 31 then 1 else 0 end) as FlCap19
+
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 42 then 1 else 0 end) as FlCap25
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 43 then 1 else 0 end) as FlCap35
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 44 then 1 else 0 end) as FlCap40
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 45 then 1 else 0 end) as FlCap50
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 46 then 1 else 0 end) as FlCap96
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 47 then 1 else 0 end) as FlCap145
+
+	,max(case when PropostaSeguro.CdTipoSeguro = 6 and PropostaSeguro.CdProdutoSeguro = 595 then 1 else 0 end) as FlPlacaSolar12
+	,max(case when PropostaSeguro.CdTipoSeguro = 6 and PropostaSeguro.CdProdutoSeguro = 596 then 1 else 0 end) as FlPlacaSolar24
+	,max(case when PropostaSeguro.CdTipoSeguro = 6 and PropostaSeguro.CdProdutoSeguro = 597 then 1 else 0 end) as FlPlacaSolar36
+
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 11 then 1 else 0 end) as FlCompleto
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 12 then 1 else 0 end) as FlGarantiaMecanica
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 13 then 1 else 0 end) as FlRCF
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 14 then 1 else 0 end) as FlCasco
+	,max(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 15 then 1 else 0 end) as FlGap
+
+	,sum(PropostaSeguro.VrSeguro) as VrSeguros
+
+	,sum(case when PropostaSeguro.CdTipoSeguro = 4 then PropostaSeguro.VrSeguro else 0 end) as VrDFI
+	,sum(case when PropostaSeguro.CdTipoSeguro = 2 then PropostaSeguro.VrSeguro else 0 end) as VrBVMais
+	,sum(case when PropostaSeguro.CdTipoSeguro in (3,5) then PropostaSeguro.VrSeguro else 0 end) as VrCap
+	,sum(case when PropostaSeguro.CdTipoSeguro = 6 then PropostaSeguro.VrSeguro else 0 end) as VrPlacaSolar
+
+	,sum(case when PropostaSeguro.CdTipoSeguro = 1 then PropostaSeguro.VrSeguro else 0 end) as VrDemais
+	,max(case when PropostaSeguro.CdTipoSeguro = 1 then PropostaSeguro.VrSeguro else 0 end) as VrDemaisMax
+	,max(case when PropostaSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro <> 11 then PropostaSeguro.VrSeguro else 0 end) as VrDemaisSemCompletoMax
+
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 33 then PropostaSeguro.VrSeguro else 0 end) as VrCap03
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 35 then PropostaSeguro.VrSeguro else 0 end) as VrCap05
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 37 then PropostaSeguro.VrSeguro else 0 end) as VrCap07
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 30 then PropostaSeguro.VrSeguro else 0 end) as VrCap10
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 38 then PropostaSeguro.VrSeguro else 0 end) as VrCap12
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 39 then PropostaSeguro.VrSeguro else 0 end) as VrCap15
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 31 then PropostaSeguro.VrSeguro else 0 end) as VrCap19
+
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 42 then PropostaSeguro.VrSeguro else 0 end) as VrCap25
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 43 then PropostaSeguro.VrSeguro else 0 end) as VrCap35
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 44 then PropostaSeguro.VrSeguro else 0 end) as VrCap40
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 45 then PropostaSeguro.VrSeguro else 0 end) as VrCap50
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 46 then PropostaSeguro.VrSeguro else 0 end) as VrCap96
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro in (3,5) and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 47 then PropostaSeguro.VrSeguro else 0 end) as VrCap145
+
+	,sum(case when PropostaSeguro.CdTipoSeguro = 6 and PropostaSeguro.CdProdutoSeguro = 595 then PropostaSeguro.VrSeguro else 0 end) as VrPlacaSolar12
+	,sum(case when PropostaSeguro.CdTipoSeguro = 6 and PropostaSeguro.CdProdutoSeguro = 596 then PropostaSeguro.VrSeguro else 0 end) as VrPlacaSolar24
+	,sum(case when PropostaSeguro.CdTipoSeguro = 6 and PropostaSeguro.CdProdutoSeguro = 597 then PropostaSeguro.VrSeguro else 0 end) as VrPlacaSolar36
+
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 11 then PropostaSeguro.VrSeguro else 0 end) as VrCompleto
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 12 then PropostaSeguro.VrSeguro else 0 end) as VrGarantiaMecanica
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 13 then PropostaSeguro.VrSeguro else 0 end) as VrRCF
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 14 then PropostaSeguro.VrSeguro else 0 end) as VrCasco
+	,sum(case when GrupoProdutoSeguro.CdTipoSeguro = 1 and GrupoProdutoSeguro.CdGrupoProdutoSeguro = 15 then PropostaSeguro.VrSeguro else 0 end) as VrGap
+
+from TbPropostaSeguro PropostaSeguro
+
+	left join AUTOMATI.TBSEG_PRODUTOSEGURO GrupoProdutoSeguro
+		on  PropostaSeguro.CdProdutoSeguro = GrupoProdutoSeguro.CdProdutoSeguro
+
+group by
+	 PropostaSeguro.NuProposta
+;run;
+
+/*Inclui o NuCnpjLojaFavorecido para o Solar - 22-05-25 - Shiroma*/
+PROC SQL;
+CREATE TABLE ritosol.TbPropostaAPNPSolar AS
+SELECT
+	 Originacao.DtEntradaProposta
+	,Originacao.DtAtualizacao
+	,case
+		when Originacao.QtDiasUteisMaturacao > 10 then 'Acima de 10 Dias'
+		when Originacao.QtDiasUteisMaturacao >  5 then '6 a 10 Dias'
+		when Originacao.QtDiasUteisMaturacao > -1 then '0 a 5 Dias'
+	 end as FxDiasUteisMaturacao
+	,originacao.QtDiasUteisMaturacao
+	,originacao.NuProposta
+
+	,originacao.CdParceiroComercial
+	,originacao.NmParceiroComercial
+	,originacao.NuCnpjLojaFavorecido
+	,originacao.NmParceiroComercialFavorecido
+	,originacao.NmGrupoProdutoMeta
+	,originacao.DsTipoCanalProducao
+	,originacao.NmPessoa
+	,originacao.NuCpfCnpj
+	,originacao.TpPessoa
+	,NuTelefone1
+	,NuTelefone2
+	,NuTelefone3
+	,Contato.DsEmail as Email1
+	,Contato.DsEmail2 as Email2
+	,originacao.NmColaborador
+	,originacao.NmCanalEstruturaComercial
+	,originacao.NmAreaEstruturaComercial
+	,originacao.NmSubEstruturaComercialA
+	,originacao.DsLoginN1
+	,originacao.DsloginN2A
+	,originacao.DsloginN3A
+	,originacao.LstSubstituicao
+	,ColaboradorFocal.LstColaboradorFocal
+	,originacao.QtParcelas
+	,originacao.NuScoreFim
+	,originacao.FxScoreFim
+	,originacao.FlTxAlterada
+	,originacao.FxEntrada
+	,originacao.VrLiberado Format COMMAX12.2
+	,originacao.VrPrestacao Format COMMAX12.2
+
+	,Coalesce(ExtPropostaSeguros.FlBVMais,0) as FlBVMais Format Commax12.
+	,Coalesce(ExtPropostaSeguros.VrBVMais,0) as VrBVMais Format COMMAX12.2
+	,Coalesce(ExtPropostaSeguros.FlCap,0) as FlCap Format Commax12.
+	,Coalesce(ExtPropostaSeguros.VrCap,0) as VrCap Format COMMAX12.2
+	,Coalesce(ExtPropostaSeguros.FlPlacaSolar,0) as FlPlacaSolar Format Commax12.
+	,Coalesce(ExtPropostaSeguros.VrPlacaSolar,0) as VrPlacaSolar Format COMMAX12.2
+
+	,originacao.CdColaboradorC
+	,originacao.NmColaboradorC
+	,originacao.DsLoginN1C
+	,originacao.CdFilialC
+	,originacao.NmFilialC
+	,originacao.CdAreaEstruturaComercialC
+	,originacao.NmAreaEstruturaComercialC
+	,originacao.DsLoginN2C
+	,originacao.DsLoginN3C
+	,originacao.NmSubEstruturaComercialC
+	,originacao.LstSubstituicaoC
+	,originacao.DsLoginOriginador
+
+FROM Tmp.TbOriginacao Originacao
+
+	left join bases.TbPessoa Contato
+		on Originacao.NuCpfCnpj = Contato.NuCpfCnpj
+
+	left join basegrc.TbColaboradorFocal ColaboradorFocal
+		on  Originacao.CdFilial = ColaboradorFocal.CdFilial
+		and Originacao.NmGrupoProdutoMeta = ColaboradorFocal.NmGrupoProdutoMeta
+
+	left join TbExtPropostaSeguros ExtPropostaSeguros
+		on  Originacao.NuProposta = ExtPropostaSeguros.NuProposta
+
+WHERE Originacao.FlPropostaAPNP = 1 and Originacao.NmGrupoprodutoMeta = 'Solar' and Originacao.NuScoreFim >= 6
+
+;run;
+
+proc export
+data= ritosol.TbPropostaAPNPSolar
+file= '/riscosbvf/BA/processos/output/cartapdv_apnp_solar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /riscosbvf/BA/processos/output/cartapdv_apnp_solar.csv  /riscosbvf/BA/processos/output/ ";

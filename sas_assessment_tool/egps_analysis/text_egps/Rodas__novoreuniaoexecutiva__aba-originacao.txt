@@ -1,0 +1,216 @@
+START_METADATA
+PROJECT: Rodas__novoreuniaoexecutiva
+FILE_SAS: aba-originacao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 151
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: ano13M, anoHoje, safra13M
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /RISCOSBVF/BA/PROCESSOS/TMP/ORIGINACAO_NRE.CSV [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], TMP.TBORIGINACAO&ANO13M [SAS/Local], TMP.TBORIGINACAO&ANOHOJE [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/originacao_nre.csv
+TABLE_READ_PROVENANCE (Flow): CONVSIMU.TBSIMULACOES [PROC SQL - FROM], TMP.TBORIGINACAO&ANO13M [DATA Step - SET], TMP.TBORIGINACAO&ANOHOJE [DATA Step - SET], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/originacao_nre.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CONSOLIDADO, DADOS_ORIGINACAO, DADOS_PRODUCAO, ORIGINACAO, SIMULACOES
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{ANO13M}, TMP.TBORIGINACAO{ANOHOJE}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/originacao_nre.csv
+
+END_METADATA
+================================================================================
+/* |	Alteração:	Incluido Origem PPAR2								 				| */
+/* |	Resp: 		Gustavo Domingues - MIS IGE											| */
+/* |	Data:		04/03/2025															| */
+/* ====================================================================================== */
+
+/* Parâmetros iniciais */
+option compress = binary;
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/libname.sas';
+
+DATA _NULL_;
+  hoje = Today();
+
+  anoHoje = YEAR(hoje);
+  ano13M = YEAR(hoje) - 1;
+  safra13M = (ano13M * 100) + MONTH(hoje);
+
+  CALL SYMPUT('safra13M', PUT(safra13M,6.));
+  CALL SYMPUT('anoHoje', PUT(anoHoje,4.));
+  CALL SYMPUT('ano13M', PUT(ano13M,4.));
+RUN;
+
+/* Passo 1 de 4 - Buscar dados de originação */
+DATA ORIGINACAO;
+SET TMP.TBORIGINACAO&ano13M. - TMP.TBORIGINACAO&anoHoje.;
+  WHERE NuAnoMes >= &safra13M.
+    AND StProposta IN ('A','AP','PA','CA','N');
+RUN;
+
+PROC SQL;
+  CREATE TABLE DADOS_ORIGINACAO AS
+    SELECT
+      NuAnoMes AS Safra,
+      NmGrupoProdutoMeta AS Produto,
+      DtAtualizacao,
+      SUM(FlPropostaOriginada) AS QtdPropostasOriginadas,
+      SUM(FlPropostaAprovada) AS QtdPropostasAprovadas,
+      SUM(FlPropostaEfetivada) AS QtdPropostasEfetivadas,
+      SUM(VrLiberadoDiaUtil) AS VrLiberadoDiaUtil,
+      SUM(VrPropostaOriginada) AS VrPropostaOriginada,
+	  SUM(VrPropostaAprovada) AS VrPropostaAprovada
+    FROM ORIGINACAO
+    GROUP BY 1,2,3;
+RUN;
+
+/* Passo 2 de 4 - Buscar dados de produção */
+PROC SQL;
+  CREATE TABLE DADOS_PRODUCAO AS
+    SELECT
+      NuAnoMes AS Safra,
+      NmGrupoProdutoMeta AS Produto,
+      DtAtualizacao,
+      SUM(VrProducaoDiaUtil) AS VrProducaoDiaUtil,
+      SUM(VrProducaoProjetado) AS VrProducaoProjetado,
+      SUM(VpTxGerencial) AS VpTxGerencial,
+      SUM(VrProducao) AS VrProducao,
+      SUM(VrMargem) AS VrMargem,
+      SUM(((1+(VpTxGerencial/VrProducao)) / (1+(((TxTirContabil/100) * (VrProducao))/VrProducao)) -1 ) * VrProducao) AS VpSpread,
+      SUM(FlBVMais) AS QtdBVMais,
+      SUM(FlBVMaisEleg) AS QtdBVMaisEleg,
+      SUM(FlCap) AS QtdCap,
+      SUM(FlCap07) AS QtdCap07,
+      SUM(FlCap10) AS QtdCap10,
+      SUM(FlCap12) AS QtdCap12,
+      SUM(FlCap15) AS QtdCap15,
+	  SUM(FlCap19) AS QtdCap19,
+      SUM(FlCapEleg) AS QtdCapEleg,
+      SUM(FlDemaisSemCompleto) AS QtdDemais,
+	  SUM(FlCompleto) AS QtdCompleto,
+	  SUM(FlCompletoEleg) AS QtdCompletoEleg,
+      SUM(FlCasco) AS QtdCasco,
+      SUM(FlRCF) AS QtdRCF,
+      SUM(FlGarantiaMecanica) AS QtdGarantiaMecanica,
+      SUM(FlDemaisEleg) AS QtdDemaisEleg,
+      SUM(VrComissaoTotal + COALESCE(VrComissaoParcelada,0)) as VrComissaoTotal,
+      SUM(VrComissaoTotal) as VrComissaoOriginacao,
+      SUM(COALESCE(VrComissaoParcelada,0)) as VrComissaoManutencao
+    FROM TMP.TBPRODUCAO
+    WHERE NuAnoMes >= &safra13M.
+    GROUP BY 1,2,3;
+RUN;
+
+/* Passo 3 de 4 - Buscar dados de simulação */
+PROC SQL;
+  CREATE TABLE SIMULACOES AS
+    SELECT
+	  NuAnoMes AS Safra,
+	  CASE WHEN Produto = 'CVG Leves' THEN 'Leves'
+           WHEN Produto = 'CVG Pesados' THEN 'Pesados'
+           ELSE Produto
+      END AS Produto,
+	  DtAtualizacao,
+	  COUNT(DISTINCT (CASE WHEN FlCard = 1 THEN NuCpfCnpj END)) AS Cards,
+	  SUM(VrProposta) AS VrProposta
+	FROM CONVSIMU.tbsimulacoes
+	WHERE Produto <> 'Outros'
+          AND SistemaInicial IN ('APAR','PPAR','ACOM','PPAR2')
+          AND NuAnoMes >= &safra13M.
+	GROUP BY 1,2,3;
+RUN;
+
+/* Passo 4 de 4 - Gerar base consolidada geral */
+PROC SQL;
+  CREATE TABLE CONSOLIDADO AS
+    SELECT
+      COALESCE(ORI.Safra, PRD.Safra,SMU.Safra) AS Safra,
+      COALESCE(ORI.Produto, PRD.Produto,SMU.Produto) AS Produto,
+	  SMU.DtAtualizacao AS DtSimulacao FORMAT=mmddyy10.,
+      ORI.DtAtualizacao AS DtOriginacao FORMAT=mmddyy10.,
+      PRD.DtAtualizacao AS DtProducao FORMAT=mmddyy10.,
+	  COALESCE(SMU.Cards,0) AS Cards FORMAT=num18.,
+	  COALESCE(SMU.VrProposta,0) AS VrPropostaSimulacao FORMAT=num18.,
+      COALESCE(ORI.QtdPropostasOriginadas,0) AS QtdPropostasOriginadas FORMAT=num18.,
+      COALESCE(ORI.QtdPropostasAprovadas,0) AS QtdPropostasAprovadas FORMAT=num18.,
+      COALESCE(ORI.QtdPropostasEfetivadas,0) AS QtdPropostasEfetivadas FORMAT=num18.,
+      COALESCE(ORI.VrLiberadoDiaUtil,0) AS VrLiberadoDiaUtil FORMAT=num18.2,
+      COALESCE(ORI.VrPropostaOriginada,0) AS VrPropostaOriginada FORMAT=num18.2,
+	  COALESCE(ORI.VrPropostaAprovada,0) AS VrPropostaAprovada FORMAT=num18.2,
+      COALESCE(PRD.VrProducaoDiaUtil,0) AS VrProducaoDiaUtil FORMAT=num18.2,
+      COALESCE(PRD.VrProducaoProjetado,0) AS VrProducaoProjetado FORMAT=num18.2,
+      COALESCE(PRD.VpTxGerencial,0) AS VpTxGerencial FORMAT=num18.2,
+      COALESCE(PRD.VrProducao,0) AS VrProducao FORMAT=num18.2,
+      COALESCE(PRD.VrMargem,0) AS VrMargem FORMAT=num18.2,
+      COALESCE(PRD.VpSpread,0) AS VpSpread FORMAT=num18.2,
+      COALESCE(PRD.QtdBVMais,0) AS QtdSPF FORMAT=num18.,
+      COALESCE(PRD.QtdBVMaisEleg,0) AS QtdSPFEleg FORMAT=num18.,
+      COALESCE(PRD.QtdCap,0) AS QtdCap FORMAT=num18.,
+      COALESCE(PRD.QtdCap07,0) AS QtdCap07 FORMAT=num18.,
+      COALESCE(PRD.QtdCap10,0) AS QtdCap10 FORMAT=num18.,
+      COALESCE(PRD.QtdCap12,0) AS QtdCap12 FORMAT=num18.,
+      COALESCE(PRD.QtdCap15,0) AS QtdCap15 FORMAT=num18.,
+	  COALESCE(PRD.QtdCap19,0) AS QtdCap19 FORMAT=num18.,
+      COALESCE(PRD.QtdCapEleg,0) AS QtdCapEleg FORMAT=num18.,
+      COALESCE(PRD.QtdDemais,0) AS QtdDemais FORMAT=num18.,
+	  COALESCE(PRD.QtdCompleto,0) AS QtdCompleto FORMAT=num18.,
+	  COALESCE(PRD.QtdCompletoEleg,0) AS QtdCompletoEleg FORMAT=num18.,
+      COALESCE(PRD.QtdCasco,0) AS QtdCasco FORMAT=num18.,
+      COALESCE(PRD.QtdRCF,0) AS QtdRCF FORMAT=num18.,
+      COALESCE(PRD.QtdGarantiaMecanica,0) AS QtdGarantiaMecanica FORMAT=num18.,
+      COALESCE(PRD.QtdDemaisEleg,0) AS QtdDemaisEleg FORMAT=num18.,
+      COALESCE(PRD.VrComissaoTotal,0) AS VrComissaoTotal FORMAT=num18.2,
+      COALESCE(PRD.VrComissaoOriginacao,0) AS VrComissaoOriginacao FORMAT=num18.2,
+      COALESCE(PRD.VrComissaoManutencao,0) AS VrComissaoManutencao FORMAT=num18.2
+  FROM
+    DADOS_ORIGINACAO ORI
+  FULL OUTER JOIN DADOS_PRODUCAO PRD
+    ON ORI.Safra = PRD.Safra
+   AND ORI.Produto = PRD.Produto
+  FULL OUTER JOIN SIMULACOES SMU
+    ON ORI.Safra = SMU.Safra
+   AND ORI.Produto = SMU.Produto;
+RUN;
+
+FILENAME exprt '/riscosbvf/BA/processos/tmp/originacao_nre.csv' encoding="utf-8";
+
+PROC EXPORT
+data=CONSOLIDADO
+outfile=exprt replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/originacao_nre.csv /riscosbvf/BA/processos/output/';

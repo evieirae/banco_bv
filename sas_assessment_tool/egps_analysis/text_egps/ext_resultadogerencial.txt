@@ -1,0 +1,289 @@
+START_METADATA
+PROJECT: SAS_UC4__ext_resultadogerencial
+FILE_SAS: ext_resultadogerencial.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:58 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -122
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 216
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], DBGERENCIAL.TBCONTRATOREFINANCIAMENTIMBLRO [DBCON], DBGERENCIAL.TBRESULTADOGERENCIAL [DBCON], DBIMOBILIARIO.TBPROPOSTA [DBCON], EGI.TBCONTRATOFINANCEIRO [DBCON], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBRESULTADOGERENCIAL [DATA Step - UPDATE], BASES.TBRESULTADOGERENCIAL_RH [DATA Step - UPDATE], DBGERENCIAL.TBCONTRATOREFINANCIAMENTIMBLRO [Pass-Through Native (DBCON) - FROM], DBGERENCIAL.TBRESULTADOGERENCIAL [Pass-Through Native (DBCON) - FROM], DBIMOBILIARIO.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], EGI.TBCONTRATOFINANCEIRO [Pass-Through Native (DBCON) - JOIN], TMP.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASES.TBRESULTADOGERENCIAL, BASES.TBRESULTADOGERENCIAL_RH
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBRESULTADOGERENCIAL, BASES.TBRESULTADOGERENCIAL_RH
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: EXT_PTA, EXT_PTA_DATAS, EXT_PTA_RESULTADOGERENCIAL, EXT_PTA_RESULTADOGERENCIALIMBLRO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_resultadogerencial.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	ext_resultadogerencial.sas											| */
+/* |	Descricao: 	Programa para extrair informacoes de resultados gerenciais.			| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableua utilizados pela		| */
+/* |				area comercial.														| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de BA								| */
+/* |	Criador: 	Carlos Makoto - BA													| */
+/* |	Data:		01/04/2020															| */
+/* ====================================================================================== */
+/* |	Atualizacao:	08/04/2020														| */
+/* |	Responsavel: 	Paulo Oliveira - Squad MIS Comercial							| */
+/* |	Alt. Realizada:	- Inclusao de cabecalho											| */
+/* |					- Testes iniciais												| */
+/* ====================================================================================== */
+/* |	Atualizacao:	24/04/2020														| */
+/* |	Responsavel: 	Nome - Squad MIS Comercial										| */
+/* |	Alt. Realizada:	- Utilizacao do usuario sistemico								| */
+/* |					- 																| */
+/* ====================================================================================== */
+/* |	Atualizacao:	04/05/2021														| */
+/* |	Responsavel: 	Gabriel Souza - IGE Varejo										| */
+/* |	Alt. Realizada:	- Utilizacao do usuario sistemico								| */
+/* |					- 																| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ==================== Extracao PTA  ===================== */
+/* ======================================================== */
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE ext_pta_ResultadoGerencial AS
+SELECT * FROM connection to dbcon
+(
+	SELECT
+		     ResultadoGerencial.NuContrato
+			,ResultadoGerencial.SqContratoFinanceiro
+			,ResultadoGerencial.VrFinanciado VrFinanciamento
+			,ResultadoGerencial.VrAcordoComercial
+			,ResultadoGerencial.VrLiberado
+			,ResultadoGerencial.VrCustoVariavel
+			,ResultadoGerencial.VrPerdaEstimada
+			,ResultadoGerencial.TxTir
+			,ResultadoGerencial.VrDurationVP
+			,ResultadoGerencial.VrMargemBruta
+			,ResultadoGerencial.VrMargemLiquida
+			,ResultadoGerencial.VrMargemContribuicaoFinal
+			,ResultadoGerencial.VrMargemContribuicao
+			,((ResultadoGerencial.VrFinanciado * ResultadoGerencial.PcROE) * ResultadoGerencial.VrDurationVP) as VpRoe
+			,ResultadoGerencial.PcROE
+			,ResultadoGerencial.TsReplicacao
+	FROM DBGERENCIAL.TbResultadoGerencial ResultadoGerencial
+
+	WHERE ResultadoGerencial.TsReplicacao >= today()-45
+)
+;RUN;
+
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE ext_pta_ResultadoGerencialImblro AS
+SELECT * FROM connection to dbcon
+(
+	SELECT
+			Contrato.NuContrato
+			,Contrato.SqContratoFinanceiro
+			,ResultadoGerencial.VrLiberado
+			,ResultadoGerencial.VrFinanciado VrFinanciamento
+			,ResultadoGerencial.VrCusto as VrCustoVariavel
+			,ResultadoGerencial.VrPdd as VrPerdaEstimada
+			,ResultadoGerencial.TxTIR
+			,ResultadoGerencial.VrMargemBruta
+			,ResultadoGerencial.VrMargemLiquida
+			,((Proposta.PcMargemLiquida*Proposta.VrProposta)/100) AS VrMargemContribuicaoFinal
+			,((Proposta.PcMargemLiquida*Proposta.VrProposta)/100) AS VrMargemContribuicao
+	FROM DBGERENCIAL.TbContratoRefinanciamentImblro ResultadoGerencial
+
+		LEFT JOIN EGI.TbContratoFinanceiro Contrato
+			ON  ResultadoGerencial.NuContrato = Contrato.NuContrato
+
+		LEFT JOIN DbImobiliario.TbProposta Proposta
+			ON  ResultadoGerencial.NuProposta = Proposta.NuProposta
+
+	WHERE Contrato.NuContrato > 0
+		AND Contrato.DtContratoFinanceiro >= today()-180
+		AND ResultadoGerencial.VrLiberado is not null
+)
+;RUN;
+
+data ext_pta;
+set
+	ext_pta_ResultadoGerencial
+	ext_pta_ResultadoGerencialImblro
+;run;
+
+proc sort data=ext_pta; by NuContrato SqContratoFinanceiro;run;
+
+proc sql;drop index chave on bases.TbResultadoGerencial;run;
+
+data bases.TbResultadoGerencial;
+	update
+		bases.TbResultadoGerencial
+		ext_pta (Drop = TsReplicacao)
+	;by NuContrato SqContratoFinanceiro;
+run;
+
+proc sql;create index chave on bases.TbResultadoGerencial (NuContrato,SqContratoFinanceiro);run;
+
+/* ====================================================================================== */
+/* ===== Email (Caxa MIS): TABLEAU EGV (SET) - GR FABIANO FREITAS|| de 02/10/2023 ======= */
+/* ===== Aprovação em Caixa MIS dia 27/10/2023=========================================== */
+/* ===== Email (Caxa MIS): RES: ERRO TABLEAU EGV (SET) - GR FABIANO FREITAS ============= */
+/* ===== Aprovação em Caixa MIS dia 30/10/2023=========================================== */
+/* ===== Email (Caxa MIS): RES: Ajuste Manual MC EVG ==================================== */
+/* ===== Aprovação em Caixa MIS dia 28/05/2024=========================================== */
+/* ===== Evidencias e aprovações salvas em: N:\DVMD\Planejamento Varejo\MIS Varejo\Processos\010. Documentação\Caixa MIS\Evidencias de Ajustes */
+/* ===== Email (Caxa MIS): RES: Proposta Paga - Não consta PB|| de 28/10/2024 =========== */
+/* ===== Aprovação em Caixa MIS dia 23/10/2024=========================================== */
+/* ===== Email (Caxa MIS): Divergência de MC - Proposta 355052775|| de 09/10/2025 ======= */
+/* ===== Aprovação em Caixa MIS dia 09/10/2025=========================================== */
+/* ====================================================================================== */
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 5691.64 , VrMargemContribuicaoFinal = 2246.28 , VrMargemContribuicao = 2246.28
+where NuContrato=12061000010348
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 1337.5 , VrMargemContribuicaoFinal = 3028.88 , VrMargemContribuicao = 3028.88
+where NuContrato=12035000393121
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 7072 , VrMargemContribuicaoFinal = 1718.6 , VrMargemContribuicao = 1718.6
+where NuContrato=12027000347814
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 1552 , VrMargemContribuicaoFinal = 5134.26 , VrMargemContribuicao = 5134.26
+where NuContrato=12086000009035
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 1795.9 , VrMargemContribuicaoFinal = 3303.84 , VrMargemContribuicao = 3303.84
+where NuContrato=12332000001168
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 2004.85 , VrMargemContribuicaoFinal = 1290.55 , VrMargemContribuicao = 1290.55
+where NuContrato=12332000001183
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 5009.33 , VrMargemContribuicaoFinal = 317.14 , VrMargemContribuicao = 317.14
+where NuContrato=12034000308565
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 190.98 , VrMargemContribuicaoFinal = 2276.74 , VrMargemContribuicao = 2276.74
+where NuContrato=12042000296315
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 4155.81 , VrMargemContribuicaoFinal = 1331.20 , VrMargemContribuicao = 1331.20
+where NuContrato=12042000296500
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 806.68 , VrMargemContribuicaoFinal = 2156.14 , VrMargemContribuicao = 2156.14
+where NuContrato=12201000008581
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 10264.81 , VrMargemContribuicaoFinal = 3629 , VrMargemContribuicao = 3629
+where NuContrato=12341000021463
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 8077.42 , VrMargemContribuicaoFinal = 3617.58 , VrMargemContribuicao = 3617.58
+where NuContrato=12042000295225
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 4074.11 , VrMargemContribuicaoFinal = 3469.20 , VrMargemContribuicao = 3469.20
+where NuContrato=12042000296098
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 3022.24 , VrMargemContribuicaoFinal = 3076.06 , VrMargemContribuicao = 3076.06
+where NuContrato=12360000000668
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 5544.24 , VrMargemContribuicaoFinal = 1969.09 , VrMargemContribuicao = 1969.09
+where NuContrato=12034000320279
+;run;
+proc sql;update bases.TbResultadoGerencial set VrPerdaEstimada = 6690.00 , VrMargemContribuicaoFinal = 9637.53 , VrMargemContribuicao = 9637.53
+where NuContrato=12355000006043
+;run;
+
+/*incluindo a data do contrato na base e gerando outra base apenas com contratos que tiveram ajustes antes do envio da comissão ao RH*/
+Proc Sql;
+Create table ext_pta_datas (Where = (Filtro = 'Ajustar')) as
+	Select
+			a.NuContrato
+			,a.SqContratoFinanceiro
+			,a.VrFinanciamento
+			,a.VrAcordoComercial
+			,a.VrLiberado
+			,a.VrCustoVariavel
+			,a.VrPerdaEstimada
+			,a.TxTir
+			,a.VrDurationVP
+			,a.VrMargemBruta
+			,a.VrMargemLiquida
+			,a.VrMargemContribuicaoFinal
+			,a.VrMargemContribuicao
+			,a.VpRoe
+			,a.PcROE
+			,DatePart(a.TsReplicacao) as TsReplicacao Format ddmmyy10.
+			,prod.DtContrato
+			,Case
+				When day(prod.DtContrato) < 16  Then INTNX('month', prod.DtContrato+31, 0, 'BEGINNING')
+				When day(prod.DtContrato) >= 16 Then INTNX('month', prod.DtContrato+16, 0, 'BEGINNING')
+			End as MesRef format ddmmyy10.
+			,mdy(MONTH(Calculated MesRef),Day('17Jun2024'd), YEAR(Calculated MesRef)) as DtLimAjuste format ddmmyy10.
+			,Case When DatePart(a.TsReplicacao) <= Calculated DtLimAjuste Then "Ajustar" Else "Não Ajustar" End as Filtro
+From ext_pta as a
+	Left join tmp.tbproducao as prod On A.NuContrato = Prod.NuContrato;
+Quit;
+
+proc sort data=ext_pta_datas;
+	by NuContrato SqContratoFinanceiro;
+run;
+
+proc sql;
+	drop index chave on bases.TbResultadoGerencial_RH;
+run;
+
+data bases.TbResultadoGerencial_RH;
+	update
+		bases.TbResultadoGerencial_RH
+		ext_pta_datas (drop = MesRef)
+	;
+	by NuContrato SqContratoFinanceiro;
+run;
+
+proc sql;
+	create index chave on bases.TbResultadoGerencial_RH (NuContrato,SqContratoFinanceiro);
+run;
+
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* ====================================================================================== */
+%PUT #!# FIM ext_resultadogerencial.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%PUT #!# TEMPO PROCESSAMENTO:   %SYSFUNC(intck(SECOND, &W_ini, %SYSFUNC(datetime())), tod8.);

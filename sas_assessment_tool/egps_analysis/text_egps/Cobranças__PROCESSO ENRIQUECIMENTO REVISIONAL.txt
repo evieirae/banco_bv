@@ -1,0 +1,360 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__PROCESSO ENRIQUECIMENTO REVISIONAL
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:32 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 245
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [BIGQUERY], BV-PDBD-PRD.DVRY_CORE.TBCONTRATOFINANCEIRO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\Gestao_Operacional\01 - Equipe\Equipe\Carol Matos\ALAVANCAS JURIDICAS\REVISIONAL\ENR_POS_REDIST.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.ENR_POS_REDIST <- N:\DVMD\Cobrança\Gestao_Operacional\01 - Equipe\Equipe\Carol Matos\ALAVANCAS JURIDICAS\REVISIONAL\ENR_POS_REDIST.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.ENR_POS_REDIST
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.DVRY_CORE.TBCONTRATOFINANCEIRO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], WORK.ENR_POS_REDIST [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DVMD\Cobrança\Gestao_Operacional\01 - Equipe\Equipe\Carol Matos\ALAVANCAS JURIDICAS\REVISIONAL\ENR_POS_REDIST_FINAL.xlsx
+TEMP/DISCARDED OUTPUTS: BASE_GCP, ENR_POS_DIST_FINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\Gestao_Operacional\01 - Equipe\Equipe\Carol Matos\ALAVANCAS JURIDICAS\REVISIONAL\ENR_POS_REDIST.csv|N:/DVMD/COBRANÇA/GESTAO_OPERACIONAL/01 - EQUIPE/EQUIPE/CAROL MATOS/ALAVANCAS JURIDICAS/REVISIONAL|ENR_POS_REDIST.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: PROCESSO ENRIQUECIMENTO REVISIONAL */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: PROCESSO ENRIQUECIMENTO REVISIONAL */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Wfcidg41iGh7q1S8/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO CONNECT_GCP;
+connect to bigquery as perm (
+project     = 'bv-sadi-dtm'
+credfile    = '/projetos/acessos/bq/di/sadi-dtm.json'
+schema      = 'bv-pdbd-prd'
+READ_MODE   = storage
+ALLOW_LARGE_RESULTS = must
+MAX_CHAR_LEN = 40
+);
+%MEND CONNECT_GCP;
+
+PROC SQL;
+%CONNECT_GCP;
+CREATE TABLE BASE_GCP AS
+SELECT *
+FROM CONNECTION TO perm
+(WITH SITUACAO_CONTRATO AS (
+
+SELECT
+
+  NUCONTRATO,
+  SQCONTRATOFINANCEIROATIVO AS SQCONTRATOFINANCEIRO,
+  NUCPFCNPJ,
+  CASE
+  WHEN CDSITUACAOCONTRATO = 1 THEN 'ABERTO'
+  WHEN CDSITUACAOCONTRATO = 2 THEN 'FECHADO'
+  END AS STATUS
+
+FROM bv-pdbd-prd.trusted_dbgestaocdccg.tbcontrato
+
+),
+
+ENTRADA_BNDU AS (
+
+SELECT
+
+  NUCONTRATOGESTAO,
+  MAX(DTENTRADA) AS DTENTRADA
+
+FROM bv-pdbd-prd.trusted_dbpatio.tbentrada
+
+GROUP BY NUCONTRATOGESTAO
+
+),
+
+FLAG_BNDU AS (
+
+SELECT
+
+S.*,
+CASE
+  WHEN E.NUCONTRATOGESTAO IS NOT NULL THEN 'S'
+  ELSE 'N'
+END AS FLAG_ENTRADA_BNDU
+
+FROM SITUACAO_CONTRATO AS S LEFT JOIN ENTRADA_BNDU AS E
+
+ON S.NUCONTRATO = E.NUCONTRATOGESTAO
+
+),
+
+SAJ_PROCESSO AS (
+
+SELECT
+
+  NUCONTRATOGESTAO,
+  MAX(DT_ASSES) AS DT_ASSES
+
+FROM bv-pdbd-prd.trusted_scc_fin.saj_processo
+
+WHERE ATIVA_PRINC = 'E'
+
+GROUP BY NUCONTRATOGESTAO
+
+),
+
+BASE_ASSES AS (
+
+SELECT
+
+  BSP.NUCONTRATOGESTAO,
+  BSP.DT_ASSES,
+  GSP.COD_ASSES,
+  GSA.RAZAO_NOME
+
+FROM SAJ_PROCESSO AS BSP LEFT JOIN bv-pdbd-prd.trusted_scc_fin.saj_processo AS GSP
+  ON BSP.NUCONTRATOGESTAO = GSP.NUCONTRATOGESTAO
+    AND BSP.DT_ASSES = GSP.DT_ASSES
+
+  LEFT JOIN bv-pdbd-prd.trusted_scc_fin.saj_agente AS GSA
+    ON GSP.COD_ASSES = GSA.COD_AGENTE
+
+),
+
+ENRIQUECIDA AS (
+
+SELECT
+
+  FB.NUCONTRATO,
+  FB.SQCONTRATOFINANCEIRO,
+  FB.NUCPFCNPJ,
+  FB.STATUS,
+  FB.FLAG_ENTRADA_BNDU,
+  BAS.COD_ASSES,
+  BAS.RAZAO_NOME
+
+FROM FLAG_BNDU AS FB LEFT JOIN BASE_ASSES AS BAS
+  ON FB.NUCONTRATO = BAS.NUCONTRATOGESTAO
+
+),
+
+DTVENCIMENTO AS (
+
+SELECT
+
+  E.NUCONTRATO,
+  E.SQCONTRATOFINANCEIRO,
+  MIN(TP.dt_vencimento) AS DTVENCIMENTO
+
+FROM ENRIQUECIDA AS E LEFT JOIN `bv-pdbd-prd.dvry_core.tbparcela` AS TP
+    ON E.NUCONTRATO = TP.cd_contrato
+      AND E.SQCONTRATOFINANCEIRO = TP.sq_contrato_financeiro
+
+WHERE TP.st_parcela <> 'Q'
+
+GROUP BY
+    E.NUCONTRATO,
+    E.SQCONTRATOFINANCEIRO
+
+),
+
+ENRIQUECIMENTO_2 AS (
+
+SELECT
+
+  E.NUCONTRATO,
+  E.SQCONTRATOFINANCEIRO,
+  E.NUCPFCNPJ,
+  E.STATUS,
+  E.FLAG_ENTRADA_BNDU,
+  E.COD_ASSES,
+  E.RAZAO_NOME,
+  DT.DTVENCIMENTO
+
+FROM ENRIQUECIDA E LEFT JOIN DTVENCIMENTO DT
+ON E.NUCONTRATO = DT.NUCONTRATO
+AND E.SQCONTRATOFINANCEIRO = DT.SQCONTRATOFINANCEIRO
+
+),
+
+ENRIQUECIDA_UNIQUE AS (
+
+SELECT DISTINCT
+  NUCONTRATO,
+  SQCONTRATOFINANCEIRO,
+  NUCPFCNPJ,
+  STATUS,
+  FLAG_ENTRADA_BNDU,
+  COD_ASSES,
+  RAZAO_NOME,
+  DTVENCIMENTO,
+  DATE_DIFF(CURRENT_DATE(), DTVENCIMENTO, DAY) AS ATRASO
+
+FROM ENRIQUECIMENTO_2
+
+)
+
+SELECT
+
+  E.NUCONTRATO,
+  E.SQCONTRATOFINANCEIRO,
+  E.NUCPFCNPJ,
+  E.STATUS,
+  E.FLAG_ENTRADA_BNDU,
+  E.COD_ASSES,
+  E.RAZAO_NOME,
+  E.DTVENCIMENTO,
+  E.ATRASO,
+
+  CASE
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND A.cdsubproduto IS NULL THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) IN (21, 22, 29, 44) THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '18' THEN 'CP_BV_MAR_ABERTO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '22' THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '56' THEN 'CP_PRE_APROVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '67' THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '71' THEN 'CP_BOM_PRA_CREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '72' THEN 'CP_SERASA_ECRED'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '73' THEN 'CP_FINANZERO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '77' THEN 'CP_MINHA_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '82' THEN 'CP_EASYCREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) IN ('85', '86') THEN 'CP_NEON'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '87' THEN 'CP_JUST'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '97' THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '89' THEN 'CP_JUROS_BAIXO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '93' THEN 'CP_QUERO_FINANCIAR'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '68' THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '96' THEN 'CP_ABASTECE_AI'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND CAST(A.cdsubproduto AS STRING) = '100' THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 11 AND CAST(C.cd_modalidade_produto AS INT64) = 16 THEN 'INSS'
+        WHEN CAST(C.cd_produto AS INT64) = 11 AND CAST(C.cd_modalidade_produto AS INT64) IN (17, 75) THEN 'PRIVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 11 AND CAST(C.cd_modalidade_produto AS INT64) IN (18, 32, 37, 39) THEN 'PUBLICO'
+        WHEN CAST(C.cd_produto AS INT64) = 14 AND CAST(A.cdsubproduto AS STRING) IN ('1', '4', '8', '9', '10', '16', '19', '29', '30', '31', '33', '34', '35', '58', '59', '60') THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14 AND A.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14 AND CAST(A.cdsubproduto AS STRING) IN ('2', '3', '11', '13', '20', '32', '61', '62', '63') THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(A.cdsubproduto AS STRING) IN ('15', '21', '75') THEN 'CDC_CONSTRUCAO'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(C.cd_modalidade_produto AS INT64) IN (12, 54) AND A.cdsubproduto IS NULL THEN 'CDC_CONSTRUCAO'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(A.cdsubproduto AS STRING) = '76' THEN 'CDC_TURISMO'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(A.cdsubproduto AS STRING) = '74' THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(A.cdsubproduto AS STRING) IN ('46', '47') THEN 'CDC_MOVEIS'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(A.cdsubproduto AS STRING) = '70' THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(A.cdsubproduto AS STRING) = '53' THEN 'CDC_ODONTOLOGICO'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(C.cd_modalidade_produto AS INT64) = 55 AND A.cdsubproduto IS NULL THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(C.cd_modalidade_produto AS INT64) = 10 AND A.cdsubproduto IS NULL THEN 'CDC_DESCONTO_CHEQUE'
+        WHEN CAST(C.cd_produto AS INT64) = 13 AND CAST(C.cd_modalidade_produto AS INT64) = 11 AND A.cdsubproduto IS NULL THEN 'CDC_INFORMATICA'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 3 AND A.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 6 AND A.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 6 AND CAST(A.cdsubproduto AS STRING) = '8' THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 6 AND CAST(A.cdsubproduto AS STRING) = '13' THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 27 AND A.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 27 AND CAST(A.cdsubproduto AS STRING) IN ('19', '60') THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 28 AND CAST(A.cdsubproduto AS STRING) IN ('20', '63') THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 78 AND CAST(A.cdsubproduto AS STRING) IN ('13', '20') THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 79 AND CAST(A.cdsubproduto AS STRING) IN ('8', '19') THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 79 AND CAST(A.cdsubproduto AS STRING) IN ('13', '20') THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 2 AND CAST(A.cdsubproduto AS STRING) = '9' THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 3 AND CAST(A.cdsubproduto AS STRING) = '16' THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 3 AND CAST(A.cdsubproduto AS STRING) = '30' THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 5 THEN 'MOTOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 7 AND A.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 7 AND CAST(A.cdsubproduto AS STRING) = '4' THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 7 AND CAST(A.cdsubproduto AS STRING) = '3' THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 8 AND A.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 8 AND CAST(A.cdsubproduto AS STRING) IN ('1', '58') THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 9 AND A.cdsubproduto IS NULL THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 9 AND CAST(A.cdsubproduto AS STRING) IN ('2', '3', '61') THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 38 AND CAST(A.cdsubproduto AS STRING) = '29' THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12 AND CAST(C.cd_modalidade_produto AS INT64) = 38 AND CAST(A.cdsubproduto AS STRING) = '31' THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 16 AND CAST(C.cd_modalidade_produto AS INT64) = 60 THEN 'COBAN'
+    END AS Produto,
+    CASE
+        WHEN CAST(C.cd_produto AS INT64) IN (10, 13) THEN 'EMPRESTIMO'
+        WHEN CAST(C.cd_produto AS INT64) = 11 AND CAST(D.cd_motivo_contrato_financeiro AS INT64) = 4 AND CAST(D.cd_tipo_cobranca AS INT64) = 1 THEN 'EMPRESTIMO'
+        WHEN CAST(C.cd_produto AS INT64) IN (12, 14) THEN 'RODAS'
+        WHEN CAST(C.cd_produto AS INT64) IN (11) THEN 'CONSIGNADO'
+        WHEN CAST(C.cd_produto AS INT64) IN (15) THEN 'CARTAO_CREDITO'
+        WHEN CAST(C.cd_produto AS INT64) IN (16) THEN 'RESSARCIMENTO'
+    END AS Familia
+
+FROM
+    ENRIQUECIDA_UNIQUE AS E
+INNER JOIN
+    bv-pdbd-prd.dvry_core.tbcontrato AS C
+    ON E.NUCONTRATO = C.cd_contrato
+INNER JOIN
+    bv-pdbd-prd.dvry_core.tbcontratofinanceiro AS D
+    ON E.NUCONTRATO = D.cd_contrato AND E.SQCONTRATOFINANCEIRO = D.sq_contrato_financeiro
+INNER JOIN
+    bv-pdbd-prd.trusted_dbcred.tbproposta AS A
+    ON A.nucontratogestao = CAST(C.cd_contrato AS STRING)
+);
+QUIT;
+
+ PROC SQL;
+CREATE TABLE ENR_POS_DIST_FINAL AS
+
+SELECT
+
+GCP.*
+
+FROM WORK.ENR_POS_REDIST E  LEFT JOIN BASE_GCP AS GCP
+
+ON E.NuContratoText = GCP.NUCONTRATO
+WHERE E.NuContratoText IS NOT NULL
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: PROCESSO ENRIQUECIMENTO REVISIONAL */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.ENR_POS_DIST_FINAL
+    OUTFILE='N:\DVMD\Cobrança\Gestao_Operacional\01 - Equipe\Equipe\Carol Matos\ALAVANCAS JURIDICAS\REVISIONAL\ENR_POS_REDIST_FINAL.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

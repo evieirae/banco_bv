@@ -1,0 +1,412 @@
+START_METADATA
+PROJECT: Rodas__tbcontadigital
+FILE_SAS: 02 - TbContaDigitalFinal_Csv.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -2
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 328
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SafraM13, max_DtAtualizacao, safraM0
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASEGRC.TBCONTADIGITAL60 [SAS/Local], BASES.TBCONTADIGITALFINAL_FINAL [SAS/Local], BASES.TBPESSOA [SAS/Local], BV-PDBD-PRD.TRUSTED_SGPPGESTAOPARCERIA.TBCLIENTEBENEFICIOEPS [BIGQUERY], BV-PDBD-PRD.TRUSTED_SGPPGESTAOPARCERIA.TBDADOCLIENTEBENEFICIO [BIGQUERY], BV-PDBD-PRD.TRUSTED_SGPPGESTAOPARCERIA.TBRETORNOEPSBENEFICIO [BIGQUERY], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], BASEGRC.TBCONTADIGITAL60 [PROC SQL - FROM], BASES.TBCONTADIGITALFINAL_FINAL [DATA Step - SET], BASES.TBCONTADIGITALFINAL_FINAL60 [DATA Step - SET], BASES.TBPESSOA [PROC SORT - DATA=], BV-PDBD-PRD.TRUSTED_SGPPGESTAOPARCERIA.TBCLIENTEBENEFICIOEPS [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_SGPPGESTAOPARCERIA.TBDADOCLIENTEBENEFICIO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_SGPPGESTAOPARCERIA.TBRETORNOEPSBENEFICIO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], TMP.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): BASES.TBCONTADIGITALFINAL_FINAL60
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBCONTADIGITALFINAL_FINAL60
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbContaDigital.csv
+TEMP/DISCARDED OUTPUTS: TAGVEICULAR, TBCONTADIGITALFINAL, TBCONTADIGITALFINAL_DENOMINADOR, TBCONTADIGITALFINAL_FINAL, TBCONTADIGITALFINAL_FINAL60, TBCONTADIGITALFINAL_FINAL60CSV, TBCONTADIGITALFINAL_NUMERADOR, TBCONTADIGITALFINAL_NUMERADOR_2, TBPESSOA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Atualizacao:	19/03/2024 														| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE			                            | */
+/* |	Alt. Realizada:	- Incluido normalização de hierarquia para 202403               | */
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* |	Atualizacao:	10/06/2025														| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE			                            | */
+/* |	Alt. Realizada:	- Incluido nova regra de 60 dias para numerador / denominador   | */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/infogrc/utils/all-includes.sas';
+
+/*Importa base de tag */
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd'
+READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100
+);
+create table TagVeicular as
+select
+*
+
+from connection to perm(
+  SELECT
+    DISTINCT
+    Cast(tdcb.dtinclusao as date) as dtinclusao,
+    tcbe.cddadoclientebeneficio,
+    treb.cdidentificadorbeneficio,
+    tdcb.nucontacobranca,
+    tcbe.DsUltimoEventoBeneficioEps
+  FROM
+    `bv-pdbd-prd.trusted_sgppgestaoparceria.tbclientebeneficioeps` tcbe
+  INNER JOIN
+    `bv-pdbd-prd.trusted_sgppgestaoparceria.tbdadoclientebeneficio` tdcb
+  ON
+    tcbe.cddadoclientebeneficio = tdcb.cddadoclientebeneficio
+  INNER JOIN
+    `bv-pdbd-prd.trusted_sgppgestaoparceria.tbretornoepsbeneficio` treb
+  ON
+    tcbe.cdclientebeneficioeps = treb.cdclientebeneficioeps /*and treb.TpStatusRetorno = 'ATIVO'*/
+    where 1=1
+    and Cast(tdcb.dtinclusao as date) < current_date()
+    and tcbe.DsUltimoEventoBeneficioEps = 'ATIVO'
+  ORDER BY
+    2,4
+ );
+disconnect from perm;
+quit;
+
+PROC SQL;
+CREATE TABLE TbContaDigitalFinal  AS
+SELECT
+
+	Producao.NuAnoMes
+	,ContaDigital.SafraProposta
+	,ContaDigital.SafraConta
+	,ContaDigital.SafraAtivacao
+	,ContaDigital.NuContrato
+	,Producao.NuProposta
+	,ContaDigital.NuCpfCnpj
+	,ContaDigital.DtContrato
+	,ContaDigital.DtConta
+	,ContaDigital.DtAtivacao
+	,ContaDigital.DtEncerramentoConta
+	,ContaDigital.FlElegContaDigital
+	,ContaDigital.FlContaDigital
+	,ContaDigital.FlAtivacaoContaDigital
+	,ContaDigital.FlElegContaDigitalComissao
+	,ContaDigital.DtAtualizacao
+
+	,ContaDigital.FlContaAberta
+	,ContaDigital.FlHabilitadoDAVeiculos
+	,ContaDigital.DtPrimeiroDARodas FORMAT DATE9.
+	,ContaDigital.DtSafraPrimeiroDARodas FORMAT DATE9.
+	,ContaDigital.FlDebitoAutomaticoEfetivado
+	,ContaDigital.FlElegivelBonus
+/*	,case when ContaDigital.FlElegivelBonus = 1 and today() - ContaDigital.DtContrato > 120 then 0 else 1 end as  FlElegivelBonusRevisada*/
+	,case when ContaDigital.FlElegivelBonus = 1 and today() - ContaDigital.DtContrato > 120 then 0
+		  when ContaDigital.FlElegivelBonus is null then 0
+		  when ContaDigital.FlElegivelBonus = 0 	then 0
+		else 1 end as  FlElegivelBonusRevisada
+
+	,Producao.DsTipoCanalProducao
+	,Producao.NmCanalEstruturaComercial
+	,Producao.NmAreaEstruturaComercial
+	,Producao.NmSubEstruturaComercialA
+	,Producao.CdFilial
+	,Producao.DsFilial
+	,Producao.CdParceiroComercial
+	,Producao.NmParceiroComercial
+	,Producao.CdParceiroComercial
+	,Producao.NmPessoa
+	,Producao.TpPessoa
+	,Producao.CdColaborador
+	,Producao.NmColaborador
+	,Producao.DsLoginN1
+	,Producao.DsLoginN2A
+	,Producao.DsLoginN3A
+	,Producao.LstSubstituicao
+	,Producao.NmGrupoProdutoMeta
+	,Producao.VrProducao
+	,ColaboradorFocal.LstColaboradorFocal
+	,'              ' as ContatoNuCpfCnpj
+	,'              ' as NuTelefone1
+	,'              ' as NuTelefone2
+	,tag.DsUltimoEventoBeneficioEps as StatusTag
+	,Producao.DtPrimeiroVencimento
+	,Producao.QtParcelas
+	,ContaDigital.TpOferta
+	,Case when tag.DsUltimoEventoBeneficioEps = 'ATIVO' then 1 else 0 end as FlStatusTag
+
+FROM basegrc.TbContaDigital60 ContaDigital
+
+	INNER JOIN TMP.TbProducao Producao
+		ON ContaDigital.NuContrato = Producao.NuContrato
+
+	LEFT JOIN basegrc.TbColaboradorFocal ColaboradorFocal
+			ON  Producao.CdFilial = ColaboradorFocal.CdFilial
+		    AND Producao.NmGrupoProdutoMeta = ColaboradorFocal.NmGrupoProdutoMeta
+			/*AND ColaboradorFocal.NmCanalEstruturaComercial = 'Canal Veiculos'*/
+
+	LEFT JOIN  TagVeicular as tag
+	ON ContaDigital.nuconta = tag.nucontacobranca
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbContaDigitalFinal_Numerador AS
+SELECT DISTINCT
+'Contas' as Tipo
+/*,Case when DtConta < DtContrato then SafraProposta else SafraConta end as NuAnoMes*/
+,SafraProposta as NuAnoMes
+,NuContrato
+,NuProposta
+,NuCpfCnpj
+,DtContrato
+,DtConta
+,DtAtivacao
+,DtEncerramentoConta
+,FlElegContaDigital
+,FlContaDigital
+,FlElegContaDigitalComissao
+,DtAtualizacao
+,FlContaAberta
+,FlHabilitadoDAVeiculos
+,DtPrimeiroDARodas FORMAT DATE9.
+,DtSafraPrimeiroDARodas FORMAT DATE9.
+,FlDebitoAutomaticoEfetivado
+,FlElegivelBonus
+,FlElegivelBonusRevisada
+,DsTipoCanalProducao
+,NmCanalEstruturaComercial
+,NmAreaEstruturaComercial
+,NmSubEstruturaComercialA
+,DsFilial
+,CdParceiroComercial
+,NmParceiroComercial
+,NmPessoa
+,TpPessoa
+,CdColaborador
+,NmColaborador
+,DsLoginN1
+,DsLoginN2A
+,DsLoginN3A
+,LstSubstituicao
+,NmGrupoProdutoMeta
+,ContatoNuCpfCnpj
+,NuTelefone1
+,NuTelefone2
+,VrProducao
+,LstColaboradorFocal
+,CdFilial
+,FlStatusTag
+,DtPrimeiroVencimento
+,QtParcelas
+,TpOferta
+FROM TbContaDigitalFinal
+where SafraConta <> .
+and FlcontaDigital = 1
+and SafraConta >= 202301
+and SafraProposta >= Case when DtConta < DtContrato then SafraProposta else SafraConta end
+/*and nucontrato = 12087000221000*/
+;RUN;
+
+/*dados de ativação*/
+
+PROC SQL;
+CREATE TABLE TbContaDigitalFinal_Numerador_2 AS
+SELECT DISTINCT
+'Ativacao' as Tipo
+/*,Case when DtAtivacao < DtContrato then SafraConta else SafraAtivacao end as NuAnoMes*/
+, SafraProposta as NuAnoMes
+/*,SafraConta as NuAnoMes*/
+,NuContrato
+,NuProposta
+,NuCpfCnpj
+,DtContrato
+,DtConta
+,DtAtivacao
+,DtEncerramentoConta
+,FlElegContaDigital
+,FlAtivacaoContaDigital
+,FlElegContaDigitalComissao
+,DtAtualizacao
+,FlContaAberta
+,FlHabilitadoDAVeiculos
+,DtPrimeiroDARodas FORMAT DATE9.
+,DtSafraPrimeiroDARodas FORMAT DATE9.
+,FlDebitoAutomaticoEfetivado
+,FlElegivelBonus
+,FlElegivelBonusRevisada
+,DsTipoCanalProducao
+,NmCanalEstruturaComercial
+,NmAreaEstruturaComercial
+,NmSubEstruturaComercialA
+,DsFilial
+,CdParceiroComercial
+,NmParceiroComercial
+,NmPessoa
+,TpPessoa
+,CdColaborador
+,NmColaborador
+,DsLoginN1
+,DsLoginN2A
+,DsLoginN3A
+,LstSubstituicao
+,NmGrupoProdutoMeta
+,ContatoNuCpfCnpj
+,NuTelefone1
+,NuTelefone2
+,VrProducao
+,LstColaboradorFocal
+,CdFilial
+,FlStatusTag
+,DtPrimeiroVencimento
+,QtParcelas
+,TpOferta
+FROM TbContaDigitalFinal
+where SafraConta <> .
+and FlcontaDigital = 1
+and FlAtivacaoContaDigital = 1
+and SafraAtivacao >= 202301
+and SafraProposta >= SafraAtivacao
+/*and SafraAtivacao >= SafraProposta*/
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbContaDigitalFinal_Denominador AS
+SELECT
+'Elegiveis' as Tipo
+,SafraProposta as NuAnoMes
+/*,case when FlcontaDigital = 1 then SafraConta else SafraProposta end as NuAnoMes*/
+,NuContrato
+,NuProposta
+,NuCpfCnpj
+,DtContrato
+,DtConta
+,DtAtivacao
+,DtEncerramentoConta
+,FlElegContaDigital
+,FlContaDigital
+,FlElegContaDigitalComissao
+,DtAtualizacao
+,FlContaAberta
+,FlHabilitadoDAVeiculos
+,DtPrimeiroDARodas FORMAT DATE9.
+,DtSafraPrimeiroDARodas FORMAT DATE9.
+,FlDebitoAutomaticoEfetivado
+,FlElegivelBonus
+,FlElegivelBonusRevisada
+,DsTipoCanalProducao
+,NmCanalEstruturaComercial
+,NmAreaEstruturaComercial
+,NmSubEstruturaComercialA
+,DsFilial
+,CdParceiroComercial
+,NmParceiroComercial
+,NmPessoa
+,TpPessoa
+,CdColaborador
+,NmColaborador
+,DsLoginN1
+,DsLoginN2A
+,DsLoginN3A
+,LstSubstituicao
+,NmGrupoProdutoMeta
+,ContatoNuCpfCnpj
+,NuTelefone1
+,NuTelefone2
+,VrProducao
+,LstColaboradorFocal
+,CdFilial
+,FlStatusTag
+,DtPrimeiroVencimento
+,QtParcelas
+,TpOferta
+FROM TbContaDigitalFinal
+where (FlcontaDigital = 1 or FlElegcontaDigital = 1) and SafraProposta >=202301
+;RUN;
+
+data TbContaDigitalFinal_Final;
+
+set	TbContaDigitalFinal_Denominador
+	TbContaDigitalFinal_Numerador
+	TbContaDigitalFinal_Numerador_2;
+
+	Drop 	CdFilial
+
+	;run;
+
+/* Passo 1: Calcular o valor máximo */
+	PROC SQL;
+  SELECT MAX(DtAtualizacao) format date9.   INTO :max_DtAtualizacao   FROM TbContaDigitalFinal_Final;
+RUN;
+
+/*Corta a base e Joga o valor maximo pra base por conta do congelamento*/
+
+data TbContaDigitalFinal_Final60 (Drop= NuTelefone1 NuTelefone2);
+
+set	TbContaDigitalFinal_Final (Where=(NuAnomes>=202506 and NuAnomes <= &safraM0.))
+	Bases.TbContaDigitalFinal_Final (Where=(NuAnomes >= 202401 and NuAnomes <= 202505));
+	DtAtualizacao = input("&max_DtAtualizacao.", date9.);
+	format DtAtualizacao date9.;
+
+	run;
+
+/*Atualiza telefones*/
+
+	PROC SORT DATA=bases.tbpessoa (where=(NuTelefone1 <> '' and
+									 NuTelefone2 <> '' and
+									 NuTelefone3 <> ''))  NODUPKEY out=tbpessoa;
+BY NuCpfCnpj;
+RUN;
+
+proc sort data=tbpessoa; by NuCpfCnpj; run;
+
+proc sort data=TbContaDigitalFinal_Final60; by NuCpfCnpj; run;
+
+data bases.TbContaDigitalFinal_Final60;
+	merge TbContaDigitalFinal_Final60 (in=a)
+	tbpessoa (in=b keep=NuCpfCnpj NuTelefone1 NuTelefone2 );
+	by NuCpfCnpj;
+	if a;
+run;
+
+data TbContaDigitalFinal_Final60CSV;
+	set bases.TbContaDigitalFinal_Final60 (Where=(NuAnoMes >= &SafraM13.))
+;run;
+
+/*Exporta BAse*/
+proc export
+data=TbContaDigitalFinal_Final60CSV
+file='/riscosbvf/BA/processos/output/TbContaDigital.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

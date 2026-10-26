@@ -1,0 +1,432 @@
+START_METADATA
+PROJECT: Rodas__precoxrisco
+FILE_SAS: 04.input-bases-sas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 60)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), PROC DATASETS (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 363
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: inicioDate
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/verifica/verifica-originacao.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/VERIFICA/VERIFICA-ORIGINACAO.SAS [SAS/Local], BASES.TBCETIPCONVERSAOENVIO [SAS/Local], BASES.TBCETIPCONVERSAORETORNO [SAS/Local], DWBI_DTWH.TBAGENTEMIS [DBCON], SHMESA.BASEUNICARODAS_2022 [SAS/Local], SHMESA.BASEUNICARODAS_2025 [SAS/Local], TMP.TBEXTPROPOSTA [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/verifica/verifica-originacao.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBCETIPCONVERSAOENVIO [PROC SQL - FROM], BASES.TBCETIPCONVERSAORETORNO [PROC SQL - JOIN], DWBI_DTWH.TBAGENTEMIS [Pass-Through Native (DBCON) - FROM], SHMESA.BASEUNICARODAS_2022 [DATA Step - SET], SHMESA.BASEUNICARODAS_2025 [DATA Step - SET], TMP.TBEXTPROPOSTA [PROC SQL - FROM], TMP.TBORIGINACAO [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/verifica/verifica-originacao.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEUNICARODAS, CONVERSAO, INFOCLIENTE, SCOREPROPOSTA, SCOREPROPOSTA01, TBAGENTE, TBCETIPCONVERSAOENVIO, TBCONSOLIDADO, TBCONSOLIDADO_LIMPEZA01, TBCONSOLIDADO_STEP01, TBORIGINACAO, TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/verifica/verifica-originacao.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/verifica/verifica-originacao.sas';
+
+/* STEP 01.01 - Buscar dados seguindo as regras do Qualidade de Vendas */
+PROC SQL;
+  CREATE TABLE TbProducao AS
+    SELECT
+	  p.DtContrato,
+	  (YEAR(p.DtContrato) * 100) + MONTH(p.DtContrato) AS SafraProposta,
+      p.NuProposta,
+	  p.NuContrato,
+	  p.NmGrupoProdutoMeta AS Produto,
+	  p.NuCpfCnpj,
+      'AP' AS StProposta,
+	  p.FlBVMais AS FlagSPF,
+	  p.FlCap AS FlagCAP,
+	  p.FlDemais AS FlagAuto,
+	  p.VrSeguros,
+	  p.DsTipoCanalProducao,
+	  p.TpPessoa,
+	  p.CdFilial,
+	  p.NmAreaEstruturaComercial AS DsFilial,
+	  p.VrProducao,
+	   /*Inclui os VP para calculo Guta*/
+      ((1+(p.VpTxGerencial/VrProducao)) / (1+(((p.TxTirContabil/100) * (p.VrProducao))/p.VrProducao)) -1 ) * p.VrProducao AS VpSpread,
+	  p.VpTxGerencial,
+	  p.VpTirContabil,
+	  p.VpIdade,
+	  p.VpPrazo,
+	  p.VpEntrada,
+	  p.VpScore,
+	  p.VrMargem
+    FROM
+	  TMP.TbProducao as P
+
+    WHERE
+	  p.NmGrupoProdutoMeta IN ('Leves','Motos','Pesados','CVG Leves','CVG Pesados','Leves-BVO')
+      AND p.DtContrato >= &inicioDate.;
+RUN;
+
+PROC SQL;
+CREATE TABLE ScoreProposta01 AS
+  SELECT DISTINCT
+    NuProposta,
+	COALESCE(NuRating,NuScoreFim) AS NuRating
+  FROM TMP.TBEXTPROPOSTA
+  WHERE DtEntradaProposta >= &inicioDate.;
+RUN;
+
+PROC SORT DATA=ScoreProposta01 OUT=ScoreProposta NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC SQL;
+  CREATE TABLE TbOriginacao AS
+    SELECT
+	  a.DtEntradaProposta,
+      (YEAR(a.DtEntradaProposta) * 100) + MONTH(a.DtEntradaProposta) AS SafraProposta,
+      a.NuProposta,
+      a.NuContratoGestao AS NuContrato,
+	  a.NmGrupoProdutoMeta AS Produto,
+	  a.NuCpfCnpj,
+      a.StProposta,
+	  a.TpPessoa,
+	  a.TpOrigemTaxa,
+      a.CdParceiroComercial AS CdConvenio,
+      a.TxGerencial,
+      a.FlPropostaOriginada,
+      a.FlPropostaAprovada,
+      a.FlPropostaEfetivada,
+	  a.FlConcorrente AS FlConversao,
+	  CASE WHEN a.FlBancoBrasil = 1 THEN 'BB'
+           WHEN a.FlBradesco = 1 THEN 'Bradesco'
+           WHEN a.FlItau = 1 THEN 'Itau'
+           WHEN a.FlPan = 1 THEN 'Pan'
+           WHEN a.FlSafra = 1 THEN 'Safra'
+           WHEN a.FlSantander = 1 THEN 'Santander'
+           WHEN a.FlMontadoras = 1 THEN 'Montadoras'
+           WHEN a.FlOutros = 1 THEN 'Outros'
+	  END AS BancoConversao,
+	  CASE WHEN (a.StProposta IN ('CA', 'A', 'PA', 'VA', 'P', 'CE')) OR a.FlPropostaAPNP = 1 THEN 'APNP'
+	       WHEN a.FlPropostaNegada = 1 THEN 'Negada'
+		   WHEN a.StProposta = 'C' THEN 'Cancelada'
+	  END AS StPropostaConversao,
+      a.QtAnosIdade,
+      a.FlTxAlterada,
+      a.FxIdade,
+      b.NuRating AS NuScoreFim,
+      a.CdTabelaFinanciamento,
+      a.VrPrestacao,
+      a.PcEntrada,
+      a.QtDiasCarencia,
+      a.VrFinanciamento,
+      a.QtParcelas,
+      a.VrPDD,
+      (a.VrPDD / a.VrFinanciamento) AS RUPE,
+      CASE WHEN (a.VrPDD / a.VrFinanciamento) BETWEEN  0.0 AND 0.0399 THEN "0-3"
+           WHEN (a.VrPDD / a.VrFinanciamento) BETWEEN 0.04 AND 0.0699 THEN "4-6"
+           WHEN (a.VrPDD / a.VrFinanciamento) BETWEEN 0.07 AND 0.0999 THEN "7-9"
+           WHEN (a.VrPDD / a.VrFinanciamento) BETWEEN  0.1 AND 0.1299 THEN "10-12"
+           WHEN (a.VrPDD / a.VrFinanciamento) BETWEEN 0.13 AND 0.1599 THEN "13-15"
+           WHEN (a.VrPDD / a.VrFinanciamento) >= 0.16 THEN "Maior que 15"
+	  END AS FaixaRUPE,
+      a.TxTIRContabil,
+      a.CdUFPessoa AS UF,
+      CASE WHEN a.CdUfPessoa IN ('AC','AM','AP','PA','RO','RR','TO') THEN 'Norte'
+           WHEN a.CdUfPessoa IN ('AL','BA','CE','MA','PB','PE','PI','RN','SE') THEN 'Nordeste'
+           WHEN a.CdUfPessoa IN ('DF','GO','MS','MT') THEN 'Centro-oeste'
+           WHEN a.CdUfPessoa IN ('SP','RJ','ES','MG') THEN 'Sudeste'
+           WHEN a.CdUfPessoa IN ('PR','RS','SC') THEN 'Sul'
+           ELSE "Não identificado"
+      END AS RegiaoBR,
+      a.NmSubEstruturaComercialA AS Regional,
+	  a.DsTipoCanalProducao,
+	  a.CdFilial,
+	  a.NmAreaEstruturaComercial AS DsFilial,
+      a.VrProposta,
+      a.VrEntrada,
+      a.VrLiberado,
+	  a.VrPropostaOriginada,
+	  /*Inclui os VP para calculo Guta */
+	  (((1+(A.VpTxGerencial/A.VrLiberado)) / (1+(((A.TxTirContabil/100) * (A.VrLiberado))/A.VrLiberado)) -1 ) * A.VrLiberado) AS VpSpread,
+	  a.VpTxGerencial,
+	  a.VpTirContabil,
+	  a.VpIdade,
+	  a.VpPrazo,
+	  a.VpEntrada,
+	  a.VpScore,
+	  a.tpVeiculo
+	FROM TMP.TbOriginacao a
+	LEFT JOIN ScoreProposta b
+	  ON a.NuProposta = b.NuProposta
+	WHERE a.DtEntradaProposta >= &inicioDate.
+      AND a.NmGrupoProdutoMeta IN ('Leves','Motos','Pesados','CVG Leves','CVG Pesados','Leves-BVO');
+RUN;
+
+PROC SQL;
+  CREATE TABLE TbConsolidado_Step01 AS
+    SELECT DISTINCT
+	  COALESCE(Originacao.SafraProposta,Producao.SafraProposta) AS Safra,
+	  COALESCE(Producao.NuProposta, Originacao.NuProposta) AS NuProposta,
+	  Producao.NuContrato AS NuContratoProd,
+	  COALESCE(Producao.NuContrato, Originacao.NuContrato) FORMAT=15. AS NuContrato,
+	  COALESCE(Producao.Produto, Originacao.Produto) AS Produto,
+	  COALESCE(Producao.NuCpfCnpj, Originacao.NuCpfCnpj) AS NuCpfCnpj,
+	  Originacao.DtEntradaProposta,
+	  Originacao.TpOrigemTaxa,
+	  Producao.DtContrato,
+      COALESCE(Producao.StProposta, Originacao.StProposta) AS StProposta,
+	  COALESCE(Producao.FlagSPF,0) AS FlagSPF,
+	  COALESCE(Producao.FlagCAP,0) AS FlagCAP,
+	  COALESCE(Producao.FlagAuto,0) AS FlagAuto,
+	  Producao.VrSeguros,
+	  COALESCE(Originacao.DsTipoCanalProducao, Producao.DsTipoCanalProducao) AS DsTipoCanalProducao,
+	  Originacao.CdFilial,
+	  COALESCE(Originacao.DsFilial, Producao.DsFilial) AS DsFilial,
+      COALESCE(Originacao.TpPessoa, Producao.TpPessoa) AS TpPessoa,
+      Originacao.CdConvenio,
+      Originacao.TxGerencial,
+      COALESCE(Originacao.FlPropostaOriginada,0) AS FlPropostaOriginada,
+      COALESCE(Originacao.FlPropostaAprovada,0) AS FlPropostaAprovada,
+      COALESCE(Originacao.FlPropostaEfetivada,0) AS FlPropostaEfetivada,
+	  COALESCE(Originacao.FlConversao,0) AS FlConversao,
+	  Originacao.BancoConversao,
+	  Originacao.StPropostaConversao,
+      Originacao.QtAnosIdade,
+      COALESCE(Originacao.FlTxAlterada,0) AS FlTxAlterada,
+      Originacao.FxIdade,
+      Originacao.NuScoreFim,
+      Originacao.CdTabelaFinanciamento,
+      Originacao.VrPrestacao,
+      Originacao.PcEntrada,
+      Originacao.QtDiasCarencia,
+      Originacao.VrFinanciamento,
+      Originacao.QtParcelas,
+      Originacao.VrPDD,
+	  Originacao.RUPE,
+	  Originacao.FaixaRUPE,
+	  Originacao.TxTIRContabil,
+	  Originacao.UF,
+	  Originacao.RegiaoBR,
+	  Originacao.Regional,
+      Originacao.VrProposta,
+      Originacao.VrEntrada,
+      Originacao.VrLiberado,
+	  Originacao.VrPropostaOriginada AS VrPropostaOriginada,
+	  Producao.VrProducao AS VrProducao,
+	  Originacao.Tpveiculo,
+
+	  /*Incluir aqui tambem o Valor ponderado Guta*/
+	  COALESCE(Producao.VpSpread, Originacao.VpSpread) FORMAT=15.4 AS VpSpread,
+	  COALESCE(Producao.VpTxGerencial, Originacao.VpTxGerencial) FORMAT=15.2 AS VpTxGerencial,
+	  COALESCE(Producao.VpTirContabil, Originacao.VpTirContabil) FORMAT=15.2 AS VpTirContabil,
+	  COALESCE(Producao.VpIdade, Originacao.VpIdade) FORMAT=15.2 AS VpIdade,
+	  COALESCE(Producao.VpPrazo, Originacao.VpPrazo) FORMAT=15.2 AS VpPrazo,
+	  COALESCE(Producao.VpEntrada, Originacao.VpEntrada) FORMAT=15.2 AS VpEntrada,
+	  COALESCE(Producao.VpScore, Originacao.VpScore) FORMAT=15.2 AS VpScore,
+	  Producao.VrMargem FORMAT=15.2
+    FROM TbProducao Producao
+	FULL OUTER JOIN TbOriginacao Originacao
+      ON Producao.NuProposta = Originacao.NuProposta;
+RUN;
+
+PROC SQL;
+  CREATE TABLE TbConsolidado_Limpeza01 AS
+    SELECT
+	  NuProposta,
+	  MIN(DtEntradaProposta) FORMAT=DATE9. AS DtEntradaProposta,
+	  MIN(DtContrato) FORMAT=DATE9. AS DtContrato,
+	  MIN(TpOrigemTaxa) AS TpOrigemTaxa,
+	  MIN(VrSeguros) AS VrSeguros,
+	  MIN(CdConvenio) AS CdConvenio,
+	  MIN(TxGerencial) AS TxGerencial,
+	  MIN(QtAnosIdade) AS QtAnosIdade,
+	  MIN(FxIdade) AS FxIdade,
+	  MIN(CdTabelaFinanciamento) AS CdTabelaFinanciamento,
+	  MIN(CdFilial) AS CdFilial,
+	  MIN(DsFilial) AS DsFilial,
+	  MIN(VrPrestacao) AS VrPrestacao,
+	  MIN(PcEntrada) AS PcEntrada,
+      MIN(QtDiasCarencia) AS QtDiasCarencia,
+      MIN(VrFinanciamento) AS VrFinanciamento,
+      MIN(QtParcelas) AS QtParcelas,
+      MIN(VrPDD) AS VrPDD,
+      MIN(RUPE) AS RUPE,
+      MIN(FaixaRUPE) AS FaixaRUPE,
+      MIN(TxTIRContabil) AS TxTIRContabil,
+      MIN(UF) AS UF,
+      MIN(RegiaoBR) AS RegiaoBR,
+      MIN(Regional) AS Regional,
+      MIN(VrProposta) AS VrProposta,
+      MIN(VrEntrada) AS VrEntrada,
+      MIN(VrLiberado) AS VrLiberado,
+	  MIN(VrPropostaOriginada) AS VrPropostaOriginada,
+	  MIN(VrProducao) AS VrProducao,
+	  /* Inclui o valor ponderado Guta*/
+	  MIN(VpSpread) as VpSpread,
+	  MIN(VpTxGerencial) as VpTxGerencial,
+	  MIN(VpTirContabil) as VpTirContabil,
+	  MIN(VpIdade) as VpIdade,
+	  MIN(VpPrazo) as VpPrazo,
+	  MIN(VpEntrada) as VpEntrada,
+	  MIN(VpScore) as VpScore,
+	  MIN(VrMargem) as VrMargem,
+	  MIN(Tpveiculo) as Tpveiculo,
+	  CASE WHEN NuContrato = NuContratoProd THEN 'Manter' ELSE 'Excluir' END AS FlExcluir
+	FROM TbConsolidado_Step01
+	WHERE NuContrato <> .
+	GROUP BY NuContrato
+    HAVING COUNT(1) > 1;
+RUN;
+
+PROC SQL;
+  CREATE TABLE TbConsolidado AS
+    SELECT DISTINCT
+	  Consolidado.Safra,
+	  Consolidado.NuProposta,
+	  Consolidado.NuContrato,
+	  Consolidado.NuCpfCnpj,
+	  Consolidado.Produto,
+	  COALESCE(Limpeza.DtEntradaProposta, Consolidado.DtEntradaProposta) FORMAT=DATE9. AS DtEntradaProposta,
+	  COALESCE(Limpeza.DtContrato, Consolidado.DtContrato) FORMAT=DATE9. AS DtContrato,
+      Consolidado.StProposta,
+	  Consolidado.TpOrigemTaxa,
+	  Consolidado.FlagSPF,
+	  Consolidado.FlagCAP,
+	  Consolidado.FlagAuto,
+	  COALESCE(Limpeza.VrSeguros, Consolidado.VrSeguros) AS VrSeguros,
+	  Consolidado.DsTipoCanalProducao,
+	  COALESCE(Limpeza.CdFilial, Consolidado.CdFilial) AS CdFilial,
+	  COALESCE(Limpeza.DsFilial, Consolidado.DsFilial) AS DsFilial,
+      Consolidado.TpPessoa,
+      COALESCE(Limpeza.CdConvenio, Consolidado.CdConvenio) AS CdConvenio,
+      COALESCE(Limpeza.TxGerencial, Consolidado.TxGerencial) AS TxGerencial,
+      Consolidado.FlPropostaOriginada,
+      Consolidado.FlPropostaAprovada,
+      Consolidado.FlPropostaEfetivada,
+	  Consolidado.FlConversao,
+	  Consolidado.BancoConversao,
+	  Consolidado.StPropostaConversao,
+      COALESCE(Limpeza.QtAnosIdade, Consolidado.QtAnosIdade) AS QtAnosIdade,
+      Consolidado.FlTxAlterada,
+      COALESCE(Limpeza.FxIdade, Consolidado.FxIdade) AS FxIdade,
+      Consolidado.NuScoreFim,
+      COALESCE(Limpeza.CdTabelaFinanciamento, Consolidado.CdTabelaFinanciamento) AS CdTabelaFinanciamento,
+      COALESCE(Limpeza.VrPrestacao, Consolidado.VrPrestacao) AS VrPrestacao,
+      COALESCE(Limpeza.PcEntrada, Consolidado.PcEntrada) AS PcEntrada,
+      COALESCE(Limpeza.QtDiasCarencia, Consolidado.QtDiasCarencia) AS QtDiasCarencia,
+      COALESCE(Limpeza.VrFinanciamento, Consolidado.VrFinanciamento) AS VrFinanciamento,
+      COALESCE(Limpeza.QtParcelas, Consolidado.QtParcelas) AS QtParcelas,
+      COALESCE(Limpeza.VrPDD, Consolidado.VrPDD) AS VrPDD,
+	  COALESCE(Limpeza.RUPE, Consolidado.RUPE) AS RUPE,
+	  COALESCE(Limpeza.FaixaRUPE, Consolidado.FaixaRUPE) AS FaixaRUPE,
+	  COALESCE(Limpeza.TxTIRContabil, Consolidado.TxTIRContabil) AS TxTIRContabil,
+	  COALESCE(Limpeza.UF, Consolidado.UF) AS UF,
+	  COALESCE(Limpeza.RegiaoBR, Consolidado.RegiaoBR) AS RegiaoBR,
+	  COALESCE(Limpeza.Regional, Consolidado.Regional) AS Regional,
+      COALESCE(Limpeza.VrProposta, Consolidado.VrProposta) AS VrProposta,
+      COALESCE(Limpeza.VrEntrada, Consolidado.VrEntrada) AS VrEntrada,
+      COALESCE(Limpeza.VrLiberado, Consolidado.VrLiberado) AS VrLiberado,
+	  COALESCE(Limpeza.VrPropostaOriginada, Consolidado.VrPropostaOriginada) AS VrPropostaOriginada,
+	  COALESCE(Limpeza.VrProducao, Consolidado.VrProducao) AS VrProducao,
+	  COALESCE(Limpeza.TpVeiculo, Consolidado.TpVeiculo) AS TpVeiculo,
+      /*Inlui o valor ponderado Guta*/
+	  COALESCE(Limpeza.VpSpread, Consolidado.VpSpread) AS VpSpread,
+	  COALESCE(Limpeza.VpTxGerencial, Consolidado.VpTxGerencial) AS VpTxGerencial,
+	  COALESCE(Limpeza.VpTirContabil, Consolidado.VpTirContabil) AS VpTirContabil,
+	  COALESCE(Limpeza.VpIdade, Consolidado.VpIdade) AS VpIdade,
+	  COALESCE(Limpeza.VpPrazo, Consolidado.VpPrazo) AS VpPrazo,
+	  COALESCE(Limpeza.VpScore, Consolidado.VpScore) AS VpScore,
+	  COALESCE(Limpeza.VpEntrada, Consolidado.VpEntrada) AS VpEntrada,
+	  COALESCE(Limpeza.VrMargem, Consolidado.VrMargem) AS VrMargem
+    FROM TbConsolidado_Step01 Consolidado
+	LEFT JOIN TbConsolidado_Limpeza01 Limpeza
+      ON Consolidado.NuProposta = Limpeza.NuProposta
+    WHERE FlExcluir <> 'Excluir';
+RUN;
+
+/* Informação de clientes pré-aprovados */
+DATA BaseUnicaRodas;
+SET SHMESA.BaseUnicaRodas_2022 - SHMESA.BaseUnicaRodas_2025;
+RUN;
+
+PROC SQL;
+  CREATE TABLE InfoCliente AS SELECT DISTINCT NuProposta, FlPAP FROM BaseUnicaRodas;
+RUN;
+
+PROC SORT DATA=InfoCliente NODUPKEY;
+BY NuProposta;
+RUN;
+
+/* Limpar datasets*/
+PROC DATASETS LIBRARY=WORK;
+  DELETE TbProducao TbOriginacao TbConsolidado_Step01 TbConsolidado_Limpeza01 BaseUnicaRodas;
+RUN;
+QUIT;
+
+/* Buscar data de conversão das propostas */
+PROC SQL;
+%CONECTADB(server = BI);
+CREATE TABLE TbAgente AS SELECT * FROM connection to dbcon (
+  SELECT *
+  FROM DWBI_DTWH.TbAgenteMIS
+WHERE NuCnpjAgente <> 0
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE TbCetipConversaoEnvio AS
+  SELECT
+    *,
+    CASE WHEN DtEntradaProposta < '14JUL2021'd
+         THEN SUBSTR(chave,1,30)||PUT(VrFinanciamento,z10.)
+         ELSE chave
+    END AS chave2 FORMAT=$53.
+  FROM BASES.TbCetipConversaoEnvio;
+RUN;
+
+PROC SQL;
+CREATE TABLE CONVERSAO AS
+  SELECT DISTINCT
+    A.NuProposta,
+    CASE WHEN Agente.NmGrupoAgenteMIS = 'MONTADORAS' THEN 'MONTADORAS'
+         ELSE Agente.NmSubgrupoAgenteMis
+    END AS Banco,
+    INTCK('DAY',A.DtEntradaProposta,B.Dt_Gravame) AS DiasConversao
+  FROM TBCETIPCONVERSAOENVIO A
+  LEFT JOIN BASES.TBCETIPCONVERSAORETORNO B
+    ON A.Chave2 = B.Chave
+  INNER JOIN TbAgente Agente
+    ON B.cnpj_agfin = Agente.NuCNPJAgente
+  WHERE Agente.NmSubgrupoAgenteMis <> 'BV';
+RUN;
+
+PROC SORT DATA=CONVERSAO NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC DATASETS LIBRARY=WORK;
+  DELETE TbAgente TbCetipConversaoEnvio;
+RUN;
+QUIT;

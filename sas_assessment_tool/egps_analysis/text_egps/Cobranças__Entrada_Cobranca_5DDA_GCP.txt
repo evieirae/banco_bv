@@ -1,0 +1,528 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Entrada_Cobranca_5DDA_GCP
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:28 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -6
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 374
+CODE_TASKS_COUNT: 9
+DETECTED_PROCS: FREQ, SORT, SQL
+HAS_DATA_STEP: Yes (10x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ARTHUR = /riscosbv/cobranca/aesteves; BA3040 = /riscosbv/cobranca/est_cartoes/3040; B_GERAL = /riscosbv/cobranca/malmeida; CARD_ACR = /riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/; CARD_CS = /riscosbv/cobranca/ranapole/Cartoes/Modelagem; CARNEIRO = /riscosbv/cobranca/jcarneiro; CUBO = /riscosbv/cobranca/dpompei/cartao/CA; EQUIPE3 = /riscosbvf/analytics/narciso/lucas/HACKATON_EQP3; EST_CART = /riscosbv/cobranca/jcarneiro/estrategia_cartoes; GH16 = /riscosbv/cobranca/dpompei/cartao/GH16; JOAO = /riscosbv/cobranca/bsilva/; MOVTO = /riscosbv/cobranca/erocha/CARTAO/MOVTO; PAGOSCBR = /riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber; PERF_CL = /riscosbv/cobranca/erocha/CARTAO/CL/MIS; PG_CYBER = /riscosbv/cobranca/jcarneiro/pagos_cyber; PRETER = /riscosbv/cobranca/preter; RAFAEL = /riscosbv/cobranca/ranapole
+DETECTED_MACROS_DEFINED: ONTEM, SAFRA_ATUAL
+DETECTED_MACROS_USED: ONTEM
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DBCON, PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOFATURA [BIGQUERY], CARNEIRO.CARTEIRA_CA [SAS/Local], MOVTO.PERF_AMIGAVEL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.FATURAS, WORK.FATURAS_B
+IMPORTED_LIBNAMES: CARNEIRO, MOVTO
+EXPORTED_LIBNAMES: CARNEIRO
+IMPORTED FILES (Requires Ingestion): /riscosbv/cobranca/jcarneiro/carteira_ca.sas7bdat
+TEMP/DISCARDED_TABLE_INPUT: WORK.FATURAS, WORK.FATURAS_B
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOFATURA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], CARNEIRO.CARTEIRA_CA [DATA Step - SET], CARNEIRO.CARTEIRA_COMPLETA [PROC SQL - FROM], MOVTO.PERF_AMIGAVEL [DATA Step - SET], WORK.FATURAS [PROC SQL - FROM], WORK.FATURAS_B [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /riscosbv/cobranca/jcarneiro/carteira_ca.sas7bdat
+INTERNAL READS (Temp/Local): CARNEIRO.CARTEIRA_COMPLETA
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CARNEIRO.CARTEIRA_COMPLETA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ATRASOS_CA, ATRASOS_CA_5DDA, CARTEIRA_CA, CARTEIRA_CA_B, CUBO_ENTRADA_5DDA, CUBO_ENTRADA_5DDA_PRODUTO, ENTRADA_COBRANCA, ENTRADA_COBRANCA_PRODUTO, ENVIO_ASS, FATURAMENTO, FATURAS, FATURAS_B, FATURA_1, PERF_AMG, PERF_AMIGAVEL_ENVIO_1, RESULTADO_ENTRADA_5DDA, WORK.QUERY_FOR_FATURAS, WORK.QUERY_FOR_FATURAS_B
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SAFRA_ATUAL=202502;
+%LET ONTEM=TODAY()-1;
+
+[[ FILE_REFS_MACRO ]]
+IN|/riscosbv/cobranca/jcarneiro/carteira_ca.sas7bdat|/RISCOSBV/COBRANCA/JCARNEIRO|CARTEIRA_CA.SAS7BDAT||suspeito
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: LIBNAME */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-UhnolyEwYrllQx95/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME ARTHUR 		BASE '/riscosbv/cobranca/aesteves';
+LIBNAME JOAO 		BASE '/riscosbv/cobranca/bsilva/';
+LIBNAME CUBO 		BASE '/riscosbv/cobranca/dpompei/cartao/CA';
+
+LIBNAME MOVTO 		BASE '/riscosbv/cobranca/erocha/CARTAO/MOVTO';
+LIBNAME CARD_ACR 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Relatorios_Acordos/Entrada/';
+LIBNAME CARD_BC 	BASE'/riscosbv/cobranca/ranapole/Cartoes/3040';
+
+LIBNAME CARD_CS 	BASE '/riscosbv/cobranca/ranapole/Cartoes/Modelagem';
+
+LIBNAME PERF_CL 	BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+
+LIBNAME GH16 		BASE '/riscosbv/cobranca/dpompei/cartao/GH16';
+
+LIBNAME EQUIPE3 	BASE '/riscosbvf/analytics/narciso/lucas/HACKATON_EQP3';
+
+LIBNAME CARNEIRO 	BASE '/riscosbv/cobranca/jcarneiro';
+
+LIBNAME EST_CART 	BASE '/riscosbv/cobranca/jcarneiro/estrategia_cartoes';
+
+LIBNAME PG_CYBER	BASE '/riscosbv/cobranca/jcarneiro/pagos_cyber';
+
+LIBNAME BA3040 		BASE '/riscosbv/cobranca/est_cartoes/3040';
+
+LIBNAME PRETER 		BASE '/riscosbv/cobranca/preter';
+
+LIBNAME PAGOSCBR 	BASE '/riscosbv/cobranca/jcarneiro/estrategia_cartoes/pagos_cyber';
+
+LIBNAME B_GERAL 	BASE '/riscosbv/cobranca/malmeida';
+
+LIBNAME RAFAEL	BASE '/riscosbv/cobranca/ranapole';
+
+%LET SAFRA_ATUAL = 202502;
+
+/* =========================FIM TASK=========================== */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Faturas */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Faturas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-jMz9Au4aWvJUKFf7/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS = must MAX_CHAR_LEN = 30);
+
+create table FATURAS as
+    select distinct
+	input(cddimcontacartao,best22.) as cddimcontacartao
+
+
+	,dtcortefatura
+	,dtvencimentofatura
+	,DtAtingimentoPagamentoMnmoFtra
+
+	,input(VrPagamentoConta,best12.) 	as VrPagamentoConta
+	,input(VrPagamentoFatura,best12.) 	as VrPagamentoFatura
+	,input(VrPagamentoMinimoFatura,best12.) 	as VrPagamentoMinimoFatura
+	,input(VrSaldoFatura,best12.) 	as VrSaldoFatura
+	,input(VrPagamentoFaturaAnterior,best12.) 	as VrPagamentoFaturaAnterior
+	,input(VrPagamentoMinimoFtraAntr,best12.) 	as VrPagamentoMinimoFtraAntr
+
+	,FlFaturaDesconsiderada
+
+	,input(VrLimiteContaCartaoGeral,best12.) 	as VrLimiteContaCartaoGeral
+
+    from connection to perm (
+	select distinct
+	CdDimContaCartao,
+	DtCorteFatura,
+	DtVencimentoFatura,
+	DtAtingimentoPagamentoMnmoFtra,
+	VrPagamentoConta,
+	VrPagamentoFatura,
+	VrPagamentoMinimoFatura,
+	VrSaldoFatura,
+	VrPagamentoFaturaAnterior,
+	VrPagamentoMinimoFtraAntr,
+	FlFaturaDesconsiderada,
+	VrLimiteContaCartaoGeral
+	from bv-pdbd-prd.trusted_dwbi_dmoc.tbfatofatura
+	where DtVencimentoFatura >= '2024-01-01'
+	);
+
+disconnect from perm;
+quit;
+
+DATA FATURAS_B;
+SET FATURAS;
+SAFRA = 100*YEAR(DtVencimentoFatura)+MONTH(DtVencimentoFatura);
+WHERE FlFaturaDesconsiderada = 'N';
+RUN;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DATA FATURAS;
+SET FATURAS;
+SAFRA = 100*YEAR(DtVencimentoFatura)+MONTH(DtVencimentoFatura);
+RUN;
+
+PROC SQL;
+CREATE TABLE FATURAS AS SELECT
+A.*,
+B.CONTADOR
+FROM FATURAS AS A LEFT JOIN
+(SELECT CdDimContaCartao, SAFRA, COUNT(*) AS CONTADOR
+FROM FATURAS GROUP BY CdDimContaCartao, SAFRA) AS B
+ON A.CdDimContaCartao = B.CdDimContaCartao AND A.SAFRA = B.SAFRA;
+QUIT;
+
+PROC FREQ
+DATA=FATURAS;
+TABLE SAFRA;RUN;
+
+DATA FATURAS;
+SET FATURAS;
+
+IF -VrPagamentoFaturaAnterior >= VrPagamentoMinimoFtraAntr THEN N_Fatura = 1;
+ELSE  N_Fatura = 2;
+
+IF DtVencimentoFatura	< MDY(04,15,2024) AND
+(DtVencimentoFatura < DtAtingimentoPagamentoMnmoFtra OR DtAtingimentoPagamentoMnmoFtra = .) THEN Fatura_Atraso = 1;
+ELSE Fatura_Atraso = 0;
+
+DIA_VCTO = DAY(DtVencimentoFatura);
+RUN;
+
+DATA FATURA_1;
+SET FATURAS;
+WHERE  N_Fatura = 1 and VrSaldoFatura > 0;
+RUN;
+
+PROC SQL;
+CREATE TABLE FATURA_1 AS SELECT
+A.*, B.CONTADOR FROM FATURA_1 A LEFT JOIN
+(SELECT SAFRA, CdDimContaCartao, COUNT(*) AS CONTADOR
+FROM FATURA_1 GROUP BY SAFRA, CdDimContaCartao) B
+ON A.SAFRA = B.SAFRA AND A.CdDimContaCartao = B.CdDimContaCartao;
+QUIT;
+
+PROC SQL;
+CREATE TABLE FATURAMENTO AS SELECT
+SAFRA,	FlFaturaDesconsiderada,
+COUNT(*) AS QUANTIDADE,
+SUM(VrSaldoFatura) AS VrSaldoFatura
+FROM FATURAS
+GROUP BY
+SAFRA,	FlFaturaDesconsiderada;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Faturas */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. Atrasos_CA */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. Atrasos_CA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hPt8o8IoAiEYuLhl/code.sas */
+/* =========================INÍCIO TASK========================= */
+x gunzip '/riscosbv/cobranca/jcarneiro/carteira_ca.sas7bdat.gz';
+
+%let ONTEM = TODAY()-1;
+
+DATA ATRASOS_CA;
+SET CARNEIRO.CARTEIRA_CA;
+
+WHERE DT_INICIO_ATRASO >= MDY(01,01,2023) AND PRODUTO <> 0;
+IF DT_RETIRADA - DT_INICIO_ATRASO >=6 OR (DT_RETIRADA = . AND &ONTEM. - DT_INICIO_ATRASO >=5) THEN FLAG_5 = 1; ELSE FLAG_5 = 0;
+
+IF COD_ASS_FIM = 1020 THEN FLAG_SUSPENSAO = 1;ELSE FLAG_SUSPENSAO = 0;
+
+IF DT_RETIRADA - DT_INICIO_ATRASO <=75 AND DT_RETIRADA <> . THEN DIAS_REG = DT_RETIRADA - DT_INICIO_ATRASO;
+ELSE DIAS_REG = .;
+RUN;
+
+PROC SORT DATA=ATRASOS_CA;
+BY DT_INICIO_ATRASO;
+RUN;
+
+DATA ATRASOS_CA_5DDA;
+SET ATRASOS_CA;
+WHERE FLAG_5 =1;
+RUN;
+
+PROC SORT DATA=ATRASOS_CA_5DDA;
+BY DT_INICIO_ATRASO;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. Atrasos_CA */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03. Entrada_Cobrança */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03. Entrada_Cobrança */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-avW1wxD3D53sujmo/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE ENTRADA_COBRANCA AS SELECT
+A.*,
+B.FLAG_5,
+100*YEAR(B.DT_INICIO_ATRASO+5)+MONTH(B.DT_INICIO_ATRASO+5) AS SAFRA_ENTRADA
+FROM FATURA_1 A
+LEFT JOIN
+ATRASOS_CA_5DDA B
+ON A.CDDIMCONTACARTAO = 1000000000*B.PRODUTO+B.NUCONTA AND
+
+A.DtVencimentoFatura = B.DT_INICIO_ATRASO;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_ENTRADA_5DDA AS SELECT
+SAFRA AS DATA_BASE,
+FLAG_5,
+SAFRA_ENTRADA,
+COUNT(*) AS Quantidade,
+SUM(VrSaldoFatura) AS VrSaldoFatura
+FROM ENTRADA_COBRANCA
+GROUP BY
+SAFRA, FLAG_5, SAFRA_ENTRADA;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RESULTADO_ENTRADA_5DDA AS SELECT
+A.DATA_BASE,
+(B.SALDO_ENTRADA/A.SALDO)*100 AS ENTRADA_COB FORMAT 10.2
+FROM
+
+(SELECT SAFRA AS DATA_BASE,
+SUM(VrSaldoFatura) AS SALDO
+FROM ENTRADA_COBRANCA
+GROUP BY
+SAFRA) A
+LEFT JOIN
+(SELECT SAFRA AS DATA_BASE,
+SUM(VrSaldoFatura) AS SALDO_ENTRADA
+FROM ENTRADA_COBRANCA
+WHERE FLAG_5 =1
+GROUP BY
+SAFRA) B
+
+ON A.DATA_BASE = B.DATA_BASE
+
+;
+QUIT;
+
+
+
+data entrada_cobranca_produto;
+set ENTRADA_COBRANCA;
+produto = substr(put(cddimcontacartao,z11.),1,2)*1;
+run;
+
+PROC SQL;
+CREATE TABLE CUBO_ENTRADA_5DDA_produto AS SELECT
+SAFRA AS DATA_BASE,
+FLAG_5,
+SAFRA_ENTRADA,
+produto,
+COUNT(*) AS Quantidade,
+SUM(VrSaldoFatura) AS VrSaldoFatura
+FROM entrada_cobranca_produto
+GROUP BY
+SAFRA, FLAG_5, SAFRA_ENTRADA, produto;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03. Entrada_Cobrança */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: IU_Carteira_Completa */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: IU_Carteira_Completa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Dymh5nNZKuTtqiMH/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE CARNEIRO.CARTEIRA_COMPLETA AS SELECT
+A.*, B.VrSaldoFatura, B.VrLimiteContaCartaoGeral
+FROM
+CARNEIRO.CARTEIRA_COMPLETA A LEFT JOIN
+FATURAS B
+ON
+b.CdDimContaCartao	= 1000000000*A.PRODUTO+A.NUCONTA
+AND A.DT_INICIO_ATRASO = B.DtVencimentoFatura;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: IU_Carteira_Completa */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-xYyiRFiASU5hbgWH/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET ONTEM = TODAY() -1;
+
+DATA CARTEIRA_CA;
+SET CARNEIRO.CARTEIRA_CA;
+WHERE SAFRA_ATR >= 202401;
+DIA_SEM = WEEKDAY(DT_RETIRADA);
+IF DT_ENQUAD = . OR DT_ENQUAD > DT_RETIRADA + 5 THEN DT_REG = DT_RETIRADA;
+ELSE IF DT_ENQUAD >= DT_RETIRADA - 5 AND  DT_ENQUAD <= DT_RETIRADA + 5 THEN DT_REG = .;
+FORMAT DT_REG DDMMYY10.;
+RUN;
+
+
+
+DATA PERF_AMG; SET MOVTO.PERF_AMIGAVEL;
+WHERE SAFRA >= MDY(01,01,2024) AND TPCLASSE = 'F';
+IF FX_ATRASO_NEW = 'FLUXO' THEN
+DT_ATRASO = DATEPART(DTENVIO_CYBER)-DIAS_ATRASO; FORMAT DT_ATRASO DDMMYY10.;
+ELSE
+DT_ATRASO = DT_INICIO_ATRASO;
+RUN;
+
+PROC SORT DATA = PERF_AMG NODUPKEY; BY NUCONTA PRODUTO DT_ATRASO ;RUN;
+
+DATA CARTEIRA_CA_B;
+SET CARTEIRA_CA;
+IF DT_RETIRADA - DT_INICIO_ATRASO >=6 OR (DT_RETIRADA = . AND &ONTEM. - DT_INICIO_ATRASO >=5) THEN FLAG_5 = 1; ELSE FLAG_5 = 0;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE PERF_AMIGAVEL_ENVIO_1 AS SELECT
+A.*,
+B.COD_aSSESS as ASSESSORIA FROM
+CARTEIRA_CA_B A
+LEFT JOIN PERF_AMG B
+ON A.NUCONTA = B.NUCONTA AND A.PRODUTO = B.PRODUTO AND A.DT_INICIO_ATRASO = B.DT_ATRASO;
+QUIT;
+
+PROC SQL;
+CREATE TABLE ENVIO_asS AS SELECT
+SAFRA_ATR, FLAG_5, ASSESSORIA,
+COUNT(*) AS QUANTIDADE,
+SUM(VLR_COB_INI) AS VALOR
+FROM PERF_AMIGAVEL_ENVIO_1
+GROUP BY SAFRA_ATR, FLAG_5, ASSESSORIA;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_FATURAS);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_FATURAS AS
+   SELECT 
+            (SUM(t1.VrSaldoFatura)) AS SUM_of_VrSaldoFatura
+      FROM WORK.FATURAS t1
+      WHERE t1.FlFaturaDesconsiderada = 'N';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE ENVIO_asS AS SELECT
+SAFRA_ATR, FLAG_5, ASSESSORIA,
+COUNT(*) AS QUANTIDADE,
+SUM(VLR_COB_INI) AS VALOR
+FROM PERF_AMIGAVEL_ENVIO_1
+GROUP BY SAFRA_ATR, FLAG_5, ASSESSORIA;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_FATURAS_B);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_FATURAS_B AS
+   SELECT 
+            (SUM(t1.VrSaldoFatura)) AS SUM_of_VrSaldoFatura
+      FROM WORK.FATURAS_B t1
+      WHERE t1.SAFRA = 202509;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */

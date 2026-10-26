@@ -1,0 +1,221 @@
+START_METADATA
+PROJECT: Rodas__contratacao_veiculos
+FILE_SAS: contratacao_veiculos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 156
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: dir_csv, dtexport, dtmerge, dtprop, dtprop_gcp, maxDtCto
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], BV-PDBD-PRD.TRUSTED_DBCNTF.TBTIPOMODELOPROPOSTA [BIGQUERY], DBCOR.TBSUBPRODUTO [DBCON], DBCRED.TBGRUPOSUBPRODUTO [DBCON], DBCRED.TBPROPOSTA [DBCON], DBCRED.TBSUBPRODUTOGRUPO [DBCON], DBPENDENCIA.TBDOCUMENTOCONTRATOPENDENCIA [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CONTRATO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_DBCNTF.TBTIPOMODELOPROPOSTA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], CONTRATO.PROPOSTA_ASSINATURA [PROC SQL - FROM], DBCOR.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCRED.TBGRUPOSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBCRED.TBSUBPRODUTOGRUPO [Pass-Through Native (DBCON) - JOIN], DBPENDENCIA.TBDOCUMENTOCONTRATOPENDENCIA [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): CONTRATO.PROPOSTA_ASSINATURA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CONTRATO.PROPOSTA_ASSINATURA
+APPEND_ONLY_OUTPUTS: CONTRATO.PROPOSTA_ASSINATURA
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CONTRATO.PROPOSTA_ASSINATURA
+EXPORTED FILES (Artifacts): &dir_csv./proposta_assinatura.csv
+TEMP/DISCARDED OUTPUTS: PRODUCAO, PROPOSTA_ASSINATURA, PROPOSTA_DOCUMENTACAO, TBEXPORT, TBTIPOMODELO_PROPOSTA, TPASSINATURA_NOVO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/*OPTIONS ERRORABEND;*/
+OPTIONS COMPRESS=BINARY REUSE=YES;
+
+%INCLUDE '/infogrc/utils/all-includes.sas';
+
+proc sql; select max(dtcontrato) format DATE9. into:maxDtCto from contrato.proposta_assinatura; run;
+
+data _null_;
+dtprop = intnx('month', "&maxDtCto."d, -2, 'beginning');
+dtmerge = intnx('month', "&maxDtCto."d, -1, 'beginning');
+dtprop_gcp = "'"||put(year(dtprop),4.)||"-"||put(month(dtprop),z2.)||"-"||put(day(dtprop),z2.)||"'";
+dtexport = intnx('month', today(), -6, 'beginning');
+
+CALL symputx('dtprop', put(dtprop,date9.));
+CALL symputx('dtmerge', put(dtmerge,date9.));
+CALL symputx('dtprop_gcp', dtprop_gcp);
+CALL symputx('dtexport', put(dtexport,date9.));
+run;
+
+%PUT &dtprop;
+%PUT &dtmerge;
+%PUT &dtprop_gcp;
+%PUT &dtexport;
+
+proc sql;create table producao as
+select
+	nuanomes,
+	nuproposta,
+	dtentradaproposta,
+	nmgrupoprodutometa,
+	nmareaestruturacomercial,
+	nmcanalestruturacomercial,
+	nmsubestruturacomercialA,
+	nmcolaborador,
+	catx(" - ",cdparceirocomercial,nmparceirocomercial) as nmparceirocomercial,
+	dsloginn1c,
+	dsloginn2c,
+	dsloginn3c,
+	nucontrato,
+	dtcontrato,
+	vrproducao
+from bases.tbproducao
+where dtcontrato >= "&dtmerge."d
+	and nmgrupoprodutometa in ("Leves", "Leves-BVO", "Motos", "Pesados", "CVG Leves", "CVG Pesados")
+;run;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage);
+create table tbtipomodelo_proposta as
+select
+	*
+	,case when cdtipomodelo = 1 then 'Web'
+		  	when cdtipomodelo = 10 then 'App'
+		  		when cdtipomodelo in (14,15)then 'Física'
+		  			else 'nd' end as tpassinatura
+from connection to perm(
+	select
+		 cast(NUPROPOSTA as numeric) as nuproposta
+		,cast(cdtipomodeloproposta as numeric) as cdtipomodeloproposta
+		,cast(DTINCLUSAO as datetime) as dtinclusao
+		,cast(dataescolhaassinatura as datetime) as dataescolhaassinatura
+		,cast(datafinalizacaoassinatura as datetime) as datafinalizacaoassinatura
+		,cast(CDMOTIVOCANCELAMENTOASSINATURA as string) as cdmotivocancelamentoassintura
+		,cast(CDTIPOMODELO as numeric) as cdtipomodelo
+		,cast(SGCANALOPCAOASSINATURA as string) AS dscanalassinatura
+	from bv-pdbd-prd.trusted_dbcntf.tbtipomodeloproposta
+	where cast(DTINCLUSAO as date) >= &dtprop_gcp
+);
+disconnect from perm;
+quit;
+
+proc sql;
+create table tpassinatura_novo as
+select
+	nuproposta,
+	tpassinaturalog,
+	fl_gapregistro
+from(
+	select
+		a.nuproposta,
+	/*	b.dtinclusao,*/
+	/*	c.dataescolhaassinatura as dataescolhaassinatura,*/
+		c.tpassinatura as tpassinaturalog,
+		case when d.datafinalizacaoassinatura > c.dataescolhaassinatura then 1 else . end as fl_assinou,
+		case when d.datafinalizacaoassinatura is not null and
+				  d.datafinalizacaoassinatura > c.dataescolhaassinatura  and
+				  d.datafinalizacaoassinatura <> c.datafinalizacaoassinatura then 1 else . end as fl_gapregistro
+	from(
+		select
+			nuproposta,
+			min(cdtipomodeloproposta) as cdtipomodeloproposta_min,
+			max(cdtipomodeloproposta) as cdtipomodeloproposta_max
+		from tbtipomodelo_proposta
+		group by 1
+		) a
+	left join tbtipomodelo_proposta b on a.cdtipomodeloproposta_min = b.cdtipomodeloproposta
+	left join tbtipomodelo_proposta c on a.cdtipomodeloproposta_max = c.cdtipomodeloproposta
+	left join (
+		select
+			nuproposta,
+			max(datafinalizacaoassinatura) as datafinalizacaoassinatura
+		from tbtipomodelo_proposta
+		where datafinalizacaoassinatura is not null
+		and cdmotivocancelamentoassintura is null
+		group by 1
+		) d on a.nuproposta = d.nuproposta
+)where fl_assinou = 1 or tpassinaturalog = "Física"
+;run;
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE proposta_documentacao AS SELECT * FROM CONNECTION TO DBCON (
+SELECT
+t1.NuProposta,
+/*t1.DtEntradaProposta,*/
+/*t1.StProposta,*/
+/*t2.DsSubProduto, */
+/*t5.NmGrupoSubProduto,*/
+CASE WHEN t3.CdDocumento in (161)	 THEN 'Eletrônica'
+	 WHEN t3.CdDocumento in (42,147) THEN 'Física'
+	 								 ELSE 'ND' END AS TpAssinaturadoc
+FROM DBCRED..TbProposta t1
+INNER JOIN DBCOR..TbSubProduto t2 ON t1.CdSubProduto = t2.CdSubProduto and t2.CdProduto = 12
+LEFT JOIN DBPENDENCIA..TbDocumentoContratoPendencia t3 ON t1.NuContratoGestao = t3.NuContrato AND t3.CdDocumento  IN (161,42,147)
+LEFT JOIN DBCRED..TbSubProdutoGrupo t4 ON t1.cdSubProduto = t4.cdsubproduto
+LEFT JOIN DBCRED..TbGrupoSubProduto t5 ON t4.CdGrupoSubProduto = t5.CdGrupoSubProduto
+WHERE  t1.StProposta IN ('AP')
+AND t1.DtEntradaProposta >= &dtprop_gcp
+)
+;QUIT;
+
+proc sql; create table proposta_assinatura as
+select
+	a.nuanomes,
+	a.dtentradaproposta,
+	a.nuproposta,
+	a.nmgrupoprodutometa,
+	a.nmareaestruturacomercial,
+	a.nmcanalestruturacomercial,
+	a.nmsubestruturacomercialA,
+	a.nmcolaborador,
+	a.nmparceirocomercial,
+	a.dsloginn1c,
+	a.dsloginn2c,
+	a.dsloginn3c,
+	a.nucontrato,
+	a.dtcontrato,
+	a.vrproducao,
+	COALESCE(b.tpassinaturadoc, "ND") as tpassinaturadoc,
+	COALESCE(c.tpassinaturalog, "ND") as tpassinaturalog,
+	c.fl_gapregistro
+from producao a
+left join proposta_documentacao b on a.nuproposta = b.nuproposta
+left join tpassinatura_novo c on a.nuproposta = c.nuproposta
+;run;
+
+proc sort data=proposta_assinatura NODUPKEY; by nucontrato; run;
+proc sql; delete from contrato.proposta_assinatura where dtcontrato >= "&dtmerge."d;run;
+proc sql; insert into contrato.proposta_assinatura select * from proposta_assinatura; run;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+proc sql; create table tbexport as select * from contrato.proposta_assinatura where dtcontrato >= "&dtexport."d ;run;
+
+PROC EXPORT
+DATA= tbexport
+FILE="&dir_csv./proposta_assinatura.csv" REPLACE
+DBMS=DLM;
+DELIMITER=';';
+RUN;

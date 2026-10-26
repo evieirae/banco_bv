@@ -1,0 +1,94 @@
+START_METADATA
+PROJECT: Rodas__cupons-solar
+FILE_SAS: 02-exportar-bases.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 92)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 34
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBCONTROLEUTILIZACAOCUPOM [SAS/Local], BASES.TBTABELASOLAR [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBCONTROLEUTILIZACAOCUPOM [PROC EXPORT - DATA=], BASES.TBTABELASOLAR [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/tmp/TbControleUtilizacaoCupom.csv, /riscosbvf/BA/processos/tmp/TbTabelaSolar.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/tmp/TbControleUtilizacaoCupom.csv, /riscosbvf/BA/processos/tmp/TbTabelaSolar.csv
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/tmp/TbControleUtilizacaoCupom.csv
+[CODE REF] /riscosbvf/BA/processos/tmp/TbTabelaSolar.csv
+
+END_METADATA
+================================================================================
+proc export
+data=BASES.TbControleUtilizacaoCupom
+file='/riscosbvf/BA/processos/tmp/TbControleUtilizacaoCupom.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/TbControleUtilizacaoCupom.csv /riscosbvf/BA/processos/output/';
+
+proc export
+data=BASES.TbTabelaSolar
+file='/riscosbvf/BA/processos/tmp/TbTabelaSolar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/TbTabelaSolar.csv /riscosbvf/BA/processos/output/';
+
+/* Envio de Email */
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+
+SUBJECT="Painel Cupons Solar | Fim da atualização";
+
+DATA _NULL_;
+	FILE MAIL;
+		PUT "Prezados,";
+		PUT ;
+		PUT "As bases de Cupons Solar foram atualizadas e estão disponíveis.";
+		PUT ;
+		PUT "Favor não responder este e-mail.";
+		PUT ;
+		PUT "Atenciosamente,";
+		PUT ;
+		PUT "Informações Gerenciais Estratégicas";
+		PUT ;
+RUN;
+*/

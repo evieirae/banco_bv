@@ -1,0 +1,263 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Lancar_Cotas
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:37 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -21
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 173
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: Base
+DETECTED_MACROS_USED: Base
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): PLANCTRL.BASE_SAIDA_SIC_AGO25 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CALCULO_SEGM
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Cotas\quebra_cotas.xlsx[SHEET='quebra']
+TEMP/DISCARDED_FILE_INPUT: WORK.quebra_cotas <- N:\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Cotas\quebra_cotas.xlsx[SHEET='quebra']
+TEMP/DISCARDED_TABLE_INPUT: WORK.AJUSTES, WORK.CALCULO_COTAS, WORK.CALCULO_SEGM, WORK.COTAS_SICSAIDA, WORK.DUPLICADOS, WORK.QUEBRA_COTAS, WORK.SEGMENTADO, WORK.ZERAR_DRE
+TABLE_READ_PROVENANCE (Flow): PLANCTRL.BASE_SAIDA_SIC_AGO25 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], WORK.AJUSTES [PROC SQL - FROM], WORK.CALCULO_COTAS [PROC SQL - FROM], WORK.CALCULO_SEGM [PROC SQL - FROM], WORK.COTAS_SICSAIDA [PROC SQL - FROM], WORK.DUPLICADOS [PROC SQL - FROM], WORK.QUEBRA_COTAS [PROC SQL - FROM], WORK.SEGMENTADO [PROC SQL - FROM; PROC SQL - JOIN], WORK.ZERAR_DRE [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CALCULO_SEGM, WORK.AJUSTES, WORK.CALCULO_COTAS, WORK.COTAS_ARQUIVO, WORK.COTAS_SICSAIDA, WORK.DUPLICADOS, WORK.OUTRAS_COTAS, WORK.SEGMENTADO, WORK.SEGMENTADO_MARGEM, WORK.ZERAR_DRE, _AGO25
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET Base=_AGO25;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DFRI\SPT. ALM. RI. P&C. Contas a Pagar\P&C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Cotas\quebra_cotas.xlsx[SHEET='quebra']||QUEBRA_COTAS.XLSX|C|ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Ajustes_Cotas */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Ajustes_Cotas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-4bPS5LHHm2IpTFGn/code.sas */
+/* =========================INÍCIO TASK========================= */
+%Let Base = _AGO25;
+
+proc sql;
+
+create table work.Cotas_SICSaida as
+select * from Planctrl.BASE_SAIDA_SIC&Base.
+where cdobjetonegociacao in ( select cota from work.quebra_cotas)
+and template_margem not like '%BOF%';
+
+create table Work.Zerar_DRE as
+select * from work.Cotas_SICSaida
+where template_margem in ('NAO EXPLICADO DRE', 'NAO EXPLICADO DRE TESOURARIA MANUAL', 'NAO EXPLICADO DRE CONCILIACAO');
+
+update Work.Zerar_DRE
+set template_margem = 'NAO EXPLICADO DRE';
+
+create table Work.Calculo_Cotas as
+select * from work.Cotas_SICSaida
+where template_margem not in ('NAO EXPLICADO DRE', 'NAO EXPLICADO DRE TESOURARIA MANUAL', 'NAO EXPLICADO DRE CONCILIACAO');
+
+update Work.Zerar_DRE
+set res_dia_gerencial_sas_brl = res_dia_gerencial_sas_brl*-1,
+    resultado_tesouraria_brl = resultado_tesouraria_brl*-1,
+    resultado_comercial_brl = resultado_comercial_brl*-1,
+    resultado_acionista_brl = resultado_acionista_brl*-1,
+	vrmesacaixa = vrmesacaixa*-1;
+
+update Work.Calculo_Cotas
+set res_dia_gerencial_sas_brl = res_dia_gerencial_sas_brl*-1,
+    resultado_tesouraria_brl = resultado_tesouraria_brl*-1,
+    resultado_comercial_brl = resultado_comercial_brl*-1,
+    resultado_acionista_brl = resultado_acionista_brl*-1,
+	vrmesacaixa = vrmesacaixa*-1;
+
+create table work.segmentado as
+select distinct cdobjetonegociacao, CdModalidade_Produto_SAS, CdSegmento_Mercado_SAS, Tipo_Contabil, anomes,  Chave_Unica,
+CdCliente, CdOfficer_SAS, CdDivisao_Comercial_SAS, CdGrupo_Comercial_SAS, CdGrupo_Economico_SAS,
+CdVeiculo, CdBook, cdGrupoConciliacao
+from Work.Calculo_Cotas
+where chave_unica not in ('')
+and origem = 'SIC'
+order by chave_unica;
+
+create table work.duplicados as
+select chave_unica, count(*) as qtd
+from work.segmentado
+group by chave_unica
+having count(*) > 1
+order by chave_unica;
+
+delete from work.segmentado
+where chave_unica in (select chave_unica from work.duplicados)
+and cdbook = 169;
+
+create table work.segmentado_margem as
+select distinct cdobjetonegociacao, CdModalidade_Produto_SAS, CdSegmento_Mercado_SAS, Tipo_Contabil, anomes,  Chave_Unica,
+CdCliente, CdOfficer_SAS, CdDivisao_Comercial_SAS, CdGrupo_Comercial_SAS, CdGrupo_Economico_SAS,
+CdVeiculo, CdBook, cdGrupoConciliacao
+from Work.Calculo_Cotas
+where chave_unica not in ('')
+and origem = 'Margem'
+and chave_unica not in (select chave_unica from segmentado);
+
+insert into work.segmentado
+select * from segmentado_margem;
+
+create table work.duplicados as
+select chave_unica, count(*) as qtd
+from work.segmentado
+group by chave_unica
+having count(*) > 1
+order by chave_unica;
+
+delete from work.segmentado
+where chave_unica in (select chave_unica from work.duplicados)
+and cdsegmento_mercado_sas = 8;
+
+create table work.duplicados as
+select chave_unica, count(*) as qtd
+from work.segmentado
+group by chave_unica
+having count(*) > 1
+order by chave_unica;
+
+create table Calculo_segm as
+select * 
+from quebra_cotas as q
+inner join work.segmentado as s
+on s.cdobjetonegociacao = q.cota;
+
+insert into Work.Calculo_Cotas (cdobjetonegociacao, res_dia_gerencial_sas_brl, resultado_tesouraria_brl,
+resultado_comercial_brl, resultado_acionista_brl, vrmesacaixa, CdModalidade_Produto_SAS, CdSegmento_Mercado_SAS, Tipo_Contabil,anomes, Chave_Unica,
+CdCliente, CdOfficer_SAS, CdDivisao_Comercial_SAS, CdGrupo_Comercial_SAS, CdGrupo_Economico_SAS,
+CdVeiculo, CdBook, cdGrupoConciliacao )
+select cota, contabil, tesouraria, comercial, acionista, mesacaixa, CdModalidade_Produto_SAS, CdSegmento_Mercado_SAS, Tipo_Contabil,anomes, Chave_Unica,
+CdCliente, CdOfficer_SAS, CdDivisao_Comercial_SAS, CdGrupo_Comercial_SAS, CdGrupo_Economico_SAS,
+CdVeiculo, CdBook, cdGrupoConciliacao
+from work.Calculo_segm;
+
+quit;
+
+
+Proc sql;
+
+create table work.Ajustes as
+select 2 as CdTipoAjuste, 2101 as CdTipoRealocacao, Template_Margem as DsJustificativaRealocacao, CdModalidade_Produto_SAS,
+CdComponente, CdSegmento_Mercado_SAS, Tipo_Contabil, anomes as DtReferencia,
+sum(resultado_tesouraria_brl) as resultado_tesouraria_brl, sum(resultado_comercial_brl) as resultado_comercial_brl,
+sum(resultado_acionista_brl) as resultado_acionista_brl, 0 as VrResultadoComercialPrivate, sum(VrMesaCaixa) as VrMesaCaixa,
+0 as ResultadoMora, 0 as ResultadoMulta, 0 as RiscoAlocado,
+Chave_Unica, CdCliente, max(CdOfficer_SAS) as CdOfficer_SAS, max(CdDivisao_Comercial_SAS) as CdDivisao_Comercial_SAS, max(CdGrupo_Comercial_SAS) as CdGrupo_Comercial_SAS,
+max(CdGrupo_Economico_SAS) as CdGrupo_Economico_SAS, '' as CdRegional, CdVeiculo, '' as CdContaContabil, CdBook, cdGrupoConciliacao, 'Não' as Segmentar
+from  Work.Zerar_DRE
+group by Template_Margem, CdModalidade_Produto_SAS, cdComponente, CdSegmento_Mercado_SAS, Tipo_Contabil,
+anomes, Chave_Unica, CdCliente, CdVeiculo, CdBook, cdGrupoConciliacao;
+
+insert into work.Ajustes
+select 2 as CdTipoAjuste, 2082 as CdTipoRealocacao, 'CORRECAO RESULTADO COTAS FIDC' as DsJustificativaRealocacao, CdModalidade_Produto_SAS,
+CdComponente, CdSegmento_Mercado_SAS, Tipo_Contabil, anomes as DtReferencia,
+sum(resultado_tesouraria_brl) as resultado_tesouraria_brl, sum(resultado_comercial_brl) as resultado_comercial_brl,
+sum(resultado_acionista_brl) as resultado_acionista_brl, 0 as VrResultadoComercialPrivate, sum(VrMesaCaixa) as VrMesaCaixa,
+0 as ResultadoMora, 0 as ResultadoMulta, 0 as RiscoAlocado,
+Chave_Unica, CdCliente, max(CdOfficer_SAS) as CdOfficer_SAS, max(CdDivisao_Comercial_SAS) as CdDivisao_Comercial_SAS, max(CdGrupo_Comercial_SAS) as CdGrupo_Comercial_SAS,
+max(CdGrupo_Economico_SAS) as CdGrupo_Economico_SAS, '' as CdRegional, CdVeiculo, '' as CdContaContabil, CdBook, cdGrupoConciliacao, 'Não' as Segmentar
+from  Work.Calculo_Cotas
+group by CdModalidade_Produto_SAS, cdComponente, CdSegmento_Mercado_SAS, Tipo_Contabil,
+anomes, Chave_Unica, CdCliente, CdVeiculo, CdBook, cdGrupoConciliacao;
+
+delete from work.Ajustes
+where abs(resultado_tesouraria_brl) < 0.2
+and abs(resultado_comercial_brl) < 0.2
+and abs(resultado_acionista_brl) < 0.2
+and abs(VrMesaCaixa) < 0.2;
+
+quit;
+
+proc sql;
+
+drop table work.Zerar_DRE;
+drop table work.Calculo_Cotas;
+drop table work.Calculo_segm;
+drop table work.segmentado;
+drop table work.segmentado_margem;
+drop table work.Cotas_SICSaida;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Ajustes_Cotas */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Batimento_cotas */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Batimento_cotas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-B3m4CmZVhhP1UI8H/code.sas */
+/* =========================INÍCIO TASK========================= */
+%Let Base = _AGO25;
+
+proc sql;
+
+Create Table work.cotas_arquivo as
+select anomes, chave_unica, cdobjetonegociacao, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cliente, cdbook, book, cdsegmento_mercado_sas, segmento_mercado_sas,
+ cdveiculo, template_margem, sum(carteira_contabil_brl) as carteira_contabil_brl,
+sum(saldo_notional_brl) as saldo_notional_brl, sum(res_dia_gerencial_sas_brl) as resultadocontabil,
+sum(resultado_tesouraria_brl) as resultado_tesouraria_brl, sum(resultado_comercial_brl) as resultado_comercial_brl, sum(resultado_acionista_brl) as resultado_acionista_brl,
+sum(vrmesacaixa) as vrmesacaixa, versao
+from planctrl.BASE_SAIDA_SIC&Base.
+where cdobjetonegociacao in ( select cota from work.quebra_cotas )
+group by anomes, chave_unica, cdobjetonegociacao, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cliente, cdbook, book, cdsegmento_mercado_sas, segmento_mercado_sas,
+ cdveiculo, template_margem, versao
+order by cdobjetonegociacao;
+
+quit;
+
+proc sql;
+
+Create Table work.outras_cotas as
+select anomes, chave_unica, cdobjetonegociacao, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cliente, cdbook, book, cdsegmento_mercado_sas, segmento_mercado_sas,
+ cdveiculo, template_margem, sum(carteira_contabil_brl) as carteira_contabil_brl,
+sum(saldo_notional_brl) as saldo_notional_brl, sum(res_dia_gerencial_sas_brl) as resultadocontabil,
+sum(resultado_tesouraria_brl) as resultado_tesouraria_brl, sum(resultado_comercial_brl) as resultado_comercial_brl, sum(resultado_acionista_brl) as resultado_acionista_brl,
+sum(vrmesacaixa) as vrmesacaixa, versao
+from planctrl.BASE_SAIDA_SIC&Base.
+where cdobjetonegociacao not in ( select cota from work.quebra_cotas )
+and cdmodalidade_produto_sas in (211)
+group by anomes, chave_unica, cdobjetonegociacao, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cliente, cdbook, book, cdsegmento_mercado_sas, segmento_mercado_sas,
+ cdveiculo, template_margem, versao
+order by cdobjetonegociacao;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Batimento_cotas */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

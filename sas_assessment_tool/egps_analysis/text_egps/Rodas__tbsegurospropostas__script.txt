@@ -1,0 +1,129 @@
+START_METADATA
+PROJECT: Rodas__tbsegurospropostas
+FILE_SAS: script.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 70
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: a0, a1, iqA1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DBA.TBPROPOSTA [DBCON], DBCRED.TBPROPOSTASEGURO [DBCON], TMP.TBORIGINACAO&A0 [SAS/Local], TMP.TBORIGINACAO&A1 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: AUXL, BASES
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tboriginacao&amp;a0..sas7bdat
+TABLE_READ_PROVENANCE (Flow): DBA.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBCRED.TBPROPOSTASEGURO [Pass-Through Native (DBCON) - JOIN], TMP.TBORIGINACAO&A0 [DATA Step - SET], TMP.TBORIGINACAO&A1 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tboriginacao&amp;a0..sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUXL.TBSEGUROSPROPOSTAS, BASES.TBSEGUROSPROPOSTAS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ORIGINACAO, TBORIGINACAOSEGUROS, TBSEGUROSPROPOSTAS, TBSEGUROSPROPOSTAS001
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{A0}, TMP.TBORIGINACAO{A1}, {A0}.SAS7BDAT
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/data/bases/tmp/tboriginacao&amp;a0..sas7bdat
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE TbSegurosPropostas001 AS SELECT * FROM connection to dbcon (
+  SELECT
+    A.NuProposta,
+    B.CdTipoSeguro,
+    B.VrSeguro
+  FROM
+    DBA.TbProposta A
+  INNER JOIN
+    DBCRED.TbPropostaSeguro B
+    ON A.NuProposta = B.NuProposta
+  WHERE
+    A.DtEntradaProposta >= &iqA1.
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE TbSegurosPropostas AS
+  SELECT
+    NuProposta,
+    MAX(CASE WHEN CdTipoSeguro = 1 THEN 1 ELSE 0 END) AS FlAuto,
+    MAX(CASE WHEN CdTipoSeguro = 2 THEN 1 ELSE 0 END) AS FlSPF,
+    MAX(CASE WHEN CdTipoSeguro = 3 THEN 1 ELSE 0 END) AS FlCap,
+    MAX(CASE WHEN CdTipoSeguro = 4 THEN 1 ELSE 0 END) AS FlImobiliario,
+    MAX(CASE WHEN CdTipoSeguro = 5 THEN 1 ELSE 0 END) AS FlSeguroVida,
+    SUM(CASE WHEN CdTipoSeguro = 1 THEN VrSeguro END) AS VrAuto,
+    SUM(CASE WHEN CdTipoSeguro = 2 THEN VrSeguro END) AS VrSPF,
+    SUM(CASE WHEN CdTipoSeguro = 3 THEN VrSeguro END) AS VrCap,
+    SUM(CASE WHEN CdTipoSeguro = 4 THEN VrSeguro END) AS VrImobiliario,
+    SUM(CASE WHEN CdTipoSeguro = 5 THEN VrSeguro END) AS VrSeguroVida
+  FROM
+    TbSegurosPropostas001
+  GROUP BY 1;
+RUN;
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tboriginacao&a0..sas7bdat,12,300);
+
+DATA Originacao;
+SET TMP.TbOriginacao&a1. - TMP.TbOriginacao&a0.;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbOriginacaoSeguros AS
+  SELECT
+    A.NuAnoMes,
+    A.NuProposta,
+    A.DtEntradaProposta,
+    A.NmGrupoProdutoMeta,
+    COALESCE(B.FlAuto,0) AS FlAuto,
+    COALESCE(B.FlSPF,0) AS FlSPF,
+    COALESCE(B.FlCap,0) AS FlCap,
+    COALESCE(B.FlImobiliario,0) AS FlImobiliario,
+    COALESCE(B.FlSeguroVida,0) AS FlSeguroVida,
+    COALESCE(B.VrAuto,0) AS VrAuto,
+    COALESCE(B.VrSPF,0) AS VrSPF,
+    COALESCE(B.VrCap,0) AS VrCap,
+    COALESCE(B.VrImobiliario,0) AS VrImobiliario,
+    COALESCE(B.VrSeguroVida,0) AS VrSeguroVida
+  FROM
+    Originacao A
+  LEFT JOIN
+    TbSegurosPropostas B
+    ON A.NuProposta = B.NuProposta;
+RUN;
+
+options compress=yes;
+DATA AUXL.TbSegurosPropostas;
+SET TbOriginacaoSeguros;
+RUN;
+
+options compress=yes;
+DATA bases.TbSegurosPropostas;
+SET TbOriginacaoSeguros;
+RUN;

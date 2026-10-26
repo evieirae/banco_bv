@@ -1,0 +1,240 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_TbEnvioBvia
+FILE_SAS: TbEnvioBvia.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 8
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 161
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: AnoMes, dir_csv, dt_atu, safraM0
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.CARTEIRANAPISTAPRODUTOS [SAS/Local], BASEGRC.TBMETANAOISONOMICANAPISTA [SAS/Local], BASEGRC.TBPORTEPDV [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBENCARTCOMERCIAL
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBENCARTCOMERCIAL
+TABLE_READ_PROVENANCE (Flow): BASEGRC.CARTEIRANAPISTAPRODUTOS [PROC SQL - FROM], BASEGRC.CARTEIRA_META_BVIA [PROC EXPORT - DATA=], BASEGRC.TBMETANAOISONOMICANAPISTA [PROC SQL - FROM], BASEGRC.TBPORTEPDV [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM], WORK.TBENCARTCOMERCIAL [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/tmp/carteira_meta_bvia_&amp;AnoMes..csv
+INTERNAL READS (Temp/Local): BASEGRC.CARTEIRA_META_BVIA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.CARTEIRA_META_BVIA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./encarteiramento_comercial_&dt_atu..csv, &dir_csv./parceiroPorteClassificacao_&dt_atu..csv, /riscosbvf/BA/processos/tmp/carteira_meta_bvia_&AnoMes..csv
+TEMP/DISCARDED OUTPUTS: PARCEIROCOMERCIALPORTE, PARCEIROPORTECLASSIFICACAO, TBENCARTCOMERCIAL, TBENCARTCOMERCIAL1, TBENCARTCOMERCIAL2, TBNAPISTAMETAGF, TBNAPISTAMETAGR
+DYNAMIC REFS (Ambiguous): {ANOMES}.CSV, {DT_ATU}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 1, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/carteira_meta_bvia_&amp;AnoMes..csv
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+/* ================================================================================================= */
+/* ============ ARQUIVO DE METAS NÃO ISONÔMICAS POR COLABORADOR - ENVIO BVIA ======================= */
+/* ================================================================================================= */
+
+PROC SQL;
+CREATE TABLE TbNaPistaMetaGr AS
+SELECT
+	     NuAnoMes
+		,CdColaborador
+		,CdFilial
+		,SUM(VrProducao) AS Meta
+FROM basegrc.TbMetaNaoIsonomicaNaPista
+WHERE DsLoginN1 IS NOT NULL
+AND NuAnoMes >= &safraM0.
+GROUP BY  1,2,3
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbNaPistaMetaGF AS
+SELECT
+	     NaPista.NuAnoMes
+		,Colaborador.CdColaboradorAtivoN2A AS CdColaborador
+		,NaPista.CdFilial
+		,SUM(NaPista.VrProducao) as Meta
+FROM basegrc.TbMetaNaoIsonomicaNaPista NaPista
+	LEFT JOIN bases.TbEstruturaComercial Colaborador
+		ON NaPista.DsLoginN2A = Colaborador.DsLoginN2A
+		AND NaPista.NuAnoMes = Colaborador.NuAnoMes
+		AND Colaborador.NmCanalEstruturaComercial = 'Canal Veiculos'
+		AND Colaborador.NmGrupoCargo = 'Gerente Filial Veiculos'
+		AND Colaborador.NmNivel = 'N2'
+WHERE NaPista.DsLoginN1 IS NOT NULL
+AND NaPista.NuAnoMes >= &safraM0.
+GROUP BY 1,2,3
+;RUN;
+
+data basegrc.carteira_meta_bvia;
+set TbNaPistaMetaGF
+	TbNaPistaMetaGr;
+;run;
+data  _null_;
+
+     call symput('AnoMes',compress(put(today(),yymmdd10.),"-"));
+run;
+
+%put &AnoMes.;
+
+proc export
+data=basegrc.carteira_meta_bvia
+file="/riscosbvf/BA/processos/tmp/carteira_meta_bvia_&AnoMes..csv" replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  '/riscosbvf/BA/processos/tmp/carteira_meta_bvia_&AnoMes..csv' /riscosbvf/BA/processos/output/ ";
+
+/* ======================================================== */
+/* ============ Porte PDV - ENVIO BVIA ==================== */
+/* ======================================================== */
+
+/*%LET 	dir_csv = /infogrc/parceiroPorteClassificacao/csv;*/
+%LET 	dir_csv =/riscosbvf/BA/processos/output;
+
+data _null_;
+	dt_atu = today();
+	call symputx('dt_atu',put(dt_atu,YYMMDDN.));
+run;
+
+%put &dt_atu.;
+
+PROC SQL;
+CREATE TABLE ParceiroComercialPorte AS
+SELECT
+		TbParceiroComercial.CdParceiroComercial
+		,TbParceiroComercial.NmParceiroComercial
+		,TbParceiroComercial.CdFilialC
+		,TbParceiroComercial.NmFilialC
+		,TbParceiroComercial.CdAreaEstruturaComercialC
+		,TbParceiroComercial.NmAreaEstruturaComercialC
+		,TbParceiroComercial.NmSubEstruturaComercialC
+		,TbParceiroComercial.NmCanalEstruturaComercialC
+		,CASE WHEN TbParceiroComercial.NmAreaEstruturaComercialC = 'Canal Motos' then PortePDV.FlPorteNovoMotos
+		else PortePDV.FlPorteA end as FlPorteA
+		,TbParceiroComercial.DsLoginN2C
+		,TbParceiroComercial.DsLoginN3C
+		,TbParceiroComercial.LstSubstituicaoC
+		,TbParceiroComercial.PredominanciaProduto
+FROM tmp.TbParceiroComercial TbParceiroComercial
+	LEFT JOIN basegrc.TbPortepdv PortePDV
+		ON TbParceiroComercial.NuCnpjLoja = PortePDV.NuCnpjLoja
+		AND PortePDV.NuAno = year(today())
+WHERE FlAtivo = 'S'
+;run;
+
+proc sql ;
+CREATE TABLE parceiroPorteClassificacao AS
+SELECT
+				CdParceiroComercial
+				,coalesce(FlPorteA,'Sem porte informado') as FlPorteA
+		                ,PredominanciaProduto
+
+				,"" AS DsClassificacaoA
+FROM ParceiroComercialPorte
+;run;
+
+/*NOTE: Table WORK.PARCEIROPORTECLASSIFICACAO created, with 27.007 rows and 3 columns.*/
+/*real time           13.96 seconds*/
+
+PROC EXPORT
+DATA= parceiroPorteClassificacao
+FILE="&dir_csv./parceiroPorteClassificacao_&dt_atu..csv" REPLACE
+DBMS=DLM;
+DELIMITER=';';
+RUN;
+
+/* ======================================================== */
+/* =========== Encarteiramento - ENVIO BVIA =============== */
+/* ======================================================== */
+
+proc sql;
+CREATE TABLE TbEncartComercial1 AS
+SELECT
+		  ni.NuAnoMes
+		, ni.Produto                  as Produto
+		, ''                          as StVeiculo
+		, ni.CdColaborador            as CdColaborador
+		, ni.CdFilial                 as CdFilial
+		, ni.NmAreaEstruturaComercial as NmAreaEstruturaComercial
+		, ni.DsLoginN1                as DsLoginN1
+		, ni.DsLoginN2A               as DsLoginN2A
+		, ni.DsLoginN3A               as DsLoginN3A
+		, ni.LstSubstituicao          as LstSubstituicao
+		, ni.CdParceiroComercial      as CdParceiroComercial
+		, pc.NuCnpjLoja               as NuCnpjLoja
+
+FROM basegrc.TbMetaNaoIsonomicaNaPista ni
+	LEFT JOIN bases.tbparceirocomercial pc
+		ON pc.CdParceiroComercial = ni.CdParceiroComercial
+WHERE ni.nuanomes >= &safraM0.
+AND UPCASE(ni.Produto) ='NAPISTA'
+ORDER BY ni.NuAnoMes, ni.CdColaborador
+;run;
+
+proc sql;
+CREATE TABLE TbEncartComercial2 as
+SELECT
+		  ni.NuAnoMes                 as NuAnoMes
+		, ''                          as Produto
+		, ''                          as StVeiculo
+		, ni.CdColaborador            as CdColaborador
+		, ni.CdFilial                 as CdFilial
+		, ni.NmAreaEstruturaComercial as NmAreaEstruturaComercial
+		, ni.DsLoginN1                as DsLoginN1
+		, ni.DsLoginN2A               as DsLoginN2A
+		, ni.DsLoginN3A               as DsLoginN3A
+		, ni.LstSubstituicao          as LstSubstituicao
+		, ni.CdParceiroComercial      as CdParceiroComercial
+		, pc.NuCnpjLoja               as NuCnpjLoja
+FROM basegrc.CarteiraNaPistaProdutos ni
+	LEFT JOIN bases.tbparceirocomercial pc
+		ON pc.CdParceiroComercial = ni.CdParceiroComercial
+WHERE ni.nuanomes >= &safraM0.
+AND ni.CdColaborador is not null
+ORDER BY ni.NuAnoMes, ni.CdColaborador
+;RUN;
+
+data TBENCARTCOMERCIAL;
+set TbEncartComercial1
+    TbEncartComercial2;run;
+/*proc sort data=TBENCARTCOMERCIAL nodupkey; by CdParceiroComercial;run;*/
+
+PROC EXPORT
+DATA= work.TBENCARTCOMERCIAL
+FILE="&dir_csv./encarteiramento_comercial_&dt_atu..csv" REPLACE
+DBMS=DLM;
+DELIMITER=';';
+RUN;

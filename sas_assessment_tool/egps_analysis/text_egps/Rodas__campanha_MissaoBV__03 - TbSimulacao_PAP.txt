@@ -1,0 +1,113 @@
+START_METADATA
+PROJECT: Rodas__campanha_MissaoBV
+FILE_SAS: 03 - TbSimulacao_PAP.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 52
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CMBV = /infogrc/Campanha_MissaoBV; CMBV_BKP = /infogrc/Campanha_MissaoBV/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes, Max_TbSimulacao_PAP
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.MAX_DATA, WORK.TBSIMULACAORESUMO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CMBV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.MAX_DATA, WORK.TBSIMULACAORESUMO, WORK.TBSIMULACAORESUMO_1
+TABLE_READ_PROVENANCE (Flow): CMBV.TBSIMULACAO_PAP [PROC SQL - FROM], CONVSIMU.TBSIMULACOES [DATA Step - SET], WORK.MAX_DATA [DATA Step - SET], WORK.TBSIMULACAORESUMO [DATA Step - SET], WORK.TBSIMULACAORESUMO_1 [PROC APPEND - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): CMBV.TBSIMULACAO_PAP
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CMBV.TBSIMULACAO_PAP
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CMBV.TBSIMULACAO_PAP
+APPEND_ONLY_OUTPUTS: CMBV.TBSIMULACAO_PAP
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CMBV.TBSIMULACAO_PAP
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: MAX_DATA, TBSIMULACAORESUMO, TBSIMULACOES, TBSIMULACOES_FINAL, WORK.TBSIMULACAORESUMO_1
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CMBV '/infogrc/Campanha_MissaoBV';
+LIBNAME CMBV_BKP '/infogrc/Campanha_MissaoBV/Bases_BKP';
+
+Data TbSimulacoes (Keep=NuAnoMes Produto Canal dsloginn1 SistemaInicial FlSimuValida FlSimuValidaEfet FlPAp Flconversao FlPropostaOriginada FlPropostaEfetivada Mensageria);
+Set convsimu.TbSimulacoes (Where=(NuAnoMes between 202510 AND 202512))
+;run;
+
+Data TbSimulacoes_Final;
+Set TbSimulacoes (Where=(Produto IN('Leves')
+						 AND Canal IN ('MULTIMARCAS','CONCESSIONARIAS','LOJA CANAL NEGOCIOS')
+						 AND Mensageria in ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%','7. Plano Aprovado',
+							 				'0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+						 AND SistemaInicial = 'PPAR'
+						 and FlSimuValidaEfet = 1
+						 and FlPAp = 'Sim'
+))
+;run;
+
+proc sql;
+create table TbSimulacaoResumo as
+select distinct
+nuanomes,
+dsloginn1,
+Sum(Flconversao) as Convertidas,
+Sum(FlPropostaEfetivada) as FlPropostaEfetivada
+/*sum(FlPropostaOriginada) as FlPropostaOriginada*/
+from TbSimulacoes_Final
+where  1=1
+group by 1,2
+;run;
+
+/*DATA CMBV.TbSimulacao_PAP;*/
+/*SET WORK.TbSimulacaoResumo;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_TbSimulacao_PAP
+FROM CMBV.TbSimulacao_PAP
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_TbSimulacao_PAP',Max_TbSimulacao_PAP);
+;run;
+%PUT &Max_TbSimulacao_PAP;
+
+PROC SQL;
+DELETE FROM CMBV.TbSimulacao_PAP
+WHERE NUANOMES = &Max_TbSimulacao_PAP.;
+;RUN;
+
+DATA WORK.TbSimulacaoResumo_1;
+SET WORK.TbSimulacaoResumo;
+WHERE NuAnoMes = &Base_Mes.;
+;RUN;
+
+PROC APPEND BASE=CMBV.TbSimulacao_PAP DATA=WORK.TbSimulacaoResumo_1;RUN;

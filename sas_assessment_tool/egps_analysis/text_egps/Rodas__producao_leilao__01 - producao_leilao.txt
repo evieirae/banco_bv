@@ -1,0 +1,278 @@
+START_METADATA
+PROJECT: Rodas__producao_leilao
+FILE_SAS: 01 - producao_leilao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -2
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (1x | +20), FILENAME  (2x | +24)
+----------------------------------------
+LINES_OF_CODE: 190
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: Dia
+DETECTED_MACROS_USED: Dia, QtdPropostas
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], DBCONSULTAINFORMACAOBEM.TBRETORNOBASELEILAO [DBCON], TMP.TBEXTPROPOSTA [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.PRODUCAOLEILAO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.PRODUCAOLEILAO
+TABLE_READ_PROVENANCE (Flow): BASES.TBEXTCONTRATO [PROC SQL - JOIN], DBCONSULTAINFORMACAOBEM.TBRETORNOBASELEILAO [Pass-Through Native (DBCON) - FROM], TMP.TBEXTPROPOSTA [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - JOIN], WORK.PRODUCAOLEILAO [PROC EXPORT - DATA=; PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/producao_leilao/Base/ProducaoLeilao.csv, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBBASELEILAO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /infogrc/producao_leilao/Base/ProducaoLeilao.csv
+TEMP/DISCARDED OUTPUTS: PRODUCAOLEILAO, PROPOSTASAP, TBBASELEILAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/producao_leilao/Base/ProducaoLeilao.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/*============================================================================================*/
+/* Programa: ProducaoLeilao.sas                                                  			  */
+/* Autor:    Gustavo Domingues - IGE		  		                                          */
+/* Versão:   001																			  */
+/* Dta: 09/03/2023                 															  */
+/*============================================================================================*/
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: Considerado o sucatemaneto do último leilao */
+/* Dta: 31/03/2023                 															  */
+/*============================================================================================*/
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: Considerado o sucatemaneto do últ leilao e menor tipo em caso de msma dtLeialo  */
+/* Dta: 26/04/2023                 															  */
+/*============================================================================================*/
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: Alterado destinatarios do envio quando houver casos fora da regra  			  */
+/* Dta: 11/05/2023                 															  */
+/*============================================================================================*/
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: retirado filtro de filiais										  			  */
+/* Dta: 29/08/2023                															  */
+/*============================================================================================*/
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: incluido macro de conexao da base de leilao						  			  */
+/* Dta: 04/09/2023                															  */
+/*============================================================================================*/
+/* Resp:    Gustavo Domingues - IGE		  		                                          	  */
+/* Alteraçao: retirado casos com Pcentradamolicar = .						  			  */
+/* Dta: 02/10/2023                															  */
+/*============================================================================================*/
+
+/*********************************************/
+/* LibName e parametros 					*/
+/*********************************************/
+
+%include '/infogrc/utils/all-includes.sas';
+
+/*********************************************/
+/* Declara varial de dia da semana */
+/*********************************************/
+
+%let Dia = Case when weekday (today()) = 2 then 3 else 1 end ;
+
+/*************************************************/
+/* Monta base de prospotas com devidos criterios */
+/*************************************************/
+
+proc sql;
+create table PropostasAP as
+select
+epro.Nuproposta,
+epro.Nuchassis,
+Ext.DsPlaca,
+epro.PcEntradaMolicar,
+Prod.DtContrato as DtContrato,
+Prod.NmAreaEstruturaComercial,
+Prod.NmSubEstruturaComercialA,
+coalesce(Prod.DsLoginN1,Prod.DsLoginN1C) 	as GR,
+coalesce(coalesce(Prod.DsLoginN2A,Prod.DsLoginN2C),Prod.DsLoginN2H) as GF,
+coalesce(coalesce(Prod.DsLoginN3A,Prod.DsLoginN3C),,Prod.DsLoginN3H)	as GER
+from tmp.TBEXTPROPOSTA  as epro
+	inner join bases.TbExtContrato as Ext
+			on ext.Nuproposta = epro.Nuproposta
+
+	left join tmp.TBPRODUCAO as Prod
+			on Prod.Nuproposta = epro.Nuproposta
+
+WHere 1=1
+and prod.DtContrato between Today()-&Dia. and Today()
+/*and epro.Nuanomes = 202303*/
+and epro.stproposta = "AP"
+and epro.PcEntradaMolicar < 30
+and epro.PcEntradaMolicar <> .
+and prod.NmGrupoProdutoMeta in ('Leves','Motos','Pesados')
+/*and Prod.NmAreaEstruturaComercial in (	'Canal ABC','Canal Bauru','Canal Cascavel','Canal Curitiba I',*/
+/*										'Canal Curitiba II','Canal Goiânia','Canal Londrina',*/
+/*										'Canal Rio de Janeiro II','Canal Salvador',	*/
+/*										'Canal S J Campos','Canal Tatuapé','Canal Varginha')*/
+
+/*and epro.nuproposta = 271654897*/
+;run;
+
+/*********************************************/
+/* Monta base de Leilão */
+/*********************************************/
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=CRE);
+CREATE TABLE TbBaseLeilao AS
+SELECT * FROM connection to dbcon
+(
+SELECT distinct
+				  TbRetornoBaseLeilao.DsChassi
+				 ,TbRetornoBaseLeilao.DtRetorno as DtRetorno
+				 ,TbRetornoBaseLeilao.DtLeilao as DtLeilao
+				 ,TbRetornoBaseLeilao.TpSucateamento as TpSucateamento
+			FROM DbConsultaInformacaoBem..TbRetornoBaseLeilao TbRetornoBaseLeilao
+/*			where DsChassi = '9BWAA05ZXA4120896'*/
+						order by TbRetornoBaseLeilao.DtLeilao desc , TbRetornoBaseLeilao.TpSucateamento
+
+);quit;
+
+	PROC SORT DATA=TbBaseLeilao NODUPKEY;
+BY DsChassi;
+RUN;
+
+data basegrc.TbBaseLeilao ;
+set TbBaseLeilao
+;run;
+
+/*********************************************/
+/* Monta base final */
+/*********************************************/
+
+proc sql;
+create table ProducaoLeilao as
+select  distinct
+	 Pr.nuproposta
+	,Bl.TpSucateamento
+	,Bl.DtRetorno as DTConsulta
+	,Bl.DtLeilao
+	,Pr.DtContrato
+	,Pr.NmAreaEstruturaComercial
+	,Pr.NmSubEstruturaComercialA
+	,Pr.DsPlaca
+	,Pr.NuChassis
+	,catt(put(Pr.PcEntradaMolicar,2.),'%') as PcEntradaMolicar
+	,GR
+	,GF
+	,GER
+from PropostasAP as Pr
+	inner join TbBaseLeilao as BL
+		on	Pr.NuChassis = bl.DsChassi
+where 1=1
+and	Bl.TpSucateamento in (4,5)
+/*and	Bl.TpSucateamento in (9)*/
+order by GER, GF, GR
+/*and month (Bl.DtRetorno) = 10 and year (Bl.DtRetorno) = 2022*/
+;run;
+
+/*********************************************/
+/* Exporta CSV para anexar ao emial */
+/*********************************************/
+
+PROC EXPORT
+        DATA=work.ProducaoLeilao
+        OUTFILE= "/infogrc/producao_leilao/Base/ProducaoLeilao.csv"
+        DBMS=DLM
+        REPLACE;
+        DELIMITER=";";
+        PUTNAMES=YES;
+RUN;
+
+/*********************************************/
+/* Variavel para condição de envio de email */
+/*********************************************/
+
+PROC SQL;SELECT COUNT(NuProposta) INTO :QtdPropostas FROM WORK.ProducaoLeilao;RUN;
+
+/****************************************/
+/* Condição de envio de email */
+/****************************************/
+
+%IF &QtdPropostas. gt 0 %THEN
+	%DO;
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+ FILENAME MAIL EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("bvs-adm-pagamentos@bv.com.br","canaldogestor@bv.com.br",
+		"luis.mendes@bv.com.br","joyce.alves@bv.com.br" ,"eliane.miranda@bv.com.br")
+
+/*	CC=("gleidson.bicalho@bv.com.br","alexandre.prates@bv.com.br","atillio.fontanive@bv.com.br",*/
+/*		"marcelo.marchi@bv.com.br","morgana.shlemper@bv.com.br","fabio.santos1@bv.com.br") */
+
+    BCC = ("inf-gerenciais@bv.com.br","matheus.pancera@bv.com.br",
+		   "vanessa.garcia@bv.com.br","robson.krekowiski@bv.com.br")
+
+	Type    = 'text/html'
+	Attach=("/infogrc/producao_leilao/Base/LayoutLeilao.JPG" inlined='Leilao')
+	attach="/infogrc/producao_leilao/Base/ProducaoLeilao.csv"
+
+ SUBJECT= "Produção Leilão - Fora do normativo";
+
+DATA _NULL_;
+    FILE MAIL;
+		PUT "<html>
+     			<body>
+		<img src=cid:Leilao>
+    			</body>
+			</html>"
+;RUN;
+
+	%END;
+%ELSE
+	%DO;
+	%PUT SEM PRODUCAO;
+
+/****************************************/
+/* Envio de Email BASES NÃO ATUALIZADAS */
+/****************************************/
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+ FILENAME MAIL EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("inf-gerenciais@bv.com.br" )
+    CC = ("matheus.pancera@bv.com.br","robson.krekowiski@bv.com.br","eliane.miranda@bv.com.br")
+	Type    = 'text/html'
+	Attach=("/infogrc/producao_leilao/Base/LayoutLeilaoVazio.JPG" inlined='Leilao')
+/*	attach="/infogrc/producao_leilao/Base/ProducaoLeilao.csv"*/
+
+ SUBJECT= "Sem Produção Leilão - Fora do normativo";
+
+DATA _NULL_;
+    FILE MAIL;
+		PUT "<html>
+     			<body>
+		<img src=cid:Leilao>
+    			</body>
+			</html>"
+;RUN;
+
+%END;

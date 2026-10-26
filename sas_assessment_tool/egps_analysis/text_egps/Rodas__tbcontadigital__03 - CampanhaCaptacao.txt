@@ -1,0 +1,244 @@
+START_METADATA
+PROJECT: Rodas__tbcontadigital
+FILE_SAS: 03 - CampanhaCaptacao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 170
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBCAMPANHACAPTACAOPARCEIROS [SAS/Local], BASES.TBPARCEIROCOMERCIAL25NOV24 [SAS/Local], BV-PDBD-PRD.DVRY_BIROBV.TBCONTADIGITAL_DETALHE_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCAMPANHACAPTACAOPARCEIROS [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL25NOV24 [PROC SQL - JOIN], BV-PDBD-PRD.DVRY_BIROBV.TBCONTADIGITAL_DETALHE_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ANALITICOPROMOCAOCAPTACAO, ANALITICOPROPRIETARIOS, ANALITICOPROPRIETARIOSTOTAL, DUP, TBCAMPANHACAPTACAO, TBCONTAATUAL, TBCONTACORTE, TBCONTADETALHADA, TBCONTADETALHADAANALITICO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+options compress=binary;
+%include '/infogrc/utils/all-includes.sas';
+
+PROC SQL;
+CONNECT TO bigquery AS perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE TbContaCorte AS
+SELECT
+	  *
+
+FROM connection to perm
+
+     	(SELECT
+		  	`dt_apuracao_saldo_conta` as DtCorte,
+			`cd_cpf_cnpj` as NuCPFCNPJCorte,
+  			`vr_aplicado` as Vr_AplicadoCorte ,
+  			`vr_saldo_total` as Vr_Saldo_TotalCorte
+		FROM
+  			`bv-pdbd-prd.dvry_birobv.tbcontadigital_detalhe_fato`
+		WHERE
+			`dt_apuracao_saldo_conta` = '2024-10-11'
+			and `vr_aplicado` is not null
+  );
+
+DISCONNECT FROM perm
+;QUIT;
+
+PROC SQL;
+CONNECT TO bigquery AS perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE TbContaAtual AS
+SELECT
+	  *
+
+FROM connection to perm
+
+     	(SELECT
+		  	`dt_apuracao_saldo_conta` as DtAtual,
+			`cd_cpf_cnpj` as NuCPFCNPJAtual,
+  			`vr_aplicado` as Vr_AplicadoAtual ,
+  			`vr_saldo_total` as Vr_Saldo_TotalAtual
+		FROM
+  			`bv-pdbd-prd.dvry_birobv.tbcontadigital_detalhe_fato`
+		WHERE
+			`dt_apuracao_saldo_conta` = (
+					SELECT
+						MAX(`dt_apuracao_saldo_conta`) - 1
+					FROM
+						`bv-pdbd-prd.dvry_birobv.tbcontadigital_detalhe_fato`
+				)
+			and `vr_aplicado` is not null
+  );
+
+DISCONNECT FROM perm
+;QUIT;
+
+proc sql;
+create table TbContaDetalhadaAnalitico as
+select
+	coalesce(A.NuCPFCNPJCorte,B.NuCPFCNPJAtual) as Chave,
+	A.DtCorte,
+	A.NuCPFCNPJCorte,
+  	A.Vr_AplicadoCorte ,
+  	A.Vr_Saldo_TotalCorte,
+	B.DtAtual,
+	B.NuCPFCNPJAtual,
+  	B.Vr_AplicadoAtual ,
+  	B.Vr_Saldo_TotalAtual
+from TbContaCorte as A full join TbContaAtual as B
+	on A.NuCPFCNPJCorte = B.NuCPFCNPJAtual
+;run;
+
+proc sql;
+create table Dup as
+select distinct Chave, count(1) from TbContaDetalhadaAnalitico group by Chave having count(1) > 1
+;run;
+
+proc sql;
+create table TbContaDetalhada as
+select distinct A.*
+from TbContaDetalhadaAnalitico as A where A.Chave in (select distinct CPF FROM basegrc.TbCampanhaCaptacaoParceiros)
+;run;
+
+/*Cria a tabela congelada de parceiros comerciais que será usada como referência de carteira para o dash*/
+
+/*proc sql;
+create table bases.TbParceiroComercial25NOV24 as
+select * from bases.TbParceiroComercial
+;run;*/
+
+proc sql;
+create table AnaliticoProprietariosTotal as
+select
+	A.NmRepresentanteLegal,
+	A.CPF,
+	A.TipoPerfil,
+	COALESCE(A.CdParceiro,B.CdParceiroComercial) as CdParceiroComercialParc,
+	COALESCE(A.DsRazaoSocial,B.NmParceiroComercial) as NmParceiroComercialParc,
+	B.NuCnpjLoja as NuCnpjLojaParc,
+	B.CdColaboradorC as CdColaboradorCParc,
+	A.NmColaboradorC as NmColaboradorCParc,
+	B.CdFilialC as CdFilialCParc,
+	B.NmFilialC as NmFilialCParc,
+	B.CdAreaEstruturaComercialC as CdAreaEstruturaComercialCParc,
+	coalesce(A.NmAreaEstruturaComercialC,B.NmAreaEstruturaComercialC) as NmAreaEstruturaComercialCParc,
+	coalesce(A.NmSubEstruturaComercialC,B.NmSubEstruturaComercialC) as NmSubEstruturaComercialCParc,
+	coalesce(A.NmCanalEstruturaComercialC,B.NmCanalEstruturaComercialC) as NmCanalEstruturaComercialCParc,
+	B.DsLoginN1C as DsLoginN1CParc,
+	B.DsLoginN2C as DsLoginN2CParc,
+	B.DsLoginN3C as DsLoginN3CParc
+from
+	basegrc.TbCampanhaCaptacaoParceiros as A
+	left join Bases.TbParceiroComercial25NOV24 as B
+		on A.CdParceiro = B.CdParceiroComercial
+		and B.FlAtivo = 'S'
+		/*and A.NmAreaEstruturaComercialC not like '%Centralizados%*/
+		and A.NmTipoParceiroComercial <> 'Concessionaria'
+		and B.CdFilialC <> 276
+
+;run;
+
+proc sql;
+create table AnaliticoProprietarios as
+select * from AnaliticoProprietariosTotal
+/*where NmSubEstruturaComercialCParc <> ""*/
+;run;
+
+proc sql;
+create table AnaliticoPromocaoCaptacao as
+select
+	A.*,B.DtCorte,B.Vr_Saldo_TotalCorte as VrAplicadoCorte ,B.DtAtual,B.Vr_AplicadoAtual as Vr_AplicadoAtual
+from
+	AnaliticoProprietarios as A
+	left join TbContaDetalhada as B
+		on A.CPF = B.Chave
+;run;
+
+proc sql;
+create table TbCampanhaCaptacao as
+select
+	A.CdParceiroComercialParc,
+	A.NmParceiroComercialParc,
+	A.NuCnpjLojaParc,
+	A.CdColaboradorCParc,
+	A.NmColaboradorCParc,
+	A.CdFilialCParc,
+	A.NmFilialCParc,
+	A.CdAreaEstruturaComercialCParc,
+	A.NmAreaEstruturaComercialCParc,
+	A.NmSubEstruturaComercialCParc,
+	A.NmCanalEstruturaComercialCParc,
+	A.DsLoginN1CParc,
+	A.DsLoginN2CParc,
+	A.DsLoginN3CParc,
+	max(A.DtCorte) as DtCorte FORMAT DATE9.,
+	max(A.DtAtual) as DtAtual FORMAT DATE9.,
+  	/*sum(A.Vr_AplicadoCorte) as VrAplicadoCorte FORMAT numx8.3,*/
+	0 as VrAplicadoCorte FORMAT numx8.3,
+  	sum(A.Vr_AplicadoAtual) as VrAplicadoAtual FORMAT numx8.3,
+	cats(A.CdParceiroComercialParc, " - " ,A.NmParceiroComercialParc) as NmParceiroConcat,
+	UPCASE(A.NmRepresentanteLegal) AS NmRepresentanteLegal,
+	A.CPF,
+	UPCASE(A.TipoPerfil) AS TipoPerfil
+from
+	AnaliticoPromocaoCaptacao as A
+where
+	DsLoginN1CParc <> ''
+	and A.VrAplicadoCorte < 0
+group by
+	A.CdParceiroComercialParc,
+	A.NmParceiroComercialParc,
+	A.NuCnpjLojaParc,
+	A.CdColaboradorCParc,
+	A.NmColaboradorCParc,
+	A.CdFilialCParc,
+	A.NmFilialCParc,
+	A.CdAreaEstruturaComercialCParc,
+	A.NmAreaEstruturaComercialCParc,
+	A.NmSubEstruturaComercialCParc,
+	A.NmCanalEstruturaComercialCParc,
+	A.DsLoginN1CParc,
+	A.DsLoginN2CParc,
+	A.DsLoginN3CParc,
+	UPCASE(A.NmRepresentanteLegal),
+	A.CPF,
+	UPCASE(A.TipoPerfil)
+;run;
+
+%ExportaCSV(TbCampanhaCaptacao,TbCampanhaCaptacao);

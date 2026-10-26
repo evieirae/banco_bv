@@ -1,0 +1,313 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__B&A
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:46 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 234
+CODE_TASKS_COUNT: 7
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASFULL = /riscosbv/juridico/bases_full; BDCIVEL = /riscosbv/MRO/BDCivel; COMPTOTAL = /riscosbv/juridico/comp_total; LELE = /riscosbv/juridico/comp_total; PROVAR = /riscosbv/MRO/Estudo/AcoesCiveis/Provisao/Variacao; YRIBEIRO = /riscosbv/juridico/yribeiro
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: fim, inicio
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BDCIVEL.MASSIFICADO [SAS/Local], PROVAR.NOVASACOES [SAS/Local], YRIBEIRO.TBLCONTRATOSIQ [SAS/Local], YRIBEIRO.TBLPRODUTO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BDCIVEL, PROVAR, YRIBEIRO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BDCIVEL.MASSIFICADO [DATA Step - SET], PROVAR.NOVASACOES [DATA Step - SET], YRIBEIRO.TBLCONTRATOSIQ [DATA Step - SET; PROC SQL - FROM], YRIBEIRO.TBLPRODUTO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CONTRATOS, CONTRATOS_ATIVOS_POR_MES, CONTRATOS_BA, CONTR_REV, DADO_CONTR_REV, MESES, NOVAS_REVISIONAIS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Bases BI de BA */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Bases BI de BA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Nrv7S57REOV1kmPc/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname yribeiro "/riscosbv/juridico/yribeiro"; 
+libname bdcivel "/riscosbv/MRO/BDCivel"; 
+libname provar "/riscosbv/MRO/Estudo/AcoesCiveis/Provisao/Variacao"; 
+
+libname basfull "/riscosbv/juridico/bases_full";
+
+data contr_rev(keep = NuCONTRATO);
+	set bdcivel.massificado;
+	where  MotivoPadrao = "REVISIONAIS" and NuCONTRATO ne . ;
+run;
+
+proc sort data = contr_rev nodupkey;
+	by NuCONTRATO;
+run;
+
+
+
+proc sql;
+	create table dado_contr_rev as
+	select contr.*
+	from yribeiro.tblcontratosiq as contr
+	where contr.Nucontrato in (select NuCONTRATO from contr_rev);
+quit;
+
+data novas_revisionais;
+	set provar.novasacoes(where = (MotivoPadrao = "REVISIONAIS"));
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Bases BI de BA */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Contratos Mês */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Contratos Mês */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-pAbKYvztZIWWvBdt/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+	create table contratos as
+	select contr.NuContratoText,
+		   contr.NmProduto,
+		   dicprod.NmProdutoGrupo3,
+		   contr.DtInicioVigencia,
+		   contr.DtFimVigencia
+	from yribeiro.tblcontratosiq as contr
+	left join yribeiro.tblproduto as dicprod
+		on contr.NmProduto = dicprod.NmProduto
+	where dicprod.NmProdutoGrupo3 = "VEICULOS";
+quit;
+
+
+proc sql;
+	select min(DtInicioVigencia) as min_inic_date into:inicio
+	from contratos;
+
+	select max(DtFimVigencia) as max_fim_date into:fim
+	from contratos;
+quit;
+
+%put &inicio.;
+%put &fim.;
+
+
+data meses(keep = mes);
+	format inicio yymmd.;
+	format fim yymmd.;
+	format mes yymmd.;
+
+	inicio = intnx('month', min(&inicio.), 0, 'same');
+	fim = intnx('month', max(&fim.), 0, 'same');
+	n_meses = intck("month", inicio, fim);
+
+	do i = 0 to intck("month", inicio, fim) by 1;
+		mes = intnx("month", inicio, i, "e");
+		output;
+	end;
+run;
+
+
+proc sql;
+	create table contratos_ativos_por_mes as
+	select m.mes,
+		   count(c.NuContratoText) as qtd_contratos_ativos format commax25.
+	from meses as m
+	left join contratos as c
+		on c.DtInicioVigencia <= intnx('month', m.mes, 0, 'same')
+			and c.DtFimVigencia >= intnx('month', m.mes, 0, 'same')
+	group by m.mes;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Contratos Mês */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Rascunho */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Rascunho */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-SKPRJglNdoYPLUB9/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname COMPTOTAL "/riscosbv/juridico/comp_total";
+
+/* =========================FIM TASK=========================== */
+/* TASK: Rascunho */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Contratos para BA */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Contratos para BA */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dqdry5QFNVAkvWdL/code.sas */
+/* =========================INÍCIO TASK========================= */
+data contratos_ba;
+	set yribeiro.tblcontratosiq(
+		where = (QtAtrasoDia > 90 and FlAtivo = "S")
+		keep = NuContratoText
+			   SqContratoFinanceiroAtivo
+			   CdSituacaoContrato
+			   CdProduto
+			   NuCpfCnpj
+			   DtNascimento
+			   DtObito
+			   CdModalidadeProduto
+			   QtParcelas
+			   VrPrestacao
+			   VrContrato
+			   VrFinanciamento
+			   FlAtivo
+			   DtContrato
+			   DtInicioVigencia
+			   DtCancelamento
+			   DtFimVigencia
+			   DtProximoVencimento
+			   DtLiquidacaoEfetiva
+			   DtUltimoVencimento
+			   DtPrimeiroVencimento
+			   NmProduto
+			   NmModalidadeProduto
+			   DtLiquidacao
+			   QtAtrasoMes
+			   QtAtrasoDia
+			   QtParcelasAbertas
+			   VrParcelasAbertasTotal
+			   QtParcelasPagas
+			   VrParcelasPagasTotal
+	);
+run;
+
+proc sql;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Contratos para BA */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+libname yribeiro "/riscosbv/juridico/yribeiro"; 
+libname bdcivel "/riscosbv/MRO/BDCivel"; 
+libname provar "/riscosbv/MRO/Estudo/AcoesCiveis/Provisao/Variacao"; 
+
+libname basfull "/riscosbv/juridico/bases_full";
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data contratos_ba;
+	set yribeiro.tblcontratosiq(
+		where = (QtAtrasoDia >= 90 and FlAtivo = "S")
+		keep = NuContratoText
+			   SqContratoFinanceiroAtivo
+			   CdSituacaoContrato
+			   CdProduto
+			   NuCpfCnpj
+			   DtNascimento
+			   DtObito
+			   CdModalidadeProduto
+			   QtParcelas
+			   VrPrestacao
+			   VrContrato
+			   VrFinanciamento
+			   FlAtivo
+			   DtContrato
+			   DtInicioVigencia
+			   DtCancelamento
+			   DtFimVigencia
+			   DtProximoVencimento
+			   DtLiquidacaoEfetiva
+			   DtUltimoVencimento
+			   DtPrimeiroVencimento
+			   NmProduto
+			   NmModalidadeProduto
+			   DtLiquidacao
+			   QtAtrasoMes
+			   QtAtrasoDia
+			   QtParcelasAbertas
+			   VrParcelasAbertasTotal
+			   QtParcelasPagas
+			   VrParcelasPagasTotal
+	);
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+libname LELE "/riscosbv/juridico/comp_total";
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */

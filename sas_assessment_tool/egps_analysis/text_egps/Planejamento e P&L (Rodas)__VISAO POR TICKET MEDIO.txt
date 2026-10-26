@@ -1,0 +1,264 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__VISAO POR TICKET MEDIO
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:38 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 162
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.POTENCIAL_PDV
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.POTENCIAL_PDV
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], BASES.TBPOTENCIALRODAS [PROC SQL - FROM], WORK.POTENCIAL_PDV [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_TICKET, POTENCIAL_PDV
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Ticket */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Ticket */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-VUO4vwqOqKu6JwDw/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE Potencial_PDV AS
+
+SELECT
+
+t1.NuAnoMes,
+t1.NmGrupoProduto,
+case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+
+CASE WHEN t1.FlAtivo = '' THEN 'Sem Cadastro BV' else t1.FlAtivo end as FlAtivo,
+case when t1.NmAreaEstruturaComercialC in ('Canal Pesados', 'Canal Motos') then '1' else '0' end as GrDedicado,
+t1.NmAreaEstruturaComercialC,
+t1.NmSubEstruturaComercialC,
+t1.NmCanalEstruturaComercialC,
+t2.PredominanciaProduto,
+
+t1.CdParceiroComercial,
+t1.nucnpjloja,
+t1.NmLoja,
+t1.NmTipoParceiroComercial,
+
+SUM(t1.QtContrato) AS QtContrato FORMAT COMMAX20.0,
+SUM(t1.VrProducao) AS VrProducao FORMAT COMMAX20.2,
+SUM(t1.QtGravamesMercado) AS QtGravamesMercado FORMAT COMMAX20.0,
+SUM(t1.VrGravamesMercado) AS VrGravamesMercado FORMAT COMMAX20.2,
+SUM(t1.VrMargemContribuicao) AS VrMargemContribuicao FORMAT COMMAX20.2,
+
+SUM(t1.VrGravamesMercado) / SUM(t1.QtGravamesMercado) AS Ticket_Mercado FORMAT COMMAX20.2,
+SUM(t1.VrProducao) / SUM(t1.QtContrato) AS Ticket_BV FORMAT COMMAX20.2,
+
+CASE
+	WHEN CALCULATED Ticket_Mercado = . THEN 'ABAIXO 100K'
+	WHEN CALCULATED Ticket_Mercado >= 0 AND CALCULATED Ticket_Mercado <= 100000 THEN 'ABAIXO 100K'
+	WHEN CALCULATED Ticket_Mercado > 100000 AND CALCULATED Ticket_Mercado <= 200000 THEN '101K A 200K'
+	WHEN CALCULATED Ticket_Mercado > 200000 AND CALCULATED Ticket_Mercado <= 300000 THEN '201K A 300K'
+	WHEN CALCULATED Ticket_Mercado > 300000 AND CALCULATED Ticket_Mercado <= 400000 THEN '301K A 400K'
+	WHEN CALCULATED Ticket_Mercado > 400000 AND CALCULATED Ticket_Mercado <= 500000 THEN '401K A 500K'
+ELSE 'ACIMA DE 500K'
+END AS FxTicket_Mercado,
+
+CASE
+	WHEN CALCULATED Ticket_BV = . THEN 'ABAIXO 100K'
+	WHEN CALCULATED Ticket_BV >= 0 AND CALCULATED Ticket_BV <= 100000 THEN 'ABAIXO 100K'
+	WHEN CALCULATED Ticket_BV > 100000 AND CALCULATED Ticket_BV <= 200000 THEN '101K A 200K'
+	WHEN CALCULATED Ticket_BV > 200000 AND CALCULATED Ticket_BV <= 300000 THEN '201K A 300K'
+	WHEN CALCULATED Ticket_BV > 300000 AND CALCULATED Ticket_BV <= 400000 THEN '301K A 400K'
+	WHEN CALCULATED Ticket_BV > 400000 AND CALCULATED Ticket_BV <= 500000 THEN '401K A 500K'
+ELSE 'ACIMA DE 500K'
+END AS FxTicket_BV
+
+FROM BASES.TBPOTENCIALRODAS t1
+
+LEFT JOIN BASES.TBPARCEIROCOMERCIAL t2 on t2.CDPARCEIROCOMERCIAL = t1.CDPARCEIROCOMERCIAL
+
+WHERE
+t1.NuAnoMes BETWEEN 202301 AND 202507
+AND t1.FlRefin NOT = 1
+and t1.flatualizacaoMercado = 1
+and t1.NmGrupoProduto = 'Pesados'
+
+
+
+
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13
+
+;QUIT;
+
+
+
+
+
+PROC SQL;
+CREATE TABLE BASE_TICKET AS
+SELECT
+
+NuAnoMes,
+FlAtivo,
+FxTicket_Mercado,
+FxTicket_BV,
+
+COUNT(DISTINCT nucnpjloja) AS QtdDist_Cnpj,
+COUNT(nucnpjloja) AS Qtd_Cnpj,
+
+sum(QtContrato) as QtContrato FORMAT COMMAX20.0,
+sum(VrProducao) as VrProducao FORMAT COMMAX20.2,
+sum(QtGravamesMercado) as QtGravamesMercado FORMAT COMMAX20.0,
+sum(VrGravamesMercado) as VrGravamesMercado FORMAT COMMAX20.2,
+sum(VrMargemContribuicao) as VrMargemContribuicao FORMAT COMMAX20.2
+
+
+
+
+FROM WORK.Potencial_PDV t1
+
+group by 1,2,3,4
+
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Ticket */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: PJ */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: PJ */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-FVECBcI6ufAPZ8t3/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE Potencial_PDV AS
+
+SELECT
+
+NuAnoMes
+Produto
+StVeiculo
+TpDoc
+QtAnosIdade
+FxIdade
+NmAgrupamentoAgente
+FlCVG
+QtGravames
+
+FROM BASES.TBPOTENCIALRODAS t1
+
+LEFT JOIN BASES.TBPARCEIROCOMERCIAL t2 on t2.CDPARCEIROCOMERCIAL = t1.CDPARCEIROCOMERCIAL
+
+WHERE
+t1.NuAnoMes BETWEEN 202301 AND 202507
+AND t1.FlRefin NOT = 1
+and t1.flatualizacaoMercado = 1
+
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: PJ */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE BASE_TICKET AS
+SELECT
+
+NuAnoMes,
+FlAtivo,
+FxTicket_Mercado,
+FxTicket_BV,
+
+COUNT(DISTINCT nucnpjloja) AS QtdDist_Cnpj,
+COUNT(nucnpjloja) AS Qtd_Cnpj,
+
+sum(QtContrato) as QtContrato FORMAT COMMAX20.0,
+sum(VrProducao) as VrProducao FORMAT COMMAX20.2,
+sum(QtGravamesMercado) as QtGravamesMercado FORMAT COMMAX20.0,
+sum(VrGravamesMercado) as VrGravamesMercado FORMAT COMMAX20.2,
+sum(VrMargemContribuicao) as VrMargemContribuicao FORMAT COMMAX20.2
+
+
+
+
+FROM WORK.Potencial_PDV t1
+
+group by 1,2,3,4
+
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA PROD;
+SET TMP.TBPRODUCAO;
+WHERE CdParceiroComercial = 28370;
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

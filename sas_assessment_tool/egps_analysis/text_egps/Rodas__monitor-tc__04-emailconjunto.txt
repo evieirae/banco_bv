@@ -1,0 +1,281 @@
+START_METADATA
+PROJECT: Rodas__monitor-tc
+FILE_SAS: 04-emailconjunto.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 24)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 98
+ODS_OUTPUTS_DETECTED: html
+TRIGGERS: FILENAME  (2x | +24)
+----------------------------------------
+LINES_OF_CODE: 186
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: ODSTEXT, REPORT
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: FL_ALERTA_2, SINAL_2
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ALERTA_TAXA, ALERTA_VALOR, QT_CONTRATOS, TAB, TC, VALOR_MAXIMO, VALOR_MEDIO, VALOR_MINIMO, VRTARIFAAVALIACAOBEM, VRTARIFACADASTRO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*Condiciona o envio ou não do e-mail*/
+
+%IF &FL_ALERTA_2 = &SINAL_2 %THEN %DO;
+
+/*1° PRIMEIRO EMAIL */
+
+/* Enviar e-mail de finalização da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=(
+"inf-gerenciais@bv.com.br"
+"#BVF-Pricing-Veiculos@bv.com.br"
+"guilherme.mendes@bv.com.br"
+"luis.santos@bv.com.br"
+"rafael.arimochi@bv.com.br"
+"paulo.floro@bv.com.br"
+"mariana.cardoso@bv.com.br"
+)
+    TYPE="text/html"
+    SUBJECT="Monitoramento Tarifas";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+TITLE1 'Monitoramento TC Consolidada Rodas';
+PROC REPORT DATA=TC_CALC nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO DATA Valor_Minimo  Valor_Medio Valor_Maximo TC Alerta_Valor Alerta_Taxa;
+RUN;
+
+TITLE1 'Monitoramento TAB Consolidada Rodas';
+PROC REPORT DATA=TAB_CALC nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO DATA Valor_Minimo  Valor_Medio Valor_Maximo TAB Alerta_Valor Alerta_Taxa;
+RUN;
+
+TITLE1 'Monitoramento TC Leves por tipo de cliente';
+PROC REPORT DATA=TC_TPCLIENTE nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO Tipo_Cliente DATA Valor_Minimo  Valor_Medio Valor_Maximo /*TC Alerta_Valor Alerta_Taxa*/;
+RUN;
+
+TITLE1 'Quantidade de Contratos por valor TC';
+PROC REPORT DATA=TC_VALORES nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO  DATA VrTarifaCadastro  QT_CONTRATOS ;
+RUN;
+
+TITLE1 'Quantidade de Contratos por valor TAB';
+PROC REPORT DATA=TAB_VALORES nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO  DATA VrTarifaAvaliacaoBem  QT_CONTRATOS ;
+RUN;
+
+TITLE1 'Base analítica de ocorrências de divergências de pagamento (TC)';
+PROC REPORT DATA=Base_Ocorrencias nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS Nuproposta NuContrato NuCpfCnpj Data_Contrato  Produto Status_TC Analise_Status;
+RUN;
+
+TITLE1 'Base analítica de ocorrências de divergências de pagamento (TAB)';
+PROC REPORT DATA=ANALISE_TAB nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS Nuproposta NuContrato NuCpfCnpj DTCONTRATO  Produto ANALISE_TAB;
+RUN;
+
+TITLE1 'Base analítica de contratos com alerta de valor (TC)';
+PROC REPORT DATA=ANALITICO_VALOR nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PROPOSTA CONTRATO PRODUTO  VALOR_TC DATA;
+RUN;
+
+TITLE1 'Descrição dos indicadores';
+PROC ODSTEXT;
+   p "Prezados";
+   p "";
+   p "Conforme regras definidas para acompanhamento geramos o quadro abaixo com as seguintes inconsistências :";
+   P "";
+   p "Parâmetros tc";
+   P "";
+   p "1) O Valor cobrado de TC em caso de clientes PF é de $1299,00";
+   P "2) O Valor cobrado de TC em caso de clientes PJ é de $1299,00";
+   p "3) O parâmetro que utilizamos de TC é 70% de penetração com isso monitoramos caso tenha uma variação maior que 5 p.p";
+   P "";
+   p "Parâmetros tab";
+   P "";
+   p "1) Isento caso seja 0 KM";
+   P "2) Isento caso cliente ou parceiro seja RJ";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+%END;
+
+%ELSE %DO;
+
+/*2° SEGUNDO EMAIL*/
+
+/* Enviar e-mail de finalização da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=(
+"inf-gerenciais@bv.com.br"
+"#BVF-Pricing-Veiculos@bv.com.br"
+"guilherme.mendes@bv.com.br"
+"luis.santos@bv.com.br"
+"rafael.arimochi@bv.com.br"
+"paulo.floro@bv.com.br"
+"mariana.cardoso@bv.com.br"
+)
+    TYPE="text/html"
+    SUBJECT="Monitoramento Tarifas";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+TITLE1 'Monitoramento TC Consolidada Rodas';
+PROC REPORT DATA=TC_CALC nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO DATA Valor_Minimo  Valor_Medio Valor_Maximo TC Alerta_Valor Alerta_Taxa;
+RUN;
+
+TITLE1 'Monitoramento TAB Consolidada Rodas';
+PROC REPORT DATA=TAB_CALC nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO DATA Valor_Minimo  Valor_Medio Valor_Maximo TAB Alerta_Valor Alerta_Taxa;
+RUN;
+
+TITLE1 'Monitoramento TC Leves por tipo de cliente';
+PROC REPORT DATA=TC_TPCLIENTE nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO Tipo_Cliente DATA Valor_Minimo  Valor_Medio Valor_Maximo /*TC Alerta_Valor Alerta_Taxa*/;
+RUN;
+
+TITLE1 'Quantidade de Contratos por valor';
+PROC REPORT DATA=TC_VALORES nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO  DATA VrTarifaCadastro  QT_CONTRATOS ;
+RUN;
+
+TITLE1 'Quantidade de Contratos por valor TAB';
+PROC REPORT DATA=TAB_VALORES nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS PRODUTO  DATA VrTarifaAvaliacaoBem  QT_CONTRATOS ;
+RUN;
+
+TITLE1 'Base analítica de ocorrências de divergências de pagamento (TC)';
+PROC REPORT DATA=Base_Ocorrencias nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS Nuproposta NuContrato NuCpfCnpj Data_Contrato  Produto Status_TC Analise_Status;
+RUN;
+
+TITLE1 'Base analítica de ocorrências de divergências de pagamento (TAB)';
+PROC REPORT DATA=ANALISE_TAB nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 10pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 10pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 10pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS Nuproposta NuContrato NuCpfCnpj DTCONTRATO  Produto ANALISE_TAB;
+RUN;
+
+TITLE1 'Descrição dos indicadores';
+PROC ODSTEXT;
+   p "Prezados";
+   p "";
+   p "Conforme regras definidas para acompanhamento geramos o quadro abaixo com as seguintes inconsistências :";
+   P "";
+   p "Parâmetros tc";
+   P "";
+   p "1) O Valor cobrado de TC em caso de clientes PF é de $1299,00";
+   P "2) O Valor cobrado de TC em caso de clientes PJ é de $1299,00";
+   p "3) O parâmetro que utilizamos de TC é 70% de penetração com isso monitoramos caso tenha uma variação maior que 5 p.p";
+   P "";
+   p "Parâmetros tab";
+   P "";
+   p "1) Isento caso seja 0 KM";
+   P "2) Isento caso cliente ou parceiro seja RJ";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+
+%END;

@@ -1,0 +1,209 @@
+START_METADATA
+PROJECT: SAS_UC4__JobRmBuildEngine_03_ExecuteEngine
+FILE_SAS: JobRmBuildEngine_03_ExecuteEngine.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:02 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (3x | +240), CALL EXECUTE (2x | +90), %INCLUDE (1x | +20), INFILE  (1x | +10), GOTO (1x | +40), %MACRO (4x | +20)
+----------------------------------------
+LINES_OF_CODE: 121
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: AAAAMM, AAAAMMDD, CHAVE, _CdMultiData, _CdOrdemAssunto, _CdParalelo, _NmJOBSAS, _waitfor, assunto_atual, bypass_ctrl, dtpurge, periodo_retencao, prll_atual, sequencia_atual, sufix
+DETECTED_MACROS_USED: AAAAMMDD, CHAVE, CdMultiData, CdOrdemAssunto, CdParalelo, DTREF, NmJOBSAS, QTD_REG, VlSysparm, _waitfor, assunto, assunto_atual, bypass_ctrl, cmd_shell, dir_cad, dir_engine, dtpurge, mainjob, nome_job, periodo_retencao, prll_atual, seq, sequencia_atual, sufix, sysparm
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/riscosmercado/rmsas/bin/sas/engine/JobRmBuildEngine_00_InicializaMacros.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): &DIR_CAD./LISTA_OLDJOBS.LST [SAS/Local], /PROJETOS/RISCOSMERCADO/RMSAS/BIN/SAS/ENGINE/JOBRMBUILDENGINE_00_INICIALIZAMACROS.SAS [SAS/Local], _RMCAD.LISTA_JOBSAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): &amp;dir_cad./lista_oldjobs.lst, /projetos/riscosmercado/rmsas/bin/sas/engine/JobRmBuildEngine_00_InicializaMacros.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.LISTA_JOBSAS
+TABLE_READ_PROVENANCE (Flow): WORK.LISTA_JOBSAS [DATA Step - SET; PROC SQL - FROM], _RMCAD.LISTA_JOBSAS [PROC SORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): &amp;dir_cad./lista_oldjobs.lst, /projetos/riscosmercado/rmsas/bin/sas/engine/JobRmBuildEngine_00_InicializaMacros.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LISTA_01, LISTA_02, WORK.LISTA_JOBSAS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (lst: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] &amp;dir_cad./lista_oldjobs.lst
+[CODE REF] /projetos/riscosmercado/rmsas/bin/sas/engine/JobRmBuildEngine_00_InicializaMacros.sas
+
+END_METADATA
+================================================================================
+%include "/projetos/riscosmercado/rmsas/bin/sas/engine/JobRmBuildEngine_00_InicializaMacros.sas";
+
+%let prll_atual=0;
+%let _NmJOBSAS=;
+%let _CdOrdemAssunto=;
+%let _CdParalelo=;
+%let _CdMultiData=;
+%let _waitfor=;
+
+%macro GeraJobAutomation;
+	%if &seq = 1 %then %do;
+		%let _NmJOBSAS=&NmJOBSAS;
+
+		%sysExec echo "/*" >> &mainjob;
+		%sysExec echo "&dtjob..&hrjob. - JOB AUTOMATION ENGINE - CONTROLE AUTOMÁTICO DE MALHA */" >> &mainjob;
+		%sysExec echo "*/" >> &mainjob;
+		%sysExec echo "" >> &mainjob;
+		%sysExec echo "" >> &mainjob;
+
+		%sysExec echo '%let sufix=&sysparm.;' >> &mainjob;
+		%sysExec echo '%let AAAAMMDD=&sufix.;' >> &mainjob;
+		%sysExec echo '%let AAAAMM=%sysfunc(substr(&sufix.,1,6));' >> &mainjob;
+		%sysExec echo "" >> &mainjob;
+		%sysExec echo "" >> &mainjob;
+		%sysExec echo '%macro ExecutaProcs;' >> &mainjob;
+
+		%let _waitfor=waitfor _all_ ;
+	%end;
+
+	%if &CdOrdemAssunto ne &assunto_atual or &CdParalelo ne &prll_atual or &CdMultiData ne &sequencia_atual %then %do;
+		%sysExec echo "	&_waitfor.;" >> &mainjob;
+		%sysExec echo "" >> &mainjob;
+		%sysExec echo "	systask command "\""&cmd_shell. &assunto. &NmJOBSAS. &DTREF. &VlSysparm."\"" taskname=task&seq. status=RC&seq.;" >> &mainjob;
+
+		%let _waitfor=waitfor _all_ task&seq.;
+		%let assunto_atual=&CdOrdemAssunto;
+		%let prll_atual=&CdParalelo;
+		%let sequencia_atual=&CdMultiData;
+		%let _NmJOBSAS=&NmJOBSAS;
+	%end;
+	%else %do;
+		%sysExec echo "	systask command "\""&cmd_shell. &assunto. &NmJOBSAS. &DTREF. &VlSysparm."\"" taskname=task&seq. status=RC&seq.;" >> &mainjob;
+
+		%let _waitfor=&_waitfor task&seq ;
+	%end;
+
+	%if &seq = &QTD_REG %then %do;
+		%sysExec echo "	&_waitfor.;" >> &mainjob;
+		%sysExec echo "" >> &mainjob;
+		%sysExec echo '%mend ExecutaProcs;' >> &mainjob;
+		%sysExec echo "" >> &mainjob;
+		%sysExec echo '%ExecutaProcs;' >> &mainjob;
+	%end;
+
+%mend GeraJobAutomation;
+
+%macro ExecutaProcs;
+	%let bypass_ctrl=&dir_engine./bypass.ctrl;
+
+	%if %sysfunc(fileexist("&bypass_ctrl.")) = 1 %then
+		%goto exit_proc;
+	%else
+		%sysExec echo "JOB &mainjob. EM EXECUÇÃO" >> &bypass_ctrl;
+
+	%if %sysfunc(fileexist("&mainjob.")) = 1 %then %do;
+		x "rm &mainjob.";
+	%end;
+
+	proc sort data=_RMCAD.LISTA_JOBSAS out=WORK.LISTA_JOBSAS;
+		by CdOrdemAssunto CdParalelo CdMultiData;
+		WHERE StExecutaJOB="S";
+	run;
+
+	proc sql noprint;
+		SELECT COUNT(*) AS QTD
+		INTO :QTD_REG
+		FROM WORK.LISTA_JOBSAS;
+	run;
+
+	data _null_;
+		set WORK.LISTA_JOBSAS;
+
+		if _N_ eq 1 then do;
+			call symputx('prll_atual',CdParalelo,'G');
+			call symputx('assunto_atual',CdOrdemAssunto,'G');
+			call symputx('sequencia_atual',CdMultiData,'G');
+		end;
+
+		call symputx('seq',_N_,'G');
+		call symputx('NmAssunto',compress(NmAssunto),'G');
+		call symputx('CdOrdemAssunto',CdOrdemAssunto,'G');
+		call symputx('CdParalelo',CdParalelo,'G');
+		call symputx('CdMultiData',CdMultiData,'G');
+		call symputx('VlSysparm',VlSysparm,'G');
+		call symputx('NmJOBSAS',NmJOBSAS,'G');
+		call symputx('DTREF',DTREF,'G');
+
+		call execute('%GeraJobAutomation;');
+
+	run;
+
+	%if %sysfunc(fileexist("&mainjob.")) = 1 %then %do;
+		x "&cmd_shell. engine &nome_job. &AAAAMMDD.";
+	%end;
+
+	x "rm &bypass_ctrl.";
+
+%exit_proc:
+	%put >>>>> JOB FINALIZADO SEM PROCESSAR.;
+	%put >>>>> AGUARDANDO TÉRMINO DE PROCESSAMENTO ANTERIOR...;
+
+%mend ExecutaProcs;
+
+%let periodo_retencao=5;
+
+%macro PurgeOldJobs;
+	%let dtpurge=%sysfunc(putn(%sysfunc(datepart(%sysfunc(datetime()))),date9.));
+
+	data _null_;
+		call symputx('dtpurge',put(intnx('day',"&dtpurge."d, -&periodo_retencao., 'same'),yymmddn.));
+	run;
+
+	%let CHAVE=_99_Automation_;
+
+	%PUT CHAVE=&CHAVE.;
+	%PUT dtpurge=&dtpurge.;
+
+	x "rm &dir_cad./lista_oldjobs.lst";
+	x "ls -dtr &dir_engine./*&CHAVE.*.sas > &dir_cad./lista_oldjobs.lst";
+
+	data lista_01;
+		infile "&dir_cad./lista_oldjobs.lst"
+		lrecl = 1000
+		firstobs = 1;
+		attrib nm_job length = $1000;
+		input nm_job;
+	run;
+	data lista_02;
+		set lista_01;
+		dtjob=scan(scan(nm_job,-1,"_"),1,".");
+		if dtjob < &dtpurge. then output;
+	run;
+	data _null_;
+		set lista_02;
+
+		x_command = "x 'rm " || compress(nm_job) || ";'";
+
+		call symputx('x_command',x_command,'G');
+		call execute('%ExecutaXCommand;');
+	run;
+	x "rm &dir_cad./lista_oldjobs.lst";
+
+%mend PurgeOldJobs;
+
+%ExecutaProcs;
+%PurgeOldJobs;

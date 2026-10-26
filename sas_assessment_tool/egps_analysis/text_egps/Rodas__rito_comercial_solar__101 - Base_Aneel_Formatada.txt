@@ -1,0 +1,282 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 101 - Base_Aneel_Formatada.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -24
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: RETAIN (1x | +10), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 207
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ANEEL = /infogrc/TbMercadoSolar/input; RITOSOL = /infogrc/rito_comercial_solar
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): ANEEL.CUSTOGERACAODISTRIBUIDA [SAS/Local], ANEEL.EMPREEND_GERACAO [SAS/Local], BASES.TBORIGINACAO [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: ANEEL
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): ANEEL.CUSTOGERACAODISTRIBUIDA [PROC SQL - JOIN], ANEEL.EMPREEND_GERACAO [PROC SQL - FROM], BASES.TBORIGINACAO [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN], RITOSOL.BASE_ANEEL_CARTA_PDV [PROC EXPORT - DATA=], RITOSOL.BASE_ORIGINACAO_CARTA_PDV [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/output/cartapdv_base_aneel.csv, /riscosbvf/BA/processos/output/cartapdv_base_originacao.csv
+INTERNAL READS (Temp/Local): RITOSOL.BASE_ANEEL_CARTA_PDV, RITOSOL.BASE_ORIGINACAO_CARTA_PDV
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): ANEEL.CUSTOGERACAODISTRIBUIDA, ANEEL.EMPREEND_GERACAO, RITOSOL.BASE_ANEEL_CARTA_PDV, RITOSOL.BASE_ORIGINACAO_CARTA_PDV
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): ANEEL.CUSTOGERACAODISTRIBUIDA
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_ANEEL_CARTA_PDV, RITOSOL.BASE_ORIGINACAO_CARTA_PDV
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/cartapdv_base_aneel.csv, /riscosbvf/BA/processos/output/cartapdv_base_originacao.csv
+TEMP/DISCARDED OUTPUTS: BASE_ANEEL, BASE_LOGINS, BASE_LOGINS_SEQUENCIAL, BASE_LOGINS_TRANSPOSTA, BASE_REGIAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/output/cartapdv_base_aneel.csv
+[CODE REF] /riscosbvf/BA/processos/output/cartapdv_base_originacao.csv
+
+END_METADATA
+================================================================================
+LibName ANEEL '/infogrc/TbMercadoSolar/input';
+/**Libname OneSolar '/infogrc/one_one_solar';**/
+Libname ritosol '/infogrc/rito_comercial_solar';
+
+/*
+Proc Sql;
+Create Table Base_Aneel as
+Select
+Input(Aneel.DatGeracaoConjuntoDados, yymmdd10.) as DatGeracaoConjuntoDados Format DDMMYY10.
+,Aneel.AnmPeriodoReferencia
+,substr(Aneel.NumCNPJDistribuidora, 1,14) as NumCNPJDistribuidora length=14
+,Aneel.SigAgente
+,Aneel.NomAgente
+,InPut(Aneel.CodClasseConsumo, 8.) as CodClasseConsumo
+,Aneel.DscClasseConsumo
+,InPut(Aneel.CodSubGrupoTarifario, 8.) as CodSubGrupoTarifario
+,Aneel.DscSubGrupoTarifario
+,InPut(Aneel.CodUFibge, 8.) as CodUFibge
+,Aneel.SigUF
+,InPut(Aneel.CodRegiao, 8.) as CodRegiao
+,Aneel.NomRegiao
+,InPut(Aneel.CodMunicipioIbge, 8.) as CodMunicipioIbge
+,UpCase(translate(Aneel.NomMunicipio,'AAAAACEEEEIIIIDNOOOOOOUUUUYaaaaaceeeeiiiidnooooouuuuy', 'ÁÀÂÃÄÇÉÈÊËÍÌÎÏÐÑÓÒÔÕÖÚÙÛÜÝáàâãäçéèêëíìîïðñóòôõöúùûüý')) as NmMunicipio
+,Trim(Aneel.SigUF) ||" - "|| Trim(Calculated NmMunicipio) as UF_Municipio
+,Aneel.CodCEP
+,Aneel.SigTipoConsumidor
+,Aneel.NumCPFCNPJ
+,Aneel.NomTitularEmpreendimento
+,InPut(Aneel.CodEmpreendimento, 8.) as CodEmpreendimento
+,Input(Aneel.DthAtualizaCadastralEmpreend, yymmdd10.) as DthAtualizaCadastralEmpreend Format DDMMYY10.
+,Calculated DthAtualizaCadastralEmpreend - 60 as DtVendaProjeto Format DDMMYY10.
+,(YEAR(Calculated DthAtualizaCadastralEmpreend - 60) * 100) + MONTH(Calculated DthAtualizaCadastralEmpreend - 60) as NuAnomes_VdProjeto
+
+,Aneel.SigModalidadeEmpreendimento
+,Aneel.DscModalidadeHabilitado
+,InPut(Aneel.QtdUCRecebeCredito, 8.) as QtdUCRecebeCredito
+,Aneel.SigTipoGeracao
+,Aneel.DscFonteGeracao
+,Aneel.DscPorte
+,InPut(tranwrd(Aneel.NumCoordNEmpreendimento, ',', '.'), Best32.) as NumCoordNEmpreendimento format=8.0
+,InPut(tranwrd(Aneel.NumCoordEEmpreendimento, ',', '.'), Best32.) as NumCoordEEmpreendimento format=8.0
+,InPut(tranwrd(Aneel.MdaPotenciaInstaladaKW, ',', '.'), Best32.) as MdaPotenciaInstaladaKW format=8.2
+,CD.Kit_Placa_Inversor as Kit_Placa_Inversor format=8.2
+,CD.'Integração(MO)'n as Integração format=8.2
+,CD.Custo_Total as Custo_Total format=8.2
+
+,(Calculated MdaPotenciaInstaladaKW * Custo_Total) * 1000 as Valor_Financeiro format COMMAX10.2
+from ANEEL.EMPREEND_GERACAO as Aneel
+Left Join ANEEL.CustoGeracaoDistribuida as CD ON (YEAR(Input(Aneel.DthAtualizaCadastralEmpreend, yymmdd10.) - 60) * 100) + MONTH(Input(Aneel.DthAtualizaCadastralEmpreend, yymmdd10.) - 60) = CD.Anomes
+;Quit;
+*/
+
+Proc Sql;
+Create Table Base_Aneel as
+Select
+Aneel.DatGeracaoConjuntoDados as DatGeracaoConjuntoDados Format DDMMYY10.
+,Aneel.AnmPeriodoReferencia
+,put(Aneel.NumCNPJDistribuidora, 14.) as NumCNPJDistribuidora length=14
+,Aneel.SigAgente
+,Aneel.NomAgente
+,Aneel.CodClasseConsumo as CodClasseConsumo
+,Aneel.DscClasseConsumo
+,InPut(Aneel.CodSubGrupoTarifario, 8.) as CodSubGrupoTarifario
+,Aneel.DscSubGrupoTarifario
+,Aneel.CodUFibge as CodUFibge
+,Aneel.SigUF
+,Aneel.CodRegiao as CodRegiao
+,Aneel.NomRegiao
+,Aneel.CodMunicipioIbge as CodMunicipioIbge
+,UpCase(Aneel.NomMunicipio) as NmMunicipio
+/*,UpCase(translate(Aneel.NomMunicipio,'AAAAACEEEEIIIIDNOOOOOOUUUUYaaaaaceeeeiiiidnooooouuuuy', 'ÁÀÂÃÄÇÉÈÊËÍÌÎÏÐÑÓÒÔÕÖÚÙÛÜÝáàâãäçéèêëíìîïðñóòôõöúùûüý')) as NmMunicipio*/
+,Trim(Aneel.SigUF) ||" - "|| Trim(Calculated NmMunicipio) as UF_Municipio
+,Aneel.CodCEP
+,Aneel.SigTipoConsumidor
+,Aneel.NumCPFCNPJ
+,Aneel.NomTitularEmpreendimento
+,Aneel.CodEmpreendimento as CodEmpreendimento
+,Aneel.DthAtualizaCadastralEmpreend as DthAtualizaCadastralEmpreend Format DDMMYY10.
+,Aneel.DthAtualizaCadastralEmpreend - 60 as DtVendaProjeto Format DDMMYY10.
+,(YEAR(Aneel.DthAtualizaCadastralEmpreend - 60) * 100) + MONTH(Aneel.DthAtualizaCadastralEmpreend - 60) as NuAnomes_VdProjeto
+
+,Aneel.SigModalidadeEmpreendimento
+,Aneel.DscModalidadeHabilitado
+,InPut(Aneel.QtdUCRecebeCredito, 8.) as QtdUCRecebeCredito
+,Aneel.SigTipoGeracao
+,Aneel.DscFonteGeracao
+,Aneel.DscPorte
+,Aneel.NumCoordNEmpreendimento as NumCoordNEmpreendimento format=8.0
+,Aneel.NumCoordEEmpreendimento as NumCoordEEmpreendimento format=8.0
+,Aneel.MdaPotenciaInstaladaKW as MdaPotenciaInstaladaKW format=8.2
+,CD.Kit_Placa_Inversor as Kit_Placa_Inversor format=8.2
+,CD.'Integração(MO)'n as Integração format=8.2
+,CD.Custo_Total as Custo_Total format=8.2
+
+,(Aneel.MdaPotenciaInstaladaKW * Custo_Total) * 1000 as Valor_Financeiro format COMMAX10.2
+from ANEEL.EMPREEND_GERACAO as Aneel
+Left Join ANEEL.CustoGeracaoDistribuida as CD ON (YEAR(Aneel.DthAtualizaCadastralEmpreend - 60) * 100) + MONTH(Aneel.DthAtualizaCadastralEmpreend - 60) = CD.Anomes
+;Quit;
+
+/*
+Data ANEEL.CustoGeracaoDistribuida;
+Set WORK.'Custo Geração Distribuida'n;
+;Run;
+*/
+
+/*Gerando base de Logins por UF e Cidade*/
+Proc Sql;
+Create Table Base_Logins as
+Select Distinct
+CdUf as SigUF
+,NmCidade
+,DsLoginN1C
+From Bases.TbParceiroComercial as TbParc
+Where TbParc.TpAtividade = 7 and TbParc.NmCanalEstruturaComercialC = 'Canal Solar' and TbParc.DsLoginN1C NE ""
+;Quit;
+
+proc sort data=Base_Logins;
+    by SigUF NmCidade DsLoginN1C;
+run;
+
+data Base_Logins_Sequencial;
+    set Base_Logins;
+    by SigUF NmCidade;
+    retain LoginNum;
+    if first.NmCidade then LoginNum = 1;
+    else LoginNum + 1;
+run;
+
+proc transpose data=Base_Logins_Sequencial out=Base_Logins_Transposta
+(drop=_NAME_ _LABEL_ rename=('1'n=DsLoginN1C_1 '2'n=DsLoginN1C_2 '3'n=DsLoginN1C_3 '4'n=DsLoginN1C_4 '5'n=DsLoginN1C_5 '6'n=DsLoginN1C_6 '7'n=DsLoginN1C_7 '8'n=DsLoginN1C_8));
+    by SigUF NmCidade;
+    id LoginNum;
+    var DsLoginN1C;
+run;
+
+Proc Sql;
+Create Table ritosol.Base_Aneel_Carta_PDV as
+Select
+Aneel.NuAnomes_VdProjeto as NuAnomes
+,Aneel.SigAgente
+,Aneel.DscClasseConsumo
+,Aneel.DscSubGrupoTarifario
+,Aneel.SigUF
+,Upcase(Aneel.NomRegiao) as NmRegiao
+,Upcase(Aneel.NmMunicipio) as NmMunicipio
+,Upcase(Aneel.UF_Municipio) as UF_Municipio
+,Aneel.SigTipoConsumidor as TpPessoa
+,Aneel.DscModalidadeHabilitado
+,Aneel.DscPorte
+,Logins.DsLoginN1C_1
+,Logins.DsLoginN1C_2
+,Logins.DsLoginN1C_3
+,Logins.DsLoginN1C_4
+,Logins.DsLoginN1C_5
+,Logins.DsLoginN1C_6
+,"" as DsLoginN1C_7
+/*,Logins.DsLoginN1C_8*/
+
+,Sum(Aneel.QtdUCRecebeCredito) as QtdUCRecebeCredito format=10.
+,Sum(Aneel.MdaPotenciaInstaladaKW) as MdaPotenciaInstaladaKW format=8.2
+,Sum(Aneel.Valor_Financeiro) as Valor_Financeiro format COMMAX10.2
+
+,AVG(Aneel.Kit_Placa_Inversor) as Kit_Placa_Inversor format=8.2
+,AVG(Aneel.Integração) as Integração format=8.2
+,AVG(Aneel.Custo_Total) as Custo_Total format=8.2
+
+,Count(Distinct NumCPFCNPJ) as Qtd_Instalacao
+
+from Base_Aneel as Aneel
+Left Join Base_Logins_Transposta as Logins On Aneel.SigUF = Logins.SigUF and Upcase(Aneel.NmMunicipio) = Logins.NmCidade
+Where NuAnomes_VdProjeto >= &Base_m5.
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
+;Quit;
+
+Proc Sql;
+Create Table Base_Regiao as
+Select Distinct
+SigUF
+,Upcase(NomRegiao) as NmRegiao
+From Base_Aneel
+Where SigUF NE ""
+;Quit;
+
+Proc Sql;
+Create table ritosol.Base_Originacao_Carta_PDV as
+Select
+Orig.NuAnoMes
+,Parc.DsLoginN1C
+,Parc.DsLoginN2C
+,Parc.DsLoginN3C
+,Orig.CdParceiroComercial
+,Orig.NmParceiroComercial
+,Orig.TpPessoa
+,Regiao.NmRegiao
+,Upcase(Orig.CdUfPessoa) as SigUF
+,Upcase(Orig.NmCidadePessoa) as NmCidadePessoa
+,Trim(Upcase(Orig.CdUfPessoa)) ||" - "|| Trim(Upcase(Orig.NmCidadePessoa)) as UF_Cidade
+,Count(Orig.NuProposta) as QtdProposta
+,Sum(Orig.VrProposta) as VrProposta
+,Sum(Orig.FlPropostaOriginada) as FlPropostaOriginada
+,Sum(Orig.FlPropostaAprovada) as FlPropostaAprovada
+,Sum(Orig.FlPropostaEfetivada) as FlPropostaEfetivada
+,Sum(Case When Orig.FlPropostaOriginada = 1 Then Orig.VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When Orig.FlPropostaAprovada = 1 Then Orig.VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When Orig.FlPropostaEfetivada = 1 Then Orig.VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+From Bases.TbOriginacao as Orig
+Left join Base_Regiao as Regiao ON Orig.CdUfPessoa = Regiao.SigUF
+Left Join Bases.TbParceiroComercial as Parc On Orig.CdParceiroComercial = Parc.CdParceiroComercial
+Where NuAnomes >= &Base_m5. and NmGrupoProdutoMeta = 'Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11
+;Quit;
+
+proc export
+data = ritosol.Base_Aneel_Carta_PDV
+file = '/riscosbvf/BA/processos/output/cartapdv_base_aneel.csv' replace
+dbms = dlm;
+delimiter = ';';
+run;
+
+X "mv  /riscosbvf/BA/processos/output/cartapdv_base_aneel.csv  /riscosbvf/BA/processos/output/ ";
+
+proc export
+data = ritosol.Base_Originacao_Carta_PDV
+file = '/riscosbvf/BA/processos/output/cartapdv_base_originacao.csv' replace
+dbms = dlm;
+delimiter = ';';
+run;
+
+X "mv  /riscosbvf/BA/processos/output/cartapdv_base_originacao.csv  /riscosbvf/BA/processos/output/ ";

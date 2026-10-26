@@ -1,0 +1,152 @@
+START_METADATA
+PROJECT: Rodas__novoreuniaoexecutiva
+FILE_SAS: producao-nn.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 89
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safra13M
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /RISCOSBVF/BA/PROCESSOS/TMP/RESUMO-NN.CSV [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/resumo-nn.csv
+TABLE_READ_PROVENANCE (Flow): BASES.TBEXTCONTRATO [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/resumo-nn.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PRODUCAO_NN, PRODUCAO_NN01, SPREADCONTRATO, SPREADCONTRATO01
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/resumo-nn.csv
+
+END_METADATA
+================================================================================
+/* Parâmetros iniciais */
+option compress = binary;
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/libname.sas';
+
+DATA _NULL_;
+  hoje = Today();
+
+  anoHoje = YEAR(hoje);
+  ano13M = YEAR(hoje) - 1;
+  safra13M = (ano13M * 100) + MONTH(hoje);
+
+  CALL SYMPUT('safra13M', PUT(safra13M,6.));
+  CALL SYMPUT('anoHoje', PUT(anoHoje,4.));
+  CALL SYMPUT('ano13M', PUT(ano13M,4.));
+RUN;
+
+/* Buscar dados de produção */
+PROC SQL;
+CREATE TABLE SpreadContrato01 AS
+  SELECT DISTINCT
+    NuContrato,
+	VrRetencao,
+    VrPrestacao,
+    VrIof
+  FROM BASES.TBEXTCONTRATO
+  WHERE NuAnoMes >= &safra13M.;
+RUN;
+
+PROC SORT DATA=SpreadContrato01 OUT=SpreadContrato NODUPKEY;
+BY NuContrato;
+RUN;
+
+PROC SQL;
+  CREATE TABLE PRODUCAO_NN01 AS
+    SELECT
+      a.DtAtualizacao AS DtBaseProducao FORMAT=mmddyy10.,
+      SUBSTR(PUT(a.NuAnoMes,6.),5,2)||"/01/"||SUBSTR(PUT(a.NuAnoMes,6.),1,4) AS Safra,
+      a.NmGrupoProdutoMeta AS Produto,
+      a.NmSubEstruturaComercialA AS Regional,
+      a.DsTipoCanalProducao AS Canal,
+	  a.QtCorridosDiaUtilMesSab,
+      a.QtTotalDiaUtilMesSab,
+      COUNT(a.NuContrato) AS QtdContrato,
+      SUM(a.VrProducao) AS VrProducao FORMAT=num18.2,
+      SUM(a.VrProducaoProjetado) AS VrProducaoProjetado FORMAT=num18.2,
+      SUM(a.VrProducaoDiaUtil) AS VrProducaoDiaUtil FORMAT=num18.2,
+      SUM(a.VrFinanciamento) AS VrFinanciamento FORMAT=num18.2,
+      SUM(a.VrMargemContribuicao) AS VrMC FORMAT=num18.2,
+      SUM(a.VrMargemContribuicao * VrProducao) AS VpMC FORMAT=num18.2,
+      SUM(a.VpTxGerencial) AS VpTaxa FORMAT=num18.2,
+      SUM(a.VpTirContabil) AS VpTir FORMAT=num18.2,
+      SUM(((1+((case when B.VrRetencao > 1 then (Finance('RATE', A.QtParcelas, B.VrPrestacao, -((A.VrContrato-B.VrRetencao)+B.VrIof+coalesce(A.VrTarifaCadastro,0)))*A.VrProducao) ELSE A.VpTxGerencial END)/A.VrProducao)) / (1+(((A.TxTirContabil/100) * (A.VrProducao))/A.VrProducao)) -1 ) * A.VrProducao) AS VpSpread FORMAT=num18.2,
+      COALESCE(SUM(CASE WHEN a.VrTarifaCadastro > 0 THEN 1 END),0) AS QtdTC,
+      SUM(a.VrPerdaEstimada) AS VrPerdaEstimada FORMAT=num18.2
+    FROM TMP.TBPRODUCAO A
+	LEFT JOIN SpreadContrato B
+	  ON A.NuContrato = B.NuContrato
+    WHERE a.NuAnoMes >= &safra13M.
+      AND a.NmGrupoProdutoMeta IN ('Estudantil','Saude','Solar','Turismo','Market Place','CIG')
+      and a.nuproposta <>239351181
+    GROUP BY 1,a.NuAnoMes,3,4,5,6,7
+    ORDER BY 1,a.NuAnoMes,3,4,5,6,7;
+RUN;
+
+PROC SQL;
+CREATE TABLE PRODUCAO_NN AS
+  SELECT
+    DtBaseProducao,
+    Safra,
+    Produto,
+    Regional,
+    Canal,
+    QtCorridosDiaUtilMesSab,
+    QtTotalDiaUtilMesSab,
+    QtdContrato,
+    VrProducao,
+    VrProducaoProjetado,
+    VrProducaoDiaUtil,
+    VrFinanciamento,
+    VrMC,
+    (VrMC / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS VrMCProjetado,
+    VpMC,
+    VpTaxa,
+    VpTir,
+    VpSpread,
+    QtdTC,
+    VrPerdaEstimada
+  FROM PRODUCAO_NN01;
+RUN;
+
+/* Exportar base de dados */
+FILENAME rsvprd '/riscosbvf/BA/processos/tmp/resumo-nn.csv' encoding="utf-8";
+
+PROC EXPORT DATA=PRODUCAO_NN OUTFILE=rsvprd REPLACE DBMS=dlm;
+  DELIMITER=';';
+RUN;
+
+X 'mv /riscosbvf/BA/processos/tmp/resumo-nn.csv /riscosbvf/BA/processos/output';

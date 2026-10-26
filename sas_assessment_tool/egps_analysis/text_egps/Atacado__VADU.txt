@@ -1,0 +1,368 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Atacado__VADU
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:44 UTC
+BUSINESS_AREA: Atacado
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 221
+CODE_TASKS_COUNT: 7
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): SASHELP.CLASS [SAS/Local], SHAREATA.TBCARTEIRAGRUPO [SAS/Local], _INSIGHT.TBBRUTA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.VADU_GRUPOSECO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.VADU_GRUPOSECO
+TABLE_READ_PROVENANCE (Flow): SASHELP.CLASS [PROC SQL - FROM], SHAREATA.TBCARTEIRAGRUPO [PROC SQL - FROM], WORK.VADU_GRUPOSECO [PROC SQL - FROM], _INSIGHT.TBBRUTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\01.GrupoEconomico\VADU_GRUPOSECO.xlsx, N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\02.GrupoMonitoramento\VADU_GruposMonit.xlsx, N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\03.GrupoEconomico_new_project\VADU_GRUPOSECO.csv, N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\03.GrupoEconomico_new_project\VADU_GRUPOSECO_teste.csv
+TEMP/DISCARDED OUTPUTS: QUERY_FOR_TBBRUTA, TBCARTEIRAGRUPO, VADU_GRUPOSECO, VADU_GRUPOSECO_TESTE, VADU_GRUPOSMONITORAMENTO, WORK.QUERY_FOR_VADU_GRUPOSECO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Gera bases manutenção */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 12 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Gera bases manutenção */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-I72RmkjA5cpsycye/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+	CREATE TABLE TBCARTEIRAGRUPO AS SELECT DISTINCT
+
+		CdGrupoEconomico,
+		NmGrupoEconomico,
+		SegmentoAtuacao,
+		NmGerenteExecutivo,
+		NmGerenteCredito,
+		NmAnalistaCredito
+
+	FROM SHAREATA.TBCARTEIRAGRUPO
+	WHERE TipoEsteira EQ 'Julgamental' AND NmGerenteCredito EQ 'RODRIGO.ACASTRO'
+
+;QUIT;
+
+PROC SQL;
+
+   CREATE TABLE QUERY_FOR_TBBRUTA AS SELECT DISTINCT
+
+			t1.CdGpEconomico,
+	     	t1.NmGpEconomico,
+	      	t1.NmPessoa,
+	       	t1.NuCpfCnpjRaiz,
+	        t1.NuCpfCnpj,
+	        t1.CdPessoa,
+			t2.NmAnalistaCredito,
+			t2.NmGerenteCredito,
+	        CATX('',t2.NmAnalistaCredito,'@BV.COM.BR') AS email_analista,
+	        CATX('',t2.NmGerenteCredito,'@BV.COM.BR') AS email_gerente,
+	        CATX('',t2.NmGerenteExecutivo,'@BV.COM.BR') AS email_gerenteexec,
+	        t1.NmOfficer,
+			t1.VrFaturamentoP,
+			t1.VrFaturamentoGP
+
+      FROM _INSIGHT.TBBRUTA t1
+	  LEFT JOIN TBCARTEIRAGRUPO t2 ON(t1.CdGpEconomico = t2.CdGrupoEconomico)
+
+      WHERE t1.TpLancamento = 'Pessoa' AND
+			t1.TpPessoa = 'J' AND
+
+			t1.CdGpEconomico NOT = . AND
+           	t1.NuCpfCnpjRaiz NOT = '00000000' AND
+			t1.NuCpfCnpj NOT = '00000000000000' AND
+			t2.NmAnalistaCredito NOT IN ('S/INF' 'MASSIFICADA' '')
+
+;QUIT;
+
+PROC SQL;
+
+   CREATE TABLE VADU_GruposEco AS SELECT DISTINCT
+
+		CdPessoa,
+	    NuCpfCnpj,
+	    NmPessoa,
+		CdGpEconomico,
+	    NmGpEconomico,
+		VrFaturamentoP,
+		VrFaturamentoGP,
+		0 as NivelGarantia,
+		0 as AtrasoInterno,
+		0 as AtrasoInternoQt,
+		0 as ILM,
+		'N' as PendenciaFormalizacao,
+		CATX(',', email_analista, email_gerente,'#BCOMonitoramentoeChecagem@bancovotorantim.com.br', 'matheus.cavalcante@bv.com.br', 'fabiola.silva1@bv.com.br') AS EMAIL,
+		NmAnalistaCredito,
+		NmGerenteCredito,
+		NmOfficer
+
+      FROM QUERY_FOR_TBBRUTA
+	  order by CdGpEconomico
+
+;QUIT;
+
+proc sql;
+   create table VADU_GruposEco_teste as
+   select distinct
+        73609 as CdPessoa,
+        '86046612000130' as NuCpfCnpj,
+        'MOVEIS RUDNICK S/A' as NmPessoa,
+        10442 as CdGpEconomico,
+        'MOVEIS RUDNICK' as NmGpEconomico,
+        134621000 as VrFaturamentoP,
+        134621000 as VrFaturamentoGP,
+        0 as NivelGarantia,
+        0 as AtrasoInterno,
+        0 as AtrasoInternoQt,
+        0 as ILM,
+        'N' as PendenciaFormalizacao,
+        catx(',', 'matheus.cavalcante@bv.com.br', 'fabiola.silva1@bv.com.br') as EMAIL,
+        'LEONARDO.SILVA2' as NmAnalistaCredito,
+        'RODRIGO.ACASTRO' as NmGerenteCredito,
+        'ARTUR EDUARDO DA NAVE E CASTRO' as NmOfficer
+
+   from sashelp.class
+
+
+;quit;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DATA VADU_GruposMonitoramento;
+SET ANALIST ;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Gera bases manutenção */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+   create table VADU_GruposEco_teste as
+   select distinct
+        73609 as CdPessoa,
+        '86046612000130' as NuCpfCnpj,
+        'MOVEIS RUDNICK S/A' as NmPessoa,
+        10442 as CdGpEconomico,
+        'MOVEIS RUDNICK' as NmGpEconomico,
+        134621000 as VrFaturamentoP,
+        134621000 as VrFaturamentoGP,
+        0 as NivelGarantia,
+        0 as AtrasoInterno,
+        0 as AtrasoInternoQt,
+        0 as ILM,
+        'N' as PendenciaFormalizacao,
+        catx(',', 'matheus.cavalcante@bv.com.br', 'fabiola.silva1@bv.com.br') as EMAIL,
+        'LEONARDO.SILVA2' as NmAnalistaCredito,
+        'RODRIGO.ACASTRO' as NmGerenteCredito,
+        'ARTUR EDUARDO DA NAVE E CASTRO' as NmOfficer
+
+   from sashelp.class
+
+
+;quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_VADU_GRUPOSECO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_VADU_GRUPOSECO AS
+   SELECT 
+            (COUNT(DISTINCT(t1.NuCpfCnpj))) AS COUNT_DISTINCT_of_NuCpfCnpj,
+          t1.NuCpfCnpj
+      FROM WORK.VADU_GRUPOSECO t1
+      GROUP BY t1.NuCpfCnpj
+      HAVING (CALCULATED COUNT_DISTINCT_of_NuCpfCnpj) > 1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.VADU_GRUPOSMONITORAMENTO
+    OUTFILE='N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\02.GrupoMonitoramento\VADU_GruposMonit.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.VADU_GRUPOSECO
+    OUTFILE='N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\01.GrupoEconomico\VADU_GRUPOSECO.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.VADU_GRUPOSECO
+    OUTFILE='N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\03.GrupoEconomico_new_project\VADU_GRUPOSECO.csv'
+    DBMS=csv REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.VADU_GRUPOSECO_TESTE
+    OUTFILE='N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\04.VADU\02.Manutencao\03.GrupoEconomico_new_project\VADU_GRUPOSECO_teste.csv'
+    DBMS=csv REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */

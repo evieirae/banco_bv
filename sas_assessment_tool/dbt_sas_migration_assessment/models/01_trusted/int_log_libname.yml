@@ -1,0 +1,35 @@
+version: 1
+
+models:
+  - name: int_log_libname
+    description: >
+      Intermediate table responsible for detailed parsing of SAS `LIBNAME` statements 
+      extracted from logs. This model classifies libraries into relational databases (DATABASE), 
+      physical directories (PATH), or system commands (CLEAR/LIST), accurately separating 
+      data engines, paths, and connection parameters. It is an essential model for mapping 
+      data sources and building automated data lineage for the PySpark/Databricks migration.
+    columns:
+      - name: log_file
+        description: "Name of the masked log file from which the statement was extracted."
+      - name: project_name
+        description: "Corresponding SAS Enterprise Guide (.egp) project name."
+      - name: task_name
+        description: "Name of the task (or program) within the SAS EGP project where the code was executed."
+      - name: content
+        description: "The original `LIBNAME` statement, cleaned only of line breaks and comments."
+      - name: libname_alias
+        description: "The alias assigned to the SAS library (e.g., `DBEP`, `HIST`, `CART&MES4.`). This is the key used in FROM/JOIN statements within the SAS code."
+      - name: libname_type
+        description: "Functional classification of the statement. Can be `DATABASE` (relational or meta databases), `PATH` (physical files/XML/JSON), `CLEAR` (reference cleanup), or `LIST` (log diagnostics)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['DATABASE', 'PATH', 'CLEAR', 'LIST']
+      - name: libname_path
+        description: "The physical directory or file path on disk. Populated exclusively when `libname_type` is `PATH`."
+      - name: connection_engine
+        description: "The data access engine used by SAS (e.g., `BASE`, `ORACLE`, `META`, `XML`, `SQLSVR`)."
+      - name: connection_options
+        description: "Parameters, credentials, and configurations for database connections (e.g., `USER=... PASSWORD=... SCHEMA=...`). Populated only for `DATABASE`."
+      - name: path_options
+        description: "Advanced read/write options and configurations for physical files (e.g., `COMPRESS=YES`, `ENCODING=...`). Populated only for `PATH`."

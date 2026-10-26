@@ -1,0 +1,182 @@
+START_METADATA
+PROJECT: Rodas__Incentivo_Comercial
+FILE_SAS: 01 - TbGrComissaoPerf_Analitica.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -25
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 107
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBGRINCENTIVO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBGRCOMISSAOPERF_ANALITICA
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: ICOM
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_META_PRODUCAO_ANALITICA_03, WORK.TBGRCOMISSAOPERF_ANALITICA
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRINCENTIVO [PROC SQL - JOIN], WORK.BASE_META_PRODUCAO_ANALITICA_03 [PROC SQL - FROM], WORK.TBGRCOMISSAOPERF_ANALITICA [DATA Step - SET; PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ICOM.TBGRCOMISSAOPERF_ANALITICA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBGRCOMISSAOPERF_ANALITICA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE TBGRCOMISSAOPERF_ANALITICA AS
+SELECT
+
+A.NuAnoMes,
+
+B.NmCanalEstruturaComercial,
+B.NmEstruturaComercialA,
+B.NmSubEstruturaComercialA,
+B.NmAreaEstruturaComercial,
+B.LstSubstituicao,
+B.LstColaboradorFocal,
+
+B.DsLoginN3A,
+CASE WHEN B.DsLoginN2A = '' THEN 'cadeira.vazia' ELSE B.DsLoginN2A END AS DsLoginN2A,
+
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+A.TpValor,
+
+A.VrMedida_Seguros,
+A.VrDenominador_Seguros,
+A.VrMetaN1_Seguros,
+A.VrMetaProducaoN1_Seguros,
+A.Pc_Ating_SPF_AP,
+A.VrMedidaMC_Rodas,
+A.VrMargemDescontos_MC_Rodas,
+A.VrMetaMC_Rodas,
+A.Pc_Ating_MC_Rodas,
+A.VrMedidaMC_EGV,
+A.VrMargemDescontos_MC_EGV,
+A.VrMetaMC_EGV,
+A.Pc_Ating_MC_EGV,
+A.QtNumeradorNI_ContaDigital,
+A.QtDenominadorNI_ContaDigital,
+A.VrMeta_ContaDigital,
+A.Pc_Ating_Conta_Digital,
+A.VrMedida_NaPista,
+A.VrMeta_NaPista,
+A.Pc_Ating_NaPista,
+A.VrMedida_Inad15,
+A.VrDenominador_Inad15,
+A.VrMeta_Inad15,
+A.Pc_Ating_Inad15,
+
+A.VrMedida_Extra_Seguros,
+A.VrDenominador_Extra_Seguros,
+A.VrMetaN1_Extra_Seguros,
+A.VrMetaProducaoN1_Extra_Seguros,
+A.Pc_Ating_Seguros_Total,
+A.VrMargemDescontos_ExtraSeguros,
+A.Pc_Ating_MC_Total,
+A.Pc_Ating_ExtraSeguros,
+
+A.VrMedida_ExtraSegurosAuto,
+A.VrMetaN1_ExtraSegurosAuto,
+A.Pc_Ating_ExtraSegurosAuto,
+
+A.QtNumerador_PenPDV,
+A.QtDenominador_PenPDV,
+A.VrMeta_PenPDV,
+A.Pc_Ating_PenPDV
+
+FROM WORK.BASE_META_PRODUCAO_ANALITICA_03 A
+
+LEFT JOIN BASEGRC.TBGRINCENTIVO B ON B.DsLoginN1 = A.DsLoginN1 AND B.NUANOMES = A.NUANOMES
+
+;RUN;
+
+/*********************************************************************************/
+/*DELETAMOS ESTE INDICADOS DA BASE POIS ELE É VALIDO SOMENTE DE MAIO/25 EM DIANTE*/
+/*********************************************************************************/
+
+PROC SQL;
+DELETE FROM WORK.TBGRCOMISSAOPERF_ANALITICA
+WHERE
+(NUANOMES <= 202504 OR NuAnoMes >= 202509)
+AND TpValor in ('ExtraSeguros')
+;RUN;
+
+/****************************************************************************/
+/*DELETAMOS ESTE INDICADOR DA BASE POIS ELE É VALIDO SOMENTE PARA DEZEMBRO-25/
+/****************************************************************************/
+
+PROC SQL;
+DELETE FROM WORK.TBGRCOMISSAOPERF_ANALITICA
+WHERE
+NuAnoMes NOT IN (202512, 202601)
+AND TpValor in ('ExtraSeguros_Auto')
+;RUN;
+
+/***********************************************************************************/
+/*AJUSTAMOS A NOMENCLATURA DE PENPDV PARA PenPDV_Pesados - PARA USAR NA BASE ABAIXO*/
+/***********************************************************************************/
+
+proc sql;
+update TBGRCOMISSAOPERF_ANALITICA set TpValor = 'PenPDV_Pesados'
+where TpValor in ('PenPdv');
+;run;
+
+/****************************************************************/
+/*O INDICADOR PENPDV É SOMENTE PARA O CARGO GR EXCLUSIVO PESADOS*/
+/****************************************************************/
+
+PROC SQL;
+DELETE FROM WORK.TBGRCOMISSAOPERF_ANALITICA
+WHERE
+NuAnoMes >= 202601
+AND TpValor in ('PenPDV_Pesados')
+AND NmSubEstruturaComercialA NOT IN ('Canal Pesados')
+;RUN;
+
+/*******************************/
+/*FAZ BKP DA ÚLTIMA BASE VALIDA*/
+/*******************************/
+
+/*
+DATA ICOM_BKP.TBCOMPERF_ANALITICA_BKP_&AnoMes.;
+SET ICOM.TBGRCOMISSAOPERF_ANALITICA;
+;RUN;
+*/
+
+/******************/
+/*SALVA BASE FINAL*/
+/******************/
+
+DATA ICOM.TBGRCOMISSAOPERF_ANALITICA;
+SET WORK.TBGRCOMISSAOPERF_ANALITICA;
+;RUN;

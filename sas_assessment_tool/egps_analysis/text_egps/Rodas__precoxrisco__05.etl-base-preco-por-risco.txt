@@ -1,0 +1,307 @@
+START_METADATA
+PROJECT: Rodas__precoxrisco
+FILE_SAS: 05.etl-base-preco-por-risco.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 12)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 249
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/BA/PROCESSOS/OUTPUT/PRECO_POR_RISCO_ANALITICA.CSV [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: INFGER
+IMPORTED FILES (Requires Ingestion): /infogrc/precoxrisco/ppr_analitico.sas7bdat, /riscosbvf/BA/processos/output/preco_por_risco_analitica.csv
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/precoxrisco/ppr_analitico.sas7bdat, /riscosbvf/BA/processos/output/preco_por_risco_analitica.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): INFGER.PPR_ANALITICO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: EXPORTAR_PPR, PROJETO_DELTA_PRECO_STEP_1, PROJETO_DELTA_PRECO_STEP_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/precoxrisco/ppr_analitico.sas7bdat
+[CODE REF] /riscosbvf/BA/processos/output/preco_por_risco_analitica.csv
+
+END_METADATA
+================================================================================
+/*
+   STEP 05.01
+   Montagem das bases de preço por risco
+*/
+
+PROC SQL;
+  CREATE TABLE PROJETO_DELTA_PRECO_STEP_1 AS
+    SELECT DISTINCT
+      Consolidado.Safra,
+      Consolidado.NuProposta,
+      Consolidado.NuContrato,
+      Consolidado.DtEntradaProposta,
+      Consolidado.NuCpfCnpj,
+      COALESCE(Cliente.FlPAP,Cliente2.FlPAP) as FlPAP,
+      Consolidado.Produto,
+	  Consolidado.TpVeiculo,
+      INPUT(SUBSTR(Consolidado.NuCpfCnpj,6,2),2.) AS SubCpfCnpj,
+      Consolidado.DtContrato,
+      Consolidado.TpOrigemTaxa,
+      INTCK('day', Consolidado.DtEntradaProposta, Consolidado.DtContrato) AS DiasEfetivacao,
+      Conversao.DiasConversao,
+      Consolidado.StProposta,
+      COALESCE(PropostasCtr.OrigemProposta,'CREW') AS SistemaEdicao,
+      DeltaPreco.SistemaOrigem AS SistemaEdicaoBI,
+      DeltaPreco.FlProbAprNegativa,
+      Consolidado.FlagSPF,
+      Consolidado.FlagCAP,
+      Consolidado.FlagAuto,
+      Consolidado.VrSeguros,
+      Consolidado.DsTipoCanalProducao,
+      Consolidado.TpPessoa,
+      Consolidado.CdConvenio,
+      Consolidado.TxGerencial,
+      Consolidado.FlPropostaOriginada,
+      Consolidado.FlPropostaAprovada,
+      Consolidado.FlPropostaEfetivada,
+      Consolidado.FlConversao,
+      Conversao.Banco AS BancoConversao,
+      Consolidado.StPropostaConversao,
+      Consolidado.QtAnosIdade,
+      Consolidado.FlTxAlterada,
+      Consolidado.FxIdade,
+      Consolidado.NuScoreFim,
+      Consolidado.CdTabelaFinanciamento,
+      Consolidado.VrPrestacao,
+      Consolidado.PcEntrada,
+      Consolidado.QtDiasCarencia,
+      Consolidado.VrFinanciamento,
+      Consolidado.QtParcelas,
+      Consolidado.VrPDD,
+      Consolidado.RUPE,
+      Consolidado.FaixaRUPE,
+      Consolidado.TxTIRContabil,
+      Consolidado.UF,
+      Consolidado.RegiaoBR,
+      Consolidado.Regional,
+      Consolidado.VrProposta,
+      Consolidado.VrEntrada,
+      Consolidado.VrLiberado,
+      Consolidado.VrPropostaOriginada,
+      Consolidado.VrProducao,
+      DeltaPreco.PcEntradaAjustada,
+      DeltaPreco.TxFinanciamentoSolicitada,
+      DeltaPreco.TpOrigemTaxaDelta,
+      DeltaPreco.VariacaoTaxaSolicitada,
+      DeltaPreco.TaxaComDelta,
+      DeltaPreco.PcVariacaoTabelaFinanciamento,
+      PropostasCtr.TxPactuada,
+      PropostasCtr.TxCetCalculada,
+      CASE WHEN Consolidado.VrSeguros = . THEN Seguros.VrTotalSeguro
+           ELSE Consolidado.VrSeguros
+      END AS VrTotalSeguro,
+      PropostasCtr.PcTaxaRetorno AS PcTxRetorno,
+      DeltaPreco.TxInicioFinanciamento,
+      DeltaPreco.Politica,
+      DeltaPreco.FlagDelta,
+      ROUND(DeltaPreco.PcProbabilidadeAprovacao, 0.0001) AS PcProbabilidadeAprovacao,
+      DeltaPreco.TxOriginalFinanciamento,
+      PropostasCtr.PcTaxaAlterada,
+      PropostasCtr.PcMargemLiquida,
+      PropostasCtr.TpOrigemTaxa,
+      PropostasCtr.QtAlteracao,
+      PropostasCtr.CdTaxaRetorno,
+      DeltaPreco.QtdSimulacoes,
+      ((PropostasCtr.PcMargemLiquida/100) * Consolidado.VrProposta) AS MargemPonderada,
+      Consolidado.CdFilial,
+      Consolidado.DsFilial,
+      Consolidado.VpSpread,
+      Consolidado.VpTxGerencial,
+      Consolidado.VpTirContabil,
+      Consolidado.VpIdade,
+      Consolidado.VpPrazo,
+      Consolidado.VpScore,
+      Consolidado.VpEntrada,
+      ((DeltaPreco.TxOriginalFinanciamento*100) / Consolidado.VrProposta) AS VpTxOriginalProposta,
+      Consolidado.VrMargem,
+      CASE WHEN ROUND(DeltaPreco.TxInicioFinanciamento,0.01) = ROUND(PropostasCtr.PcTaxaAlterada,0.01) THEN 'S' ELSE 'N' END AS SimuValida,
+      (PropostasCtr.PcTaxaAlterada - DeltaPreco.TaxaComDelta) AS VarTaxaAlterada
+    FROM
+      TbConsolidado Consolidado
+    LEFT JOIN DELTA_PRECO_CONV DeltaPreco
+      ON Consolidado.NuProposta = DeltaPreco.NuProposta
+    LEFT JOIN PROPOSTAS_CTR PropostasCtr
+      ON Consolidado.NuProposta = PropostasCtr.NuProposta
+    LEFT JOIN INFO_SEGUROS Seguros
+      ON Consolidado.NuProposta = Seguros.NuProposta
+    LEFT JOIN INFOCLIENTE Cliente
+      ON Consolidado.NuProposta = Cliente.NuProposta
+	LEFT JOIN INFOCLIENTE2 Cliente2
+      ON Consolidado.NuProposta = Cliente2.NuProposta
+    LEFT JOIN CONVERSAO Conversao
+      ON Consolidado.NuProposta = Conversao.NuProposta;
+RUN;
+
+PROC SQL;
+  CREATE TABLE PROJETO_DELTA_PRECO_STEP_2 AS
+    SELECT DISTINCT
+      Safra,
+      NuProposta,
+      NuContrato,
+      Produto,
+      DtEntradaProposta format=mmddyy10.,
+      DtContrato format=mmddyy10.,
+      NuCpfCnpj,
+      FlPAP,
+      TpOrigemTaxa,
+      TxOriginalFinanciamento AS TaxaTabela FORMAT=NUM18.2,
+      PcVariacaoTabelaFinanciamento AS DeltaAplicado FORMAT=NUM18.2,
+      TaxaComDelta FORMAT=NUM18.2,
+      VarTaxaAlterada FORMAT=NUM18.2,
+      PcTaxaAlterada AS TaxaAlterada FORMAT=NUM18.2,
+      TxFinanciamentoSolicitada AS TaxaFinanciamentoSolicitada FORMAT=NUM18.2,
+      VariacaoTaxaSolicitada FORMAT=NUM18.2,
+      TxInicioFinanciamento AS TaxaNetBI FORMAT=NUM18.2,
+      TxGerencial AS TaxaGerencial FORMAT=NUM18.2,
+      TxPactuada AS TaxaPactuada FORMAT=NUM18.2,
+      TxCetCalculada AS TaxaCet FORMAT=NUM18.2,
+      PcTxRetorno AS TaxaRetorno FORMAT=NUM18.2,
+      (PcVariacaoTabelaFinanciamento * VrProposta) AS VpDeltaAplicado format=num18.2,
+      (TaxaComDelta * VrProposta) AS VpTaxaComDelta format=num18.2,
+      (TxPactuada * VrProposta) AS VpTaxaPactuada FORMAT=NUM18.2,
+      (TxCetCalculada * VrProposta) AS VpTaxaCet FORMAT=NUM18.2,
+      (TxFinanciamentoSolicitada * VrProposta) AS VpTaxaFinanciamentoSolicitada FORMAT=NUM18.2,
+      (PcTaxaAlterada * VrProposta) AS VpTaxaAlterada FORMAT=NUM18.2,
+      (VariacaoTaxaSolicitada * VrProposta) AS VpVariacaoTaxaSolicitada FORMAT=NUM18.2,
+      VpSpread format=num18.8,
+      VpTxGerencial format=num18.4,
+      VpTirContabil format=num18.4,
+      VpIdade format=num18.4,
+      VpPrazo format=num18.4,
+      VpScore format=num18.4,
+      VpEntrada format=num18.4,
+      VpTxOriginalProposta format=num18.4,
+      VrMargem format=num18.4,
+      DiasEfetivacao,
+      DiasConversao,
+      StProposta,
+      FlagSPF,
+      FlagCAP,
+      FlagAuto,
+      VrSeguros format=num18.2,
+      DsTipoCanalProducao,
+      TpPessoa,
+      CdConvenio,
+      FlProbAprNegativa,
+      FlPropostaOriginada,
+      FlPropostaAprovada,
+      FlPropostaEfetivada,
+      FlConversao,
+      BancoConversao,
+      StPropostaConversao,
+      QtAnosIdade,
+      FlTxAlterada,
+      FxIdade,
+      NuScoreFim format=num18.1,
+      CdTabelaFinanciamento,
+      VrPrestacao format=num18.2,
+      PcEntrada format=num18.2,
+      QtDiasCarencia,
+      VrFinanciamento format=num18.2,
+      QtParcelas,
+      VrPDD format=num18.2,
+      RUPE format=num18.10,
+      FaixaRUPE,
+      TxTIRContabil format=num18.5,
+      UF,
+      RegiaoBR,
+      Regional,
+      VrProposta format=num18.2,
+      VrEntrada format=num18.2,
+      VrLiberado format=num18.2,
+      VrPropostaOriginada format=num18.2,
+      VrProducao format=num18.2,
+      PcEntradaAjustada format=num18.2,
+      VrTotalSeguro format=num18.2,
+      FlagDelta AS FlDeltaSimu,
+      PcProbabilidadeAprovacao format=num18.2,
+      PcMargemLiquida format=num18.2,
+      TpOrigemTaxa,
+      QtAlteracao,
+      QtdSimulacoes,
+      MargemPonderada format=num18.2,
+      CdFilial,
+      DsFilial,
+      CASE WHEN QtParcelas BETWEEN  1 AND 12 THEN 12
+           WHEN QtParcelas BETWEEN 13 AND 24 THEN 24
+           WHEN QtParcelas BETWEEN 25 AND 36 THEN 36
+           WHEN QtParcelas BETWEEN 37 AND 48 THEN 48
+           WHEN QtParcelas BETWEEN 49 AND 60 THEN 60
+      END AS PrazoFinanciamento,
+      CASE WHEN PcEntradaAjustada BETWEEN  0.0  AND 10 THEN "0 - 10%"
+           WHEN PcEntradaAjustada BETWEEN 10.01 AND 20 THEN "11 - 20%"
+           WHEN PcEntradaAjustada BETWEEN 20.01 AND 30 THEN "21 - 30%"
+           WHEN PcEntradaAjustada BETWEEN 30.01 AND 40 THEN "31 - 40%"
+           WHEN PcEntradaAjustada BETWEEN 40.01 AND 50 THEN "41 - 50%"
+           WHEN PcEntradaAjustada > 50 THEN "Maior que 50%"
+      END AS FaixaEntrada,
+      CASE WHEN PcProbabilidadeAprovacao <= 0.5 THEN 'ZERO'
+     	 WHEN PcProbabilidadeAprovacao <= 6.0 THEN 'ATÉ 6,0'
+	     WHEN PcProbabilidadeAprovacao <= 7.3 THEN '6,25-7,25'
+	  	 WHEN PcProbabilidadeAprovacao <= 7.9 THEN '7,5-7,75'
+	     WHEN PcProbabilidadeAprovacao <= 8.5 THEN '8,25-8,5'
+	     WHEN PcProbabilidadeAprovacao <= 9.8 THEN '8,75-9,75'
+	     WHEN PcProbabilidadeAprovacao <= 10  THEN '10'
+	     ELSE 'ZERO'
+	END AS FaixaScore,
+      SistemaEdicao,
+      SistemaEdicaoBI,
+      SimuValida,
+	  TpVeiculo
+    FROM
+      PROJETO_DELTA_PRECO_STEP_1
+    WHERE Produto IN ('Leves-BVO','Leves','CVG Leves','Motos','Pesados','CVG Pesados');
+RUN;
+
+DATA EXPORTAR_PPR;
+SET PROJETO_DELTA_PRECO_STEP_2;
+WHERE Safra >= 202101 AND Produto in ('Leves','Leves-BVO');
+RUN;
+
+filename exprt2 '/riscosbvf/BA/processos/output/preco_por_risco_analitica.csv' encoding="utf-8";
+
+proc export
+data=EXPORTAR_PPR
+outfile=exprt2 replace
+dbms=dlm;
+delimiter=';';
+run;
+
+%if %sysfunc(exist(PROJETO_DELTA_PRECO_STEP_2)) %then %do;
+  X 'rm /infogrc/precoxrisco/ppr_analitico.sas7bdat';
+
+  DATA INFGER.PPR_ANALITICO;
+  SET PROJETO_DELTA_PRECO_STEP_2;
+  RUN;
+%end;

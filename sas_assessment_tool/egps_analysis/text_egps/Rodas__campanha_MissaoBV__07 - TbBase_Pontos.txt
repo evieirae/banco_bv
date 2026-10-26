@@ -1,0 +1,161 @@
+START_METADATA
+PROJECT: Rodas__campanha_MissaoBV
+FILE_SAS: 07 - TbBase_Pontos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), PROC APPEND (1x | +15), INFILE  (1x | +10), ARRAY (5x | +75)
+----------------------------------------
+LINES_OF_CODE: 89
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CMBV = /infogrc/Campanha_MissaoBV; CMBV_BKP = /infogrc/Campanha_MissaoBV/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes, Max_Base_Pts
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/CAMPANHA_MISSAOBV/IMPORT/TABELAPONTOS.CSV [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.MAX_DATA, WORK.TBPTS_CRESCIMENTO_1, WORK.TBTABELAPONTOS
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CMBV
+IMPORTED FILES (Requires Ingestion): /infogrc/Campanha_MissaoBV/Import/TabelaPontos.csv, /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.MAX_DATA, WORK.TBPTS_CRESCIMENTO_1, WORK.TBPTS_CRESCIMENTO_2, WORK.TBPTS_CRESCIMENTO_3, WORK.TBTABELAPONTOS
+TABLE_READ_PROVENANCE (Flow): CMBV.BASE_PONTOS [PROC SQL - FROM], WORK.MAX_DATA [DATA Step - SET], WORK.TBPTS_CRESCIMENTO_1 [DATA Step - SET], WORK.TBPTS_CRESCIMENTO_2 [DATA Step - SET], WORK.TBPTS_CRESCIMENTO_3 [PROC APPEND - DATA=], WORK.TBTABELAPONTOS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/Campanha_MissaoBV/Import/TabelaPontos.csv, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): CMBV.BASE_PONTOS
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CMBV.BASE_PONTOS
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CMBV.BASE_PONTOS
+APPEND_ONLY_OUTPUTS: CMBV.BASE_PONTOS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CMBV.BASE_PONTOS
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: MAX_DATA, TBPTS_CRESCIMENTO_1, TBTABELAPONTOS, WORK.TBPTS_CRESCIMENTO_2, WORK.TBPTS_CRESCIMENTO_3
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/Campanha_MissaoBV/Import/TabelaPontos.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CMBV '/infogrc/Campanha_MissaoBV';
+LIBNAME CMBV_BKP '/infogrc/Campanha_MissaoBV/Bases_BKP';
+
+/********************************************/
+/*IMPORT BASE PONTOS DO ATINGIMENTO DE METAS*/
+/********************************************/
+
+DATA TbTabelaPontos;
+  INFILE "/infogrc/Campanha_MissaoBV/Import/TabelaPontos.csv"
+  ENCODING="UTF-8" FIRSTOBS=2 MISSOVER DSD TRUNCOVER DELIMITER=",";
+
+  INPUT
+        AnoMes           : ?? BEST6.
+        NuAnoMes         : ?? BEST6.
+        NmCanalEstruturaComercial : $CHAR14.
+        NmSubEstruturaComercialA : $CHAR17.
+        DsLoginN1        : $CHAR20.
+        QtAtingMetaSummarize : ?? BEST10.
+        QtdDeflator2     : ?? BEST10.
+        QtdDeflator      : ?? BEST10.
+        Pontuacao     : ?? BEST10. ;
+  FORMAT
+        AnoMes           :  BEST6.
+        NuAnoMes         :  BEST6.
+        NmCanalEstruturaComercial : $CHAR14.
+        NmSubEstruturaComercialA : $CHAR17.
+        DsLoginN1        : $CHAR20.
+        QtAtingMetaSummarize : BEST10.
+        QtdDeflator2     :  BEST10.
+        QtdDeflator      : BEST10.
+        Pontuacao     : BEST10. ;
+  INFORMAT
+        AnoMes           :  BEST6.
+        NuAnoMes         :  BEST6.
+        NmCanalEstruturaComercial : $CHAR14.
+        NmSubEstruturaComercialA : $CHAR17.
+        DsLoginN1        : $CHAR20.
+        QtAtingMetaSummarize : BEST10.
+        QtdDeflator2     :  BEST10.
+        QtdDeflator      : BEST10.
+        Pontuacao     : BEST10. ;
+RUN;
+
+/**************************************************/
+/*VERIFICAR SE O MÊS ATUAL TEVE CRESCIMENTO DE PONTOS*/
+/*BASE DO MÊS ATUAL DA CAMPANHA PARA VER O CRESCIMENTO DE PONTOS*/
+/**************************************************/
+/*PRECISAMOS ALTERAR A DATA DA CONSULTA PARA JUL-AGO-SET QUE SÃO OS MESES DA CAMPANHA*/
+
+PROC SQL;
+CREATE TABLE TbPts_Crescimento_1 AS
+SELECT
+
+A.NUANOMES,
+A.DSLOGINN1,
+sum(CASE WHEN A.Pontuacao <= 0 THEN 0 ELSE A.Pontuacao END) AS VrPTS
+
+FROM WORK.TbTabelaPontos A
+
+/*where NUANOMES = &Base_Mes.*/
+
+group by 1,2
+order by 2,1
+
+;RUN;
+
+/*SUBSTITUI TUDO QUE FOI "MISSING OU '.' POR '0'*/
+/*ALGUNS CASOS ESTÃO "VAZIOS" AO FINALIZAR O SCRIPT*/
+
+data work.TbPts_Crescimento_2;
+	set work.TbPts_Crescimento_1;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+/*DATA CMBV.BASE_PONTOS;*/
+/*SET WORK.TbPts_Crescimento_2;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_Base_Pts
+FROM CMBV.BASE_PONTOS
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_Base_Pts',Max_Base_Pts);
+;run;
+%PUT &Max_Base_Pts;
+
+PROC SQL;
+DELETE FROM CMBV.BASE_PONTOS
+WHERE NUANOMES = &Max_Base_Pts.;
+;RUN;
+
+DATA WORK.TbPts_Crescimento_3;
+SET WORK.TbPts_Crescimento_2;
+WHERE NuAnoMes = &Base_Mes.;
+;RUN;
+
+PROC APPEND BASE=CMBV.BASE_PONTOS DATA=WORK.TbPts_Crescimento_3;RUN;

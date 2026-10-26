@@ -1,0 +1,331 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV
+FILE_SAS: 2 - Gera csv Simulacoes Parceiros Digitais.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 95
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 226
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (16x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: TIMESTAMP, dir_csv
+DETECTED_MACROS_USED: dir_csv, timestamp
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], SOLITMP.EGV_PDEC_CREDITO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): SOLITMP.EGV_PDEC_CREDITO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./EGV_DLV_Abastece_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Ame_Simu_&timestamp..csv, &dir_csv./EGV_DLV_BomPraCredito_Simu_&timestamp..csv, &dir_csv./EGV_DLV_ConsumidorPos_Simu.csv, &dir_csv./EGV_DLV_CredTruck_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Easy_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Finanzero_Simu.csv, &dir_csv./EGV_DLV_Franq_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Gringo_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Inklo_Simu_&timestamp..csv, &dir_csv./EGV_DLV_JurosBaixo_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Meliuz_Simu_&timestamp..csv, &dir_csv./EGV_DLV_QueroQuitar_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Quero_Financiar_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Serasa_Simu_&timestamp..csv, &dir_csv./EGV_DLV_Tatos_Simu_&timestamp..csv
+TEMP/DISCARDED OUTPUTS: PDEC_PARCEIROS, TBABASTECE, TBAME, TBBOMPRACREDITO, TBCONSUMIDORPOS, TBCREDTRUCK, TBEASY, TBFINANZERO, TBFRANQ, TBGRINGO, TBINKLO, TBJUROSBAIXO, TBMELIUZ, TBQUEROQUITAR, TBQUERO_FINANCIAR, TBSERASA, TBTATOS
+DYNAMIC REFS (Ambiguous): {TIMESTAMP}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	2 - Gera csv Parceiros DIgitais.sas														| */
+/* | Descricao: Programa para arquivos csv dos parceiros digitais.					| */
+/* | Objetivo: 	Envio para os parceiros via B2B. 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+%LET TIMESTAMP = %SYSFUNC(DATE(),YYMMDDN8.);
+/* ======================================================================================*/
+/* =====================Gera csv parceiros digitais=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+   CREATE TABLE PDEC_PARCEIROS AS
+   SELECT
+		t1.nuanomes,
+		t1.NuCpfCnpj,
+		t1.DtSimulacaoInicial,
+		t1.CdSimulacaoInicial,
+		t1.CdParceiroComercial,
+		t1.NmParceiroComercial,
+		t1.DsTipoCanalProducao,
+		t1.FlSimulacao,
+		t1.FlSimuValida,
+		t1.FlSimuValidaEfet,
+		t1.FlPropostaOriginada,
+		t1.FlPropostaAprovada,
+		t1.FlPropostaEfetivada,
+		t1.FlPropostaPaga
+      FROM SOLITMP.EGV_PDEC_CREDITO t1
+	  WHERE t1.nuanomes >= year(today())*100+month(today())-1
+	  AND t1.flparceirodigital = 'S'
+ ;
+QUIT;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+/* FINANZERO */
+
+DATA TbFinanzero;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'FINANZERO'));
+run;
+
+PROC EXPORT
+	DATA= TbFinanzero
+	FILE="&dir_csv./EGV_DLV_Finanzero_Simu.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* QUERO_FINANCIAR */
+
+DATA TbQuero_Financiar;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'FINANCIAR'));
+NmPessoa='';
+NuCpfCnpj='';
+run;
+
+/*EXPORTA RESULTADO*/
+
+PROC EXPORT
+	DATA= TbQuero_Financiar
+	FILE="&dir_csv./EGV_DLV_Quero_Financiar_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* GRINGO */
+
+DATA TbGringo;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'GRINGO'));
+run;
+
+/*EXPORTA RESULTADO GRINGO*/
+
+PROC EXPORT
+	DATA= TbGringo
+	FILE="&dir_csv./EGV_DLV_Gringo_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* EASY */
+
+DATA TbEasy;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'EASY'));
+run;
+
+/*EXPORTA RESULTADO EASY*/
+
+PROC EXPORT
+	DATA= TbEasy
+	FILE="&dir_csv./EGV_DLV_Easy_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* ABASTECE AI */
+
+DATA TbAbastece;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'ABASTECE'));
+run;
+
+/*EXPORTA RESULTADO ABASTECE*/
+PROC EXPORT
+	DATA= TbAbastece
+	FILE="&dir_csv./EGV_DLV_Abastece_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* JUROS BAIXO */
+
+DATA TbJurosBaixo;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'JUROS'));
+run;
+
+/*EXPORTA RESULTADO JUROS BAIXO*/
+
+PROC EXPORT
+	DATA= TbJurosBaixo
+	FILE="&dir_csv./EGV_DLV_JurosBaixo_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* CREDTRUCK */
+
+DATA TbCredTruck;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'TRUCK'));
+run;
+
+/*EXPORTA RESULTADO CREDTRUCK*/
+
+PROC EXPORT
+	DATA= TbCredTruck
+	FILE="&dir_csv./EGV_DLV_CredTruck_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+/* BomPraCrédito */
+DATA TbBomPraCredito;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'BOM PRA CREDITO'));
+run;
+
+/*EXPORTA RESULTADO BomPraCrédito*/
+
+PROC EXPORT
+	DATA= TbBomPraCredito
+	FILE="&dir_csv./EGV_DLV_BomPraCredito_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+/* Inklo*/
+DATA TbInklo;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'INKLO'));
+run;
+
+/*EXPORTA RESULTADO Inklo*/
+
+PROC EXPORT
+	DATA= TbInklo
+	FILE="&dir_csv./EGV_DLV_Inklo_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* TATOS */
+
+DATA TbTatos;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'TATOS'));
+run;
+
+PROC EXPORT
+	DATA= TbTatos
+	FILE="&dir_csv./EGV_DLV_Tatos_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* FRANQ */
+
+DATA TbFranq;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'FRANQ'));
+run;
+
+PROC EXPORT
+	DATA= TbFranq
+	FILE="&dir_csv./EGV_DLV_Franq_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* SERASA */
+
+DATA TbSerasa;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'SERASA'));
+run;
+
+PROC EXPORT
+	DATA= TbSerasa
+	FILE="&dir_csv./EGV_DLV_Serasa_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* MELIUZ */
+
+DATA TbMeliuz;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'MELIUZ'));
+run;
+
+PROC EXPORT
+	DATA= TbMeliuz
+	FILE="&dir_csv./EGV_DLV_Meliuz_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+/* AME */
+
+DATA TbAme;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'AME'));
+run;
+
+PROC EXPORT
+	DATA= TbAme
+	FILE="&dir_csv./EGV_DLV_Ame_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* CONSUMIDOR+ */
+
+DATA TbConsumidorPos;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'CONSUMIDOR'));
+run;
+
+PROC EXPORT
+	DATA= TbConsumidorPos
+	FILE="&dir_csv./EGV_DLV_ConsumidorPos_Simu.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* QUERO QUITAR */
+
+DATA TbQueroQuitar;
+	set PDEC_PARCEIROS
+	(where=(UPPER(NmParceiroComercial) CONTAINS 'QUITAR'));
+run;
+
+PROC EXPORT
+	DATA= TbQueroQuitar
+	FILE="&dir_csv./EGV_DLV_QueroQuitar_Simu_&timestamp..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

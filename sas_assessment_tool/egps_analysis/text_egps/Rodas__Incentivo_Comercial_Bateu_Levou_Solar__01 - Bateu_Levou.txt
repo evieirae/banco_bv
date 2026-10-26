@@ -1,0 +1,352 @@
+START_METADATA
+PROJECT: Rodas__Incentivo_Comercial_Bateu_Levou_Solar
+FILE_SAS: 01 - Bateu_Levou.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -28
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), ARRAY (10x | +150)
+----------------------------------------
+LINES_OF_CODE: 238
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (8x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ICOMS = /infogrc/Incentivo_Comercial/Solar; ICOMSBKP = /infogrc/Incentivo_Comercial/Solar/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: AnoMes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBGRINCENTIVO [SAS/Local], BASEGRC.TBGRINCENTIVOCARGACOMISSAOMETA [SAS/Local], BASEGRC.TBGRINCENTIVOPESOFINAL [SAS/Local], BASEGRC.TBINCENTIVOALVOFINAL [SAS/Local], BASES.TBMETAPRODUCAOFINAL_DASH [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: ICOMS, ICOMSBKP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRINCENTIVO [PROC SQL - JOIN], BASEGRC.TBGRINCENTIVOCARGACOMISSAOMETA [PROC SQL - JOIN], BASEGRC.TBGRINCENTIVOPESOFINAL [PROC SQL - JOIN], BASEGRC.TBINCENTIVOALVOFINAL [PROC SQL - JOIN], BASES.TBMETAPRODUCAOFINAL_DASH [DATA Step - SET], ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR [DATA Step - SET], ICOMS.TBGRCOMISSAOPERF_SOLAR [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR, ICOMS.TBGRCOMISSAOPERF_SOLAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR, ICOMS.TBGRCOMISSAOPERF_SOLAR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR, ICOMS.TBGRCOMISSAOPERF_SOLAR, ICOMSBKP.TBCOMPERF_ANALITICA_BKP_&ANOMES, ICOMSBKP.TBGRCOMISSAOPERF_&ANOMES
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_META_PRODUCAO_ANALITICA, BASE_META_PRODUCAO_ANALITICA_01, BASE_META_PRODUCAO_ANALITICA_02, BASE_META_PRODUCAO_ANALITICA_03, BASE_META_PRODUCAO_ANALITICA_04, BASE_META_PRODUCAO_ANALITICA_05, BASE_META_PRODUCAO_ANALITICA_06, BASE_META_PRODUCAO_ANALITICA_07, BASE_META_PRODUCAO_ANALITICA_OK
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME ICOMS '/infogrc/Incentivo_Comercial/Solar';
+LIBNAME ICOMSBKP '/infogrc/Incentivo_Comercial/Solar/Bases_BKP';
+
+DATA BASE_META_PRODUCAO_ANALITICA;
+SET bases.TbMetaProducaoFinal_Dash;
+WHERE
+NUANOMES >= 202503
+AND DSLOGINN1 <> ''
+AND NmCanalEstruturaComercial = 'Canal Solar'
+and NmGrupoCargoColaborador IN ('Gerente Relacionamento Solar')
+and TpValor in ('VrSPF', 'VrAP', 'VrMargemContribuicao', 'Efetivacao', 'ParceiroProduzindo', 'VrAP_VrPlacaSolar')
+;RUN;
+
+Proc Sql;
+Create Table BASE_META_PRODUCAO_ANALITICA_OK as
+Select
+MetaProd.NuAnoMes
+,MetaProd.NmCanalEstruturaComercial
+,MetaProd.CdColaborador
+,MetaProd.NmGrupoCargoColaborador
+,MetaProd.NmGrupoProdutoMeta
+,MetaProd.DsLoginN1
+,MetaProd.TpValor
+,Sum(MetaProd.VrMedida) as VrMedida
+,Sum(MetaProd.VrSegurosCancelados) as VrSegurosCancelados
+,Sum(MetaProd.VrDenominador) as VrDenominador
+,Sum(MetaProd.VrMetaN1) as VrMetaN1
+,Sum(MetaProd.VrMetaProducaoN1) as VrMetaProducaoN1
+,Sum(MetaProd.VrMedidaNI) as VrMedidaNI
+,Sum(MetaProd.VrMargemDescontos) as VrMargemDescontos
+,Sum(MetaProd.VrMetaNIN1) as VrMetaNIN1
+,Sum(MetaProd.QtNumeradorNI) as QtNumeradorNI
+,Sum(MetaProd.QtDenominadorNI) as QtDenominadorNI
+
+From BASE_META_PRODUCAO_ANALITICA as MetaProd
+Group by 1,2,3,4,5,6,7
+;Quit;
+
+/*********************************************/
+/*UPDATES CASO NECESSÁRIO ZERAR ALGUNS CAMPOS*/
+/*********************************************/
+
+/**********************************************************************************************************/
+/*ZERA OS DADOS DE SEGUROS DE META ISONOMICA A PARTIR DE OUTUBRO-24 QUANDO A META DE SEGUROS VIROU NÃO ISO*/
+/**********************************************************************************************************/
+
+proc sql;
+update BASE_META_PRODUCAO_ANALITICA_OK set VrMetaN1 = 0
+where NUANOMES >= 202503
+  and NmCanalEstruturaComercial = 'Canal Solar'
+  and NmGrupoProdutoMeta = 'Solar'
+  AND TpValor in ('VrMargemContribuicao')
+
+ ;run;
+
+/*********************************************************************************************************/
+/*CRIA NOVAS COLUNAS DE METAS DE EFETIVAÇÃO E PDVS PRODUZINDO*/
+/*********************************************************************************************************/
+
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_01 AS
+SELECT
+A.*,
+
+/*META EFETIVAÇÃO*/
+CASE
+	WHEN TpValor = 'Efetivacao' and NUANOMES >= 202503 and NUANOMES <= 202504 and NmCanalEstruturaComercial in ('Canal Solar') THEN 0.66
+	WHEN TpValor = 'Efetivacao' and NUANOMES >= 202505 and NmCanalEstruturaComercial in ('Canal Solar') THEN 0.70
+	ELSE 0
+END AS VrMetaEfetivacao,
+
+/*META PDV PRODUZINDO*/
+CASE
+	WHEN TpValor = 'ParceiroProduzindo' AND NUANOMES >= 202503 and NmCanalEstruturaComercial in ('Canal Solar') THEN 0.5
+	ELSE 0
+END AS VrMetaParceiroProduzindo
+
+FROM BASE_META_PRODUCAO_ANALITICA_OK A
+
+;RUN;
+
+/***********************************************/
+/*****************FIM UPDATES*******************/
+/***********************************************/
+
+/*SUBSTITUI TUDO QUE FOI "MISSING OU '.' POR '0'*/
+/*SAS ESTAVA APRESENTANDO PROBLEMA QUANDO FAZIA O CALCULO COM O 'MISSING'*/
+
+data BASE_META_PRODUCAO_ANALITICA_02;
+	set BASE_META_PRODUCAO_ANALITICA_01;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+/*****************************************/
+/*CALCULA AS MEDIDAS, METAS E ATINGIMENTO*/
+/*****************************************/
+
+/*************************************************/
+/*AGRUPA TODOS OS ATINGIMENTO EM UMA ÚNICA COLUNA*/
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_03 AS
+SELECT
+
+NuAnoMes,
+CdColaborador,
+NmGrupoCargoColaborador,
+DsLoginN1,
+TpValor,
+
+/*********/
+/*SEGUROS*/
+/*********/
+
+SUM(CASE
+		WHEN TpValor in ('VrAP') and NuAnoMes <= 202506 THEN (VrMedida + VrSegurosCancelados)
+		WHEN TpValor in ('VrSPF') THEN (VrMedida + VrSegurosCancelados)
+		WHEN TpValor in ('VrAP_VrPlacaSolar') and NuAnoMes >= 202507 THEN (VrMedida + VrSegurosCancelados)
+ELSE 0
+END) AS VrMedida_Seguros FORMAT COMMAX20.2,
+
+SUM(CASE
+		WHEN TpValor in ('VrAP') and NuAnoMes <= 202506 THEN (VrDenominador)
+		WHEN TpValor in ('VrSPF') THEN (VrDenominador)
+		WHEN TpValor in ('VrAP_VrPlacaSolar') and NuAnoMes >= 202507 THEN (VrDenominador)
+ELSE 0
+END) AS VrDenominador_Seguros FORMAT COMMAX20.2,
+
+SUM(CASE
+		WHEN TpValor in ('VrAP') and NuAnoMes <= 202506 THEN (VrMetaN1)
+		WHEN TpValor in ('VrSPF') THEN (VrMetaN1)
+		WHEN TpValor in ('VrAP_VrPlacaSolar') and NuAnoMes >= 202507 THEN (VrMetaN1)
+ELSE 0
+END) AS VrMetaN1_Seguros FORMAT COMMAX20.2,
+
+SUM(CASE
+		WHEN TpValor in ('VrAP') and NuAnoMes <= 202506 THEN (VrMetaProducaoN1)
+		WHEN TpValor in ('VrSPF') THEN (VrMetaProducaoN1)
+		WHEN TpValor in ('VrAP_VrPlacaSolar') and NuAnoMes >= 202507 THEN (VrMetaProducaoN1)
+ELSE 0
+END) AS VrMetaProducaoN1_Seguros FORMAT COMMAX20.2,
+
+(CALCULATED VrMedida_Seguros / CALCULATED VrDenominador_Seguros) / (CALCULATED VrMetaN1_Seguros / CALCULATED VrMetaProducaoN1_Seguros) AS Pc_Ating_Seguros FORMAT PERCENT9.2,
+
+/**********/
+/*MC RODAS*/
+/**********/
+
+SUM(CASE WHEN TpValor in ('VrMargemContribuicao') THEN (VrMedidaNI) ELSE 0 END) AS VrMedidaMC FORMAT COMMAX20.2,
+SUM(CASE WHEN TpValor in ('VrMargemContribuicao') THEN (VrMargemDescontos) ELSE 0 END) AS VrMargemDescontos_MC FORMAT COMMAX20.2,
+SUM(CASE WHEN TpValor in ('VrMargemContribuicao') THEN (VrMetaNIN1) ELSE 0 END) AS VrMetaMC FORMAT COMMAX20.2,
+
+(CALCULATED VrMedidaMC + CALCULATED VrMargemDescontos_MC) / (CALCULATED VrMetaMC) AS Pc_Ating_MC FORMAT PERCENT9.2,
+
+/***************/
+/*EFETIVAÇÃO*/
+/***************/
+
+SUM(CASE WHEN TPVALOR = 'Efetivacao' THEN (QtNumeradorNI) ELSE 0 END) AS QtNumeradorNI_Efetivacao FORMAT COMMAX20.0,
+SUM(CASE WHEN TPVALOR = 'Efetivacao' THEN (QtDenominadorNI) ELSE 0 END) AS QtDenominadorNI_Efetivacao FORMAT COMMAX20.0,
+SUM(CASE WHEN TPVALOR = 'Efetivacao' THEN (VrMetaEfetivacao) ELSE 0 END) AS VrMeta_Efetivacao FORMAT PERCENT9.2,
+
+COALESCE((CALCULATED QtNumeradorNI_Efetivacao / CALCULATED QtDenominadorNI_Efetivacao) / (CALCULATED VrMeta_Efetivacao),0) AS Pc_Ating_Efetivacao FORMAT PERCENT9.2,
+
+/**********************/
+/*PARCEIROS PRODUZINDO*/
+/**********************/
+
+SUM(CASE WHEN TPVALOR = 'ParceiroProduzindo' THEN (QtNumeradorNI) ELSE 0 END) AS QtNumeradorNI_Produzindo FORMAT COMMAX20.0,
+SUM(CASE WHEN TPVALOR = 'ParceiroProduzindo' THEN (QtDenominadorNI) ELSE 0 END) AS QtDenominadorNI_Produzindo FORMAT COMMAX20.0,
+SUM(CASE WHEN TPVALOR = 'ParceiroProduzindo' THEN (VrMetaParceiroProduzindo) ELSE 0 END) AS VrMeta_Produzindo FORMAT PERCENT9.2,
+
+COALESCE((CALCULATED QtNumeradorNI_Produzindo / CALCULATED QtDenominadorNI_Produzindo) / (CALCULATED VrMeta_Produzindo),0) AS Pc_Ating_Produzindo FORMAT PERCENT9.2
+
+FROM BASE_META_PRODUCAO_ANALITICA_02
+
+GROUP BY 1,2,3,4,5/*,6,7,8,9,10,11,12,13,14*/
+
+;RUN;
+/*************************************************/
+
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_04 AS
+SELECT
+NuAnoMes,
+CdColaborador,
+NmGrupoCargoColaborador,
+DsLoginN1,
+TpValor,
+
+CASE
+	WHEN TpValor = 'VrSPF' THEN Pc_Ating_Seguros
+	WHEN TpValor = 'VrAP' THEN Pc_Ating_Seguros
+	WHEN TpValor = 'VrAP_VrPlacaSolar' THEN Pc_Ating_Seguros
+	WHEN TpValor = 'VrMargemContribuicao' THEN Pc_Ating_MC
+	WHEN TpValor = 'Efetivacao' THEN Pc_Ating_Efetivacao
+	WHEN TpValor = 'ParceiroProduzindo' THEN Pc_Ating_Produzindo
+ELSE 0
+END AS VrAtingimento FORMAT PERCENT9.2
+
+FROM BASE_META_PRODUCAO_ANALITICA_03
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_05 AS
+SELECT
+NuAnoMes,
+CdColaborador,
+NmGrupoCargoColaborador,
+DsLoginN1,
+TpValor,
+
+CASE
+	WHEN TpValor  in ('VrSPF', 'VrAP','VrMargemContribuicao','Efetivacao','ParceiroProduzindo', 'VrAP_VrPlacaSolar') AND VrAtingimento >= 0 THEN VrAtingimento
+	WHEN TpValor  in ('VrSPF', 'VrAP','VrMargemContribuicao','Efetivacao','ParceiroProduzindo', 'VrAP_VrPlacaSolar') AND VrAtingimento < 0 AND VrAtingimento <> . THEN 0
+END AS VrAtingimento
+
+FROM BASE_META_PRODUCAO_ANALITICA_04
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_META_PRODUCAO_ANALITICA_06 AS
+SELECT
+A.NuAnoMes,
+
+E.NmCanalEstruturaComercial,
+E.NmEstruturaComercialA,
+E.NmSubEstruturaComercialA,
+E.NmAreaEstruturaComercial,
+E.LstSubstituicao,
+E.LstColaboradorFocal,
+E.DsLoginN3A,
+CASE WHEN E.DsLoginN2A = '' THEN 'cadeira.vazia' ELSE E.DsLoginN2A END AS DsLoginN2A,
+
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+A.TpValor,
+A.VrAtingimento format percent9.2,
+
+C.Peso AS PesoMeta format percent9.2,
+CASE WHEN A.VrAtingimento >= 1 THEN D.VrComissaoMeta ELSE 0 END AS VrComissaoGR,
+D.VrComissaoMeta as VrComissaoMaximaKpi,
+B.VrComissaoMetaTotal,
+
+(C.Peso * (CASE WHEN A.VrAtingimento >= 2 THEN 2 ELSE A.VrAtingimento END)) AS VrAtingimentoPonderado format percent9.2
+
+FROM BASE_META_PRODUCAO_ANALITICA_05 A
+
+LEFT JOIN BASEGRC.TBINCENTIVOALVOFINAL B ON B.NUANOMES = A.NUANOMES AND B.DsLoginN1 = A.DsLoginN1
+LEFT JOIN BASEGRC.TBGRINCENTIVOPESOFINAL C ON C.NUANOMES = A.NUANOMES AND C.DsLoginN1 = A.DsLoginN1 AND C.Indicadores = A.TpValor
+LEFT JOIN BASEGRC.TBGRINCENTIVOCARGACOMISSAOMETA D ON D.NUANOMES = A.NUANOMES AND D.DsLogin = A.DsLoginN1 AND D.Indicadores = A.TpValor
+LEFT JOIN BASEGRC.TBGRINCENTIVO E ON E.DsLoginN1 = A.DsLoginN1 AND E.NUANOMES = A.NUANOMES
+
+Where Coalesce(C.Peso,0) > 0
+
+;RUN;
+
+data BASE_META_PRODUCAO_ANALITICA_07;
+	set BASE_META_PRODUCAO_ANALITICA_06;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+/*******************************/
+/*FAZ BKP DA ÚLTIMA BASE VALIDA*/
+/*******************************/
+data  _null_;
+     call symput('AnoMes',compress(put(today()-1,yymmdd10.),"-"));
+run;
+%put &AnoMes.;
+
+/*Comentar até gerar a primeira base*/
+
+DATA ICOMSBKP.TBCOMPERF_ANALITICA_BKP_&AnoMes.;
+SET ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR
+;RUN;
+
+DATA ICOMSBKP.TBGRCOMISSAOPERF_&AnoMes.;
+SET ICOMS.TBGRCOMISSAOPERF_SOLAR;
+;RUN;
+
+/******************/
+/*SALVA BASE FINAL*/
+/******************/
+
+DATA ICOMS.TBGRCOMISSAOPERF_ANALITICA_SOLAR;
+SET BASE_META_PRODUCAO_ANALITICA_03
+;RUN;
+
+DATA ICOMS.TBGRCOMISSAOPERF_SOLAR;
+SET BASE_META_PRODUCAO_ANALITICA_07
+;RUN;

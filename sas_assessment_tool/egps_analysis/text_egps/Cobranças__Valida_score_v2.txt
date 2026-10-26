@@ -1,0 +1,157 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Valida_score_v2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:00 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 102
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ALVESDS = /riscosbv/cobranca/alvesds; CAROL2 = /riscosbv/cobranca/caroline/Auxiliar; CAROL2 = /riscosbv/cobranca/caroline/Auxiliar LTV; KEVIN = /riscosbv/cobranca/kevin; LDUARTE = /riscosbv/cobranca/lduarte
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): KEVIN.ANALISE_DIVERGENCIAS_SCORES [SAS/Local], LDUARTE.CAMP_ANALITIC2_20250731 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: KEVIN, LDUARTE
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): KEVIN.ANALISE_DIVERGENCIAS_SCORES [DATA Step - SET], LDUARTE.CAMP_ANALITIC2_20250731 [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ANALISE_DIVERGENCIA_SCORE, DIVERGENCIAS_ENRIQ
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Libnames, macros e bases iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 1 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Libnames, macros e bases iniciais */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-wgbUBjgsimf9hkjJ/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME carol2      '/riscosbv/cobranca/caroline/Auxiliar LTV';
+LIBNAME ALVESDS '/riscosbv/cobranca/alvesds';
+LIBNAME KEVIN '/riscosbv/cobranca/kevin';
+LIBNAME lduarte '/riscosbv/cobranca/lduarte';
+
+
+DATA ANALISE_DIVERGENCIA_SCORE;
+SET KEVIN.ANALISE_DIVERGENCIAS_SCORES;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Libnames, macros e bases iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Validação */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Validação */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-qEXZF56zjTPbVVSV/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE
+	DIVERGENCIAS_ENRIQ AS
+SELECT DISTINCT
+	A.*
+	,B.GRUPO_TEST
+	,B.ACAO
+	,B.TESTE_CONTROLE
+	,B.DTPROCESSAMENTO_ACAO AS DATA_MARCACAO_ACAO
+FROM
+	ANALISE_DIVERGENCIA_SCORE A
+LEFT JOIN
+	lduarte.CAMP_ANALITIC2_20250731 B
+ON
+	A.NUCONTRATO = B.NUCONTRATO
+GROUP BY
+	A.NUCONTRATO
+HAVING
+	B.CONTADOR = MAX(B.CONTADOR)
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Validação */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME lduarte '/riscosbv/cobranca/lduarte';
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE
+	DIVERGENCIAS_ENRIQ AS
+SELECT DISTINCT
+	A.*
+	,B.GRUPO_TEST
+	,B.ACAO
+	,B.TESTE_CONTROLE
+	,B.DTPROCESSAMENTO_ACAO AS DATA_MARCACAO_ACAO
+FROM
+	ANALISE_DIVERGENCIA_SCORE A
+LEFT JOIN
+	lduarte.CAMP_ANALITIC2_20250731 B
+ON
+	A.NUCONTRATO = B.NUCONTRATO
+GROUP BY
+	A.NUCONTRATO
+HAVING
+	B.CONTADOR = MAX(B.CONTADOR)
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

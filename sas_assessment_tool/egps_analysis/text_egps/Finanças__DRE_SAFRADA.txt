@@ -1,0 +1,541 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__DRE_SAFRADA
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:38 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC TRANSPOSE (1x | +10), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 330
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: Datarodar
+DETECTED_MACROS_USED: ANOMES, anomes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CPM.DRE_SAFRADA [SAS/Local], FINAL.TABELAO_&ANOMES._AUTOMACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.DRE_SAFRADA2
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.DRE_SAFRADA1, WORK.DRE_SAFRADA2, WORK.DRE_SAFRADA3
+TABLE_READ_PROVENANCE (Flow): CPM.DRE_SAFRADA [PROC SQL - FROM], FINAL.TABELAO_&ANOMES._AUTOMACAO [PROC SQL - FROM], WORK.DRE_SAFRADA1 [DATA Step - SET; PROC SORT - DATA=], WORK.DRE_SAFRADA2 [PROC TRANSPOSE - DATA=], WORK.DRE_SAFRADA3 [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &ANOMES, DRE_SAFRADA2, DRE_SAFRADA3, REAL, REAL2, WORK.DRE_SAFRADA, WORK.DRE_SAFRADA1, WORK.DRE_SAFRADA3
+DYNAMIC REFS (Ambiguous): FINAL.TABELAO_{ANOMES}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET Datarodar=202508;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: DRE */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 17 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: DRE */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1Iln94rhmbL5s4p3/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let Datarodar=202508;
+%macro gerar(ANOMES);
+PROC SQL;
+CREATE TABLE &anomes. AS
+SELECT
+A.MesRef AS Competencia,
+datepart(A.Mes_Contrato) as Safra format date9.,
+A.Produto_AUTOMACAO,
+A.Grupo_Produto format $30.,
+
+SUM( SUM(A.VLR_ACCRUAL_CEDIDOS), SUM(A.VLR_ACCRUAL_PROPRIA), SUM(A.VLR_CESSAO_FIDC))/1000000 AS 'Accrual Juros'n,
+SUM( SUM(A.VLR_CUSTOCAPT_ATE60), SUM(A.VLR_CUSTOCAPT_CARTCED))/1000000  AS 'CUSTO CAPTAÇÃO'n,
+SUM( A.VLR_DESC_PRINCIPAL)/1000000  AS 'Descontos Concedidos (Principal)'n,
+SUM( A.VLR_TARIFA)/1000000  AS Tarifas,
+SUM( A.VLR_RECUPERACAO)/1000000  AS 'Recuperação de Crédito'n,
+SUM( A.VLR_CUSTOCAPT_ACIMA60)/1000000  AS 'CARTEIRA ACIMA 60 DIAS'n,
+SUM( A.VLR_PDD_BRUTA)/1000000  AS 'PDD Bruta'n,
+SUM( A.VLR_MORA_MULTA)/1000000  AS Mora,
+SUM( A.VLR_RCO)/1000000  AS 'Result. de Liq. Antecipada'n,
+SUM( A.VLR_COBRANCA)/1000000  AS 'Custos de Cobrança'n,
+SUM( A.VLR_FRAUDE)/1000000  AS Fraudes,
+SUM( SUM(A.VLR_DEMAISRES_DIVIDA_SUB), SUM(A.VLR_DEMAISRES_HEDGES),
+     SUM(A.VLR_DEMAISRES_NFF), SUM(A.VLR_DEMAISRES_OUTROS),
+     SUM(A.VLR_DEMAISRES_REMCAPITAL))/1000000  AS 'Demais Resultados'n,
+SUM( A.Vlr_IR_CS_FIM)/1000000  AS 'IR/CS'n,
+SUM( A.VLR_RETORNO)/1000000  AS Retorno,
+SUM( SUM(A.VLR_CUSTO_TOTAL), SUM(A.VLR_CCOMIS_ORIG_DIR),
+     SUM(A.VLR_CCOMIS_ORIG_INDIR), SUM(A.VLR_CCOMIS_SUP_INDIR))/1000000  AS 'Custos Diretos'n,
+SUM( A.VLR_TRIBUTOS)/1000000  AS 'Despesas Tributárias'n,
+SUM( A.VLR_CONTG_CIVEIS)/1000000  AS 'Contingências Cíveis'n,
+SUM( SUM(A.VLR_DTRAB_DIR), SUM(A.VLR_DTRAB_IND))/1000000  AS 'Contingências Trabalhistas'n,
+SUM( A.VLR_OUTRAS_CONT_FISC)/1000000  AS 'Contingências Fiscais'n,
+SUM( A.VLR_BNDU)/1000000  AS 'BNDU'n,
+SUM( SUM(A.VLR_OUTRAS_GCUT),
+     SUM(A.VLR_OUTRAS_REC_DESP))/1000000  AS 'Outros Resultados'n,
+SUM( SUM(A.VLR_PLR_DIR), SUM(A.VLR_PLR_IND))/1000000  AS 'Remuneração Variável'n,
+SUM( A.PL_ROE)/1000000  AS 'PL Alocado'n,
+SUM( SUM(A.VLR_DP_ORIG_DIR), SUM(A.VLR_DP_ORIG_IND))/1000000  AS 'Despesas de Pessoal Originação'n,
+SUM( A.VLR_DP_SUP_IND)/1000000  AS 'Despesas de Pessoal Suporte'n,
+SUM( SUM(A.VLR_DA_ORIG_DIR), SUM(A.VLR_DA_ORIG_IND))/1000000  AS 'Despesas Adm Originação'n,
+SUM( A.VLR_DA_SUP_IND)/1000000  AS 'Despesas Adm Suporte'n,
+SUM( A.RECEITA_SERVICO)/1000000  AS 'Receita de Servicos'n,
+
+
+sum(A.VALORLIBERADO)/1000000 AS 'Produção'n,
+sum(A.VALORFINANCIADO)/1000000 AS 'Valor Financiado'n,
+sum(A.VRSALDO)/1000000 AS 'Carteira'n,
+sum(A.SALDO_PDD)/1000000 AS 'Saldo PDD'n,
+sum(A.VLR_CART_ATE_60)/1000000 AS 'Carteira Accrual'n,
+sum(A.VLR_CART_ACIMA_60)/1000000 AS 'Carteira > 60'n,
+sum(A.VLR_CART_ACIMA_90)/1000000 AS 'Carteira > 90'n
+
+FROM FINAL.TABELAO_&ANOMES._AUTOMACAO AS A
+
+where datepart(a.Mes_COntrato) >='01jan2021'd
+GROUP BY 1,2,3,4
+;QUIT;
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%macro gerar2(ANOMES);
+
+PROC SQL;
+CREATE TABLE &anomes. AS
+SELECT
+A.MesRef AS Competencia,
+(A.Mes_Contrato) as Safra format date9.,
+A.Produto_AUTOMACAO format $30.,
+A.Grupo_Produto,
+
+SUM( SUM(A.VLR_ACCRUAL_CEDIDOS), SUM(A.VLR_ACCRUAL_PROPRIA), SUM(A.VLR_CESSAO_FIDC))/1000000 AS 'Accrual Juros'n,
+SUM( SUM(A.VLR_CUSTOCAPT_ATE60), SUM(A.VLR_CUSTOCAPT_CARTCED))/1000000  AS 'CUSTO CAPTAÇÃO'n,
+SUM( A.VLR_DESC_PRINCIPAL)/1000000  AS 'Descontos Concedidos (Principal)'n,
+SUM( A.VLR_TARIFA)/1000000  AS Tarifas,
+SUM( A.VLR_RECUPERACAO)/1000000  AS 'Recuperação de Crédito'n,
+SUM( A.VLR_CUSTOCAPT_ACIMA60)/1000000  AS 'CARTEIRA ACIMA 60 DIAS'n,
+SUM( A.VLR_PDD_BRUTA)/1000000  AS 'PDD Bruta'n,
+SUM( A.VLR_MORA_MULTA)/1000000  AS Mora,
+SUM( A.VLR_RCO)/1000000  AS 'Result. de Liq. Antecipada'n,
+SUM( A.VLR_COBRANCA)/1000000  AS 'Custos de Cobrança'n,
+SUM( A.VLR_FRAUDE)/1000000  AS Fraudes,
+SUM( SUM(A.VLR_DEMAISRES_DIVIDA_SUB), SUM(A.VLR_DEMAISRES_HEDGES),
+     SUM(A.VLR_DEMAISRES_NFF), SUM(A.VLR_DEMAISRES_OUTROS),
+     SUM(A.VLR_DEMAISRES_REMCAPITAL))/1000000  AS 'Demais Resultados'n,
+SUM( A.Vlr_IR_CS_FIM)/1000000  AS 'IR/CS'n,
+SUM( A.VLR_RETORNO)/1000000  AS Retorno,
+SUM( SUM(A.VLR_CUSTO_TOTAL), SUM(A.VLR_CCOMIS_ORIG_DIR),
+     SUM(A.VLR_CCOMIS_ORIG_INDIR), SUM(A.VLR_CCOMIS_SUP_INDIR))/1000000  AS 'Custos Diretos'n,
+SUM( A.VLR_TRIBUTOS)/1000000  AS 'Despesas Tributárias'n,
+SUM( A.VLR_CONTG_CIVEIS)/1000000  AS 'Contingências Cíveis'n,
+SUM( SUM(A.VLR_DTRAB_DIR), SUM(A.VLR_DTRAB_IND))/1000000  AS 'Contingências Trabalhistas'n,
+SUM( A.VLR_OUTRAS_CONT_FISC)/1000000  AS 'Contingências Fiscais'n,
+SUM( A.VLR_BNDU)/1000000  AS 'BNDU'n,
+SUM( SUM(A.VLR_OUTRAS_GCUT),
+     SUM(A.VLR_OUTRAS_REC_DESP))/1000000  AS 'Outros Resultados'n,
+SUM( SUM(A.VLR_PLR_DIR), SUM(A.VLR_PLR_IND))/1000000  AS 'Remuneração Variável'n,
+SUM( A.PL_ROE)/1000000  AS 'PL Alocado'n,
+SUM( SUM(A.VLR_DP_ORIG_DIR), SUM(A.VLR_DP_ORIG_IND))/1000000  AS 'Despesas de Pessoal Originação'n,
+SUM( A.VLR_DP_SUP_IND)/1000000  AS 'Despesas de Pessoal Suporte'n,
+SUM( SUM(A.VLR_DA_ORIG_DIR), SUM(A.VLR_DA_ORIG_IND))/1000000  AS 'Despesas Adm Originação'n,
+SUM( A.VLR_DA_SUP_IND)/1000000  AS 'Despesas Adm Suporte'n,
+SUM( A.RECEITA_SERVICO)/1000000  AS 'Receita de Servicos'n,
+
+
+sum(A.VALORLIBERADO)/1000000 AS 'Produção'n,
+sum(A.VALORFINANCIADO)/1000000 AS 'Valor Financiado'n,
+sum(A.VRSALDO)/1000000 AS 'Carteira'n,
+sum(A.SALDO_PDD)/1000000 AS 'Saldo PDD'n,
+sum(A.VLR_CART_ATE_60)/1000000 AS 'Carteira Accrual'n,
+sum(A.VLR_CART_ACIMA_60)/1000000 AS 'Carteira > 60'n,
+sum(A.VLR_CART_ACIMA_90)/1000000 AS 'Carteira > 90'n
+
+FROM FINAL.TABELAO_&anomes._AUTOMACAO AS A
+WHERE upcase(GRUPO_PRODUTO) IN ('CP','CREDITO PESSOAL','EP','CRÉDITO PESSOAL')
+and a.Mes_COntrato >='01jan2025'd
+GROUP BY 1,2,3,4
+;QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%gerar2(jan25);
+%gerar2(fev25);
+%gerar2(MAR25);
+%gerar2(ABR25);
+%gerar2(mai25);
+%gerar2(JUN25);
+%gerar2(JUL25);
+%gerar2(AGO25);
+%gerar2(set25);
+%gerar2(out25);
+%gerar2(nov25);
+%gerar2(dez25);
+
+Data Real;
+set
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+jan25
+fev25
+mar25
+ABR25
+mai25
+jun25
+jul25
+ago25
+set25
+out25
+nov25
+dez25;
+
+run;
+
+data real2;
+set real;
+
+where Grupo_Produto in ('CP com Garantia - Leves',
+'CP com Garantia - Pesados',
+'CVG',
+'CVG PF',
+'CVG PJ',
+'EVG',
+'Leves',
+'Motos',
+'Pesados',
+'Refinanciamento - Leves',
+'Refinanciamento - Pesados',
+'Solar',
+'Vans',
+'Veiculos',
+'CP',
+'CP Consignado Privado',
+'EP',
+'Privado'
+
+);
+run;
+
+data WORK.DRE_SAFRADA;
+set real2;
+format Produto $20.;
+if Grupo_Produto in ('Privado','CP Consignado Privado') then do;
+
+	Produto = 'Privado';
+
+end;
+if Grupo_Produto in ('CP com Garantia - Leves','CP com Garantia - Pesados','CVG','CVG PF','CVG PJ','EVG','Refinanciamento - Leves','Refinanciamento - Pesados') then do;
+
+	Produto = 'EVG';
+
+end;
+if Grupo_Produto in ('Leves','Veiculos','Vans') then do;
+
+	Produto = 'Leves';
+
+end;
+if Grupo_Produto in ('Pesados') then do;
+
+	Produto = 'Pesados';
+
+end;
+if Grupo_Produto in ('Motos') then do;
+
+	Produto = 'Motos';
+
+end;
+if Grupo_Produto in ('Solar') then do;
+
+	Produto = 'Solar';
+
+end;
+if Grupo_Produto in ('CP','EP') then do;
+
+	Produto = 'EP';
+
+end;
+
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: DRE */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: OutPutDash */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 17 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: OutPutDash */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-IwfMSIn8WAPSEKVx/code.sas */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_DRE_SAFRADA1);
+
+PROC SQL;
+   CREATE TABLE WORK.dre_safrada1 AS
+   SELECT t1.Competencia,
+          t1.Safra,
+          t1.Produto,
+			
+			SUM(t1.'Accrual Juros'n) + SUM(t1.'CUSTO CAPTAÇÃO'n) + SUM(t1.'Result. de Liq. Antecipada'n) AS '3 RESULTADO CARTEIRA'N,
+            (SUM(t1.'Accrual Juros'n)) AS '4 Accrual Juros'n,
+            (SUM(t1.'CUSTO CAPTAÇÃO'n)) AS '5 CUSTO CAPTAÇÃO'n,
+            (SUM(t1.'Result. de Liq. Antecipada'n)) AS '6 Result. de Liq. Antecipad'n,
+			
+			(SUM(t1.'Receita de Servicos'n))+ (SUM(t1.Tarifas)) + (SUM(t1.'Custos Diretos'n)) + (SUM(t1.Retorno)) AS 'RESULTADO PRODUCAO'N,
+			(SUM(t1.'Receita de Servicos'n)) AS 'Receita de Servicos'n,
+			(SUM(t1.Tarifas)) AS Tarifas,
+	        (SUM(t1.'Custos Diretos'n)) AS 'Custos Diretos'n,
+            (SUM(t1.Retorno)) AS Retorno,
+			
+			(SUM(t1.'CARTEIRA ACIMA 60 DIAS'n))+(SUM(t1.Mora))+(SUM(t1.'Custos de Cobrança'n)) AS 'RESULTADO INADIMPLENCIA'N,
+            (SUM(t1.'CARTEIRA ACIMA 60 DIAS'n)) AS 'CARTEIRA ACIMA 60 DIAS'n,
+            (SUM(t1.Mora)) AS Mora,
+            (SUM(t1.'Custos de Cobrança'n)) AS 'Custos de Cobrança'n,
+			
+			(SUM(t1.Fraudes)) + (SUM(t1.'Demais Resultados'n)) as OUTROS,
+            (SUM(t1.Fraudes)) AS Fraudes,
+            (SUM(t1.'Demais Resultados'n)) AS 'Demais Resultados'n,
+			
+            (SUM(t1.'PDD Bruta'n))	+ (SUM(t1.'Recuperação de Crédito'n)) + (SUM(t1.'Descontos Concedidos (Principal)'n)) AS 'CUSTO DE CREDITO'N
+            (SUM(t1.'PDD Bruta'n)) AS 'PDD Bruta'n,
+            (SUM(t1.'Recuperação de Crédito'n)) AS 'Recuperação de Crédito'n,
+            (SUM(t1.'Descontos Concedidos (Principal)'n)) AS 'Descontos Concedidos'n,
+			
+			(SUM(t1.'Despesas de Pessoal Originação'n)) + (SUM(t1.'Despesas Adm Originação'n)) as 'DESPESAS DE ORIGINACAO'N,
+            (SUM(t1.'Despesas de Pessoal Originação'n)) AS 'Despesas de Pessoal Origi'n,
+            (SUM(t1.'Despesas Adm Originação'n)) AS 'Despesas Adm Originação'n,
+			
+            (SUM(t1.'Despesas Tributárias'n)) AS 'Despesas Tributárias'n,
+			
+            (SUM(t1.'Contingências Cíveis'n)) AS 'Contingências Cíveis'n,
+			
+			(SUM(t1.'Despesas de Pessoal Suporte'n))+ (SUM(t1.'Despesas Adm Suporte'n)) AS 'DESPESAS DE SUPORTE'N,
+            (SUM(t1.'Despesas de Pessoal Suporte'n)) AS 'Despesas de Pessoal Supor'n,
+            (SUM(t1.'Despesas Adm Suporte'n)) AS 'Despesas Adm Suporte'n,
+			
+			(SUM(t1.'Contingências Trabalhistas'n)) + (SUM(t1.'Contingências Fiscais'n)) + (SUM(t1.BNDU)) + (SUM(t1.'Outros Resultados'n)) AS 'OUTRAS REC/DESP'N,
+            (SUM(t1.'Contingências Trabalhistas'n)) AS 'Contingências Trabalhista'n,
+            (SUM(t1.'Contingências Fiscais'n)) AS 'Contingências Fiscais'n,
+            (SUM(t1.BNDU)) AS BNDU,
+            (SUM(t1.'Outros Resultados'n)) AS 'Outros Resultados'n,
+
+            (SUM(t1.'Remuneração Variável'n)) AS 'Remuneração Variável'n,
+            (SUM(t1.'IR/CS'n)) AS 'IR/CS'n,
+
+            (SUM(t1.'PL Alocado'n)) AS 'PL Alocado'n,
+            (SUM(t1.'Produção'n)) AS 'Produção'n,
+            (SUM(t1.'Valor Financiado'n)) AS 'Valor Financiado'n,
+            (SUM(t1.Carteira)) AS Carteira,
+            (SUM(t1.'Saldo PDD'n)) AS 'Saldo PDD'n,
+            (SUM(t1.'Carteira Accrual'n)) AS 'Carteira Accrual'n,
+            (SUM(t1.'Carteira > 60'n)) AS 'Carteira > 60'n,
+            (SUM(t1.'Carteira > 90'n)) AS 'Carteira > 90'n
+
+      FROM CPM.DRE_SAFRADA t1
+      GROUP BY t1.Competencia,
+               t1.Safra,
+               t1.Produto;
+QUIT;
+
+Data dre_safrada2;
+set work.dre_safrada1;
+'Resultado Carteira'n =
+
+proc sort data=work.dre_safrada1 out=dre_safrada2 nodupkey;
+by Competencia Safra Produto ;
+run;
+
+proc transpose data=work.dre_safrada2 out=dre_safrada3;
+by Competencia Safra Produto;
+var
+'Accrual Juros'n
+'CUSTO CAPTAÇÃO'n
+'Descontos Concedidos'n
+'Tarifas'n
+'Recuperação de Crédito'n
+'CARTEIRA ACIMA 60 DIAS'n
+'PDD Bruta'n
+'Mora'n
+'Result. de Liq. Antecipad'n
+'Custos de Cobrança'n
+'Fraudes'n
+'Demais Resultados'n
+'IR/CS'n
+'Retorno'n
+'Custos Diretos'n
+'Despesas Tributárias'n
+'Contingências Cíveis'n
+'Contingências Trabalhista'n
+'Contingências Fiscais'n
+'BNDU'n
+'Outros Resultados'n
+'Remuneração Variável'n
+'PL Alocado'n
+'Despesas de Pessoal Origi'n
+'Despesas de Pessoal Supor'n
+'Despesas Adm Originação'n
+'Despesas Adm Suporte'n
+'Receita de Servicos'n
+'Produção'n
+'Valor Financiado'n
+'Carteira'n
+'Saldo PDD'n
+'Carteira Accrual'n
+'Carteira > 60'n
+'Carteira > 90'n
+;
+run;
+
+data work.dre_safrada3;
+set  work.dre_safrada3;
+rename _NAME_= Rotulo;
+rename COL1 = Valor;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: OutPutDash */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data work.dre_safrada3;
+set  work.dre_safrada3;
+rename _NAME_= Rotulo;
+rename COL1 = Valor;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

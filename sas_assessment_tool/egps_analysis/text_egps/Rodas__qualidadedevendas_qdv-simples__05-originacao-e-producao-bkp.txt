@@ -1,0 +1,701 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-simples
+FILE_SAS: 05-originacao-e-producao-bkp.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 80)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80)
+----------------------------------------
+LINES_OF_CODE: 546
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: inicio
+DETECTED_MACROS_USED: AnoXM, SafraXM, anoAtual, inicio
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AQUISIC.PREANALISE_SIMU_PROP [SAS/Local], AUXL.TAXAS_PROPOSTAS [SAS/Local], BASEGRC.TBCLASSIFICACAORISCOSPDVS [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], BASES.TBTEMPODATA [SAS/Local], CDCCG.TBCONTRATO [DBCON], CDCCG.TBPARCELA [DBCON], DBA.TBPROPGARANTIAMAQEQUIP [DBCON], RENAVE.PILOTO_RENAVE [SAS/Local], SOLITMP.TBVRMOLICARQDV [SAS/Local], TMP.TBEXTPROPOSTA [SAS/Local], TMP.TBORIGINACAO&ANOATUAL [SAS/Local], TMP.TBORIGINACAO&ANOXM [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AQUISIC.PREANALISE_SIMU_PROP [DATA Step - SET], AUXL.TAXAS_PROPOSTAS [DATA Step - SET], BASEGRC.TBCLASSIFICACAORISCOSPDVS [PROC SQL - JOIN], BASES.TBEXTCONTRATO [PROC SQL - FROM], BASES.TBTEMPODATA [PROC SQL - FROM], CDCCG.TBCONTRATO [Pass-Through Native (DBCON) - FROM], CDCCG.TBPARCELA [Pass-Through Native (DBCON) - FROM], DBA.TBPROPGARANTIAMAQEQUIP [Pass-Through Native (DBCON) - FROM], RENAVE.PILOTO_RENAVE [PROC SQL - JOIN], SOLITMP.TBVRMOLICARQDV [PROC SQL - FROM], TMP.TBEXTPROPOSTA [PROC SQL - FROM], TMP.TBORIGINACAO&ANOATUAL [DATA Step - SET], TMP.TBORIGINACAO&ANOXM [DATA Step - SET], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM], TMP.TBPRODUCAO [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbAnaliticoQdvSimples.csv
+TEMP/DISCARDED OUTPUTS: CDCCG_TBPARCELA, ORIGINACAO, ORIGINACAO01, ORIGINACAOEXP, PARCEIROCOMERCIALGRUPO, PRODUCAO, PRODUCAO01, PRODUCAOEXP, SCORECONTRATO, SCORECONTRATO01, SCOREPROPOSTA, SCOREPROPOSTA01, TAXASPROPOSTAS, TAXASPROPOSTASPRD, TBANALITICOQDVSIMPLES, TBANALITICOQDVSIMPLESANT, TBDATA, TBMOLICAR, TBPDECLEVESPROP, TBPDECLEVESPROPSORT, TBVRMERCADO, TBVRMOLICARFINAL, TBVRPROPOSTA, TBVRPROPOSTA01
+DYNAMIC REFS (Ambiguous): TMP.TBORIGINACAO{ANOATUAL}, TMP.TBORIGINACAO{ANOXM}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Atualizacao:	25/03/2025														| */
+/* |	Responsavel: 	Guta - MIS Varejo/IGE								    | */
+/* |	Alt. Realizada:	- Tirei a quebra de fxPrestação e fxVrFinanciado							| */
+/* ====================================================================================== */
+/* |	Atualizacao:	23/04/2025  													| */
+/* |	Responsavel: 	Bruno Neves - IGE                      | */
+/* |	Alt. Realizada:	- Alteracao da origem do Rating de TMP.TBEXTPROPOSTA			| */
+/* |					para IQ.						 	| */
+/* ====================================================================================== */
+/* |	Atualizacao:	10/07/2025													| */
+/* |	Responsavel: 	Flavio Pereira                      | */
+/* |	Alt. Realizada:	- Alteracao da origem do Rating de IQ							| */
+/* |			para TMP.TBEXTPROPOSTA.   			 									| */
+/* | 			(Ps.: Correcao do Rating realizado na TMP.TBEXTPROPOSTA)	  																| */
+/* ====================================================================================== */
+
+/*Período inicial para consulta*/
+%let inicio = 20240101;
+
+/*Formata variável */
+DATA _NULL_;
+    inicioIq = "'"||PUT(&inicio.,8.)||"'";
+    CALL SYMPUT('inicioIq', inicioIq);
+RUN;
+
+/* ORIGINAÇÃO */
+DATA Originacao01;
+SET TMP.TbOriginacao&AnoXM. - TMP.TbOriginacao&anoAtual.;
+  WHERE NuAnoMes >= &SafraXM.
+    AND NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados','Leves-BVO','Credito Auto-BV');
+RUN;
+
+proc sql;create index NuProposta on Originacao01;quit;
+
+PROC SQL;
+CREATE TABLE ScoreProposta01 AS
+  SELECT DISTINCT
+    NuProposta,
+	FxIdade,
+    VrFinanciamento,
+	COALESCE(NuRating,NuScoreFim) AS NuRating
+  FROM TMP.TBEXTPROPOSTA
+  WHERE NuAnoMes >= &SafraXM.;
+RUN;
+
+PROC SORT DATA=ScoreProposta01 OUT=ScoreProposta NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on ScoreProposta;quit;
+/**/
+/*PROC SQL;*/
+/*  %CONECTADB(server=BI);*/
+/*  CREATE TABLE ScoreProposta01 AS SELECT * FROM CONNECTION TO DBCON (*/
+/*    SELECT DISTINCT*/
+/*	  Proposta.CdSimulacaoProposta,*/
+/*      PrazoFinanciamentoProposta.NuProposta,*/
+/*      DATE(Proposta.DtSimulacaoProposta) AS DtSimulacaoProposta,*/
+/*      PrazoFinanciamento.PcProbabilidadeAprovacao*/
+/* */
+/*    FROM */
+/*      STGORA_APRO_SIMU.TbSimulacaoProposta Proposta*/
+/*    LEFT JOIN */
+/*      STGORA_APRO_SIMU.TbSimulacaoPropostaGarantia PropostaGarantia */
+/*      ON Proposta.CdSimulacaoProposta = PropostaGarantia.CdSimulacaoProposta*/
+/*    LEFT JOIN */
+/*      STGORA_APRO_SIMU.TbSimulacaoPrazoFnnco PrazoFinanciamento*/
+/*      ON PropostaGarantia.CdSimulacaoDadoFnnco = PrazoFinanciamento.CdSimulacaoDadoFnnco*/
+/*    INNER JOIN */
+/*      STGORA_APRO_SIMU.TbSimulacaoPrzoFnncoPrpsa PrazoFinanciamentoProposta */
+/*      ON PrazoFinanciamento.CdSimulacaoPrazoFnnco = PrazoFinanciamentoProposta.CdSimulacaoPrazoFnnco*/
+/*    WHERE*/
+/*      PrazoFinanciamentoProposta.NuProposta > 0*/
+/*      AND Proposta.DtSimulacaoProposta >= &inicioIq.*/
+/*  );*/
+/*RUN;*/
+/**/
+/**/
+/*PROC SQL;*/
+/*CREATE TABLE ScorePropostaIQ AS*/
+/*  SELECT DISTINCT*/
+/*  	*/
+/*    NuProposta,*/
+/*	CASE WHEN PcProbabilidadeAprovacao <= 0.5 THEN 'ZERO'*/
+/*     	 WHEN PcProbabilidadeAprovacao <= 6.0 THEN 'ATÉ 6,0'*/
+/*	     WHEN PcProbabilidadeAprovacao <= 7.3 THEN '6,25-7,25'*/
+/*	  	 WHEN PcProbabilidadeAprovacao <= 7.9 THEN '7,5-7,75'*/
+/*	     WHEN PcProbabilidadeAprovacao <= 8.5 THEN '8,25-8,5'*/
+/*	     WHEN PcProbabilidadeAprovacao <= 9.8 THEN '8,75-9,75'*/
+/*	     WHEN PcProbabilidadeAprovacao <= 10  THEN '10'*/
+/*	     ELSE 'ZERO'*/
+/*	END AS NuRating*/
+/*  FROM ScoreProposta01*/
+/*  WHERE YEAR(DtSimulacaoProposta) * 100 + MONTH(INTNX('MONTH', DtSimulacaoProposta,0, 'BEGINNING')) >= &SafraXM.;*/
+/*RUN;*/
+
+/*PROC SORT DATA=ScorePropostaIQ OUT=ScoreProposta NODUPKEY;*/
+/*BY NuProposta;*/
+/*RUN;*/
+
+/*proc sql;create index NuProposta on ScoreProposta;quit;*/
+
+/*******************************/
+
+PROC SQL;
+CREATE TABLE TbVrProposta01 AS
+  SELECT DISTINCT
+    NuProposta,
+	FxIdade,
+    VrFinanciamento
+  FROM TMP.TBEXTPROPOSTA
+  WHERE NuAnoMes >= &SafraXM.;
+RUN;
+
+PROC SORT DATA=TbVrProposta01 OUT=TbVrProposta NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on TbVrProposta;quit;
+
+DATA TbPdecLevesProp;SET AQUISIC.PREANALISE_SIMU_PROP;WHERE DtTransacaoFluxoDecisao >= "01JAN2024"d AND NuProposta NE . AND Visao = 'Proposta';RUN;
+
+PROC SORT  DATA=TbPdecLevesProp OUT=TbPdecLevesPropSort NODUPKEY; BY NuProposta; RUN;
+
+PROC SQL;
+CREATE TABLE Originacao AS
+  SELECT
+    A.*,
+	X.NuRating,
+	'' as FxPrestacao,
+	'' as FxFinanciamento,
+	/*CASE WHEN A.VrPrestacao = . THEN ''
+	     WHEN A.VrPrestacao BETWEEN 0 AND 100 THEN 'Até R$ 100'
+		 WHEN A.VrPrestacao BETWEEN 100 AND 250 THEN 'Até R$ 250'
+		 WHEN A.VrPrestacao BETWEEN 250 AND 500 THEN 'Até R$ 500'
+		 WHEN A.VrPrestacao BETWEEN 500 AND 750 THEN 'Até R$ 750'
+		 WHEN A.VrPrestacao BETWEEN 750 AND 1000 THEN 'Até R$ 1000'
+		 WHEN A.VrPrestacao BETWEEN 1000 AND 1500 THEN 'Até R$ 1500'
+		 WHEN A.VrPrestacao BETWEEN 1500 AND 2000 THEN 'Até R$ 2000'
+         WHEN A.VrPrestacao > 2000 THEN 'Acima de R$ 2000'
+	END AS FxPrestacao,
+	CASE WHEN A.VrFinanciamento = . THEN ''
+	     WHEN A.VrFinanciamento BETWEEN 0 AND 15000 THEN 'Até R$ 15.000'
+		 WHEN A.VrFinanciamento BETWEEN 15000 AND 20000 THEN 'Até R$ 20.000'
+		 WHEN A.VrFinanciamento BETWEEN 20000 AND 30000 THEN 'Até R$ 30.000'
+		 WHEN A.VrFinanciamento BETWEEN 30000 AND 40000 THEN 'Até R$ 40.000'
+		 WHEN A.VrFinanciamento BETWEEN 40000 AND 50000 THEN 'Até R$ 50.000'
+         WHEN A.VrFinanciamento > 50000 THEN 'Acima de R$ 50.000'
+	END AS FxFinanciamento,*/
+	B.FxIdade,
+	CASE WHEN A.NuContratoGestao <> . THEN INTCK('DAY', A.DtEntradaProposta, A.DtStatusProposta) END AS DiasEfetivacao,
+	((1+(A.VpTxGerencial/A.VrLiberado)) / (1+(((A.TxTirContabil/100) * (A.VrLiberado))/A.VrLiberado)) -1 ) * A.VrLiberado AS VpSpread2,
+	((1+((case when A.VrRetencao > 1 then (Finance('RATE', A.QtParcelas, A.VrPrestacao, -((A.VrProposta-A.VrRetencao)+A.VrIofCpmfIss+A.VrTac))*case when A.StProposta IN ('AP') then A.VrLiberado else 0 end) ELSE A.VpTxGerencial END)/A.VrLiberado)) / (1+(((A.TxTirDivulgada/100) * (A.VrLiberado))/A.VrLiberado)) -1 ) * A.VrLiberado AS VpSpreadRebate2
+
+	,CASE WHEN A.DtEntradaProposta >= Y.DtInclusao_BVO AND A.NmGrupoProdutoMeta = 'Leves-BVO' THEN 1 ELSE 0 END AS FlBVOCredito
+
+	,MotivoRecusaPropostaAgp,
+
+	case when c.cod_loja is not null then "S" else "N" END AS PilotoRenave
+
+FROM Originacao01 A
+  LEFT JOIN TbVrProposta B
+    ON A.NuProposta = B.NuProposta
+
+  LEFT JOIN
+  RENAVE.PILOTO_RENAVE C
+  ON A.cdparceirocomercial = C.cod_loja
+
+  LEFT JOIN basegrc.TbClassificacaoRiscosPDVs Y
+	ON A.CdParceiroComercial = Y.CdLoja
+
+  LEFT JOIN  TbPdecLevesPropSort PdecLevesPropSort
+  	ON A.NuProposta = PdecLevesPropSort.NuProposta
+
+  LEFT JOIN ScoreProposta X
+    ON A.NuProposta = X.NuProposta
+;RUN;
+
+proc sql;create index NuAnoMes on Originacao;quit;
+proc sql;create index CdFilial on Originacao;quit;
+proc sql;create index NuProposta on Originacao;quit;
+proc sql;create index NmGrupoProdutoMeta on Originacao;quit;
+proc sql;create index CdParceiroComercial on Originacao;quit;
+proc sql;create index DtEntradaProposta on Originacao;quit;
+
+PROC SQL;
+SELECT MAX(DtAtualizacao) INTO :DtOrig FROM Originacao;
+RUN;
+
+DATA Producao01 (DROP=VrFinanciamento);
+SET TMP.TbProducao;
+  WHERE NuAnoMes >= &SafraXM.
+    AND NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados','Leves-BVO','Credito Auto-BV');
+RUN;
+
+proc sql;create index NuContrato on Producao01;quit;
+
+PROC SQL;
+CREATE TABLE ScoreContrato01 AS
+  SELECT DISTINCT
+    NuContrato,
+	COALESCE(NuRating,NuScoreFim) AS NuRating,
+	VrRetencao,
+    VrPrestacao,
+    VrIof
+  FROM BASES.TBEXTCONTRATO
+  WHERE NuAnoMes >= &SafraXM.;
+RUN;
+
+PROC SORT DATA=ScoreContrato01 OUT=ScoreContrato NODUPKEY;
+BY NuContrato;
+RUN;
+
+proc sql;create index NuContrato on ScoreContrato;quit;
+
+PROC SQL;
+CREATE TABLE Producao AS
+  SELECT
+    A.*,
+	B.NuRating,
+	'' as FxPrestacao,
+	C.VrFinanciamento,
+	'' as FxFinanciamento,
+	/*CASE WHEN B.VrPrestacao = . THEN ''
+	     WHEN B.VrPrestacao BETWEEN 0 AND 100 THEN 'Até R$ 100'
+		 WHEN B.VrPrestacao BETWEEN 100 AND 250 THEN 'Até R$ 250'
+		 WHEN B.VrPrestacao BETWEEN 250 AND 500 THEN 'Até R$ 500'
+		 WHEN B.VrPrestacao BETWEEN 500 AND 750 THEN 'Até R$ 750'
+		 WHEN B.VrPrestacao BETWEEN 750 AND 1000 THEN 'Até R$ 1000'
+		 WHEN B.VrPrestacao BETWEEN 1000 AND 1500 THEN 'Até R$ 1500'
+		 WHEN B.VrPrestacao BETWEEN 1500 AND 2000 THEN 'Até R$ 2000'
+         WHEN B.VrPrestacao > 2000 THEN 'Acima de R$ 2000'
+	END AS FxPrestacao,
+	CASE WHEN C.VrFinanciamento = . THEN ''
+	     WHEN C.VrFinanciamento BETWEEN 0 AND 15000 THEN 'Até R$ 15.000'
+		 WHEN C.VrFinanciamento BETWEEN 15000 AND 20000 THEN 'Até R$ 20.000'
+		 WHEN C.VrFinanciamento BETWEEN 20000 AND 30000 THEN 'Até R$ 30.000'
+		 WHEN C.VrFinanciamento BETWEEN 30000 AND 40000 THEN 'Até R$ 40.000'
+		 WHEN C.VrFinanciamento BETWEEN 40000 AND 50000 THEN 'Até R$ 50.000'
+         WHEN C.VrFinanciamento > 50000 THEN 'Acima de R$ 50.000'
+	END AS FxFinanciamento,*/
+	INTCK('DAY', A.DtEntradaProposta, A.DtContrato) AS DiasEfetivacao,
+	((1+(A.VpTxGerencial/A.VrProducao)) / (1+(((A.TxTirContabil/100) * (A.VrProducao))/A.VrProducao)) -1 ) * A.VrProducao AS VpSpread2,
+	((1+((case when B.VrRetencao > 1 then (Finance('RATE', A.QtParcelas, B.VrPrestacao, -((A.VrContrato-B.VrRetencao)+B.VrIof+coalesce(A.VrTarifaCadastro,0)))*A.VrProducao) ELSE A.VpTxGerencial END)/A.VrProducao)) / (1+(((A.TxTirContabil/100) * (A.VrProducao))/A.VrProducao)) -1 ) * A.VrProducao AS VpSpreadRebate2
+
+	,CASE WHEN A.DtEntradaProposta >= Y.DtInclusao_BVO AND A.NmGrupoProdutoMeta = 'Leves-BVO' THEN 1 ELSE 0 END AS FlBVOCredito
+	,case when d.cod_loja is not null then "S" else "N" END AS PilotoRenave
+
+FROM Producao01 A
+  LEFT JOIN ScoreContrato B
+    ON A.NuContrato = B.NuContrato
+  LEFT JOIN TbVrProposta C
+    ON A.NuProposta = C.NuProposta
+
+  LEFT JOIN
+  RENAVE.PILOTO_RENAVE D
+  ON A.cdparceirocomercial = D.cod_loja
+
+  LEFT JOIN basegrc.TbClassificacaoRiscosPDVs Y
+	ON A.CdParceiroComercial = Y.CdLoja
+
+;RUN;
+
+proc sql;create index NuAnoMes on Producao;quit;
+proc sql;create index NuProposta on Producao;quit;
+proc sql;create index NuContrato on Producao;quit;
+proc sql;create index NmGrupoProdutoMeta on Producao;quit;
+proc sql;create index CdParceiroComercial on Producao;quit;
+proc sql;create index DtEntradaProposta on Producao;quit;
+
+PROC SQL;
+SELECT MAX(DtAtualizacao) INTO :DtProd FROM Producao;
+RUN;
+
+DATA TaxasPropostas;
+SET AUXL.Taxas_Propostas;
+  WHERE Safra >= &SafraXM.;
+RUN;
+
+PROC SORT DATA=TaxasPropostas NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on TaxasPropostas;quit;
+
+PROC SORT DATA=TaxasPropostas OUT=TaxasPropostasPrd NODUPKEY;
+BY NuContrato;
+RUN;
+
+proc sql;create index NuContrato on TaxasPropostasPrd;quit;
+
+proc sql;
+create table tbdata as
+select NuAnoMes,QtCorridosDiaUtilMesSab,QtTotalDiaUtilMesSab
+,max(DtTempo) as DtTempo FORMAT ddmmyy10.
+from bases.tbtempodata
+group by NuAnoMes,QtCorridosDiaUtilMesSab,QtTotalDiaUtilMesSab
+;run;
+
+PROC SQL;
+CREATE TABLE ParceiroComercialGrupo AS
+SELECT
+	TbParceiroComercial.CdParceiroComercial
+	,TbParceiroComercial.NmParceiroComercial
+	,CASE
+
+		WHEN TbParceiroComercial.CdParceiroComercial IN (290083,114119) THEN 'GRUPO VENTURE VEICULOS'
+		WHEN TbParceiroComercial.CdParceiroComercial IN (402155) THEN 'GRUPO SANAVE'
+		ELSE TbParceiroComercial.NmGrupoConcessionaria END AS NmGrupoConcessionaria
+
+	,TbParceiroComercial.NmBandeiraGrupoConcessionaria
+	,TbParceiroComercial.PredominanciaProduto
+FROM tmp.TbParceiroComercial TbParceiroComercial
+
+WHERE FlAtivo = 'S'
+;run;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+CREATE TABLE TbVrMercado AS
+SELECT * FROM connection to dbcon
+(
+	SELECT DISTINCT
+		NuContrato
+		,VrMercado
+	FROM CDCCG.TbContrato
+)
+;RUN;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+CREATE TABLE TbMolicar AS
+SELECT * FROM connection to dbcon
+(
+	SELECT DISTINCT
+		NuProposta
+		,CdMolicar
+		,VrMercado
+	FROM dba.TbPropGarantiaMaqEquip
+	WHERE CdMolicar <> ''
+)
+;RUN;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+CREATE TABLE CDCCG_TbParcela AS
+SELECT * FROM connection to dbcon
+(
+    SELECT
+		NuContrato
+		,SqContratoFinanceiro
+		,NuParcela
+		,VrParcela
+		,VrUltRecebimento
+		,StParcela
+		,DATE(DtVencimento) AS DtVencimento
+		,DATE(DtUltimoRecebimento) AS DtUltimoRecebimento
+    FROM CDCCG.TbParcela
+		WHERE NuParcela IN (1)
+		AND DtVencimento > '20240101'
+		AND SqContratoFinanceiro = 1
+)
+;RUN;
+
+/*data TbVrMolicar ;
+set Convsimu.tbsimulacoes (Where=( nuproposta <> . and Produto = 'Leves-BVO' and VrVeiculoMolicar  <> .)
+							Keep = NuAnoMes NuProposta VrVeiculoMolicar Produto)
+;run;
+
+PROC SQL; CREATE TABLE TbVrMolicarFinal AS SELECT * FROM TbVrMolicar ORDER BY 2 DESC;RUN;
+
+PROC SORT DATA=TbVrMolicarFinal NODUPKEY;
+BY NuProposta;
+RUN;*/
+
+PROC SQL; CREATE TABLE TbVrMolicarFinal AS SELECT * FROM SOLITMP.TbVrMolicarQDV ORDER BY 2 DESC;RUN;
+
+PROC SORT DATA=TbVrMolicarFinal NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC SQL;
+CREATE TABLE OriginacaoExp AS
+SELECT
+'Originacao' AS TpDados
+,Originacao.NuProposta
+,Originacao.NuAnoMes
+,Originacao.DtEntradaProposta
+,Originacao.DsTipoCanalProducao
+,Originacao.CdColaborador
+,Originacao.NmColaborador
+,Originacao.NmGrupoCargoColaborador
+,Originacao.DsLoginN1
+,Originacao.DsLoginN2A
+,Originacao.DsLoginN3A
+,Originacao.NmAreaEstruturaComercial
+,Originacao.NmSubEstruturaComercialA
+,Originacao.CdParceiroComercial
+,Originacao.NmParceiroComercial
+,Originacao.NuCpfCnpj
+,Originacao.FxIdade
+,Originacao.QtParcelas
+,Originacao.AaModelo
+,Originacao.CdMarca
+,Originacao.CdModelo
+,ParceiroComercialGrupo.NmGrupoConcessionaria
+,CASE
+		WHEN BVOonda.CdParceiroComercial <>. THEN 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.)
+ ELSE 'Demais' END AS FlGrupoBVO
+,Originacao.VrEntrada
+,Originacao.MotivoRecusaPropostaAgp
+,Originacao.FlBVOCredito
+,Originacao.NmGrupoProdutoMeta
+,Originacao.TpPessoa
+,CASE
+		WHEN Originacao.StProposta = 'A'  THEN 'Aprovada'
+        WHEN Originacao.StProposta = 'AP' THEN 'Aprovada e Paga'
+        WHEN Originacao.StProposta = 'C'  THEN 'Cancelada'
+        WHEN Originacao.StProposta = 'CA' THEN 'Cancelada Aprovada'
+        WHEN Originacao.StProposta = 'CE' THEN 'Cancelada Expirada'
+        WHEN Originacao.StProposta = 'N'  THEN 'Negada'
+        WHEN Originacao.StProposta = 'P'  THEN 'Pendente'
+        WHEN Originacao.StProposta = 'PA' THEN 'Pendente de Aprovação'
+        WHEN Originacao.StProposta = 'V'  THEN 'Verificação'
+        WHEN Originacao.StProposta = 'VA' THEN 'Verificação apos alteração'
+ELSE Originacao.StProposta END AS StProposta
+
+,COALESCE(TbMolicar.VrMercado,TbVrMercado.VrMercado) AS VrMercado
+,Originacao.FxEntrada
+,FxEntrada
+
+,Originacao.VrPrestacao AS VrParcela
+
+,Originacao.VrPDD
+,TbMolicar.CdMolicar
+
+,Originacao.VpSpread AS VpSpread FORMAT num18.2
+,Originacao.VrLiberado AS VrLiberado FORMAT num18.2
+,Originacao.VpTirContabil AS VpTirContabil FORMAT num18.2
+,Originacao.VrFinanciamento AS VrFinanciamento FORMAT num18.2
+
+,Originacao.TxPactuada AS TxPactuada FORMAT num18.2
+
+,TbVrMolicarFinal.VrVeiculoMolicar AS VrVeiculoMolicar FORMAT num18.2
+
+FROM Originacao Originacao
+	LEFT JOIN ParceiroComercialGrupo ParceiroComercialGrupo
+		ON Originacao.CdParceiroComercial = ParceiroComercialGrupo.CdParceiroComercial
+
+	LEFT JOIN TbVrMercado TbVrMercado
+		ON Originacao.NuContratoGestao = TbVrMercado.NuContrato
+
+	LEFT JOIN TbMolicar TbMolicar
+		ON Originacao.NuProposta = TbMolicar.NuProposta
+
+	Left Join TbOndaBVO BVOonda
+  			on Originacao.cdparceirocomercial = BVOonda.cdparceirocomercial
+
+	LEFT JOIN TbVrMolicarFinal TbVrMolicarFinal
+		ON Originacao.NuProposta = TbVrMolicarFinal.NuProposta
+
+	WHERE NmGrupoProdutoMeta = 'Leves-BVO'
+	AND FlPropostaOriginada = 1
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE ProducaoExp AS
+SELECT
+'Producao' AS TpDados
+,Producao.NuProposta
+,Producao.NuAnoMes
+,Producao.DtEntradaProposta
+,Producao.DtPrimeiroVencimento
+
+,Producao.DsTipoCanalProducao
+,Producao.CdColaborador
+,Producao.NmColaborador
+,Producao.NmGrupoCargoColaborador
+,Producao.DsLoginN1
+,Producao.DsLoginN2A
+,Producao.DsLoginN3A
+,Producao.NmAreaEstruturaComercial
+,Producao.NmSubEstruturaComercialA
+,Producao.CdParceiroComercial
+,Producao.NmParceiroComercial
+
+,Producao.NuCpfCnpj
+,Producao.FxIdade
+,Producao.QtParcelas
+,OriginacaoExp.AaModelo
+,OriginacaoExp.CdMarca
+,OriginacaoExp.CdModelo
+,ParceiroComercialGrupo.NmGrupoConcessionaria
+,CASE
+	WHEN BVOonda.CdParceiroComercial <>. THEN 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.)
+ ELSE 'Demais' END AS FlGrupoBVO
+,Producao.VrEntrada
+,OriginacaoExp.MotivoRecusaPropostaAgp
+,Producao.FlBVOCredito
+,Producao.TpPessoa
+,Producao.NmGrupoProdutoMeta
+
+,COALESCE(TbMolicar.VrMercado,TbVrMercado.VrMercado) AS VrMercado
+,Producao.FxEntrada
+,COALESCE(TbParcela.VrParcela, OriginacaoExp.VrParcela) AS VrParcela
+
+,OriginacaoExp.VrPDD
+,Producao.VrProducao
+
+,TbMolicar.CdMolicar
+
+,Producao.VpSpread AS VpSpread FORMAT num18.2
+,Producao.VrProducao  AS VrLiberado FORMAT num18.2
+,Producao.VpTirContabil AS VpTirContabil FORMAT num18.2
+,Producao.VrFinanciamento AS VrFinanciamento FORMAT num18.2
+
+,(Producao.VpTxJuros / Producao.VrProducao ) *100 AS TxPactuada FORMAT num18.2
+,(Producao.VpTirContabil/ Producao.VrProducao )*100 as TxTir FORMAT num18.2
+
+,(Producao.VpTxGerencial / Producao.VrProducao ) *100 AS TxGerencial FORMAT num18.2
+
+,TbVrMolicarFinal.VrVeiculoMolicar AS VrVeiculoMolicar FORMAT num18.2
+
+/*,(1+ Producao.VpTxJuros)/(1+ Producao.VpTirContabil)-1 AS SpreadCalc FORMAT num18.2*/
+
+,(((Producao.VpTxJuros / Producao.VrProducao )*100) - ((Producao.VpTirContabil/ Producao.VrProducao )*100)) AS SpreadCalc
+
+,(1+ Producao.VpTxGerencial)/(1+ Producao.VpTirContabil)-1 AS SpreadPac2 FORMAT num18.2
+
+,Producao.VrComissaoTotal AS VrComissaoTotal
+,Producao.VrAcordoComercial AS VrAcordoComercial
+
+,(Producao.VrComissaoTotal + Producao.VrAcordoComercial) AS RetornoPlus FORMAT num18.2
+
+,(Producao.VrComissaoTotal  / Producao.VrProducao ) *100 AS PercComissao FORMAT num18.2
+
+,(Producao.VrAcordoComercial  / Producao.VrProducao ) *100 AS PercAcordo FORMAT num18.2
+
+,((Producao.VrComissaoTotal + Producao.VrAcordoComercial)  / Producao.VrProducao ) *100 AS PercTotalComissao FORMAT num18.2
+
+FROM Producao Producao
+	LEFT JOIN ParceiroComercialGrupo ParceiroComercialGrupo
+		ON Producao.CdParceiroComercial = ParceiroComercialGrupo.CdParceiroComercial
+
+	LEFT JOIN OriginacaoExp
+		ON Producao.NuProposta = OriginacaoExp.NuProposta
+
+	LEFT JOIN TbVrMercado TbVrMercado
+		ON Producao.NuContrato = TbVrMercado.NuContrato
+
+	LEFT JOIN TbMolicar TbMolicar
+		ON Producao.NuProposta = TbMolicar.NuProposta
+
+	LEFT JOIN CDCCG_TbParcela TbParcela
+		ON Producao.NuContrato = TbParcela.NuContrato
+
+	 Left Join TbOndaBVO BVOonda
+  		on Producao.cdparceirocomercial = BVOonda.cdparceirocomercial
+
+	LEFT JOIN TbVrMolicarFinal TbVrMolicarFinal
+		ON Producao.NuProposta = TbVrMolicarFinal.NuProposta
+
+WHERE Producao.NmGrupoProdutoMeta = 'Leves-BVO'
+;RUN;
+
+data TbAnaliticoQdvSimples;
+set
+	OriginacaoExp
+	ProducaoExp
+;run;
+
+PROC SQL;
+CREATE TABLE TbAnaliticoQdvSimplesAnt AS
+SELECT * FROM TbAnaliticoQdvSimples
+Where TpPessoa = 'F'
+;RUN;
+
+proc sql;
+create table TbAnaliticoQdvSimples as
+Select
+Compress(TpDados,,"kw") AS TpDados
+	,NuProposta
+	,NuAnoMes
+	,DtEntradaProposta
+,Compress(DsTipoCanalProducao,,"kw") AS DsTipoCanalProducao
+	,CdColaborador
+,Compress(NmColaborador,,"kw") AS NmColaborador
+,Compress(NmGrupoCargoColaborador,,"kw") AS NmGrupoCargoColaborador
+,Compress(DsLoginN1,,"kw") AS DsLoginN1
+,Compress(DsLoginN2A,,"kw") AS DsLoginN2A
+,Compress(DsLoginN3A,,"kw") AS DsLoginN3A
+,Compress(NmAreaEstruturaComercial,,"kw") AS NmAreaEstruturaComercial
+,Compress(NmSubEstruturaComercialA,,"kw") AS NmSubEstruturaComercialA
+	,CdParceiroComercial
+,Compress(NmParceiroComercial,,"kw") AS NmParceiroComercial
+,Compress(NuCpfCnpj,,"kw") AS NuCpfCnpj
+,Compress(FxIdade,,"kw") AS FxIdade
+	,QtParcelas
+	,AaModelo
+,Compress(CdMarca,,"kw") AS CdMarca
+,Compress(CdModelo,,"kw") AS CdModelo
+,Compress(NmGrupoConcessionaria,,"kw") AS NmGrupoConcessionaria
+,Compress(FlGrupoBVO,,"kw") AS FlGrupoBVO
+,VrEntrada
+,Compress(MotivoRecusaPropostaAgp,,"kw") AS MotivoRecusaPropostaAgp
+,FlBVOCredito
+,Compress(NmGrupoProdutoMeta,,"kw") AS NmGrupoProdutoMeta
+,Compress(TpPessoa,,"kw") AS TpPessoa
+,Compress(StProposta,,"kw") AS StProposta
+,VrMercado
+,Compress(FxEntrada,,"kw") AS FxEntrada
+,VrParcela
+,VrPDD
+,CdMolicar
+,VpSpread
+,VrLiberado
+,VpTirContabil
+,VrFinanciamento
+,TxPactuada
+,VrVeiculoMolicar
+,DtPrimeiroVencimento
+,VrProducao
+,TxTir
+,TxGerencial
+,SpreadCalc
+,SpreadPac2
+,VrComissaoTotal
+,VrAcordoComercial
+,RetornoPlus
+,PercComissao
+,PercAcordo
+,PercTotalComissao
+
+from TbAnaliticoQdvSimplesAnt
+;run;
+
+%ExportaCSV(TbAnaliticoQdvSimples,TbAnaliticoQdvSimples);
+
+proc export
+data=TbAnaliticoQdvSimples
+file='/riscosbvf/BA/processos/output/TbAnaliticoQdvSimples.csv' replace
+
+dbms=dlm;
+delimiter=';';
+run;

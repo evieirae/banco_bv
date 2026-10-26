@@ -1,0 +1,299 @@
+START_METADATA
+PROJECT: Rodas__GestaoRotinaApp
+FILE_SAS: recuperashare_apuracao_impulsionamento.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 14
+ODS_OUTPUTS_DETECTED: xlsx
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (1x | +12), RETAIN (1x | +10), PROC TRANSPOSE (2x | +20)
+----------------------------------------
+LINES_OF_CODE: 212
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dir_csv, dir_xlsx
+DETECTED_MACROS_USED: dir_csv, dir_xlsx, dtgcp, dtmax, hoje
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBSHAREMISSAO [SAS/Local], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_CUPOM [BIGQUERY], SOLITMP.APRO_SIMU_TBSIMULACAOCONVERSAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBSHAREMISSAO [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_CUPOM [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], SOLITMP.APRO_SIMU_TBSIMULACAOCONVERSAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./msg_push_&hoje..xlsx
+TEMP/DISCARDED OUTPUTS: AGG_1, APRO_SIMU_CUPOM, GESTAOGR, MSG_PUSH, MSG_PUSH_1, TB_MISSAO_ANALITICA, TB_MISSAO_MATRIZ_1, TB_MISSAO_MATRIZ_2, TB_MISSAO_MATRIZ_3, TB_MISSAO_RESUMO, TB_MISSAO_RESUMO_S
+DYNAMIC REFS (Ambiguous): {HOJE}.XLSX
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+/*ajuste nos cupons de Guarulhos*/
+
+proc sql; select max(dt_atualizacao) format date9. into:dtmax from basegrc.tbsharemissao; run;
+data _null_;
+	hoje = input(today(), DATE9.);
+	dtgcp = "'"||put(year("&dtmax."d),4.)||"-"||put(month("&dtmax."d),z2.)||"-"||put(day("&dtmax."d),z2.)||"'";
+
+	call symputx('hoje', put(hoje, DATE9.));
+	call symputx('dtgcp', dtgcp);
+;run;
+%put &hoje; %put &dtmax; %put &dtgcp;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage);
+create table apro_simu_cupom as
+select * from connection to perm(
+	select
+		cast(cd_simulacao_proposta as int64) as cd_simulacao_proposta,
+		cast(cd_cupom_beneficio_parceiro as int64) as cd_cupom_beneficio_parceiro
+	from `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta_cupom`
+	where timestamp_trunc(dt_inclusao, month) >= timestamp_trunc(&dtgcp, month)
+);
+disconnect from perm;
+quit;
+
+proc sql;
+create table tb_missao_analitica as
+select
+t1.NmAreaEstruturaComercialC as regional,
+strip(scan(t1.nmparceirocomercial, 2, '-')) as nmparceirocomercial,
+t1.cdparceirocomercial,
+catx("@", t1.dsloginn1c,"bv.com.br") as emailN1,
+catx("@", t1.dsloginn2c,"bv.com.br") as emailN2,
+catx("@", t1.dsloginn3c,"bv.com.br") as emailN3,
+case when t1.flcupom = "ESPECIALBV" then 1 else 0 end as flespecialbv,
+t1.nusemana,
+t1.dt_atualizacao format date9. as dt_atualizacao,
+/*t3.cd_cupom_beneficio_parceiro,*/
+case when t3.cd_cupom_beneficio_parceiro ne . then 1 else . end as flcupom,
+count(distinct t2.nucpfcnpj) as clientes
+from basegrc.tbsharemissao t1
+
+/*left join intraday.apro_simu_tbsimulacaoconversao t2*/
+left join SOLITMP.apro_simu_tbsimulacaoconversao t2
+	on t1.cdparceirocomercial = t2.cdparceirocomercial
+	and t2.produto = 'Leves'
+	and t2.dsmensageria = 'Aprovado'
+	and t2.cdsimulacaoinicial ne .
+	and datepart(t2.dtsimulacaoinicial) > "&dtmax."d
+left join apro_simu_cupom t3
+	on t2.cdsimulacaoinicial = t3.cd_simulacao_proposta and cd_cupom_beneficio_parceiro in (776)
+where t1.dt_atualizacao = "&dtmax."d
+AND t1.flCupom <> 'GRUPO CONT'
+
+group by 1,2,3,4,5,6,7,8,9,10
+;run;
+
+proc sql;
+create table tb_missao_resumo as
+select
+	regional,
+	emailN1,
+	nmparceirocomercial,
+	flespecialbv,
+	flcupom,
+	MAX(cd_statuspdv) as cd_statuspdv
+from(
+	select
+		*,
+		case when total_clientes = 0 then 0 /* sem simulacao*/
+			 when clientes_com_cupom > 0 and flespecialbv = 1 then 3 /* PDV com cupom disponível - simulação com cupom*/
+			 when clientes_sem_cupom > 0 and flespecialbv = 0 then 1 /* PDV sem cupom disponível - simulação sem cupom*/
+			 WHEN clientes_sem_cupom > 0 AND flespecialbv = 1 THEN 2 /* PDV com cupom disponível - simulação sem cupom */
+			  else 99999 /* PDV com cupom disponível - simulou sem cupom */
+		end as cd_statuspdv
+	from(
+	select
+		regional,
+		emailN1,
+		cdparceirocomercial,
+		propcase(nmparceirocomercial) as nmparceirocomercial,
+		flespecialbv,
+		flcupom,
+		sum(clientes) as total_clientes,
+		sum(case when flcupom = 1 then clientes end) as clientes_com_cupom,
+		sum(case when flcupom = . then clientes end) as clientes_sem_cupom
+	from tb_missao_analitica
+	group by 1,2,3,4,5,6
+	)
+)
+group by 1,2,3,4,5
+order by 1,2,4,5
+;run;
+
+/* 1) Ordena e remove duplicidades (se houver) garantindo ordem alfabética dentro de cada lista */
+proc sort data=tb_missao_resumo out=tb_missao_resumo_s;
+  by regional emailN1 cd_statuspdv nmparceirocomercial flespecialbv;
+run;
+
+/* 2) Agrega as lojas por gr+status em uma única string separada por vírgula */
+data agg_1;
+  length lojas $1000.;    /* ajuste o tamanho se precisar */
+  retain lojas;
+  set tb_missao_resumo_s;
+  by regional emailN1 cd_statuspdv nmparceirocomercial;
+
+  if first.cd_statuspdv then do;
+		lojas = nmparceirocomercial;
+		qt = 1;
+	end;
+  else do;
+	lojas = catx(', ', lojas, nmparceirocomercial);    /* concatena com vírgula e espaço */
+	qt + 1;
+	end;
+
+  if last.cd_statuspdv then output;
+  keep regional emailN1 cd_statuspdv lojas qt;
+/*  where flespecialbv =1;*/
+run;
+
+/* 3) Transforma linhas (status) em colunas: loja_st_1, loja_st_2, ... */
+proc transpose data=agg_1 out=tb_missao_matriz_1(drop=_name_) prefix=loja_st_;
+  by regional emailN1;
+  id cd_statuspdv;      /* cria sufixos com o valor do status (1, 2, ...) */
+  var lojas;      /* valores agregados */
+run;
+
+proc transpose data=agg_1 out=tb_missao_matriz_2(drop=_name_) prefix=qt_st_;
+  by regional emailN1;
+  id cd_statuspdv;      /* cria sufixos com o valor do status (1, 2, ...) */
+  var qt;      /* valores agregados */
+run;
+
+proc sql; create table tb_missao_matriz_3 as
+select t1.*, t2.* from tb_missao_matriz_1 t1 left join tb_missao_matriz_2 t2 on t1.emailN1 = t2.emailN1
+;run;
+
+/*status*/
+/*0 sem simulacao (-)*/
+/*1 sem cupom disponível - simulou sem cupom (+)*/
+/*2 com cupom disponível - simulou sem cupom (-)*/
+/*3 com cupom disponivel - simulou com cupom (+)*/
+
+data msg_push; set tb_missao_matriz_3;
+
+			 if qt_st_0 = 1 then Mensagem = "#RecuperaShare - O PDV "||trim(loja_st_0)||" ainda não simulou. Reforçe a parceria com o lojista - Vamos Nessa!";
+		else if qt_st_0 > 1 then Mensagem = "#RecuperaShare - Olá! Identificamos PDVs que ainda não simularam, reforce nossa parceria com: "||loja_st_0;
+/*		else if qt_st_1 = 1 then Mensagem = "#RecuperaShare - Boa! O PDV indicado já esta simulando - Continue nessa pegada!: "||loja_st_1;*/
+/*		else if qt_st_1 > 1 then Mensagem = "#RecuperaShare - Boa! Os PDVs indicados já estão simulando - Continue nessa pegada!: "||loja_st_1;*/
+		else if qt_st_1 = 1 then Mensagem = "#RecuperaShare - Boa! O PDV indicado já esta simulando - Continue nessa pegada!";
+		else if qt_st_1 > 1 then Mensagem = "#RecuperaShare - Boa! Os PDVs indicados já estão simulando - Continue nessa pegada!";
+		else if qt_st_2 = 1 then Mensagem = "#RecuperaShare - O PDV "||trim(loja_st_2)||" ainda não usou o cupom ESPECIALBV. Aproveite pra reforçar nossa parceria.";
+		else if qt_st_2 > 1 then Mensagem = "#RecuperaShare - Alguns PDVs não aproveitaram o cupom ESPECIALBV, reforce nossa parceria com: "||loja_st_2;
+/*	    else if qt_st_3 = 1 then Mensagem = "#RecuperaShare - Boa! O PDV indicado já esta utilizando o cupom - Continue nessa pegada!: "||loja_st_3;*/
+/*		else if qt_st_3 > 1 then Mensagem = "#RecuperaShare - Boa! Os PDVs indicado já estão utilizando o cupom - Continue nessa pegada!: "||loja_st_3;*/
+		else if qt_st_3 = 1 then Mensagem = "#RecuperaShare - Boa! O PDV indicado já esta aproveitando o cupom ESPECIALBV - Continue nessa pegada!";
+		else if qt_st_3 > 1 then Mensagem = "#RecuperaShare - Boa! Os PDVs indicado já estão aproveitando o cupom ESPECIALBV - Continue nessa pegada!";
+rename emailN1 = User;
+Categoria = "Impulsionamento";
+keep emailN1 Mensagem Categoria;
+run;
+
+proc sql; select count(*) into:qtd_push from msg_push; run;
+
+proc sql; create table gestaogr as
+select distinct
+	a.emailN2 as user,
+	"#RecuperaShare - Push enviado." as mensagem,
+	"Gestão - GF" as categoria
+from tb_missao_analitica a
+inner join tb_missao_matriz_3 b on a.emailN1 = b.emailN1
+;run;
+
+data msg_push_1; set msg_push gestaogr; run;
+
+proc sql;
+	insert into msg_push_1 (user, mensagem, categoria)
+	values("luis.santos@bv.com.br", "#RecuperaShare - Push enviado.", "Gestão - MIS")
+	values("valter.morais@bv.com.br", "#RecuperaShare - Push enviado.", "Gestão - MIS")
+	values("ramon.sales@bv.com.br", "#RecuperaShare - Push enviado.", "Gestão - MIS");
+run;
+
+/*Declara endereço para exportar os arquivos*/
+%let dir_csv = /riscosbvf/BA/processos/output;
+%let dir_xlsx = /infogrc/GestaoRotinaApp/vm/export;
+
+/* Deleta os arquivos xlsx caso existam */
+x "rm &dir_xlsx./*.xlsx";
+
+/*exporta arquivo resumo*/
+/*proc export data= tb_missao_resumo */
+/*outfile= "&dir_csv./tb_missao_resumo_&hoje..xlsx" */
+/*dbms=XLSX replace;*/
+/*sheet="tb_missao_resumo_&hoje.";*/
+/*run;*/
+
+/*exporta arquivo de mensagem*/
+proc export data= msg_push
+outfile= "&dir_csv./msg_push_&hoje..xlsx"
+dbms=XLSX replace;
+sheet="msg_push_&hoje.";
+run;
+
+/*Envia email com base de comissionamento para responsáveis*/
+OPTIONS
+EMAILHOST=smtprelay.bvnet.bv
+EMAILPORT=25
+EMAILAUTHPROTOCOL=NONE
+EMAILID="inf-gerenciais@bv.com.br";
+
+FILENAME MAIL EMAIL
+CONTENT_TYPE="text/html"
+/*attach=("&dir_xlsx./msg_push_&hoje..xlsx" ct = 'binary/application')*/
+TO=("inf-gerenciais@bv.com.br")
+CC=("luis.santos@bv.com.br", "valter.morais@bv.com.br", "actct.cgrillo@bv.com.br")
+
+SUBJECT="MISSAO RECUPERA SHARE - PUSH ";
+
+	ods html3
+	body=MAIL
+	style=SASWEB
+	rs=none;
+
+	TITLE;
+
+	ods text="Prezado(a),";
+	ods text=' ';
+	ods text="O arquivo com as mensagens foi encaminhado para pasta output";
+	ods text=' ';
+	ods text='Atenciosamente,';
+	ods text=' ';
+	ods text='Equipe de Dados';
+	ods text='MIS Varejo';
+
+ods html3 close;
+
+/*N:\DVMD\Planejamento Varejo\Informações Gerenciais\Processos\2026\20260101 -  Agente como Gatilho de Engajamento*/
+
+/*liberar pesados no intradaysimulacao*/
+/*missao apnp*/
+/*trabalhar as propostas apnp*/
+/*escore acima de 8, pap, entrada ate 20%*/
+/*intraday de proposta*/
+
+/*fim do dia, tela resummo status da missao*/
+/*funil, por cpf, todos, com cupom, originou, pgto*/

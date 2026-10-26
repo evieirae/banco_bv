@@ -1,0 +1,164 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_TbColaboradorDistribuicao
+FILE_SAS: TbColaboradorDistribuicao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (3x | +60), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 101
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [DBCON], DWBI_DTWH.TBCOLABORADOR [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBCOLABORADOR [PROC SQL - FROM], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/tmp/TbColaboradorDistribuicao.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/tmp/TbColaboradorDistribuicao.csv
+TEMP/DISCARDED OUTPUTS: TBCOLABORADORDISTRIBUICAO, TBCOLABORADORESATIVOS, TBCOLABORADORESCODIGOS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 1, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/TbColaboradorDistribuicao.csv
+
+END_METADATA
+================================================================================
+/*Declara Libnames e Parametros*/
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+/*Cria Base de Colaborados Ativos da Estrutura de Distribuição Varejo*/
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table TbColaboradoresAtivos as
+select *
+from connection to dbcon
+(SELECT HierarquiaComercial.NmEstruturaComercial
+,HierarquiaComercial.NmSubEstruturaComercial
+,HierarquiaComercial.NmAreaEstruturaComercial
+,Colaborador.CdColaboradorRH as IdMatricula
+,HierarquiaComercial.CdColaborador as CdColaboradorBI
+,HierarquiaComercial.NmColaborador
+,HierarquiaComercial.NmCargoColaborador
+,HierarquiaComercial.CdEstadoColaborador
+,HierarquiaComercial.NmEstadoColaborador
+,HierarquiaComercial.DtNascimento
+,HierarquiaComercial.DsLogin as DsLogin
+,HierarquiaComercial.DsEmail as DsEmail
+,HierarquiaComercial.NmColaboradorImediato
+,HierarquiaComercial.DsLoginColaboradorImediato
+,HierarquiaComercial.DtAdmissaoColaborador
+FROM DWBI_DIME.TbDimHierarquiaComercial HierarquiaComercial
+LEFT JOIN DWBI_DTWH.TbColaborador Colaborador
+ON  HierarquiaComercial.CdColaborador = Colaborador.CdPessoa
+AND Colaborador.CdSistemaOrigem = 202
+AND today() BETWEEN Colaborador.DtInicioVigencia and Colaborador.DtFimVigencia
+WHERE today() BETWEEN HierarquiaComercial.DtInicioVigencia AND HierarquiaComercial.DtFimVigencia
+AND YEAR(HierarquiaComercial.DtInicioVigencia) BETWEEN YEAR(today())-1 AND YEAR(today())
+AND HierarquiaComercial.CdEstadoColaborador not in (4,10)
+AND HierarquiaComercial.CdEstruturaComercial = 8
+order by HierarquiaComercial.NmSubEstruturaComercial,
+HierarquiaComercial.NmAreaEstruturaComercial,
+HierarquiaComercial.NmColaborador
+)
+;
+run;
+quit;
+
+proc sql;
+create table TbColaboradoresCodigos as
+select * from bases.tbcolaborador
+where CdColaboradorBI > 0 and CdGrupoCargoColaborador > 0 and CdOperador > 0
+;run;
+
+/*Gera base final de colaboradores*/
+
+proc sql;
+create table TbColaboradorDistribuicao as
+select
+Compress(TbColaboradoresAtivos.NmEstruturaComercial,,"kw") AS NmEstruturaComercial
+,Compress(TbColaboradoresAtivos.NmSubEstruturaComercial,,"kw")AS NmSubEstruturaComercial
+,TbColaboradoresCodigos.CdFilial
+,Compress(TbColaboradoresAtivos.NmAreaEstruturaComercial,,"kw")AS NmAreaEstruturaComercial
+,TbColaboradoresAtivos.IdMatricula
+,TbColaboradoresCodigos.CdColaborador
+,TbColaboradoresCodigos.CdOperador as CdURA
+,Compress(TbColaboradoresAtivos.NmColaborador,,"kw")AS NmColaborador
+,Compress(TbColaboradoresAtivos.NmCargoColaborador,,"kw")AS NmCargoColaborador
+,TbColaboradoresAtivos.CdEstadoColaborador
+,Compress(TbColaboradoresAtivos.NmEstadoColaborador,,"kw")AS NmEstadoColaborador
+,TbColaboradoresAtivos.DtNascimento
+,Compress(TbColaboradoresAtivos.DsLogin,,"kw") as DsLogin
+,Compress(TbColaboradoresAtivos.DsEmail,,"kw") as DsEmail
+,Compress(TbColaboradoresAtivos.NmColaboradorImediato,,"kw")AS NmColaboradorImediato
+,Compress(TbColaboradoresAtivos.DsLoginColaboradorImediato,,"kw")AS DsLoginColaboradorImediato
+,TbColaboradoresAtivos.DtAdmissaoColaborador
+from TbColaboradoresAtivos
+left join TbColaboradoresCodigos
+    on TbColaboradoresAtivos.CdColaboradorBI = TbColaboradoresCodigos.CdColaboradorBI
+;run;
+
+/*Exporta tabela final*/
+
+proc export
+data=TbColaboradorDistribuicao
+file='/riscosbvf/BA/processos/tmp/TbColaboradorDistribuicao.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/*Envia base via e-mail para o Diogo Reis do time Tático de Relações Comerciais*/
+
+FILENAME MAIL EMAIL
+	FROM=("MISVarejo@bv.com.br")
+	TO=("diogo.reis@bv.com.br","alves.souza@bv.com.br","vitoria.ribeiro1@bv.com.br","paloma.castro@bv.com.br")
+	CT="text/html"
+	IMPORTANCE='high'
+    SUBJECT="Base Distribuicao Varejo - TbColaboradorDistribuicao"
+    ATTACH='/riscosbvf/BA/processos/tmp/TbColaboradorDistribuicao.csv';
+  DATA _NULL_;
+	FILE MAIL;
+	    PUT '<html><body>';
+		PUT "<p>Bom dia, prezados.";
+		PUT "<br>";
+		PUT "<br>Segue anexo contendo base gerada automaticamente dos Colaboradores Atuais da Distribuicao Varejo.";
+		PUT "<br>";
+		PUT "<br>Atenciosamente,";
+		PUT "<br>";
+		PUT "<p>MIS Varejo.</p>";
+		PUT '</body></html>';
+  RUN;

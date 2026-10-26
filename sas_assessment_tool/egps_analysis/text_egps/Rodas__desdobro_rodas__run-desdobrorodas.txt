@@ -1,0 +1,151 @@
+START_METADATA
+PROJECT: Rodas__desdobro_rodas
+FILE_SAS: run-desdobrorodas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 86
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: DESDOBRO = /infogrc/desdobro_rodas/bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DBCOR.DBO.TBSUBPRODUTO [DBCON], DBCRED.DBO.TBENDERECOTBPESSOASOBANALISE [DBCON], DBCRED.DBO.TBPESSOASOBANALISE [DBCON], DBCRED.DBO.TBPROPOSTA [DBCON], DBPAGAMENTO.DBO.TBINFORMACAOBANCARIAPAGAMENTO [DBCON], DBPAGAMENTO.DBO.TBPAGAMENTO [DBCON], DBPAGAMENTO.DBO.TBPESSOAPAGAMENTO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: DESDOBRO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): DBCOR.DBO.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBENDERECOTBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBPAGAMENTO.DBO.TBINFORMACAOBANCARIAPAGAMENTO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.DBO.TBPAGAMENTO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.DBO.TBPESSOAPAGAMENTO [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): DESDOBRO.CONTRATO_DESDOBRO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CONTRATO, DESDOBRO_1, DESDOBRO_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+LIBNAME DESDOBRO '/infogrc/desdobro_rodas/bases';
+
+OPTIONS COMPRESS = YES;
+
+/*DATA _NULL_;*/
+/*  date = INTNX('DAY', TODAY(), -1);*/
+/*  CALL SYMPUT('date',"'"||put(date,yymmddn8.)||"'");*/
+/*RUN;*/
+
+/*%put &date;*/
+
+/*
+cria tabela com a identificação do(s) favorecido(s) do pagamento dos contratos
+cada favorecido tem seu próprio registro, portanto, no caso de desdobro, a proposta é duplicada
+*/
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE CONTRATO AS SELECT * FROM CONNECTION TO DBCON (
+	SELECT
+		  PROP.NuProposta
+		, PROP.NuContratoGestao					AS NuContrato
+		, CONVERT(DATE,PROP.DtEntradaProposta)	AS DtEntradaProposta
+		, PESSOA.TpPessoa
+		, PROP.CdLoja
+		, ENDER.CdUf							AS UfProponente
+		, CONVERT(DATE,PGTO.DtPagamento) 		AS DtPagamento
+		, PGTO.VrLiberado 						AS VrLiberado
+		, PESSOAPGTO.NuCpfCnpj
+	FROM 		DBCRED.dbo.TbProposta PROP
+	LEFT JOIN	DBCOR.dbo.TbSubProduto PROD
+		ON PROD.CdSubProduto = PROP.CdSubProduto
+	LEFT JOIN   DBCRED.dbo.TbPessoaSobAnalise PESSOA
+		ON PROP.Nuproposta = PESSOA.Nuproposta
+		AND PESSOA.CdPapel = 1
+	LEFT JOIN	DBCRED.dbo.TbEnderecoTbPessoaSobAnalise ENDER
+		ON PESSOA.CdPessoaSobAnalise = ENDER.CdPessoaSobAnalise
+		AND ENDER.CdTipoEndereco = 1
+	LEFT JOIN 	DBPAGAMENTO.dbo.TbPagamento PGTO
+		ON PGTO.NuContratoGestao = PROP.NuContratoGestao
+	LEFT JOIN 	DBPAGAMENTO.dbo.TbInformacaoBancariaPagamento INFOPGTO
+		ON INFOPGTO.CdInformacaoBancariaPagto = PGTO.CdInforBancariaPagtoFavorecido
+	LEFT JOIN	DBPAGAMENTO.dbo.TbPessoaPagamento PESSOAPGTO
+		ON PESSOAPGTO.CdPessoaPagamento = INFOPGTO.CdPessoaPagamento
+	WHERE	PROD.CdProduto = 12
+	AND 	PGTO.DtPagamento >= '20210101'
+	AND		PESSOAPGTO.NmNome <> ''
+)
+;QUIT;
+
+PROC SORT DATA=CONTRATO; BY NuContrato; RUN;
+
+DATA DESDOBRO_1; SET CONTRATO; BY NuContrato;
+/*remove os contratos com favorecidos únicos da tabela*/
+IF First.Nucontrato AND Last.NuContrato THEN Delete;
+
+/*identifica o tipo de pessoa favorecida*/
+FORMAT NuCpfCnpjFavorecido $14.;
+NuCpfCnpjFavorecido  = NuCpfCnpj;
+IF LENGTH(NuCpfCnpjFavorecido) > 11 THEN TpPessoaFavorecido = 'J'; ELSE TpPessoaFavorecido = 'F';
+DROP NuCpfCnpj NuCpfCnpjFavorecido ;
+
+/*Cria flags dos tipos de favorecidos*/
+IF TpPessoaFavorecido = 'J' THEN FlPessJur = 1;
+IF TpPessoaFavorecido = 'F' THEN FlPessFis = 1;
+DROP TpPessoaFavorecido;
+
+RUN;
+
+/*
+cria base final de desdobro;
+em alguns casos cada favorecido é pago em uma data, neste caso está sendo considerada a maior data;
+cria o parâmetro TpPessoaDesdobro indicando o tipo das pessoas que receberam pagamento
+*/
+
+PROC SQL;
+CREATE TABLE DESDOBRO_2 AS
+	SELECT
+/*		  NuProposta*/
+		  NuContrato
+/*		, DtEntradaProposta*/
+		, TpPessoa
+		, CdLoja
+/*		, UfProponente*/
+		, CASE
+			WHEN MAX(FlPessJur) NE . AND MAX(FlPessFis) NE . THEN 'PJ-PF'
+			WHEN MAX(FlPessJur) NE . AND MAX(FlPessFis) EQ . THEN 'PJ-PJ'
+			WHEN MAX(FlPessJur) EQ . AND MAX(FlPessFis) NE . THEN 'PF-PF'
+															 ELSE ''
+		  END 				AS TpPessoaDesdobro
+		, MAX(DtPagamento)	AS DtPagamento FORMAT DATE9.
+		, SUM(VrLiberado) 	AS VrLiberado
+	FROM DESDOBRO_1
+	GROUP BY 1,2,3
+	ORDER BY 1
+;QUIT;
+
+DATA DESDOBRO.CONTRATO_DESDOBRO; SET DESDOBRO_2; RUN;

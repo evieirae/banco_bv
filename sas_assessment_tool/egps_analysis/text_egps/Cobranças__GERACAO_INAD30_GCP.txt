@@ -1,0 +1,2577 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__GERACAO_INAD30_GCP
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:08 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (6x | +30)
+----------------------------------------
+LINES_OF_CODE: 2204
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (16x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: EMPILHA = /riscosbv/cobranca/gtavares/Reneg/Empilha; RENEG = /riscosbv/cobranca/gtavares/Reneg
+DETECTED_MACROS_DEFINED: base, libname, path, work
+DETECTED_MACROS_USED: anomes, base, dt_anterior, dt_fim, dt_inicio, libname, mob3, path, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES, BASE, DT_ANTERIOR, DT_FIM, DT_INICIO, LIBNAME, MOB3
+CONNECTION_LIBS: PERM, SQLSVR
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBCONTRATOFINANCEIRO [BIGQUERY/GCP], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY/GCP], EMPILHA.EMPILHA_RENEG_FINAL_&ANOMES [SAS/Local], GOPRRENEGOCIACAOSIMULACAO.TBRENEGOCIACAOESCOLHIDA [SAS/Local], RENEG.BASE_ELEG_CONT_&ANOMES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.RENEG_SIMULADOR_TOTAL_D
+IMPORTED_LIBNAMES: EMPILHA, RENEG
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.RENEG_SIMULADOR, WORK.RENEG_SIMULADOR_TOTAL_D
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBCONTRATOFINANCEIRO [PROC SQL - FROM], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM], EMPILHA.EMPILHA_RENEG_FINAL_&ANOMES [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], GOPRRENEGOCIACAOSIMULACAO.TBRENEGOCIACAOESCOLHIDA [PROC SQL - FROM], RENEG.BASE_ELEG_CONT_&ANOMES [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], WORK.RENEG_SIMULADOR [PROC SQL - FROM], WORK.RENEG_SIMULADOR_TOTAL_D [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, AUX_QTD_RENEG, BASE_FPD, BASE_RENEG_MAIOR90, BASE_RENEG_MENOR90, CUBO_EXPORT, RENEG_SIMULADOR_C, RENEG_SIMULADOR_D, RENEG_SIMULADOR_FINAL_&ANOMES, RENEG_SIMULADOR_TOTAL, RENEG_SIMULADOR_TOTAL_B, RENEG_SIMULADOR_TOTAL_C, RENEG_SIMULADOR_TOTAL_D, WORK.RENEG_SIMULADOR, WORK.RENEG_SIMULADOR_B
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET libname=%sysfunc(lowcase(&libname.));
+%LET base=%sysfunc(lowcase(&base.));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Inad30 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Inad30 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ioafzJ428dT24ICY/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME EMPILHA '/riscosbv/cobranca/gtavares/Reneg/Empilha';
+LIBNAME RENEG '/riscosbv/cobranca/gtavares/Reneg';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro safra(dt_inicio, dt_fim, dt_anterior, anomes, MOB3);
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+
+DATA BASE_RENEG_MENOR90;
+SET empilha_reneg_final_&anomes.;
+RUN;
+
+proc sort data=BASE_RENEG_MENOR90 NODUPKEY;
+   by nucontrato;
+
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+DATA BASE_RENEG_MAIOR90;
+SET base_eleg_cont_&anomes.:;
+RUN;
+
+proc sort data=BASE_RENEG_MAIOR90 NODUPKEY;
+   by nucontrato;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE WORK.RENEG_SIMULADOR AS
+SELECT *
+
+FROM CONNECTION TO PERM(
+
+WITH QUERY_1 AS (
+
+SELECT DISTINCT
+	nucontratogestao,
+	sqcontratofinanceiro,
+	nucontratogestaonovo,
+	CASE
+		WHEN nucontratogestao = nucontratogestaonovo THEN sqcontratofinanceiro + 1
+		ELSE 1
+	END AS SQCONTRATONOVO,
+	dt_baixa,
+	dt_reneg,
+	CAST(vr_presente AS NUMERIC) AS vr_presente,
+	CAST(vr_financiado AS NUMERIC) AS vr_financiado,
+	qt_parcela,
+	vr_prestacao,
+	vr_desconto_mora,
+	vr_desconto_multa,
+	vr_desconto_principal,
+	tx_pactuada
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE dt_baixa >= &dt_inicio. AND dt_baixa < &dt_fim.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+
+),
+QUERY_2 AS (
+
+SELECT
+    A.NuContratoGestao AS NuContrato,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada,
+    MIN(B.vr_parcela) AS VrParcela_Anterior,
+    DATE_DIFF(CAST(A.dt_reneg AS DATE), MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END), DAY) AS Atraso,
+    SUM(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto,
+    COUNT(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_Abertas,
+    SUM(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_baixa AS DATE) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto_em_Atraso,
+    COUNT(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_reneg AS DATE) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_em_Atraso,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END) AS DT_VENCIMENTO_NOVO,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.nu_parcela
+        ELSE NULL
+    END) AS PARCELA
+FROM
+    QUERY_1 AS A
+LEFT JOIN
+    bv-pdbd-prd.dvry_core.tbparcela AS B
+ON
+    A.NuContratoGestao = B.cd_contrato
+    AND A.SqContratoFinanceiro = B.sq_contrato_financeiro
+GROUP BY
+    A.NuContratoGestao,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada
+
+),
+QUERY_3 AS (
+
+SELECT
+    A.*,
+    C.cd_produto,
+    D.cdsubproduto,
+    C.cd_modalidade_produto,
+    I.nmmodalidadeproduto,
+    H.nmgruposubproduto,
+    CASE
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto IS NULL THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) IN (21, 22, 29, 44) THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 18 THEN 'CP_BV_MAR_ABERTO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 22 THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 56 THEN 'CP_PRE_APROVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 67 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 71 THEN 'CP_BOM_PRA_CREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 72 THEN 'CP_SERASA_ECRED'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 73 THEN 'CP_FINANZERO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 77 THEN 'CP_MINHA_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 82 THEN 'CP_EASYCREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto IN (85, 86) THEN 'CP_NEON'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 87 THEN 'CP_JUST'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 97 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 101 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 89 THEN 'CP_JUROS_BAIXO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 93 THEN 'CP_QUERO_FINANCIAR'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 68 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 96 THEN 'CP_ABASTECE_AI'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 100 THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 77
+        AND (D.cdsubproduto = 100
+        OR D.cdsubproduto IS NULL) THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) = 16 THEN 'INSS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (17, 75) THEN 'PRIVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (18, 32, 37, 39) THEN 'PUBLICO'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IN (4, 7) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto = 6 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (15, 21, 75) THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 12
+        AND D.cdsubproduto IS NULL THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 76 THEN 'CDC_TURISMO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 74 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IS NULL
+        AND CAST(C.cd_modalidade_produto AS INT64) = 51 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (46, 47) THEN 'CDC_MOVEIS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 70 THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 53 THEN 'CDC_ODONTOLOGICO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 55
+        AND D.cdsubproduto IS NULL THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 10
+        AND D.cdsubproduto IS NULL THEN 'CDC_DESCONTO_CHEQUE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 11
+        AND D.cdsubproduto IS NULL THEN 'CDC_INFORMATICA'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 62
+        AND D.cdsubproduto IS NULL THEN 'CDC_ESTUDANTIL'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 8 THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 13 THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IN (19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 28
+        AND D.cdsubproduto IN (20, 63) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 78
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (8, 19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 2
+        AND D.cdsubproduto = 9 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 16 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 30 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 5 THEN 'MOTOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 4 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 3 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IN (1, 58) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IS NULL THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IN (2, 3, 61) THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 29 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 31 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 16
+        AND CAST(C.cd_modalidade_produto AS INT64) = 60 THEN 'COBAN'
+    END AS PRODUTO
+FROM
+    QUERY_2 AS A
+
+LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato AS C
+    ON A.NUCONTRATO = C.cd_contrato
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+    ON A.NUCONTRATO = D.nucontratogestao AND D.stproposta = 'AP'
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbsubproduto AS F
+    ON D.cdsubproduto = F.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbsubprodutogrupo AS G
+    ON D.cdsubproduto = G.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbgruposubproduto AS H
+    ON G.cdgruposubproduto = H.cdgruposubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbmodalidadeproduto AS I
+    ON CAST(C.cd_modalidade_produto AS INT64) = I.cdmodalidadeproduto
+
+)
+SELECT * FROM QUERY_3
+	 );
+QUIT;
+
+PROC SQL;
+CREATE TABLE WORK.RENEG_SIMULADOR_B AS
+SELECT *,
+		datepart(dt_baixa) format date9. as dt_baixa2,
+       CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 04  THEN '001_004'
+		   WHEN atraso  <= 15  THEN '005_015'
+		   WHEN atraso  <= 30  THEN '016_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 150 THEN '121_150'
+		   WHEN atraso  <= 180 THEN '151_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso,
+
+		CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 30  THEN '001_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 180 THEN '121_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso2,
+		&anomes. as safra_anomes
+
+FROM WORK.RENEG_SIMULADOR
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE AUX_QTD_RENEG AS
+SELECT A.NuContrato,
+		COUNT(DISTINCT B.sq_contrato_financeiro) AS qtd_reneg
+
+FROM RENEG_SIMULADOR_B A
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT cd_contrato,
+       sq_contrato_financeiro,
+       cd_motivo_contrato_financeiro
+ FROM bv-pdbd-prd.dvry_core.tbcontratofinanceiro
+ WHERE cd_motivo_contrato_financeiro = '4'
+
+) AS B
+	ON A.NuContrato = B.cd_contrato AND
+		A.SqContratoFinanceiro >= B.sq_contrato_financeiro
+
+	group by A.NuContrato;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_C AS
+SELECT A.*,
+	B.qtd_reneg,
+	CASE WHEN B.qtd_reneg = 0 THEN 1 ELSE 2 END AS FL_PRIMEIRA_RENEG
+
+FROM RENEG_SIMULADOR_B A
+LEFT JOIN AUX_QTD_RENEG B
+ON A.NuContrato = B.NuContrato;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_SIMULADOR_D AS
+SELECT	A.*,
+
+		B.CdRatingAtual AS CdRatingAtual_0,
+		B.CdSItuacaoContabil AS CdSItuacaoContabil_0,
+		B.VRTAXACONTRATO AS VRTAXACONTRATO_0,
+		B.VRPERMANENCIAAPROPRIADO AS VRPERMANENCIAAPROPRIADO_0,
+		B.VrPDD AS VrPDD_0,
+		B.NuDiasAtraso AS NuDiasAtraso_0,
+		C.NuDiasAtraso AS NuDiasAtraso_M3
+
+FROM RENEG_SIMULADOR_C AS A
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil,
+    SUM(CAST(vrtaxacontrato AS NUMERIC)) AS VRTAXACONTRATO,
+    SUM(CAST(vrpermanenciaapropriado AS NUMERIC)) AS VRPERMANENCIAAPROPRIADO,
+    SUM(CAST(vrpdd AS NUMERIC)) AS VrPDD,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS t
+WHERE
+    DATE(dtprocessamento) = &dt_anterior.
+    AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil
+
+) AS B
+ON	A.NuContrato = B.NuContrato
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+WHERE DATE(dtprocessamento) = &mob3.
+AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato
+
+) AS C
+ON	A.NuContratoGestaoNovo = C.NuContrato
+;
+QUIT;
+
+DATA RENEG_SIMULADOR_D;
+SET RENEG_SIMULADOR_D;
+
+	if CdSItuacaoContabil_0 = 1 THEN
+		SALDO_CONT_0 = SUM(VRTAXACONTRATO_0, VRPERMANENCIAAPROPRIADO_0); ELSE
+		SALDO_CONT_0 = VRTAXACONTRATO_0 ;
+	if CdSItuacaoContabil_0 = 1 THEN
+		PDD_FINAL_0 = VrPDD_0; ELSE
+		PDD_FINAL_0 = SALDO_CONT_0;
+
+	IF Qtd_Parcelas_Abertas < qt_parcela THEN ST_RENEG = '1. AUMENTO PRAZO'; ELSE
+	IF Qtd_Parcelas_Abertas = qt_parcela THEN ST_RENEG = '2. MANUT. PRAZO '; ELSE
+	IF Qtd_Parcelas_Abertas > qt_parcela THEN ST_RENEG = '3. REDUÇÃO PRAZO';
+
+	Diff_Parcela = sum(qt_parcela,-Qtd_Parcelas_Abertas);
+
+	if Diff_Parcela <   0  then fx_parcela = '0. Redução'; else
+	if Diff_Parcela <=  1  then fx_parcela = '1. 00-01  '; else
+	if Diff_Parcela <=  3  then fx_parcela = '2. 02-03  '; else
+	if Diff_Parcela <=  6  then fx_parcela = '3. 04-06  '; else
+	if Diff_Parcela <=  12 then fx_parcela = '4. 07-12  '; else
+	if Diff_Parcela <=  24 then fx_parcela = '5. 13-24  '; else
+	if Diff_Parcela <=  36 then fx_parcela = '6. 25-36  '; else
+	if Diff_Parcela  >  36 then fx_parcela = '7. 36-99  ';
+
+RUN;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_FINAL_&anomes. AS
+SELECT
+	A.*,
+	CASE WHEN C.MODELO_FINAL IS NOT NULL THEN C.MODELO_FINAL
+	ELSE B.GRUPO_FINAL_DECISAO
+	END AS POLITICA
+
+FROM RENEG_SIMULADOR_D AS A
+LEFT JOIN BASE_RENEG_MENOR90 AS B
+ON INPUT(A.NUCONTRATO,BEST32.) = B.NUCONTRATO
+
+LEFT JOIN BASE_RENEG_MAIOR90 AS C
+ON INPUT(A.NUCONTRATO,BEST32.) = C.NUCONTRATO
+
+;QUIT;
+
+proc sort data=RENEG_SIMULADOR_FINAL_&anomes. NODUPKEY;
+   by nucontrato;
+
+%mend;
+
+%macro safra_2(dt_inicio, dt_fim, dt_anterior, anomes, MOB3);
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+
+DATA BASE_RENEG_MENOR90;
+SET empilha_reneg_final_&anomes.;
+RUN;
+
+proc sort data=BASE_RENEG_MENOR90 NODUPKEY;
+   by nucontrato;
+
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+DATA BASE_RENEG_MAIOR90;
+SET base_eleg_cont_&anomes.:;
+RUN;
+
+proc sort data=BASE_RENEG_MAIOR90 NODUPKEY;
+   by nucontrato;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE WORK.RENEG_SIMULADOR AS
+SELECT *
+
+FROM CONNECTION TO PERM(
+
+WITH QUERY_1 AS (
+
+SELECT DISTINCT
+	nucontratogestao,
+	sqcontratofinanceiro,
+	nucontratogestaonovo,
+	CASE
+		WHEN nucontratogestao = nucontratogestaonovo THEN sqcontratofinanceiro + 1
+		ELSE 1
+	END AS SQCONTRATONOVO,
+	dt_baixa,
+	dt_reneg,
+	CAST(vr_presente AS NUMERIC) AS vr_presente,
+	CAST(vr_financiado AS NUMERIC) AS vr_financiado,
+	qt_parcela,
+	vr_prestacao,
+	vr_desconto_mora,
+	vr_desconto_multa,
+	vr_desconto_principal,
+	tx_pactuada
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE dt_baixa >= &dt_inicio. AND dt_baixa < &dt_fim.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+
+),
+QUERY_2 AS (
+
+SELECT
+    A.NuContratoGestao AS NuContrato,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada,
+    MIN(B.vr_parcela) AS VrParcela_Anterior,
+    DATE_DIFF(CAST(A.dt_reneg AS DATE), MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END), DAY) AS Atraso,
+    SUM(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto,
+    COUNT(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_Abertas,
+    SUM(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_baixa AS DATE) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto_em_Atraso,
+    COUNT(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_reneg AS DATE) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_em_Atraso,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END) AS DT_VENCIMENTO_NOVO,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.nu_parcela
+        ELSE NULL
+    END) AS PARCELA
+FROM
+    QUERY_1 AS A
+LEFT JOIN
+    bv-pdbd-prd.dvry_core.tbparcela AS B
+ON
+    A.NuContratoGestao = B.cd_contrato
+    AND A.SqContratoFinanceiro = B.sq_contrato_financeiro
+GROUP BY
+    A.NuContratoGestao,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada
+
+),
+QUERY_3 AS (
+
+SELECT
+    A.*,
+    C.cd_produto,
+    D.cdsubproduto,
+    C.cd_modalidade_produto,
+    I.nmmodalidadeproduto,
+    H.nmgruposubproduto,
+    CASE
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto IS NULL THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) IN (21, 22, 29, 44) THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 18 THEN 'CP_BV_MAR_ABERTO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 22 THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 56 THEN 'CP_PRE_APROVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 67 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 71 THEN 'CP_BOM_PRA_CREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 72 THEN 'CP_SERASA_ECRED'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 73 THEN 'CP_FINANZERO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 77 THEN 'CP_MINHA_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 82 THEN 'CP_EASYCREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto IN (85, 86) THEN 'CP_NEON'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 87 THEN 'CP_JUST'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 97 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 101 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 89 THEN 'CP_JUROS_BAIXO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 93 THEN 'CP_QUERO_FINANCIAR'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 68 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 96 THEN 'CP_ABASTECE_AI'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 100 THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 77
+        AND (D.cdsubproduto = 100
+        OR D.cdsubproduto IS NULL) THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) = 16 THEN 'INSS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (17, 75) THEN 'PRIVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (18, 32, 37, 39) THEN 'PUBLICO'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IN (4, 7) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto = 6 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (15, 21, 75) THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 12
+        AND D.cdsubproduto IS NULL THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 76 THEN 'CDC_TURISMO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 74 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IS NULL
+        AND CAST(C.cd_modalidade_produto AS INT64) = 51 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (46, 47) THEN 'CDC_MOVEIS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 70 THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 53 THEN 'CDC_ODONTOLOGICO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 55
+        AND D.cdsubproduto IS NULL THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 10
+        AND D.cdsubproduto IS NULL THEN 'CDC_DESCONTO_CHEQUE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 11
+        AND D.cdsubproduto IS NULL THEN 'CDC_INFORMATICA'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 62
+        AND D.cdsubproduto IS NULL THEN 'CDC_ESTUDANTIL'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 8 THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 13 THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IN (19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 28
+        AND D.cdsubproduto IN (20, 63) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 78
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (8, 19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 2
+        AND D.cdsubproduto = 9 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 16 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 30 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 5 THEN 'MOTOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 4 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 3 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IN (1, 58) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IS NULL THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IN (2, 3, 61) THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 29 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 31 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 16
+        AND CAST(C.cd_modalidade_produto AS INT64) = 60 THEN 'COBAN'
+    END AS PRODUTO
+FROM
+    QUERY_2 AS A
+
+LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato AS C
+    ON A.NUCONTRATO = C.cd_contrato
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+    ON A.NUCONTRATO = D.nucontratogestao AND D.stproposta = 'AP'
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbsubproduto AS F
+    ON D.cdsubproduto = F.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbsubprodutogrupo AS G
+    ON D.cdsubproduto = G.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbgruposubproduto AS H
+    ON G.cdgruposubproduto = H.cdgruposubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbmodalidadeproduto AS I
+    ON CAST(C.cd_modalidade_produto AS INT64) = I.cdmodalidadeproduto
+
+)
+SELECT * FROM QUERY_3
+	 );
+QUIT;
+
+PROC SQL;
+CREATE TABLE WORK.RENEG_SIMULADOR_B AS
+SELECT *,
+		datepart(dt_baixa) format date9. as dt_baixa2,
+       CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 04  THEN '001_004'
+		   WHEN atraso  <= 15  THEN '005_015'
+		   WHEN atraso  <= 30  THEN '016_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 150 THEN '121_150'
+		   WHEN atraso  <= 180 THEN '151_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso,
+
+		CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 30  THEN '001_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 180 THEN '121_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso2,
+		&anomes. as safra_anomes
+
+FROM WORK.RENEG_SIMULADOR
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE AUX_QTD_RENEG AS
+SELECT A.NuContrato,
+		COUNT(DISTINCT B.sq_contrato_financeiro) AS qtd_reneg
+
+FROM RENEG_SIMULADOR_B A
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT cd_contrato,
+       sq_contrato_financeiro,
+       cd_motivo_contrato_financeiro
+ FROM bv-pdbd-prd.dvry_core.tbcontratofinanceiro
+ WHERE cd_motivo_contrato_financeiro = '4'
+
+) AS B
+	ON A.NuContrato = B.cd_contrato AND
+		A.SqContratoFinanceiro >= B.sq_contrato_financeiro
+
+	group by A.NuContrato;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_C AS
+SELECT A.*,
+	B.qtd_reneg,
+	CASE WHEN B.qtd_reneg = 0 THEN 1 ELSE 2 END AS FL_PRIMEIRA_RENEG
+
+FROM RENEG_SIMULADOR_B A
+LEFT JOIN AUX_QTD_RENEG B
+ON A.NuContrato = B.NuContrato;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_SIMULADOR_D AS
+SELECT	A.*,
+
+		B.CdRatingAtual AS CdRatingAtual_0,
+		B.CdSItuacaoContabil AS CdSItuacaoContabil_0,
+		B.VRTAXACONTRATO AS VRTAXACONTRATO_0,
+		B.VRPERMANENCIAAPROPRIADO AS VRPERMANENCIAAPROPRIADO_0,
+		B.VrPDD AS VrPDD_0,
+		B.NuDiasAtraso AS NuDiasAtraso_0,
+		C.NuDiasAtraso AS NuDiasAtraso_M3
+
+FROM RENEG_SIMULADOR_C AS A
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil,
+    SUM(CAST(vrtaxacontrato AS NUMERIC)) AS VRTAXACONTRATO,
+    SUM(CAST(vrpermanenciaapropriado AS NUMERIC)) AS VRPERMANENCIAAPROPRIADO,
+    SUM(CAST(vrpdd AS NUMERIC)) AS VrPDD,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS t
+WHERE
+    DATE(dtprocessamento) = &dt_anterior.
+    AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil
+
+) AS B
+ON	A.NuContrato = B.NuContrato
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+WHERE DATE(dtprocessamento) = &mob3.
+AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato
+
+) AS C
+ON	A.NuContratoGestaoNovo = C.NuContrato
+;
+QUIT;
+
+DATA RENEG_SIMULADOR_D;
+SET RENEG_SIMULADOR_D;
+
+	if CdSItuacaoContabil_0 = 1 THEN
+		SALDO_CONT_0 = SUM(VRTAXACONTRATO_0, VRPERMANENCIAAPROPRIADO_0); ELSE
+		SALDO_CONT_0 = VRTAXACONTRATO_0 ;
+	if CdSItuacaoContabil_0 = 1 THEN
+		PDD_FINAL_0 = VrPDD_0; ELSE
+		PDD_FINAL_0 = SALDO_CONT_0;
+
+	IF Qtd_Parcelas_Abertas < qt_parcela THEN ST_RENEG = '1. AUMENTO PRAZO'; ELSE
+	IF Qtd_Parcelas_Abertas = qt_parcela THEN ST_RENEG = '2. MANUT. PRAZO '; ELSE
+	IF Qtd_Parcelas_Abertas > qt_parcela THEN ST_RENEG = '3. REDUÇÃO PRAZO';
+
+	Diff_Parcela = sum(qt_parcela,-Qtd_Parcelas_Abertas);
+
+	if Diff_Parcela <   0  then fx_parcela = '0. Redução'; else
+	if Diff_Parcela <=  1  then fx_parcela = '1. 00-01  '; else
+	if Diff_Parcela <=  3  then fx_parcela = '2. 02-03  '; else
+	if Diff_Parcela <=  6  then fx_parcela = '3. 04-06  '; else
+	if Diff_Parcela <=  12 then fx_parcela = '4. 07-12  '; else
+	if Diff_Parcela <=  24 then fx_parcela = '5. 13-24  '; else
+	if Diff_Parcela <=  36 then fx_parcela = '6. 25-36  '; else
+	if Diff_Parcela  >  36 then fx_parcela = '7. 36-99  ';
+
+RUN;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_FINAL_&anomes. AS
+SELECT
+	A.*,
+	CASE WHEN C.MODELO_FINAL IS NOT NULL THEN C.MODELO_FINAL
+	ELSE B.GRUPO_FINAL_DECISAO
+	END AS POLITICA
+
+FROM RENEG_SIMULADOR_D AS A
+LEFT JOIN BASE_RENEG_MENOR90 AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+
+LEFT JOIN BASE_RENEG_MAIOR90 AS C
+ON A.NUCONTRATO = C.NUCONTRATO
+
+;QUIT;
+
+proc sort data=RENEG_SIMULADOR_FINAL_&anomes. NODUPKEY;
+   by nucontrato;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%safra_2('2025-11-01', '2025-12-01', '2025-10-31', 202511, '2026-02-28');
+%safra_2('2025-12-01', '2026-01-01', '2025-11-30', 202512, '2026-03-31');
+
+proc sql;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE BASE_FPD AS
+SELECT *
+
+FROM CONNECTION TO PERM(
+
+SELECT DISTINCT
+    cd_contrato,
+    sq_contrato_financeiro,
+    dt_vencimento,
+    dt_ultimo_recebimento,
+    st_parcela,
+    vr_parcela,
+	CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 5
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad5,
+    CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 7
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad7,
+    CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 15
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad15,
+    CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 30
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad30,
+    CASE
+        WHEN DATE_ADD(dt_vencimento, INTERVAL 30 DAY) < CURRENT_DATE() THEN 1
+        ELSE 0
+    END AS Fl_vencido30,
+	CASE
+        WHEN DATE_ADD(dt_vencimento, INTERVAL 5 DAY) < CURRENT_DATE() THEN 1
+        ELSE 0
+    END AS Fl_vencido5
+FROM
+    bv-pdbd-prd.dvry_core.tbparcela
+WHERE
+    nu_parcela = 1
+
+);
+quit;
+
+
+
+DATA RENEG_SIMULADOR_TOTAL;
+SET RENEG_SIMULADOR_FINAL_20:;
+
+	VAR_PMT = ROUND(vr_prestacao / VrParcela_Anterior, .1);
+
+	IF VAR_PMT <= 0.25 	THEN FX_NOVA_PMT = '1. Até 25%'; ELSE
+	IF VAR_PMT <= 0.50 	THEN FX_NOVA_PMT = '2. 25-50% '; ELSE
+	IF VAR_PMT <= 0.75 	THEN FX_NOVA_PMT = '3. 50-75% '; ELSE
+	IF VAR_PMT <= 1.00 	THEN FX_NOVA_PMT = '4. 75-100%'; ELSE
+							 FX_NOVA_PMT = '5. > 100% ';
+
+	IF NuDiasAtraso_M3 > 30 THEN FL_OVER30_M3 = 1; ELSE FL_OVER30_M3 = 0;
+	IF NuDiasAtraso_M3 > 90 THEN FL_OVER90_M3 = 1; ELSE FL_OVER90_M3 = 0;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_TOTAL_B AS
+SELECT A.*,
+	   C.fl_inad5,
+	   C.fl_inad7,
+	   C.fl_inad15,
+	   C.fl_inad30,
+	   C.Fl_vencido30,
+	   C.Fl_vencido5,
+	   C.vr_parcela AS vr_parcela_inad,
+	   C.dt_vencimento,
+	   C.dt_ultimo_recebimento
+
+FROM RENEG_SIMULADOR_TOTAL AS A
+
+LEFT JOIN BASE_FPD AS C
+ON A.NuContratoGestaoNovo = C.cd_contrato AND A.SQCONTRATONOVO = C.sq_contrato_financeiro;
+
+QUIT;
+
+DATA RENEG_SIMULADOR_TOTAL_C;
+SET RENEG_SIMULADOR_TOTAL_B;
+FORMAT DT_VENC DDMMYY10.;
+SAFRA_ELEG = YEAR(DATEPART(dtvencimento)+32)*100+MONTH(DATEPART(dtvencimento)+32);
+IF SAFRA_ELEG <= 202407  THEN FLAG_ELEG_INAD = 1;
+ELSE  FLAG_ELEG_INAD = 0;
+RUN;
+
+PROC SQL;
+CONNECT TO SQLSVR (DATASRC=DBGOPR USER=GOPR_SAS PASSWORD="{SAS002}1F43540F45FB8CF123802C6A49F8525354124C9637553D8F");
+CREATE TABLE RENEG_SIMULADOR_TOTAL_D AS
+SELECT
+	A.*,
+	B.TpEntrada
+
+FROM RENEG_SIMULADOR_TOTAL_C AS A
+
+LEFT JOIN CONNECTION TO SQLSVR (
+
+SELECT
+	CdStatusRenegociacao,
+	NuContrato,
+	SqContratoFinanceiro,
+	TpEntrada,
+	DtInclusao,
+	FlReestruturacao
+
+FROM GOPRRenegociacaoSimulacao.TbRenegociacaoEscolhida
+WHERE DtInclusao >= '2024-01-01' AND CdStatusRenegociacao = 4
+) AS B
+ON INPUT(A.NuContrato, best32.) = B.NuContrato AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+;QUIT;
+
+proc sort data=RENEG_SIMULADOR_TOTAL_D NODUPKEY;
+   by nucontrato;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT AS
+SELECT DISTINCT
+	POLITICA,
+	safra_anomes,
+	FxAtraso,
+	FxAtraso2,
+	PRODUTO,
+	FX_NOVA_PMT,
+	ST_RENEG,
+	FL_PRIMEIRA_RENEG,
+	fl_inad30,
+	fl_inad5,
+	fl_inad7,
+	fl_inad15,
+	FL_OVER30_M3,
+	FL_OVER90_M3,
+	Fl_vencido30,
+	Fl_vencido5,
+	FLAG_ELEG_INAD,
+	TpEntrada,
+	
+	sum(vr_presente) as vr_presente,
+	sum(vr_financiado) as vr_financiado,
+	COUNT(NuContrato) AS COUNT_of_NuContrato,
+	SUM(SALDO_CONT_0) as SUM_of_SALDO_CONT_0
+
+FROM WORK.RENEG_SIMULADOR_TOTAL_D t1
+GROUP BY
+	politica,
+	safra_anomes,
+	FxAtraso,
+	FxAtraso2,
+	PRODUTO,
+	FX_NOVA_PMT,
+	ST_RENEG,
+	FL_PRIMEIRA_RENEG,
+	fl_inad30,
+	fl_inad5,
+	fl_inad7,
+	fl_inad15,
+	FL_OVER30_M3,
+	FL_OVER90_M3,
+	Fl_vencido30,
+	Fl_vencido5,
+	FLAG_ELEG_INAD,
+	TpEntrada
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Inad30 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME EMPILHA '/riscosbv/cobranca/gtavares/Reneg/Empilha';
+LIBNAME RENEG '/riscosbv/cobranca/gtavares/Reneg';
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%macro safra(dt_inicio, dt_fim, dt_anterior, anomes, MOB3);
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+
+DATA BASE_RENEG_MENOR90;
+SET empilha_reneg_final_&anomes.;
+RUN;
+
+proc sort data=BASE_RENEG_MENOR90 NODUPKEY;
+   by nucontrato;
+
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+DATA BASE_RENEG_MAIOR90;
+SET base_eleg_cont_&anomes.:;
+RUN;
+
+proc sort data=BASE_RENEG_MAIOR90 NODUPKEY;
+   by nucontrato;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE WORK.RENEG_SIMULADOR AS
+SELECT *
+
+FROM CONNECTION TO PERM(
+
+WITH QUERY_1 AS (
+
+SELECT DISTINCT
+	nucontratogestao,
+	sqcontratofinanceiro,
+	nucontratogestaonovo,
+	CASE
+		WHEN nucontratogestao = nucontratogestaonovo THEN sqcontratofinanceiro + 1
+		ELSE 1
+	END AS SQCONTRATONOVO,
+	dt_baixa,
+	dt_reneg,
+	CAST(vr_presente AS NUMERIC) AS vr_presente,
+	CAST(vr_financiado AS NUMERIC) AS vr_financiado,
+	qt_parcela,
+	vr_prestacao,
+	vr_desconto_mora,
+	vr_desconto_multa,
+	vr_desconto_principal,
+	tx_pactuada
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE dt_baixa >= &dt_inicio. AND dt_baixa < &dt_fim.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+
+),
+QUERY_2 AS (
+
+SELECT
+    A.NuContratoGestao AS NuContrato,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada,
+    MIN(B.vr_parcela) AS VrParcela_Anterior,
+    DATE_DIFF(CAST(A.dt_reneg AS DATE), MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END), DAY) AS Atraso,
+    SUM(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto,
+    COUNT(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_Abertas,
+    SUM(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_baixa AS DATE) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto_em_Atraso,
+    COUNT(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_reneg AS DATE) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_em_Atraso,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END) AS DT_VENCIMENTO_NOVO,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.nu_parcela
+        ELSE NULL
+    END) AS PARCELA
+FROM
+    QUERY_1 AS A
+LEFT JOIN
+    bv-pdbd-prd.dvry_core.tbparcela AS B
+ON
+    A.NuContratoGestao = B.cd_contrato
+    AND A.SqContratoFinanceiro = B.sq_contrato_financeiro
+GROUP BY
+    A.NuContratoGestao,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada
+
+),
+QUERY_3 AS (
+
+SELECT
+    A.*,
+    C.cd_produto,
+    D.cdsubproduto,
+    C.cd_modalidade_produto,
+    I.nmmodalidadeproduto,
+    H.nmgruposubproduto,
+    CASE
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto IS NULL THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) IN (21, 22, 29, 44) THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 18 THEN 'CP_BV_MAR_ABERTO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 22 THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 56 THEN 'CP_PRE_APROVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 67 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 71 THEN 'CP_BOM_PRA_CREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 72 THEN 'CP_SERASA_ECRED'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 73 THEN 'CP_FINANZERO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 77 THEN 'CP_MINHA_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 82 THEN 'CP_EASYCREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto IN (85, 86) THEN 'CP_NEON'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 87 THEN 'CP_JUST'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 97 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 101 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 89 THEN 'CP_JUROS_BAIXO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 93 THEN 'CP_QUERO_FINANCIAR'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 68 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 96 THEN 'CP_ABASTECE_AI'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 100 THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 77
+        AND (D.cdsubproduto = 100
+        OR D.cdsubproduto IS NULL) THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) = 16 THEN 'INSS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (17, 75) THEN 'PRIVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (18, 32, 37, 39) THEN 'PUBLICO'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IN (4, 7) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto = 6 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (15, 21, 75) THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 12
+        AND D.cdsubproduto IS NULL THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 76 THEN 'CDC_TURISMO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 74 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IS NULL
+        AND CAST(C.cd_modalidade_produto AS INT64) = 51 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (46, 47) THEN 'CDC_MOVEIS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 70 THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 53 THEN 'CDC_ODONTOLOGICO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 55
+        AND D.cdsubproduto IS NULL THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 10
+        AND D.cdsubproduto IS NULL THEN 'CDC_DESCONTO_CHEQUE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 11
+        AND D.cdsubproduto IS NULL THEN 'CDC_INFORMATICA'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 62
+        AND D.cdsubproduto IS NULL THEN 'CDC_ESTUDANTIL'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 8 THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 13 THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IN (19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 28
+        AND D.cdsubproduto IN (20, 63) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 78
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (8, 19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 2
+        AND D.cdsubproduto = 9 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 16 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 30 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 5 THEN 'MOTOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 4 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 3 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IN (1, 58) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IS NULL THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IN (2, 3, 61) THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 29 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 31 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 16
+        AND CAST(C.cd_modalidade_produto AS INT64) = 60 THEN 'COBAN'
+    END AS PRODUTO
+FROM
+    QUERY_2 AS A
+
+LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato AS C
+    ON A.NUCONTRATO = C.cd_contrato
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+    ON A.NUCONTRATO = D.nucontratogestao AND D.stproposta = 'AP'
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbsubproduto AS F
+    ON D.cdsubproduto = F.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbsubprodutogrupo AS G
+    ON D.cdsubproduto = G.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbgruposubproduto AS H
+    ON G.cdgruposubproduto = H.cdgruposubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbmodalidadeproduto AS I
+    ON CAST(C.cd_modalidade_produto AS INT64) = I.cdmodalidadeproduto
+
+)
+SELECT * FROM QUERY_3
+	 );
+QUIT;
+
+PROC SQL;
+CREATE TABLE WORK.RENEG_SIMULADOR_B AS
+SELECT *,
+		datepart(dt_baixa) format date9. as dt_baixa2,
+       CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 04  THEN '001_004'
+		   WHEN atraso  <= 15  THEN '005_015'
+		   WHEN atraso  <= 30  THEN '016_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 150 THEN '121_150'
+		   WHEN atraso  <= 180 THEN '151_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso,
+
+		CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 30  THEN '001_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 180 THEN '121_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso2,
+		&anomes. as safra_anomes
+
+FROM WORK.RENEG_SIMULADOR
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE AUX_QTD_RENEG AS
+SELECT A.NuContrato,
+		COUNT(DISTINCT B.sq_contrato_financeiro) AS qtd_reneg
+
+FROM RENEG_SIMULADOR_B A
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT cd_contrato,
+       sq_contrato_financeiro,
+       cd_motivo_contrato_financeiro
+ FROM bv-pdbd-prd.dvry_core.tbcontratofinanceiro
+ WHERE cd_motivo_contrato_financeiro = '4'
+
+) AS B
+	ON A.NuContrato = B.cd_contrato AND
+		A.SqContratoFinanceiro >= B.sq_contrato_financeiro
+
+	group by A.NuContrato;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_C AS
+SELECT A.*,
+	B.qtd_reneg,
+	CASE WHEN B.qtd_reneg = 0 THEN 1 ELSE 2 END AS FL_PRIMEIRA_RENEG
+
+FROM RENEG_SIMULADOR_B A
+LEFT JOIN AUX_QTD_RENEG B
+ON A.NuContrato = B.NuContrato;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_SIMULADOR_D AS
+SELECT	A.*,
+
+		B.CdRatingAtual AS CdRatingAtual_0,
+		B.CdSItuacaoContabil AS CdSItuacaoContabil_0,
+		B.VRTAXACONTRATO AS VRTAXACONTRATO_0,
+		B.VRPERMANENCIAAPROPRIADO AS VRPERMANENCIAAPROPRIADO_0,
+		B.VrPDD AS VrPDD_0,
+		B.NuDiasAtraso AS NuDiasAtraso_0,
+		C.NuDiasAtraso AS NuDiasAtraso_M3
+
+FROM RENEG_SIMULADOR_C AS A
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil,
+    SUM(CAST(vrtaxacontrato AS NUMERIC)) AS VRTAXACONTRATO,
+    SUM(CAST(vrpermanenciaapropriado AS NUMERIC)) AS VRPERMANENCIAAPROPRIADO,
+    SUM(CAST(vrpdd AS NUMERIC)) AS VrPDD,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS t
+WHERE
+    DATE(dtprocessamento) = &dt_anterior.
+    AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil
+
+) AS B
+ON	A.NuContrato = B.NuContrato
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+WHERE DATE(dtprocessamento) = &mob3.
+AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato
+
+) AS C
+ON	A.NuContratoGestaoNovo = C.NuContrato
+;
+QUIT;
+
+DATA RENEG_SIMULADOR_D;
+SET RENEG_SIMULADOR_D;
+
+	if CdSItuacaoContabil_0 = 1 THEN
+		SALDO_CONT_0 = SUM(VRTAXACONTRATO_0, VRPERMANENCIAAPROPRIADO_0); ELSE
+		SALDO_CONT_0 = VRTAXACONTRATO_0 ;
+	if CdSItuacaoContabil_0 = 1 THEN
+		PDD_FINAL_0 = VrPDD_0; ELSE
+		PDD_FINAL_0 = SALDO_CONT_0;
+
+	IF Qtd_Parcelas_Abertas < qt_parcela THEN ST_RENEG = '1. AUMENTO PRAZO'; ELSE
+	IF Qtd_Parcelas_Abertas = qt_parcela THEN ST_RENEG = '2. MANUT. PRAZO '; ELSE
+	IF Qtd_Parcelas_Abertas > qt_parcela THEN ST_RENEG = '3. REDUÇÃO PRAZO';
+
+	Diff_Parcela = sum(qt_parcela,-Qtd_Parcelas_Abertas);
+
+	if Diff_Parcela <   0  then fx_parcela = '0. Redução'; else
+	if Diff_Parcela <=  1  then fx_parcela = '1. 00-01  '; else
+	if Diff_Parcela <=  3  then fx_parcela = '2. 02-03  '; else
+	if Diff_Parcela <=  6  then fx_parcela = '3. 04-06  '; else
+	if Diff_Parcela <=  12 then fx_parcela = '4. 07-12  '; else
+	if Diff_Parcela <=  24 then fx_parcela = '5. 13-24  '; else
+	if Diff_Parcela <=  36 then fx_parcela = '6. 25-36  '; else
+	if Diff_Parcela  >  36 then fx_parcela = '7. 36-99  ';
+
+RUN;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_FINAL_&anomes. AS
+SELECT
+	A.*,
+	CASE WHEN C.MODELO_FINAL IS NOT NULL THEN C.MODELO_FINAL
+	ELSE B.GRUPO_FINAL_DECISAO
+	END AS POLITICA
+
+FROM RENEG_SIMULADOR_D AS A
+LEFT JOIN BASE_RENEG_MENOR90 AS B
+ON INPUT(A.NUCONTRATO,BEST32.) = B.NUCONTRATO
+
+LEFT JOIN BASE_RENEG_MAIOR90 AS C
+ON INPUT(A.NUCONTRATO,BEST32.) = C.NUCONTRATO
+
+;QUIT;
+
+proc sort data=RENEG_SIMULADOR_FINAL_&anomes. NODUPKEY;
+   by nucontrato;
+
+%mend;
+
+%macro safra_2(dt_inicio, dt_fim, dt_anterior, anomes, MOB3);
+
+%DESCOMPACTA(EMPILHA, empilha_reneg_final_&anomes.);
+
+DATA BASE_RENEG_MENOR90;
+SET empilha_reneg_final_&anomes.;
+RUN;
+
+proc sort data=BASE_RENEG_MENOR90 NODUPKEY;
+   by nucontrato;
+
+%DESCOMPACTA(RENEG, base_eleg_cont_&anomes.);
+DATA BASE_RENEG_MAIOR90;
+SET base_eleg_cont_&anomes.:;
+RUN;
+
+proc sort data=BASE_RENEG_MAIOR90 NODUPKEY;
+   by nucontrato;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE WORK.RENEG_SIMULADOR AS
+SELECT *
+
+FROM CONNECTION TO PERM(
+
+WITH QUERY_1 AS (
+
+SELECT DISTINCT
+	nucontratogestao,
+	sqcontratofinanceiro,
+	nucontratogestaonovo,
+	CASE
+		WHEN nucontratogestao = nucontratogestaonovo THEN sqcontratofinanceiro + 1
+		ELSE 1
+	END AS SQCONTRATONOVO,
+	dt_baixa,
+	dt_reneg,
+	CAST(vr_presente AS NUMERIC) AS vr_presente,
+	CAST(vr_financiado AS NUMERIC) AS vr_financiado,
+	qt_parcela,
+	vr_prestacao,
+	vr_desconto_mora,
+	vr_desconto_multa,
+	vr_desconto_principal,
+	tx_pactuada
+FROM bv-pdbd-prd.trusted_dbreneg.tb_reneg_simulador
+WHERE dt_baixa >= &dt_inicio. AND dt_baixa < &dt_fim.
+	AND (dt_cancelamento IS NULL OR dt_reativacao IS NOT NULL)
+	AND st_reneg = 3
+
+),
+QUERY_2 AS (
+
+SELECT
+    A.NuContratoGestao AS NuContrato,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada,
+    MIN(B.vr_parcela) AS VrParcela_Anterior,
+    DATE_DIFF(CAST(A.dt_reneg AS DATE), MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END), DAY) AS Atraso,
+    SUM(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto,
+    COUNT(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_Abertas,
+    SUM(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_baixa AS DATE) THEN B.vr_parcela
+        ELSE 0
+    END) AS Risco_Aberto_em_Atraso,
+    COUNT(CASE
+        WHEN (B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND (CAST(B.dt_ultimo_recebimento AS DATE)) >= CAST(A.dt_reneg AS DATE)))
+        AND (B.dt_vencimento) < CAST(A.dt_reneg AS DATE) THEN B.vr_parcela
+        ELSE NULL
+    END) AS Qtd_Parcelas_em_Atraso,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.dt_vencimento
+        ELSE NULL
+    END) AS DT_VENCIMENTO_NOVO,
+    MIN(CASE
+        WHEN B.st_parcela <> 'Q'
+        OR (B.st_parcela = 'Q'
+        AND CAST(B.dt_ultimo_recebimento AS DATE) >= CAST(A.dt_reneg AS DATE)) THEN B.nu_parcela
+        ELSE NULL
+    END) AS PARCELA
+FROM
+    QUERY_1 AS A
+LEFT JOIN
+    bv-pdbd-prd.dvry_core.tbparcela AS B
+ON
+    A.NuContratoGestao = B.cd_contrato
+    AND A.SqContratoFinanceiro = B.sq_contrato_financeiro
+GROUP BY
+    A.NuContratoGestao,
+    A.SqContratoFinanceiro,
+    A.NuContratoGestaoNovo,
+    A.SQCONTRATONOVO,
+    A.dt_baixa,
+    A.dt_reneg,
+    A.vr_presente,
+    A.vr_financiado,
+    A.qt_parcela,
+    A.vr_prestacao,
+    A.vr_desconto_mora,
+    A.vr_desconto_multa,
+    A.vr_desconto_principal,
+    A.Tx_Pactuada
+
+),
+QUERY_3 AS (
+
+SELECT
+    A.*,
+    C.cd_produto,
+    D.cdsubproduto,
+    C.cd_modalidade_produto,
+    I.nmmodalidadeproduto,
+    H.nmgruposubproduto,
+    CASE
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto IS NULL THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) IN (21, 22, 29, 44) THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 18 THEN 'CP_BV_MAR_ABERTO'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 22 THEN 'CP_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10 AND CAST(C.cd_modalidade_produto AS INT64) = 19 AND D.cdsubproduto = 56 THEN 'CP_PRE_APROVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 67 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 71 THEN 'CP_BOM_PRA_CREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 72 THEN 'CP_SERASA_ECRED'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 73 THEN 'CP_FINANZERO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 77 THEN 'CP_MINHA_BV'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 82 THEN 'CP_EASYCREDITO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto IN (85, 86) THEN 'CP_NEON'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 87 THEN 'CP_JUST'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 97 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 101 THEN 'CP_BANCO_DIGITAL'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 89 THEN 'CP_JUROS_BAIXO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 93 THEN 'CP_QUERO_FINANCIAR'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 68 THEN 'CP_GUIA_BOLSO'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 96 THEN 'CP_ABASTECE_AI'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 19
+        AND D.cdsubproduto = 100 THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 10
+        AND CAST(C.cd_modalidade_produto AS INT64) = 77
+        AND (D.cdsubproduto = 100
+        OR D.cdsubproduto IS NULL) THEN 'CP_SAQUE_ANIVERSARIO_FGTS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) = 16 THEN 'INSS'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (17, 75) THEN 'PRIVADO'
+        WHEN CAST(C.cd_produto AS INT64) = 11
+        AND CAST(C.cd_modalidade_produto AS INT64) IN (18, 32, 37, 39) THEN 'PUBLICO'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IN (4, 7) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 14
+        AND H.cdgruposubproduto = 6 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (15, 21, 75) THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 12
+        AND D.cdsubproduto IS NULL THEN 'CDC_ECOMMERCE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 76 THEN 'CDC_TURISMO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 74 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IS NULL
+        AND CAST(C.cd_modalidade_produto AS INT64) = 51 THEN 'CDC_SAUDE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto IN (46, 47) THEN 'CDC_MOVEIS'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 70 THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND D.cdsubproduto = 53 THEN 'CDC_ODONTOLOGICO'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 55
+        AND D.cdsubproduto IS NULL THEN 'CDC_SOLAR'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 10
+        AND D.cdsubproduto IS NULL THEN 'CDC_DESCONTO_CHEQUE'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 11
+        AND D.cdsubproduto IS NULL THEN 'CDC_INFORMATICA'
+        WHEN CAST(C.cd_produto AS INT64) = 13
+        AND CAST(C.cd_modalidade_produto AS INT64) = 62
+        AND D.cdsubproduto IS NULL THEN 'CDC_ESTUDANTIL'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 8 THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 6
+        AND D.cdsubproduto = 13 THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IS NULL THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 27
+        AND D.cdsubproduto IN (19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 28
+        AND D.cdsubproduto IN (20, 63) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 78
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (8, 19, 60) THEN 'CVG_LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 79
+        AND D.cdsubproduto IN (13, 20) THEN 'CVG_PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 2
+        AND D.cdsubproduto = 9 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 16 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 3
+        AND D.cdsubproduto = 30 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 5 THEN 'MOTOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 4 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 7
+        AND D.cdsubproduto = 3 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IS NULL THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 8
+        AND D.cdsubproduto IN (1, 58) THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IS NULL THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 9
+        AND D.cdsubproduto IN (2, 3, 61) THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 29 THEN 'LEVES'
+        WHEN CAST(C.cd_produto AS INT64) = 12
+        AND CAST(C.cd_modalidade_produto AS INT64) = 38
+        AND D.cdsubproduto = 31 THEN 'PESADOS'
+        WHEN CAST(C.cd_produto AS INT64) = 16
+        AND CAST(C.cd_modalidade_produto AS INT64) = 60 THEN 'COBAN'
+    END AS PRODUTO
+FROM
+    QUERY_2 AS A
+
+LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato AS C
+    ON A.NUCONTRATO = C.cd_contrato
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+    ON A.NUCONTRATO = D.nucontratogestao AND D.stproposta = 'AP'
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbsubproduto AS F
+    ON D.cdsubproduto = F.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbsubprodutogrupo AS G
+    ON D.cdsubproduto = G.cdsubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbgruposubproduto AS H
+    ON G.cdgruposubproduto = H.cdgruposubproduto
+
+LEFT JOIN bv-pdbd-prd.trusted_dbcor.tbmodalidadeproduto AS I
+    ON CAST(C.cd_modalidade_produto AS INT64) = I.cdmodalidadeproduto
+
+)
+SELECT * FROM QUERY_3
+	 );
+QUIT;
+
+PROC SQL;
+CREATE TABLE WORK.RENEG_SIMULADOR_B AS
+SELECT *,
+		datepart(dt_baixa) format date9. as dt_baixa2,
+       CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 04  THEN '001_004'
+		   WHEN atraso  <= 15  THEN '005_015'
+		   WHEN atraso  <= 30  THEN '016_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 150 THEN '121_150'
+		   WHEN atraso  <= 180 THEN '151_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso,
+
+		CASE
+		   WHEN atraso  <= 00  THEN '000_000'
+		   WHEN atraso  <= 30  THEN '001_030'
+		   WHEN atraso  <= 60  THEN '031_060'
+		   WHEN atraso  <= 90  THEN '061_090'
+		   WHEN atraso  <= 120 THEN '091_120'
+		   WHEN atraso  <= 180 THEN '121_180'
+		   WHEN atraso  <= 360 THEN '181_360'
+		   WHEN atraso  >  360 THEN '361_999'
+	    ELSE 'N/D'
+		END AS FxAtraso2,
+		&anomes. as safra_anomes
+
+FROM WORK.RENEG_SIMULADOR
+;QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE AUX_QTD_RENEG AS
+SELECT A.NuContrato,
+		COUNT(DISTINCT B.sq_contrato_financeiro) AS qtd_reneg
+
+FROM RENEG_SIMULADOR_B A
+
+LEFT JOIN CONNECTION TO PERM(
+
+SELECT cd_contrato,
+       sq_contrato_financeiro,
+       cd_motivo_contrato_financeiro
+ FROM bv-pdbd-prd.dvry_core.tbcontratofinanceiro
+ WHERE cd_motivo_contrato_financeiro = '4'
+
+) AS B
+	ON A.NuContrato = B.cd_contrato AND
+		A.SqContratoFinanceiro >= B.sq_contrato_financeiro
+
+	group by A.NuContrato;
+QUIT;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_C AS
+SELECT A.*,
+	B.qtd_reneg,
+	CASE WHEN B.qtd_reneg = 0 THEN 1 ELSE 2 END AS FL_PRIMEIRA_RENEG
+
+FROM RENEG_SIMULADOR_B A
+LEFT JOIN AUX_QTD_RENEG B
+ON A.NuContrato = B.NuContrato;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE RENEG_SIMULADOR_D AS
+SELECT	A.*,
+
+		B.CdRatingAtual AS CdRatingAtual_0,
+		B.CdSItuacaoContabil AS CdSItuacaoContabil_0,
+		B.VRTAXACONTRATO AS VRTAXACONTRATO_0,
+		B.VRPERMANENCIAAPROPRIADO AS VRPERMANENCIAAPROPRIADO_0,
+		B.VrPDD AS VrPDD_0,
+		B.NuDiasAtraso AS NuDiasAtraso_0,
+		C.NuDiasAtraso AS NuDiasAtraso_M3
+
+FROM RENEG_SIMULADOR_C AS A
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil,
+    SUM(CAST(vrtaxacontrato AS NUMERIC)) AS VRTAXACONTRATO,
+    SUM(CAST(vrpermanenciaapropriado AS NUMERIC)) AS VRPERMANENCIAAPROPRIADO,
+    SUM(CAST(vrpdd AS NUMERIC)) AS VrPDD,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS t
+WHERE
+    DATE(dtprocessamento) = &dt_anterior.
+    AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato,
+    cdratingatual,
+    cdsituacaocontabil
+
+) AS B
+ON	A.NuContrato = B.NuContrato
+
+	LEFT JOIN CONNECTION TO PERM (
+
+SELECT
+    nucontrato,
+    MAX(nudiasatraso) AS NuDiasAtraso
+FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+WHERE DATE(dtprocessamento) = &mob3.
+AND dtprocessamentoliquidacao IS NULL
+GROUP BY
+    nucontrato
+
+) AS C
+ON	A.NuContratoGestaoNovo = C.NuContrato
+;
+QUIT;
+
+DATA RENEG_SIMULADOR_D;
+SET RENEG_SIMULADOR_D;
+
+	if CdSItuacaoContabil_0 = 1 THEN
+		SALDO_CONT_0 = SUM(VRTAXACONTRATO_0, VRPERMANENCIAAPROPRIADO_0); ELSE
+		SALDO_CONT_0 = VRTAXACONTRATO_0 ;
+	if CdSItuacaoContabil_0 = 1 THEN
+		PDD_FINAL_0 = VrPDD_0; ELSE
+		PDD_FINAL_0 = SALDO_CONT_0;
+
+	IF Qtd_Parcelas_Abertas < qt_parcela THEN ST_RENEG = '1. AUMENTO PRAZO'; ELSE
+	IF Qtd_Parcelas_Abertas = qt_parcela THEN ST_RENEG = '2. MANUT. PRAZO '; ELSE
+	IF Qtd_Parcelas_Abertas > qt_parcela THEN ST_RENEG = '3. REDUÇÃO PRAZO';
+
+	Diff_Parcela = sum(qt_parcela,-Qtd_Parcelas_Abertas);
+
+	if Diff_Parcela <   0  then fx_parcela = '0. Redução'; else
+	if Diff_Parcela <=  1  then fx_parcela = '1. 00-01  '; else
+	if Diff_Parcela <=  3  then fx_parcela = '2. 02-03  '; else
+	if Diff_Parcela <=  6  then fx_parcela = '3. 04-06  '; else
+	if Diff_Parcela <=  12 then fx_parcela = '4. 07-12  '; else
+	if Diff_Parcela <=  24 then fx_parcela = '5. 13-24  '; else
+	if Diff_Parcela <=  36 then fx_parcela = '6. 25-36  '; else
+	if Diff_Parcela  >  36 then fx_parcela = '7. 36-99  ';
+
+RUN;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_FINAL_&anomes. AS
+SELECT
+	A.*,
+	CASE WHEN C.MODELO_FINAL IS NOT NULL THEN C.MODELO_FINAL
+	ELSE B.GRUPO_FINAL_DECISAO
+	END AS POLITICA
+
+FROM RENEG_SIMULADOR_D AS A
+LEFT JOIN BASE_RENEG_MENOR90 AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+
+LEFT JOIN BASE_RENEG_MAIOR90 AS C
+ON A.NUCONTRATO = C.NUCONTRATO
+
+;QUIT;
+
+proc sort data=RENEG_SIMULADOR_FINAL_&anomes. NODUPKEY;
+   by nucontrato;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%safra_2('2025-08-01', '2025-09-01', '2025-07-31', 202508, '2025-11-30');
+%safra_2('2025-09-01', '2025-10-01', '2025-08-31', 202509, '2025-12-31');
+%safra_2('2025-10-01', '2025-11-01', '2025-09-30', 202510, '2026-01-31');
+%safra_2('2025-11-01', '2025-12-01', '2025-10-31', 202511, '2026-02-28');
+%safra_2('2025-12-01', '2026-01-01', '2025-11-30', 202512, '2026-03-31');
+
+proc sql;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE BASE_FPD AS
+SELECT *
+
+FROM CONNECTION TO PERM(
+
+SELECT DISTINCT
+    cd_contrato,
+    sq_contrato_financeiro,
+    dt_vencimento,
+    dt_ultimo_recebimento,
+    st_parcela,
+    vr_parcela,
+	CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 5
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad5,
+    CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 7
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad7,
+    CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 15
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad15,
+    CASE
+        WHEN (DATE_DIFF(dt_ultimo_recebimento, dt_vencimento, DAY)) > 30
+        OR (st_parcela = 'A' AND dt_ultimo_recebimento IS NULL) THEN 1
+        ELSE 0
+    END AS fl_inad30,
+    CASE
+        WHEN DATE_ADD(dt_vencimento, INTERVAL 30 DAY) < CURRENT_DATE() THEN 1
+        ELSE 0
+    END AS Fl_vencido30,
+	CASE
+        WHEN DATE_ADD(dt_vencimento, INTERVAL 5 DAY) < CURRENT_DATE() THEN 1
+        ELSE 0
+    END AS Fl_vencido5
+FROM
+    bv-pdbd-prd.dvry_core.tbparcela
+WHERE
+    nu_parcela = 1
+
+);
+quit;
+
+
+
+DATA RENEG_SIMULADOR_TOTAL;
+SET RENEG_SIMULADOR_FINAL_20:;
+
+	VAR_PMT = ROUND(vr_prestacao / VrParcela_Anterior, .1);
+
+	IF VAR_PMT <= 0.25 	THEN FX_NOVA_PMT = '1. Até 25%'; ELSE
+	IF VAR_PMT <= 0.50 	THEN FX_NOVA_PMT = '2. 25-50% '; ELSE
+	IF VAR_PMT <= 0.75 	THEN FX_NOVA_PMT = '3. 50-75% '; ELSE
+	IF VAR_PMT <= 1.00 	THEN FX_NOVA_PMT = '4. 75-100%'; ELSE
+							 FX_NOVA_PMT = '5. > 100% ';
+
+	IF NuDiasAtraso_M3 > 30 THEN FL_OVER30_M3 = 1; ELSE FL_OVER30_M3 = 0;
+	IF NuDiasAtraso_M3 > 90 THEN FL_OVER90_M3 = 1; ELSE FL_OVER90_M3 = 0;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE RENEG_SIMULADOR_TOTAL_B AS
+SELECT A.*,
+	   C.fl_inad5,
+	   C.fl_inad7,
+	   C.fl_inad15,
+	   C.fl_inad30,
+	   C.Fl_vencido30,
+	   C.Fl_vencido5,
+	   C.vr_parcela AS vr_parcela_inad,
+	   C.dt_vencimento,
+	   C.dt_ultimo_recebimento
+
+FROM RENEG_SIMULADOR_TOTAL AS A
+
+LEFT JOIN BASE_FPD AS C
+ON A.NuContratoGestaoNovo = C.cd_contrato AND A.SQCONTRATONOVO = C.sq_contrato_financeiro;
+
+QUIT;
+
+DATA RENEG_SIMULADOR_TOTAL_C;
+SET RENEG_SIMULADOR_TOTAL_B;
+FORMAT DT_VENC DDMMYY10.;
+SAFRA_ELEG = YEAR(DATEPART(dtvencimento)+32)*100+MONTH(DATEPART(dtvencimento)+32);
+IF SAFRA_ELEG <= 202407  THEN FLAG_ELEG_INAD = 1;
+ELSE  FLAG_ELEG_INAD = 0;
+RUN;
+
+PROC SQL;
+CONNECT TO SQLSVR (DATASRC=DBGOPR USER=GOPR_SAS PASSWORD="{SAS002}1F43540F45FB8CF123802C6A49F8525354124C9637553D8F");
+CREATE TABLE RENEG_SIMULADOR_TOTAL_D AS
+SELECT
+	A.*,
+	B.TpEntrada
+
+FROM RENEG_SIMULADOR_TOTAL_C AS A
+
+LEFT JOIN CONNECTION TO SQLSVR (
+
+SELECT
+	CdStatusRenegociacao,
+	NuContrato,
+	SqContratoFinanceiro,
+	TpEntrada,
+	DtInclusao,
+	FlReestruturacao
+
+FROM GOPRRenegociacaoSimulacao.TbRenegociacaoEscolhida
+WHERE DtInclusao >= '2024-01-01' AND CdStatusRenegociacao = 4
+) AS B
+ON INPUT(A.NuContrato, best32.) = B.NuContrato AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+;QUIT;
+
+proc sort data=RENEG_SIMULADOR_TOTAL_D NODUPKEY;
+   by nucontrato;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT AS
+SELECT DISTINCT
+	POLITICA,
+	safra_anomes,
+	FxAtraso,
+	FxAtraso2,
+	PRODUTO,
+	FX_NOVA_PMT,
+	ST_RENEG,
+	FL_PRIMEIRA_RENEG,
+	fl_inad30,
+	fl_inad5,
+	fl_inad7,
+	fl_inad15,
+	FL_OVER30_M3,
+	FL_OVER90_M3,
+	Fl_vencido30,
+	Fl_vencido5,
+	FLAG_ELEG_INAD,
+	TpEntrada,
+	
+	sum(vr_presente) as vr_presente,
+	sum(vr_financiado) as vr_financiado,
+	COUNT(NuContrato) AS COUNT_of_NuContrato,
+	SUM(SALDO_CONT_0) as SUM_of_SALDO_CONT_0
+
+FROM WORK.RENEG_SIMULADOR_TOTAL_D t1
+GROUP BY
+	politica,
+	safra_anomes,
+	FxAtraso,
+	FxAtraso2,
+	PRODUTO,
+	FX_NOVA_PMT,
+	ST_RENEG,
+	FL_PRIMEIRA_RENEG,
+	fl_inad30,
+	fl_inad5,
+	fl_inad7,
+	fl_inad15,
+	FL_OVER30_M3,
+	FL_OVER90_M3,
+	Fl_vencido30,
+	Fl_vencido5,
+	FLAG_ELEG_INAD,
+	TpEntrada
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

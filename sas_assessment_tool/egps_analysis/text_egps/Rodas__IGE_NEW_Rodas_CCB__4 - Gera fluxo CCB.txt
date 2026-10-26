@@ -1,0 +1,220 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_CCB
+FILE_SAS: 4 - Gera fluxo CCB.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -2
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 145
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: count_exist, dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BV-PDBD-PRD.DVRY_CLIE_CRM.TBDISPAROCANALEMAILHIST [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CCBENVIODOCCRM1
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TRIBO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.CCBENVIODOCCRM1
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CLIE_CRM.TBDISPAROCANALEMAILHIST [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], TRIBO.CCBENVIODOCCRMFINAL [DATA Step - SET; PROC SQL - FROM], WORK.CCBENVIODOCCRM1 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): TRIBO.CCBENVIODOCCRMFINAL
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TRIBO.CCBENVIODOCCRMFINAL
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TRIBO.CCBENVIODOCCRMFINAL
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./CCBENVIODOCCRMFINAL.csv
+TEMP/DISCARDED OUTPUTS: CCBCLICRM, CCBENVIODOCCRM, CCBENVIODOCCRM1, CCBENVIODOCCRM2, CCBENVIODOCCRMASSINATURA, MXDISPARO, WORK.CCBENVIODOCCRM1_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	4 - Gera fluxo CCB.sas														| */
+/* | Descricao: Programa gerar o outputdo fluxo da CCB.					| */
+/* | Objetivo: 	Apuração do fluxo CCB Rodas					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera fluxo CCB=========================*/
+/* ======================================================================================*/
+
+proc sql;
+	connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+		schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+	Create table CCBCLICRM as
+
+	select a.* from connection to perm
+
+		(
+	SELECT * FROM bv-pdbd-prd.dvry_clie_crm.tbdisparocanalemailhist
+		where CAST(dtdisparo AS DATE) >= '2025-01-01'
+		and dssfnome like "%TP-0000049158%"
+			) a
+		JOIN CCBENVIODOCSCPF b
+			ON a.idpessoa = b.NuCpfCnpj_ori
+
+	;
+	disconnect from perm;
+quit;
+
+PROC SQL;
+	CREATE TABLE CCBENVIODOCCRM AS
+		SELECT C.*,D.*,intck('day',c.dtcontrato,datepart(d.dtdisparo)) as difdias
+			FROM
+				(
+			SELECT DISTINCT A.*
+				FROM CCBENVIODOCS2 A
+					WHERE 1=1
+/*						and A.DsStatusEnvioDocumento in ('Documento pendente','E-mail não preenchido','Falha no envio','Pendente Envio')*/
+) C
+					LEFT JOIN
+						(SELECT DISTINCT idpessoa, dtdisparo, dsnvlinteracao,intnx('day',DATEPART(dtdisparo),15) FORMAT DDMMYY10. AS DISP15
+							FROM CCBCLICRM) D
+								ON C.NuCpfCnpj_ori = D.idpessoa
+								AND c.dtcontrato <= datepart(D.dtdisparo)
+								AND intck('day',c.dtcontrato,datepart(d.dtdisparo))<=15;
+QUIT;
+
+PROC SORT DATA=CCBENVIODOCCRM
+	OUT=CCBENVIODOCCRM1;
+	BY DESCENDING NuCpfCnpj_ori DESCENDING NUPROPOSTA DESCENDING dtdisparo;
+RUN;
+
+data work.CCBENVIODOCCRM1_2;
+	set work.CCBENVIODOCCRM1;
+	BY DESCENDING NuCpfCnpj_ori DESCENDING NUPROPOSTA DESCENDING dtdisparo;
+
+	if first.NUPROPOSTA then
+		n=1;
+	else n+1;
+run;
+
+PROC SQL;
+	CREATE TABLE MXDISPARO AS
+		SELECT
+		  a.DtEntradaProposta,
+          a.DtContrato,
+          a.NuCpfCnpj_ori,
+          a.NuProposta,
+          a.NuContrato,
+          a.DsStatusEnvioDocumento,
+          a.DtPriInclusaoDoc,
+          a.DtPriAlteracaoDoc,
+          a.DtUltInclusaoDoc,
+          a.DtUltAlteracaoDoc,
+          a.NmGrupoProdutoMeta,
+          a.TtlInclusoesDocs,
+          a.idpessoa,
+          a.dtdisparo as DtPriDisparo,
+          a.dsnvlinteracao as PriInteracao,
+		CASE
+			WHEN A.IDPESSOA IS NULL THEN 0
+			ELSE A.n
+		END
+	AS TtlDisparosCRM
+		FROM CCBENVIODOCCRM1_2 A
+			JOIN
+				(SELECT NUPROPOSTA, MAX(N) AS MXN FROM CCBENVIODOCCRM1_2 GROUP BY NUPROPOSTA) B
+					ON A.NUPROPOSTA = B.NUPROPOSTA AND A.N = B.MXN;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CCBENVIODOCCRM2 AS
+SELECT
+/*INPUT('21/03/2025',DDMMYY10.) FORMAT DDMMYY10. AS SYSINPUT,*/
+		TODAY() FORMAT DDMMYY10. AS SYSINPUT,
+		 a.DtEntradaProposta,
+          a.DtContrato,
+          a.NuCpfCnpj_ori,
+          a.NuProposta,
+          a.NuContrato,
+          a.DsStatusEnvioDocumento,
+          a.DtPriInclusaoDoc,
+          a.DtPriAlteracaoDoc,
+          a.DtUltInclusaoDoc,
+          a.DtUltAlteracaoDoc,
+          a.NmGrupoProdutoMeta,
+          a.TtlInclusoesDocs,
+          a.idpessoa,
+		  b.DtPriDisparo,
+          a.dtdisparo AS DtUltDisparo,
+		  b.PriInteracao,
+          a.dsnvlinteracao as UltInteracao,
+ 		  b.TtlDisparosCRM,
+		  case when b.TtlDisparosCRM <> 0 then INTCK('DAY',a.DtContrato,datepart(a.DtPriInclusaoDoc)) end AS LTimeCttIncluDoc,
+		  case when b.TtlDisparosCRM <> 0 then INTCK('DAY',a.DtContrato,datepart(a.DtUltAlteracaoDoc)) end AS LTimeCttUltAlteracaoDoc,
+		  case when b.TtlDisparosCRM <> 0 then INTCK('DAY',a.DtContrato,datepart(b.DtPriDisparo)) end AS LTimeCttPriDisparoCRM,
+		  case when b.TtlDisparosCRM <> 0 then INTCK('DAY',a.DtContrato,datepart(a.dtdisparo)) end AS LTimeCttUltDisparoCRM
+
+FROM CCBENVIODOCCRM1_2 A
+JOIN MXDISPARO B
+ON A.NuProposta = B.NuProposta
+
+WHERE A.N = 1;quit;
+
+proc sql NOPRINT;
+select count(*) INTO: count_exist
+from TRIBO.CCBENVIODOCCRMFINAL
+where SYSINPUT in (select distinct SYSINPUT from CCBENVIODOCCRM2);
+quit;
+
+%if &count_exist = 0 %then %do;
+    data TRIBO.CCBENVIODOCCRMFINAL (compress='yes');
+        set
+			TRIBO.CCBENVIODOCCRMFINAL
+            CCBENVIODOCCRM2;
+    run;
+%end;
+
+proc sql;
+
+create table CCBENVIODOCCRMASSINATURA AS
+
+SELECT A.*, B.MODELO_ASSINATURA_FINAL
+FROM TRIBO.CCBENVIODOCCRMFINAL A
+LEFT JOIN tpassinatura_novo B
+ON A.NUPROPOSTA = B.NUPROPOSTA
+WHERE YEAR(A.SYSINPUT)*100+MONTH(A.SYSINPUT) >= YEAR(TODAY())*100+MONTH(TODAY())-1
+;QUIT;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= CCBENVIODOCCRMASSINATURA
+		FILE="&dir_csv./CCBENVIODOCCRMFINAL.csv" REPLACE
+		DBMS=DLM;
+	DELIMITER=';';
+RUN;

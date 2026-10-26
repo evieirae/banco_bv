@@ -1,0 +1,51 @@
+version: 1
+
+models:
+  - name: dim_log_file_import
+    description: >
+      Ultimate dimension table for file-based data ingestion. It consolidates `PROC IMPORT` 
+      and `INFILE` operations, resolving any dynamic aliases (FILEREFs) into their 
+      actual physical paths or system commands. 
+      
+      This model is the primary source for Engineers to identify which external files 
+      need to be migrated to the Data Lake and how they are accessed (e.g., direct disk access, 
+      ZIP extraction, or shell pipes).
+    columns:
+      - name: project_name
+        description: "The SAS Enterprise Guide (.egp) project identifier."
+        tests:
+          - not_null
+
+      - name: task_name
+        description: "The specific task or program name within the project where the ingestion occurs."
+        tests:
+          - not_null
+
+      - name: import_method
+        description: "The SAS mechanism used for ingestion: `PROC_IMPORT` or `INFILE`."
+
+      - name: target_table
+        description: "The destination table name in the SAS environment (e.g., STAGE.CLIENTS)."
+        tests:
+          - not_null
+
+      - name: file_type
+        description: "The file format (CSV, XLSX, TXT). If not explicit, it is inferred from the file extension."
+
+      - name: original_file_path
+        description: "The raw path or alias (FILEREF) as written in the original code."
+
+      - name: resolved_file_path
+        description: >
+          The actual physical path resolved from FILEREF definitions. 
+          Note: This column is NULL if the operation is a system command (PIPE).
+          
+      - name: system_command
+        description: >
+          The shell or operating system command executed when the connection engine is `PIPE`. 
+          Critical for identifying logic that needs to be replaced by Python/Bash in Databricks.
+
+      - name: connection_engine
+        description: >
+          The access method used. Defaults to `BASE` for standard files, but includes 
+          `ZIP`, `FTP`, `PIPE`, `TEMP`, or directory aliases like `SUST`.

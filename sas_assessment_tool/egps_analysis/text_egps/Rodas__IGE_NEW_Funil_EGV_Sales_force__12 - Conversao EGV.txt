@@ -1,0 +1,202 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 12 - Conversao EGV.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 13
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 129
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], PRIVADO.DGT_CTA_LEADS_STAGE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CONV_DGT_2
+IMPORTED_LIBNAMES: PRIVADO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.CONV_DGT_2, WORK.CONV_DGT_3, WORK.TBORIGINACAO
+TABLE_READ_PROVENANCE (Flow): PRIVADO.DGT_CTA_LEADS_STAGE [PROC SQL - FROM], WORK.CONV_DGT_2 [DATA Step - SET], WORK.CONV_DGT_3 [PROC SQL - FROM], WORK.TBORIGINACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): PRIVADO.DGT_CTA_LEADS_STAGE
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./EGV_SALESFORCE_CONVERSAO.csv
+TEMP/DISCARDED OUTPUTS: CONV_DGT_1, CONV_DGT_2, TBNUCPF, TMP_DGT_PROPOSTAS, WORK.CONV_DGT_3, WORK.CONV_DGT_4
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	9 - Conversao EGV.sas														| */
+/* | Descricao: Programa de aparucao de propostas convertidas pelos GRs no canal de négocios egv.					| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de Conversao EGV atualizada=========================*/
+/* ======================================================================================*/
+
+proc sql;
+
+create table TBNUCPF AS
+
+select DISTINCT PUT(NUCPF,Z11.) AS NUCPF
+from PRIVADO.DGT_CTA_LEADS_STAGE
+WHERE NUCPF IS NOT NULL;quit;
+
+proc sql;
+create table TMP_DGT_PROPOSTAS as
+select *
+from work.tboriginacao
+/*where NuCpfCnpj IN (SELECT DISTINCT NUCPF FROM TBNUCPF)*/
+;quit;
+
+/*CONVERSÃO PROPOSTA*/
+proc sql;
+	create table CONV_DGT_1 as
+		select
+			COALESCE(leads.data,DGTProd.dt_proposta) FORMAT DDMMYY10. AS DATA,
+			leads.NUCPF,
+			leads.TEL,
+			leads.NMGR,
+			UPPER(scan(leads.NMGR, 1, ' ')) as priNMGR,
+			leads.ORIGEM,
+			leads.DETALHAMENTO,
+			COALESCE(leads.CTA,'SEM ENTRADA NO CTA') AS CTA,
+
+			leads.OportunitStage,
+
+			DGTProd.CdSubProduto,
+			DGTProd.DsSubProduto,
+			DGTProd.CdParceiroComercial,
+			DGTProd.Convenio,
+			DGTProd.cpf_prod,
+			DGTProd.nmoperador,
+			DGTProd.prinmoperador,
+			DGTProd.dt_proposta,
+			DGTProd.dt_status_proposta,
+			DGTProd.nuproposta,
+			DGTProd.nucontratogestao as nucontrato,
+			DGTProd.StProposta,
+/*			DGTProd.FLAG_SEGUROS,*/
+/*			DGTProd.QTDE_SEGUROS,*/
+/*			DGTProd.VRSEGURO,*/
+			DGTProd.SomaVrProposta,
+			INTCK('day',leads.data,DGTProd.dt_proposta) as difdata,
+			case
+				when UPPER(scan(leads.NMGR, 1, ' ')) = DGTProd.prinmoperador
+					then 'S'
+					else 'N'
+				end
+			as Mesmo_Operador,
+		case
+			when INTCK('day',leads.data,DGTProd.dt_proposta) between 0 and 30 then 1
+			else 0
+		end
+	as proposta_valida
+
+			from PRIVADO.DGT_CTA_LEADS_STAGE leads
+			right join (
+				select
+					A.CdParceiroComercial,
+					A.NmParceiroComercial as Convenio,
+					A.nucpfcnpj as cpf_prod,
+					(A.DtEntradaProposta)  as dt_proposta,
+					(A.DtStatusProposta)  as dt_status_proposta,
+					'' as CdSubProduto,
+					A.NmGrupoProdutoMeta as DsSubProduto,
+					A.nuproposta,
+					A.nucontrato as nucontratogestao,
+					A.stproposta,
+					A.VrProposta as SomaVrProposta,
+					UPPER(A.NmColaboradorC) AS nmoperador,
+					UPPER(scan(A.NmColaboradorC, 1, ' ')) as prinmoperador
+/*					A.FLAG_SEGUROS,*/
+/*					A.QTDE_SEGUROS,*/
+/*					A.VRSEGURO */
+					from TMP_DGT_PROPOSTAS A) DGTProd
+
+				on  PUT(NUCPF,Z11.) = DGTProd.cpf_prod
+				and	 leads.data <= DGTProd.dt_proposta
+				and	month(leads.data) = month(DGTProd.dt_proposta) and
+				year(leads.data) = year(DGTProd.dt_proposta)
+/*WHERE INTCK('day',leads.data,DGTProd.dt_proposta) between 0 and 30*/
+;
+QUIT;
+
+PROC SORT DATA=CONV_DGT_1
+	OUT=CONV_DGT_2;
+	BY  nuproposta DIFDATA;
+RUN;QUIT;
+
+/*PROC SQL;*/
+/*	CREATE TABLE work.CONV_DGT_2_1 AS*/
+/**/
+/*	SELECT * FROM work.CONV_DGT_2*/
+/*		WHERE proposta_valida = 1 or */
+/*			difdata is null*/
+/*;*/
+/*QUIT;*/
+
+data work.CONV_DGT_3;
+	set work.CONV_DGT_2;
+	by nuproposta DIFDATA;
+
+	if first.nuproposta then
+		n=1;
+	else n+1;
+run;QUIT;
+
+PROC SQL;
+	CREATE TABLE work.CONV_DGT_4 AS
+
+	SELECT * FROM work.CONV_DGT_3
+		WHERE N = 1
+/*AND Mesmo_Operador = 'S'*/
+;
+QUIT;
+
+	%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= CONV_DGT_4
+		FILE="&dir_csv./EGV_SALESFORCE_CONVERSAO.csv" REPLACE
+		DBMS=DLM;
+	DELIMITER=';';
+RUN;

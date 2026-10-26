@@ -1,0 +1,172 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 01 - Monta Estrutura Comercial.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 97
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CSBV = /infogrc/Campanha_SuperaBV; CSBV_BKP = /infogrc/Incentivo_Comercial/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes, Max_Estrutura
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_FOCAL, WORK.ESTRUTURA_COMERCIAL, WORK.ESTRUTURA_COMERCIAL_01, WORK.MAX_DATA, WORK.TBADMISSAOCOLABORADOR
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CSBV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_FOCAL, WORK.ESTRUTURA_COMERCIAL, WORK.ESTRUTURA_COMERCIAL_01, WORK.MAX_DATA, WORK.TBADMISSAOCOLABORADOR
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [DATA Step - SET], BASES.TBESTRUTURACOMERCIAL [DATA Step - SET], CSBV.ESTRUTURA_COMERCIAL_01 [PROC SQL - FROM], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [Pass-Through Native (DBCON) - FROM], WORK.BASE_FOCAL [PROC SQL - JOIN], WORK.ESTRUTURA_COMERCIAL [PROC SQL - FROM], WORK.ESTRUTURA_COMERCIAL_01 [PROC APPEND - DATA=], WORK.MAX_DATA [DATA Step - SET], WORK.TBADMISSAOCOLABORADOR [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): CSBV.ESTRUTURA_COMERCIAL_01
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CSBV.ESTRUTURA_COMERCIAL_01
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CSBV.ESTRUTURA_COMERCIAL_01
+APPEND_ONLY_OUTPUTS: CSBV.ESTRUTURA_COMERCIAL_01
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CSBV.ESTRUTURA_COMERCIAL_01
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_FOCAL, ESTRUTURA_COMERCIAL, ESTRUTURA_COMERCIAL_01, MAX_DATA, TBADMISSAOCOLABORADOR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CSBV '/infogrc/Campanha_SuperaBV';
+LIBNAME CSBV_BKP '/infogrc/Incentivo_Comercial/Bases_BKP';
+
+/*****************************************/
+/*TABELA COM DATA DE ADMISSAO COLABORADOR*/
+/*****************************************/
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+CREATE TABLE TbAdmissaoColaborador AS
+SELECT
+	NmSubEstruturaComercial
+	,NmAreaEstruturaComercial
+	,CdColaborador
+	,NmColaborador
+	,DsLogin
+	,DsEmail
+	,NmCargoColaborador
+	,CdEstadoColaborador
+	,NmEstadoColaborador
+	,DtAdmissaoColaborador
+	,DtDesligamentoColaborador
+	,DATEPART(DtDesligamentoColaborador) as DtDesligamentoColaborador2 FORMAT DATE9.
+
+FROM connection to dbcon
+	(
+		SELECT * FROM DWBI_DIME.TbDimHierarquiaComercial HierarquiaComercial
+		WHERE today() BETWEEN HierarquiaComercial.DtInicioVigencia AND HierarquiaComercial.DtFimVigencia
+		AND YEAR(HierarquiaComercial.DtInicioVigencia) BETWEEN YEAR(today())-1 AND YEAR(today())
+/*		AND YEAR(DtDesligamentoColaborador) BETWEEN YEAR(today())-1 AND YEAR(today())*/
+		AND CdEstruturaComercial = 8 /*and HierarquiaComercial.CdEstadoColaborador = 5 EM ATIVIDADE NORMAL*/
+
+		ORDER BY DtDesligamentoColaborador desc
+	)
+
+/*where dslogin = 'aarao.souza'*/
+
+;run;
+quit;
+
+/***************************/
+/*MONTA ESTRUTURA COMERCIAL*/
+/***************************/
+
+DATA ESTRUTURA_COMERCIAL;
+SET BASES.TBESTRUTURACOMERCIAL;
+WHERE NUANOMES = &Base_Mes. and NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and dsloginn1 <> ''
+;RUN;
+
+DATA BASE_FOCAL;
+SET BASEGRC.TBCOLABORADORFOCAL;
+WHERE NmGrupoProdutoMeta = 'Leves';
+;run;
+
+PROC SQL;
+CREATE TABLE ESTRUTURA_COMERCIAL_01 AS
+SELECT
+
+A.NUANOMES,
+A.NMCANALESTRUTURACOMERCIAL,
+A.NmSubEstruturaComercialH,
+A.NmSubEstruturaComercialA,
+a.NmAreaEstruturaComercial,
+A.LstSubstituicao,
+b.LstColaboradorFocal,
+A.DsLoginN3H,
+A.DSLOGINN3A,
+A.DsLoginN2H,
+A.DSLOGINN2A,
+A.DSLOGINN1,
+A.NmColaborador,
+C.DtAdmissaoColaborador,
+C.NmEstadoColaborador,
+a.IdMatricula,
+a.CdColaboradorAtivo,
+a.NmGrupoCargo
+
+FROM WORK.ESTRUTURA_COMERCIAL A
+
+LEFT JOIN work.BASE_FOCAL as b
+		ON  a.CdFilial = b.CdFilial
+
+LEFT JOIN WORK.TbAdmissaoColaborador C ON C.DsLogin = A.DSLOGINN1
+
+/*WHERE NUANOMES = &NuAnoMes.*/
+
+ORDER BY A.NmAreaEstruturaComercial
+
+;RUN;
+
+/*****************************/
+/*SALVA A ESTRUTURA COMERCIAL*/
+/*****************************/
+
+/*DATA CSBV.ESTRUTURA_COMERCIAL_01;*/
+/*SET WORK.ESTRUTURA_COMERCIAL_01;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_Estrutura
+FROM CSBV.ESTRUTURA_COMERCIAL_01
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_Estrutura',Max_Estrutura);
+;run;
+%PUT &Max_Estrutura;
+
+PROC SQL;
+DELETE FROM CSBV.ESTRUTURA_COMERCIAL_01
+WHERE NUANOMES = &Max_Estrutura.;
+;RUN;
+
+PROC APPEND BASE=CSBV.ESTRUTURA_COMERCIAL_01 DATA=WORK.ESTRUTURA_COMERCIAL_01 FORCE;RUN;

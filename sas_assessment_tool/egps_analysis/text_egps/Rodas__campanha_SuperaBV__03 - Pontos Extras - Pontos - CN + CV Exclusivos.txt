@@ -1,0 +1,196 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 03 - Pontos Extras - Pontos - CN + CV Exclusivos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 85)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: INFILE  (1x | +10), ARRAY (5x | +75)
+----------------------------------------
+LINES_OF_CODE: 112
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/CAMPANHA_SUPERABV/IMPORT/TABELAPONTOS.CSV [SAS/Local], CSBV.BASE_MEDIA_PTS_CN_CV [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_CALCULO_PTS_1, WORK.TBPTS_CRESCIMENTO_1, WORK.TBTABELAPONTOS
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/Campanha_SuperaBV/Import/TabelaPontos.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_CALCULO_PTS_1, WORK.ESTRUTURA_COMERCIAL_01, WORK.TBPTS_CRESCIMENTO_1, WORK.TBPTS_CRESCIMENTO_2, WORK.TBTABELAPONTOS
+TABLE_READ_PROVENANCE (Flow): CSBV.BASE_MEDIA_PTS_CN_CV [PROC SQL - JOIN], WORK.BASE_CALCULO_PTS_1 [PROC SQL - FROM], WORK.ESTRUTURA_COMERCIAL_01 [PROC SQL - JOIN], WORK.TBPTS_CRESCIMENTO_1 [DATA Step - SET], WORK.TBPTS_CRESCIMENTO_2 [PROC SQL - FROM], WORK.TBTABELAPONTOS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/Campanha_SuperaBV/Import/TabelaPontos.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_CALCULO_PTS_1, BASE_CALCULO_PTS_2, TBPTS_CRESCIMENTO_1, TBTABELAPONTOS, WORK.TBPTS_CRESCIMENTO_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/Campanha_SuperaBV/Import/TabelaPontos.csv
+
+END_METADATA
+================================================================================
+/********************************************/
+/*IMPORT BASE PONTOS DO ATINGIMENTO DE METAS*/
+/********************************************/
+
+DATA TbTabelaPontos;
+  INFILE "/infogrc/Campanha_SuperaBV/Import/TabelaPontos.csv"
+  ENCODING="UTF-8" FIRSTOBS=2 MISSOVER DSD TRUNCOVER DELIMITER=",";
+
+  INPUT
+        AnoMes           : ?? BEST6.
+        NuAnoMes         : ?? BEST6.
+        NmCanalEstruturaComercial : $CHAR14.
+        NmSubEstruturaComercialA : $CHAR17.
+        DsLoginN1        : $CHAR20.
+        QtAtingMetaSummarize : ?? BEST10.
+        QtdDeflator2     : ?? BEST10.
+        QtdDeflator      : ?? BEST10.
+        Pontuacao     : ?? BEST10. ;
+  FORMAT
+        AnoMes           :  BEST6.
+        NuAnoMes         :  BEST6.
+        NmCanalEstruturaComercial : $CHAR14.
+        NmSubEstruturaComercialA : $CHAR17.
+        DsLoginN1        : $CHAR20.
+        QtAtingMetaSummarize : BEST10.
+        QtdDeflator2     :  BEST10.
+        QtdDeflator      : BEST10.
+        Pontuacao     : BEST10. ;
+  INFORMAT
+        AnoMes           :  BEST6.
+        NuAnoMes         :  BEST6.
+        NmCanalEstruturaComercial : $CHAR14.
+        NmSubEstruturaComercialA : $CHAR17.
+        DsLoginN1        : $CHAR20.
+        QtAtingMetaSummarize : BEST10.
+        QtdDeflator2     :  BEST10.
+        QtdDeflator      : BEST10.
+        Pontuacao     : BEST10. ;
+RUN;
+
+/**************************************************/
+/*VERIFICAR SE O MÊS ATUAL TEVE CRESCIMENTO DE PONTOS*/
+/*BASE DO MÊS ATUAL DA CAMPANHA PARA VER O CRESCIMENTO DE PONTOS*/
+/**************************************************/
+/*PRECISAMOS ALTERAR A DATA DA CONSULTA PARA JUL-AGO-SET QUE SÃO OS MESES DA CAMPANHA*/
+
+PROC SQL;
+CREATE TABLE TbPts_Crescimento_1 AS
+SELECT
+
+A.NUANOMES,
+A.DSLOGINN1,
+sum(CASE WHEN A.Pontuacao <= 0 THEN 0 ELSE A.Pontuacao END) AS VrPTS
+
+FROM WORK.TbTabelaPontos A
+
+where NUANOMES = &Base_Mes.
+
+group by 1,2
+order by 2,1
+
+;RUN;
+
+/*SUBSTITUI TUDO QUE FOI "MISSING OU '.' POR '0'*/
+/*ALGUNS CASOS ESTÃO "VAZIOS" AO FINALIZAR O SCRIPT*/
+
+data work.TbPts_Crescimento_2;
+	set work.TbPts_Crescimento_1;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+/**/
+
+PROC SQL;
+CREATE TABLE BASE_CALCULO_PTS_1 AS
+SELECT
+
+&Base_Mes. AS NuAnoMes,
+c.DtAdmissaoColaborador,
+c.NmEstadoColaborador,
+A.DsLoginN1,
+C.NmGrupoCargo AS NmGrupoCargoColaborador,
+C.CdColaboradorAtivo AS CdColaborador,
+'PTS' as PTS,
+A.VrPTS,
+
+/*CASE WHEN (B.media_PTS) IN (., 0) THEN 50 ELSE (B.media_PTS) END as media_PTS,*/
+
+/*FAZER O AJUSTE ABAIXO PARA ESTES PONTOS SEREM OS VALORES MÍNIMOS.*/
+CASE
+	WHEN (B.media_PTS) IN (., 0) and NmGrupoCargo = 'Gerente Relacionamento CN (Virtualizado)' THEN 495 /*90% DA PONTUAÇÃO TOTAL COM 100% DE ATINGIMENTO - MICHELLY*/
+	WHEN (B.media_PTS) IN (., 0) and NmGrupoCargo = 'Gerente Relacionamento Motos' THEN 450 /*90% DA PONTUAÇÃO TOTAL COM 100% DE ATINGIMENTO - MICHELLY*/
+	WHEN (B.media_PTS) IN (., 0) and NmGrupoCargo = 'Gerente Relacionamento Pesados' THEN 540 /*90% DA PONTUAÇÃO TOTAL COM 100% DE ATINGIMENTO - MICHELLY*/
+ELSE (B.media_PTS) END as media_PTS,
+
+CASE
+/*	WHEN CALCULATED media_PTS = 50 THEN 50*/
+
+/*TETO PONTUAÇÃO META DEFINIDO PELO ANDERSON - 02/09/2025 - GFM*/
+	WHEN NmGrupoCargo = 'Gerente Relacionamento CN (Virtualizado)' and (B.media_PTS) NOT IN (., 0) and (CALCULATED media_PTS + 55) > 687 THEN 687
+	WHEN NmGrupoCargo = 'Gerente Relacionamento Motos' and (B.media_PTS) NOT IN (., 0) and (CALCULATED media_PTS + 50 > 612) THEN 612 /*17/09/2025 - ANDERSON PASSOU ERRADO A PONTUAÇÃO E ALTERAMOS, INVERTENDO CANAL MOTOS E CANAL PESADOS*/
+	WHEN NmGrupoCargo = 'Gerente Relacionamento Pesados' and (B.media_PTS) NOT IN (., 0) and (CALCULATED media_PTS + 60 > 687) THEN 687 /*17/09/2025 - ANDERSON PASSOU ERRADO A PONTUAÇÃO E ALTERAMOS, INVERTENDO CANAL MOTOS E CANAL PESADOS*/
+
+	WHEN NmGrupoCargo = 'Gerente Relacionamento CN (Virtualizado)' and (B.media_PTS) NOT IN (., 0) THEN CALCULATED media_PTS + 55 /*META DE PONTOS PASSADA PELA MICHELLY*/
+	WHEN NmGrupoCargo = 'Gerente Relacionamento Motos' and (B.media_PTS) NOT IN (., 0) THEN CALCULATED media_PTS + 50 /*META DE PONTOS PASSADA PELA MICHELLY*/
+	WHEN NmGrupoCargo = 'Gerente Relacionamento Pesados' and (B.media_PTS) NOT IN (., 0) THEN CALCULATED media_PTS + 60 /*META DE PONTOS PASSADA PELA MICHELLY*/
+ELSE CALCULATED media_PTS END AS PTS_Meta
+
+FROM WORK.TbPts_Crescimento_2 A /*BASE ICM DO MÊS*/
+
+LEFT JOIN CSBV.BASE_MEDIA_PTS_CN_CV B ON B.DSLOGINN1 = A.DSLOGINN1 /*BASE FIXA COM O CALCULA DA MÉDIA DO TRIMESTRE*/
+LEFT JOIN WORK.ESTRUTURA_COMERCIAL_01 C ON C.DsLoginN1 = A.DsLoginN1 AND C.NUANOMES = &Base_Mes. /*ESTRUTURA COMERCIAL PARA TRAZER O CARGO*/
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_CALCULO_PTS_2 AS
+SELECT
+
+NuAnoMes,
+A.DsLoginN1,
+a.NmGrupoCargoColaborador,
+a.CdColaborador,
+A.PTS,
+ROUND(A.VrPTS, 1) AS VrPTS,
+ROUND(A.media_PTS, 1) AS media_PTS,
+
+ROUND(A.PTS_Meta, 1) AS PTS_Meta,
+
+CASE WHEN ROUND(VrPTS, 1) >= ROUND(PTS_Meta, 1) THEN 1 ELSE 0 END AS Fl_Ating_PTS,
+
+CASE WHEN CALCULATED Fl_Ating_PTS = 1 THEN 20 ELSE 0 END AS VrPontosExtra
+
+FROM WORK.BASE_CALCULO_PTS_1 A
+
+WHERE a.NmGrupoCargoColaborador in ('Gerente Relacionamento CN (Virtualizado)', 'Gerente Relacionamento Motos', 'Gerente Relacionamento Pesados')
+
+order by 3, 2
+
+;RUN;

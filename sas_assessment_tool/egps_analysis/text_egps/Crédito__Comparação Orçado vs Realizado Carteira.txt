@@ -1,0 +1,570 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Crédito__Comparação Orçado vs Realizado Carteira
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:23 UTC
+BUSINESS_AREA: Crédito
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 27
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 422
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: FREQ, SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DT_REF, SAFRA
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: DT_REF, SAFRA
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOCONTACARTAO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOCONTACARTAO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CUBO, CUBO_&SAFRA, MAX_DT_REF, TBFATOCONTACARTAO, TBFATOCONTACARTAO2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-A2EOXWpkjuPCjA28/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+Create table max_dt_ref as
+   select * from connection to perm
+     (select distinct DtReferencia, count(*) as qtd
+	FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+	group by 1
+	order by 1 desc
+	limit 10
+	);
+   disconnect from perm;
+quit;
+
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+Create table tbfatocontacartao as
+   select * from connection to perm
+     (select
+		CAST(EXTRACT(YEAR FROM DtReferencia) * 100 + EXTRACT(MONTH FROM DtReferencia) AS INT64) AS Safra,
+		cast(CdDimContaCartao as bigint) as CdDimContaCartao,
+		cast(cdestadocontacartao as int) as cdestadocontacartao,
+		cast(DtReferencia as date) as DtReferencia,
+		cast(NuDiasAtraso as int) as NuDiasAtraso,
+		cast(VrLimiteContaCartaoGeral as decimal) as VrLimiteContaCartaoGeral,
+		cast(VrSaldoRiscoContaCartao as decimal) as VrSaldoRiscoContaCartao
+
+	FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+	where DtReferencia in ('2025-11-30')
+	);
+   disconnect from perm;
+quit;
+
+
+DATA tbfatocontacartao2;
+SET tbfatocontacartao;
+
+IF VrLimiteContaCartaoGeral = . THEN VrLimiteContaCartaoGeral = 0;
+IF VrSaldoRiscoContaCartao = . THEN VrSaldoRiscoContaCartao = 0;
+
+IF cdestadocontacartao IN (80,81,84,92,98) THEN FLAG_APTO_EXPOSURE = 1; ELSE FLAG_APTO_EXPOSURE = 0;
+IF cdestadocontacartao IN (80,81,84,88,90,91,92,98) THEN FLAG_APTO_SALDO = 1; ELSE FLAG_APTO_SALDO = 0;
+IF FLAG_APTO_EXPOSURE = 1 THEN LIMITE_APTO = VrLimiteContaCartaoGeral; ELSE LIMITE_APTO = 0;
+
+RISCO_CARTEIRA = MAX(VrSaldoRiscoContaCartao,LIMITE_APTO);
+
+IF VrSaldoRiscoContaCartao >= LIMITE_APTO THEN LIMITE_NAO_UTILIZADO = 0;
+ELSE LIMITE_NAO_UTILIZADO = LIMITE_APTO - VrSaldoRiscoContaCartao;
+
+IF NuDiasAtraso = . OR NuDiasAtraso <= 75 THEN fl_atraso_gt75 = 0; ELSE fl_atraso_gt75 = 1;
+IF NuDiasAtraso = . OR NuDiasAtraso <= 90 THEN fl_atraso_gt90 = 0; ELSE fl_atraso_gt90 = 1;
+IF NuDiasAtraso = . OR NuDiasAtraso <= 720 THEN fl_atraso_gt720 = 0; ELSE fl_atraso_gt720 = 1;
+
+FORMAT FX_ATRASO $40.;
+IF NuDiasAtraso = . OR NuDiasAtraso = 0 THEN FX_ATRASO = '01. Em Dia';
+ELSE IF NuDiasAtraso <= 30 THEN FX_ATRASO = '02. 1 a 30';
+ELSE IF NuDiasAtraso <= 60 THEN FX_ATRASO = '03. 31 a 60';
+ELSE IF NuDiasAtraso <= 90 THEN FX_ATRASO = '04. 61 a 90';
+ELSE IF NuDiasAtraso <= 120 THEN FX_ATRASO = '05. 91 a 120';
+ELSE IF NuDiasAtraso <= 150 THEN FX_ATRASO = '06. 121 a 150';
+ELSE IF NuDiasAtraso <= 180 THEN FX_ATRASO = '07. 151 a 180';
+ELSE IF NuDiasAtraso <= 210 THEN FX_ATRASO = '08. 181 a 210';
+ELSE IF NuDiasAtraso <= 240 THEN FX_ATRASO = '09. 211 a 240';
+ELSE IF NuDiasAtraso <= 270 THEN FX_ATRASO = '10. 241 a 270';
+ELSE IF NuDiasAtraso <= 300 THEN FX_ATRASO = '11. 271 a 300';
+ELSE IF NuDiasAtraso <= 330 THEN FX_ATRASO = '12. 301 a 330';
+ELSE IF NuDiasAtraso <= 360 THEN FX_ATRASO = '13. 331 a 360';
+ELSE IF NuDiasAtraso <= 720 THEN FX_ATRASO = '14. 361 a 720';
+ELSE IF NuDiasAtraso > 720 THEN FX_ATRASO = '15. > 720';
+
+RUN;
+
+
+PROC FREQ DATA=TBFATOCONTACARTAO2;
+TABLE SAFRA;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO AS SELECT
+	SAFRA,
+	FLAG_APTO_EXPOSURE,
+	FLAG_APTO_SALDO,
+	FX_ATRASO,
+	fl_atraso_gt75,
+	fl_atraso_gt90,
+	fl_atraso_gt720,
+	COUNT(*) AS QTD,
+	SUM(VrLimiteContaCartaoGeral) AS LIMITE,
+	SUM(LIMITE_APTO) AS LIMITE_APTO,
+	SUM(VrSaldoRiscoContaCartao) AS SALDO,
+	SUM(LIMITE_NAO_UTILIZADO) AS LIMITE_NAO_UTILIZADO,
+	SUM(RISCO_CARTEIRA) AS RISCO_CARTEIRA
+FROM tbfatocontacartao2
+GROUP BY 1,2,3,4,5,6,7;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-4TNzhRjpTH9zD6Te/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO HISTORICO_LIMITES(DT_REF,SAFRA); %MACRO A; %MEND A;
+
+	proc sql ;
+	connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+	schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+	Create table tbfatocontacartao as
+	   select * from connection to perm
+	     (select
+			CAST(EXTRACT(YEAR FROM DtReferencia) * 100 + EXTRACT(MONTH FROM DtReferencia) AS INT64) AS Safra,
+			cast(CdDimContaCartao as bigint) as CdDimContaCartao,
+			cast(cdestadocontacartao as int) as cdestadocontacartao,
+			cast(DtReferencia as date) as DtReferencia,
+			cast(NuDiasAtraso as int) as NuDiasAtraso,
+			cast(VrLimiteContaCartaoGeral as decimal) as VrLimiteContaCartaoGeral,
+			cast(VrSaldoRiscoContaCartao as decimal) as VrSaldoRiscoContaCartao
+
+		FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+		where DtReferencia in (&DT_REF.)
+		);
+	   disconnect from perm;
+	quit;
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+	DATA tbfatocontacartao2;
+	SET tbfatocontacartao;
+
+	IF VrLimiteContaCartaoGeral = . THEN VrLimiteContaCartaoGeral = 0;
+	IF VrSaldoRiscoContaCartao = . THEN VrSaldoRiscoContaCartao = 0;
+
+	IF cdestadocontacartao IN (80,81,84,92,98) THEN FLAG_APTO_EXPOSURE = 1; ELSE FLAG_APTO_EXPOSURE = 0;
+	IF cdestadocontacartao IN (80,81,84,88,90,91,92,98) THEN FLAG_APTO_SALDO = 1; ELSE FLAG_APTO_SALDO = 0;
+	IF FLAG_APTO_EXPOSURE = 1 THEN LIMITE_APTO = VrLimiteContaCartaoGeral; ELSE LIMITE_APTO = 0;
+
+	RISCO_CARTEIRA = MAX(VrSaldoRiscoContaCartao,LIMITE_APTO);
+
+	IF VrSaldoRiscoContaCartao >= LIMITE_APTO THEN LIMITE_NAO_UTILIZADO = 0;
+	ELSE LIMITE_NAO_UTILIZADO = LIMITE_APTO - VrSaldoRiscoContaCartao;
+
+	IF NuDiasAtraso = . OR NuDiasAtraso <= 75 THEN fl_atraso_gt75 = 0; ELSE fl_atraso_gt75 = 1;
+	IF NuDiasAtraso = . OR NuDiasAtraso <= 90 THEN fl_atraso_gt90 = 0; ELSE fl_atraso_gt90 = 1;
+	IF NuDiasAtraso = . OR NuDiasAtraso <= 720 THEN fl_atraso_gt720 = 0; ELSE fl_atraso_gt720 = 1;
+
+	FORMAT FX_ATRASO $40.;
+	IF NuDiasAtraso = . OR NuDiasAtraso = 0 THEN FX_ATRASO = '01. Em Dia';
+	ELSE IF NuDiasAtraso <= 30 THEN FX_ATRASO = '02. 1 a 30';
+	ELSE IF NuDiasAtraso <= 60 THEN FX_ATRASO = '03. 31 a 60';
+	ELSE IF NuDiasAtraso <= 90 THEN FX_ATRASO = '04. 61 a 90';
+	ELSE IF NuDiasAtraso <= 120 THEN FX_ATRASO = '05. 91 a 120';
+	ELSE IF NuDiasAtraso <= 150 THEN FX_ATRASO = '06. 121 a 150';
+	ELSE IF NuDiasAtraso <= 180 THEN FX_ATRASO = '07. 151 a 180';
+	ELSE IF NuDiasAtraso <= 210 THEN FX_ATRASO = '08. 181 a 210';
+	ELSE IF NuDiasAtraso <= 240 THEN FX_ATRASO = '09. 211 a 240';
+	ELSE IF NuDiasAtraso <= 270 THEN FX_ATRASO = '10. 241 a 270';
+	ELSE IF NuDiasAtraso <= 300 THEN FX_ATRASO = '11. 271 a 300';
+	ELSE IF NuDiasAtraso <= 330 THEN FX_ATRASO = '12. 301 a 330';
+	ELSE IF NuDiasAtraso <= 360 THEN FX_ATRASO = '13. 331 a 360';
+	ELSE IF NuDiasAtraso <= 720 THEN FX_ATRASO = '14. 361 a 720';
+	ELSE IF NuDiasAtraso > 720 THEN FX_ATRASO = '15. > 720';
+
+	RUN;
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+	PROC FREQ DATA=TBFATOCONTACARTAO2; TABLE SAFRA; RUN;
+
+	PROC SQL;
+	CREATE TABLE CUBO_&SAFRA. AS SELECT
+		SAFRA,
+		FLAG_APTO_EXPOSURE,
+		FLAG_APTO_SALDO,
+		FX_ATRASO,
+		fl_atraso_gt75,
+		fl_atraso_gt90,
+		fl_atraso_gt720,
+		COUNT(*) AS QTD,
+		SUM(VrLimiteContaCartaoGeral) AS LIMITE,
+		SUM(LIMITE_APTO) AS LIMITE_APTO,
+		SUM(VrSaldoRiscoContaCartao) AS SALDO,
+		SUM(LIMITE_NAO_UTILIZADO) AS LIMITE_NAO_UTILIZADO,
+		SUM(RISCO_CARTEIRA) AS RISCO_CARTEIRA
+	FROM tbfatocontacartao2
+	GROUP BY 1,2,3,4,5,6,7;
+	RUN;
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+%MEND;
+
+%HISTORICO_LIMITES('2024-01-01',202401);
+%HISTORICO_LIMITES('2024-02-01',202402);
+%HISTORICO_LIMITES('2024-03-01',202403);
+%HISTORICO_LIMITES('2024-04-01',202404);
+%HISTORICO_LIMITES('2024-05-01',202405);
+%HISTORICO_LIMITES('2024-06-01',202406);
+%HISTORICO_LIMITES('2024-07-01',202407);
+%HISTORICO_LIMITES('2024-08-01',202408);
+%HISTORICO_LIMITES('2024-09-01',202409);
+%HISTORICO_LIMITES('2024-10-01',202410);
+%HISTORICO_LIMITES('2024-11-01',202411);
+%HISTORICO_LIMITES('2024-12-01',202412);
+
+DATA CUBO;
+SET CUBO_202401
+	CUBO_202402
+	CUBO_202403
+	CUBO_202404
+	CUBO_202405
+	CUBO_202406
+	CUBO_202407
+	CUBO_202408
+	CUBO_202409
+	CUBO_202410
+	CUBO_202411
+	CUBO_202412;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (3) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hQv2k6z6Ro9wnMXX/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+Create table max_dt_ref as
+   select * from connection to perm
+     (select distinct DtReferencia, count(*) as qtd
+	FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+	group by 1
+	order by 1 desc
+	limit 10
+	);
+   disconnect from perm;
+quit;
+
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+Create table tbfatocontacartao as
+   select * from connection to perm
+     (select
+		CAST(EXTRACT(YEAR FROM DtReferencia) * 100 + EXTRACT(MONTH FROM DtReferencia) AS INT64) AS Safra,
+		cast(CdDimContaCartao as bigint) as CdDimContaCartao,
+		cast(cdestadocontacartao as int) as cdestadocontacartao,
+		cast(DtReferencia as date) as DtReferencia,
+		cast(NuDiasAtraso as int) as NuDiasAtraso,
+		cast(VrLimiteContaCartaoGeral as decimal) as VrLimiteContaCartaoGeral,
+		cast(VrSaldoRiscoContaCartao as decimal) as VrSaldoRiscoContaCartao
+
+	FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+	where DtReferencia in ('2025-11-30')
+	);
+   disconnect from perm;
+quit;
+
+
+DATA tbfatocontacartao2;
+SET tbfatocontacartao;
+
+IF VrLimiteContaCartaoGeral = . THEN VrLimiteContaCartaoGeral = 0;
+IF VrSaldoRiscoContaCartao = . THEN VrSaldoRiscoContaCartao = 0;
+
+IF cdestadocontacartao IN (80,81,84,92,98) THEN FLAG_APTO_EXPOSURE = 1; ELSE FLAG_APTO_EXPOSURE = 0;
+IF cdestadocontacartao IN (80,81,84,88,90,91,92,98) THEN FLAG_APTO_SALDO = 1; ELSE FLAG_APTO_SALDO = 0;
+IF FLAG_APTO_EXPOSURE = 1 THEN LIMITE_APTO = VrLimiteContaCartaoGeral; ELSE LIMITE_APTO = 0;
+
+RISCO_CARTEIRA = MAX(VrSaldoRiscoContaCartao,LIMITE_APTO);
+
+IF VrSaldoRiscoContaCartao >= LIMITE_APTO THEN LIMITE_NAO_UTILIZADO = 0;
+ELSE LIMITE_NAO_UTILIZADO = LIMITE_APTO - VrSaldoRiscoContaCartao;
+
+IF NuDiasAtraso = . OR NuDiasAtraso <= 75 THEN fl_atraso_gt75 = 0; ELSE fl_atraso_gt75 = 1;
+IF NuDiasAtraso = . OR NuDiasAtraso <= 90 THEN fl_atraso_gt90 = 0; ELSE fl_atraso_gt90 = 1;
+IF NuDiasAtraso = . OR NuDiasAtraso <= 720 THEN fl_atraso_gt720 = 0; ELSE fl_atraso_gt720 = 1;
+
+FORMAT FX_ATRASO $40.;
+IF NuDiasAtraso = . OR NuDiasAtraso = 0 THEN FX_ATRASO = '01. Em Dia';
+ELSE IF NuDiasAtraso <= 30 THEN FX_ATRASO = '02. 1 a 30';
+ELSE IF NuDiasAtraso <= 60 THEN FX_ATRASO = '03. 31 a 60';
+ELSE IF NuDiasAtraso <= 90 THEN FX_ATRASO = '04. 61 a 90';
+ELSE IF NuDiasAtraso <= 120 THEN FX_ATRASO = '05. 91 a 120';
+ELSE IF NuDiasAtraso <= 150 THEN FX_ATRASO = '06. 121 a 150';
+ELSE IF NuDiasAtraso <= 180 THEN FX_ATRASO = '07. 151 a 180';
+ELSE IF NuDiasAtraso <= 210 THEN FX_ATRASO = '08. 181 a 210';
+ELSE IF NuDiasAtraso <= 240 THEN FX_ATRASO = '09. 211 a 240';
+ELSE IF NuDiasAtraso <= 270 THEN FX_ATRASO = '10. 241 a 270';
+ELSE IF NuDiasAtraso <= 300 THEN FX_ATRASO = '11. 271 a 300';
+ELSE IF NuDiasAtraso <= 330 THEN FX_ATRASO = '12. 301 a 330';
+ELSE IF NuDiasAtraso <= 360 THEN FX_ATRASO = '13. 331 a 360';
+ELSE IF NuDiasAtraso <= 720 THEN FX_ATRASO = '14. 361 a 720';
+ELSE IF NuDiasAtraso > 720 THEN FX_ATRASO = '15. > 720';
+
+RUN;
+
+
+PROC FREQ DATA=TBFATOCONTACARTAO2;
+TABLE SAFRA;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO AS SELECT
+	SAFRA,
+	FLAG_APTO_EXPOSURE,
+	FLAG_APTO_SALDO,
+	FX_ATRASO,
+	fl_atraso_gt75,
+	fl_atraso_gt90,
+	fl_atraso_gt720,
+	COUNT(*) AS QTD,
+	SUM(VrLimiteContaCartaoGeral) AS LIMITE,
+	SUM(LIMITE_APTO) AS LIMITE_APTO,
+	SUM(VrSaldoRiscoContaCartao) AS SALDO,
+	SUM(LIMITE_NAO_UTILIZADO) AS LIMITE_NAO_UTILIZADO,
+	SUM(RISCO_CARTEIRA) AS RISCO_CARTEIRA
+FROM tbfatocontacartao2
+GROUP BY 1,2,3,4,5,6,7;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA CUBO;
+SET CUBO_202401
+	CUBO_202402
+	CUBO_202403
+	CUBO_202404
+	CUBO_202405
+	CUBO_202406
+	CUBO_202407
+	CUBO_202408
+	CUBO_202409
+	CUBO_202410
+	CUBO_202411
+	CUBO_202412;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+Create table max_dt_ref as
+   select * from connection to perm
+     (select distinct DtReferencia, count(*) as qtd
+	FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+	group by 1
+	order by 1 desc
+	limit 10
+	);
+   disconnect from perm;
+quit;
+
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=50);
+Create table tbfatocontacartao as
+   select * from connection to perm
+     (select
+		CAST(EXTRACT(YEAR FROM DtReferencia) * 100 + EXTRACT(MONTH FROM DtReferencia) AS INT64) AS Safra,
+		cast(CdDimContaCartao as bigint) as CdDimContaCartao,
+		cast(cdestadocontacartao as int) as cdestadocontacartao,
+		cast(DtReferencia as date) as DtReferencia,
+		cast(NuDiasAtraso as int) as NuDiasAtraso,
+		cast(VrLimiteContaCartaoGeral as decimal) as VrLimiteContaCartaoGeral,
+		cast(VrSaldoRiscoContaCartao as decimal) as VrSaldoRiscoContaCartao
+
+	FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+	where DtReferencia in ('2025-10-31')
+	);
+   disconnect from perm;
+quit;
+
+
+DATA tbfatocontacartao2;
+SET tbfatocontacartao;
+
+IF VrLimiteContaCartaoGeral = . THEN VrLimiteContaCartaoGeral = 0;
+IF VrSaldoRiscoContaCartao = . THEN VrSaldoRiscoContaCartao = 0;
+
+IF cdestadocontacartao IN (80,81,84,92,98) THEN FLAG_APTO_EXPOSURE = 1; ELSE FLAG_APTO_EXPOSURE = 0;
+IF cdestadocontacartao IN (80,81,84,88,90,91,92,98) THEN FLAG_APTO_SALDO = 1; ELSE FLAG_APTO_SALDO = 0;
+IF FLAG_APTO_EXPOSURE = 1 THEN LIMITE_APTO = VrLimiteContaCartaoGeral; ELSE LIMITE_APTO = 0;
+
+RISCO_CARTEIRA = MAX(VrSaldoRiscoContaCartao,LIMITE_APTO);
+
+IF VrSaldoRiscoContaCartao >= LIMITE_APTO THEN LIMITE_NAO_UTILIZADO = 0;
+ELSE LIMITE_NAO_UTILIZADO = LIMITE_APTO - VrSaldoRiscoContaCartao;
+
+IF NuDiasAtraso = . OR NuDiasAtraso <= 75 THEN fl_atraso_gt75 = 0; ELSE fl_atraso_gt75 = 1;
+IF NuDiasAtraso = . OR NuDiasAtraso <= 90 THEN fl_atraso_gt90 = 0; ELSE fl_atraso_gt90 = 1;
+IF NuDiasAtraso = . OR NuDiasAtraso <= 720 THEN fl_atraso_gt720 = 0; ELSE fl_atraso_gt720 = 1;
+
+FORMAT FX_ATRASO $40.;
+IF NuDiasAtraso = . OR NuDiasAtraso = 0 THEN FX_ATRASO = '01. Em Dia';
+ELSE IF NuDiasAtraso <= 30 THEN FX_ATRASO = '02. 1 a 30';
+ELSE IF NuDiasAtraso <= 60 THEN FX_ATRASO = '03. 31 a 60';
+ELSE IF NuDiasAtraso <= 90 THEN FX_ATRASO = '04. 61 a 90';
+ELSE IF NuDiasAtraso <= 120 THEN FX_ATRASO = '05. 91 a 120';
+ELSE IF NuDiasAtraso <= 150 THEN FX_ATRASO = '06. 121 a 150';
+ELSE IF NuDiasAtraso <= 180 THEN FX_ATRASO = '07. 151 a 180';
+ELSE IF NuDiasAtraso <= 210 THEN FX_ATRASO = '08. 181 a 210';
+ELSE IF NuDiasAtraso <= 240 THEN FX_ATRASO = '09. 211 a 240';
+ELSE IF NuDiasAtraso <= 270 THEN FX_ATRASO = '10. 241 a 270';
+ELSE IF NuDiasAtraso <= 300 THEN FX_ATRASO = '11. 271 a 300';
+ELSE IF NuDiasAtraso <= 330 THEN FX_ATRASO = '12. 301 a 330';
+ELSE IF NuDiasAtraso <= 360 THEN FX_ATRASO = '13. 331 a 360';
+ELSE IF NuDiasAtraso <= 720 THEN FX_ATRASO = '14. 361 a 720';
+ELSE IF NuDiasAtraso > 720 THEN FX_ATRASO = '15. > 720';
+
+RUN;
+
+
+PROC FREQ DATA=TBFATOCONTACARTAO2;
+TABLE SAFRA;
+RUN;
+
+PROC SQL;
+CREATE TABLE CUBO AS SELECT
+	SAFRA,
+	FLAG_APTO_EXPOSURE,
+	FLAG_APTO_SALDO,
+	FX_ATRASO,
+	fl_atraso_gt75,
+	fl_atraso_gt90,
+	fl_atraso_gt720,
+	COUNT(*) AS QTD,
+	SUM(VrLimiteContaCartaoGeral) AS LIMITE,
+	SUM(LIMITE_APTO) AS LIMITE_APTO,
+	SUM(VrSaldoRiscoContaCartao) AS SALDO,
+	SUM(LIMITE_NAO_UTILIZADO) AS LIMITE_NAO_UTILIZADO,
+	SUM(RISCO_CARTEIRA) AS RISCO_CARTEIRA
+FROM tbfatocontacartao2
+GROUP BY 1,2,3,4,5,6,7;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

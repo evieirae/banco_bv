@@ -1,0 +1,602 @@
+START_METADATA
+PROJECT: Rodas__segurosnamira
+FILE_SAS: run-tbsegurosnamira.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 492
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: mesbase_Ini
+DETECTED_MACROS_USED: mesbase_Ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASEGRC.TBPORTEPDV [SAS/Local], BASES.TBEXTSEGUROSCANCELADOS [SAS/Local], BASES.TBSEGUROSPRODUCAOCANCELADOS [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], BASEGRC.TBPORTEPDV [PROC SQL - JOIN], BASES.TBEXTSEGUROSCANCELADOS [PROC SQL - FROM], BASES.TBSEGUROSPRODUCAOCANCELADOS [PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SEGUROS_CAP, BASE_SEGUROS_COMPLETO, BASE_SEGUROS_DEMAIS, BASE_SEGUROS_SPF, CANCELAMENTOS_MENSAIS_CAP, CANCELAMENTOS_MENSAIS_COMPLETO, CANCELAMENTOS_MENSAIS_DEMAIS, CANCELAMENTOS_MENSAIS_SPF, PARCEIROCOMERCIAL, TBPRODUCAO, TBSEGUROSNAMIRA, TBSEGUROSNAMIRA_SAIDA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+/*option compress = binary;*/
+/*%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';*/
+/*%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';*/
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+options validvarname=any;
+%include '/infogrc/utils/all-includes.sas';
+
+/* ======================================================== */
+/* =================== Cubo de Seguros ==================== */
+/* ======================================================== */
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tbproducao.sas7bdat,12,300);
+
+/*GERAR BASE PARA ATUALIZAR O ARQUIVO DE SEGUROS NA MIRA E PENETRAÇÃO DE SEGUROS*/
+%Let mesbase_Ini = 202207;
+
+PROC SQL;
+CREATE TABLE TbProducao AS
+SELECT
+	 Producao.NuAnoMes
+	,Producao.NuContrato
+	,Producao.DsTipoCanalProducao
+	,Producao.NmSubEstruturaComercialC
+	,Producao.NmAreaEstruturaComercialC
+	,Producao.FxIdade
+	,Producao.FxScoreFim
+	,Producao.FxParcela
+	,Producao.DsLoginN1C
+	,Producao.DsLoginN2C
+	,Producao.DsLoginN3C
+	,Producao.LstSubstituicaoC
+	,Producao.NmCanalEstruturaComercial
+	,Producao.CdColaborador
+	,Producao.NmColaborador
+	,Producao.CdParceiroComercial
+	,Producao.NmParceiroComercial
+	,Producao.NmGrupoProdutoMeta
+	,Producao.DtAtualizacao
+	,ColaboradorFocal.LstColaboradorFocal
+	,Count (Producao.NuContrato) as qtdcontrato
+	,Sum(Coalesce(Producao.VrProducao,0)) as Producao
+	,Sum(Coalesce(Producao.VrMargem,0)) as Margem
+
+	,Sum(Coalesce(Producao.FlDemaisEleg,0)) as QtElegDemais
+	,Sum(Coalesce(Producao.FlCapEleg,0)) as QtElegCap
+	,Sum(Coalesce(Producao.FlBVMaisEleg,0)) as QtElegBVMais
+	,sum(Coalesce(Producao.FlCompletoEleg,0)) as QtElegCompleto
+
+	,Sum(Coalesce(Producao.QtSeguros,0)) as QtSeguros
+	,Sum(Coalesce(Producao.VrSeguros,0)) as VrPremioSeguro
+
+	,Sum(Coalesce(Producao.FlBVMais,0)) as QtBvMais
+	,Sum(Coalesce(Producao.VrBVMais,0)) as VrBVMais
+	,Sum(Coalesce(SEGUROS.FlBVMais,0)) as QtBvMais_Cancel
+	,Sum(Coalesce(SEGUROS.VrBVMais,0)) as VrBvMais_Cancel
+
+	,Sum(Coalesce(Producao.FlCap,0)) as QtCap
+	,Sum(Coalesce(Producao.VrCap,0)) as VrCap
+	,Sum(Coalesce(SEGUROS.FlCAP,0)) as QtCAP_Cancel
+	,Sum(Coalesce(SEGUROS.VrCAP,0)) as VrCAP_Cancel
+
+	,Sum(Coalesce(Producao.FlCap03,0)) as QtCap3
+	,Sum(Coalesce(Producao.VrCap03,0)) as VrCap3
+
+	,Sum(Coalesce(Producao.FlCap05,0)) as QtCap5
+	,Sum(Coalesce(Producao.VrCap05,0)) as VrCap5
+
+	,Sum(Coalesce(Producao.FlCap07,0)) as QtCap7
+	,Sum(Coalesce(Producao.VrCap07,0)) as VrCap7
+
+	,Sum(Coalesce(Producao.FlCap10,0)) as QtCap10
+	,Sum(Coalesce(Producao.VrCap10,0)) as VrCap10
+
+	,Sum(Coalesce(Producao.FlCap12,0)) as QtCap12
+	,Sum(Coalesce(Producao.VrCap12,0)) as VrCap12
+
+	,Sum(Coalesce(Producao.FlCap15,0)) as QtCap15
+	,Sum(Coalesce(Producao.VrCap15,0)) as VrCap15
+
+	,Sum(Coalesce(Producao.FlCap19,0)) as QtCap19
+	,Sum(Coalesce(Producao.VrCap19,0)) as VrCap19
+
+	,Sum(Coalesce(Producao.FlCap25,0)) as QtCap25
+	,Sum(Coalesce(Producao.VrCap25,0)) as VrCap25
+
+	,Sum(Coalesce(Producao.FlCap35,0)) as QtCap35
+	,Sum(Coalesce(Producao.VrCap35,0)) as VrCap35
+
+	,Sum(Coalesce(Producao.FlCap40,0)) as QtCap40
+	,Sum(Coalesce(Producao.VrCap40,0)) as VrCap40
+
+	,Sum(Coalesce(Producao.FlCap50,0)) as QtCap50
+	,Sum(Coalesce(Producao.VrCap50,0)) as VrCap50
+
+	,Sum(Coalesce(Producao.FlCap96,0)) as QtCap96
+	,Sum(Coalesce(Producao.VrCap96,0)) as VrCap96
+
+	,Sum(Coalesce(Producao.FlCap145,0)) as QtCap145
+	,Sum(Coalesce(Producao.VrCap145,0)) as VrCap145
+
+	,Sum(Coalesce(Producao.FlDemais,0)) as QtDemais
+	,Sum(Coalesce(Producao.VrDemais,0)) as VrDemais
+	,Sum(Coalesce(SEGUROS.FlDemais,0)) as QtDemais_Cancel
+	,Sum(Coalesce(SEGUROS.VrDemais,0)) as VrAUTO_Cancel
+
+	,Sum(Coalesce(Producao.FlCompleto,0)) as QtCompleto
+	,Sum(Coalesce(Producao.VrCompleto,0)) as VrCompleto
+	,Sum(Coalesce(SEGUROS.FlCompleto,0)) as QtCOMPLETO_Cancel
+	,Sum(Coalesce(SEGUROS.VrCompleto,0)) as VrCOMPLETO_Cancel
+
+	,Sum(Coalesce(Producao.FlDemaisSemCompleto,0)) as QtDemaisSemCompleto
+	,Sum(Coalesce(Producao.VrDemaisSemCompletoMax,0)) as VrDemaisSemCompleto
+	,Sum(Coalesce(SEGUROS.FlDemaisSemCompleto,0)) as QtDemaisSemCompleto_Cancel
+	,Sum(Coalesce(SEGUROS.VrDemaisSemCompletoMax,0)) as VrDemaisSemCompleto_Cancel
+
+	,Sum(Coalesce(Producao.FlGarantiaMecanica,0)) as QtGM
+	,Sum(Coalesce(Producao.VrGarantiaMecanica,0)) as VrGM
+
+	,Sum(Coalesce(Producao.FlGap,0)) as QtGap
+	,Sum(Coalesce(Producao.VrGap,0)) as VrGap
+
+	,Sum(Coalesce(Producao.FlCasco,0)) as QtCasco
+	,Sum(Coalesce(Producao.VrCasco,0)) as VrCasco
+
+	,Sum(Coalesce(Producao.FlDFI,0)) as QtDFI
+	,Sum(Coalesce(Producao.VrDfi,0)) as VrDFI
+
+	,Sum(Coalesce(Producao.FlRCF,0)) as QtRCF
+	,Sum(Coalesce(Producao.VrRcf,0)) as VrRCF
+
+	,Sum(Coalesce(Producao.TxTirDivulgada,0) * Coalesce(Producao.VrProducao,0)) as TxPond
+	,Sum(Coalesce(Producao.TxTirContabil,0) * Coalesce(Producao.VrProducao,0)) as TirPond
+
+FROM tmp.TbProducao AS Producao
+	 LEFT JOIN basegrc.TbColaboradorFocal as ColaboradorFocal
+			ON Producao.CdFilial = ColaboradorFocal.CdFilial
+			AND ColaboradorFocal.NmGrupoProdutoMeta = 'Seguros'
+     LEFT JOIN
+		(SELECT
+			NuContrato,
+			sum(FlBVMais) AS FlBVMais,
+			sum(VrBVMais) as VrBVMais,
+			sum(FlDemais) as FlDemais,
+			sum(VrDemais) as VrDemais,
+			sum(FlDemaisSemCompleto) AS FlDemaisSemCompleto,
+			sum(VrDemaisSemCompletoMax) AS VrDemaisSemCompletoMax,
+			sum(FlCompleto) as FlCompleto,
+			sum(VrCompleto) as VrCompleto,
+			sum(FlCAP) as FlCAP,
+			sum(VrCAP) as VrCAP
+		FROM Bases.TbExtSegurosCancelados
+		GROUP BY 1) AS Seguros
+			ON Producao.NuContrato = SEGUROS.NuContrato
+WHERE Producao.NuAnoMes >= &mesbase_Ini.
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+QUIT;
+
+/*GERANDO BASE DA TBPRODUÇÃO SPF*/
+Proc Sql;
+CREATE TABLE Base_Seguros_SPF AS
+SELECT
+	 NuAnoMes
+	,DsTipoCanalProducao
+	,NmSubEstruturaComercialC
+	,NmAreaEstruturaComercialC
+	,FxIdade
+	,FxScoreFim
+	,FxParcela
+	,DsLoginN1C
+	,DsLoginN2C
+	,DsLoginN3C
+	,LstSubstituicaoC
+	,LstColaboradorFocal
+	,NmCanalEstruturaComercial
+	,CdColaborador
+	,NmColaborador
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,NmGrupoProdutoMeta
+	,DtAtualizacao
+	,"BVMais" as Seguro
+	,Sum(Coalesce(qtdcontrato,0)) as QtdContrato
+	,Sum(Coalesce(Producao,0)) as Producao
+	,Sum(Coalesce(Margem,0)) as Margem
+	,Sum(Coalesce(QtElegBVMais,0)) as QtElegíveis
+	,Sum(Coalesce(QtBvMais,0)) as QtRealizado
+	,Sum(Coalesce(VrBVMais,0)) as VrProdução
+	,Sum(Coalesce(QtBvMais_Cancel,0)) as QtSeguros_Cancel
+	,Sum(Coalesce(VrBvMais_Cancel,0)) as VrSeguros_Cancel
+FROM TbProducao
+	 WHERE NuAnoMes >= &mesbase_Ini.
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+Quit;
+
+/*GERANDO BASE DA TBPRODUÇÃO CAP*/
+PROC SQL;
+CREATE TABLE Base_Seguros_CAP AS
+SELECT
+	 NuAnoMes
+	,DsTipoCanalProducao
+	,NmSubEstruturaComercialC
+	,NmAreaEstruturaComercialC
+	,FxIdade
+	,FxScoreFim
+	,FxParcela
+	,DsLoginN1C
+	,DsLoginN2C
+	,DsLoginN3C
+	,LstSubstituicaoC
+	,LstColaboradorFocal
+	,NmCanalEstruturaComercial
+	,CdColaborador
+	,NmColaborador
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,NmGrupoProdutoMeta
+	,DtAtualizacao
+	,"CAP" as Seguro
+	,Sum(Coalesce(qtdcontrato,0)) as QtdContrato
+	,Sum(Coalesce(Producao,0)) as Producao
+	,Sum(Coalesce(Margem,0)) as Margem
+	,Sum(Coalesce(QtElegCap,0)) as QtElegíveis
+	,Sum(Coalesce(QtCap,0)) as QtRealizado
+	,Sum(Coalesce(VrCap,0)) as VrProdução
+	,Sum(Coalesce(QtCAP_Cancel,0)) as QtSeguros_Cancel
+	,Sum(Coalesce(VrCAP_Cancel,0)) as VrSeguros_Cancel
+FROM TbProducao
+	 WHERE NuAnoMes >= &mesbase_Ini.
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+Quit;
+
+/*GERANDO BASE DA TBPRODUÇÃO CAP*/
+PROC SQL;
+CREATE TABLE Base_Seguros_DEMAIS AS
+SELECT
+	 NuAnoMes
+	,DsTipoCanalProducao
+	,NmSubEstruturaComercialC
+	,NmAreaEstruturaComercialC
+	,FxIdade
+	,FxScoreFim
+	,FxParcela
+	,DsLoginN1C
+	,DsLoginN2C
+	,DsLoginN3C
+	,LstSubstituicaoC
+	,LstColaboradorFocal
+	,NmCanalEstruturaComercial
+	,CdColaborador
+	,NmColaborador
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,NmGrupoProdutoMeta
+	,DtAtualizacao
+	,"DEMAIS" as Seguro
+	,Sum(Coalesce(qtdcontrato,0)) as QtdContrato
+	,Sum(Coalesce(Producao,0)) as Producao
+	,Sum(Coalesce(Margem,0)) as Margem
+	,Sum(Coalesce(QtElegDemais,0)) as QtElegíveis
+	,Sum(Coalesce(QtDemaisSemCompleto,0)) as QtRealizado
+	,Sum(Coalesce(VrDemaisSemCompleto,0)) as VrProdução
+	,Sum(Coalesce(QtDemaisSemCompleto_Cancel,0)) as QtSeguros_Cancel
+	,Sum(Coalesce(VrDemaisSemCompleto_Cancel,0)) as VrSeguros_Cancel
+From TbProducao
+	 WHERE NuAnoMes >= &mesbase_Ini.
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+Quit;
+
+/*GERANDO BASE DA TBPRODUÇÃO COMPLETO*/
+PROC SQL;
+CREATE TABLE Base_Seguros_Completo AS
+SELECT
+	NuAnoMes
+	,DsTipoCanalProducao
+	,NmSubEstruturaComercialC
+	,NmAreaEstruturaComercialC
+	,FxIdade
+	,FxScoreFim
+	,FxParcela
+	,DsLoginN1C
+	,DsLoginN2C
+	,DsLoginN3C
+	,LstSubstituicaoC
+	,LstColaboradorFocal
+	,NmCanalEstruturaComercial
+	,CdColaborador
+	,NmColaborador
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,NmGrupoProdutoMeta
+	,DtAtualizacao
+	,"COMPLETO" as Seguro
+	,Sum(Coalesce(qtdcontrato,0)) as QtdContrato
+	,Sum(Coalesce(Producao,0)) as Producao
+	,Sum(Coalesce(Margem,0)) as Margem
+	,Sum(Coalesce(QtElegCompleto,0)) as QtElegíveis
+	,Sum(Coalesce(QtCompleto,0)) as QtRealizado
+	,Sum(Coalesce(VrCompleto,0)) as VrProdução
+	,Sum(Coalesce(QtCOMPLETO_Cancel,0)) as QtSeguros_Cancel
+	,Sum(Coalesce(VrCOMPLETO_Cancel,0)) as VrSeguros_Cancel
+FROM TbProducao
+	 WHERE NuAnoMes >= &mesbase_Ini.
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+Quit;
+
+/*base cancelamentos COMPLETO*/
+Proc Sql;
+Create Table Cancelamentos_Mensais_COMPLETO as
+SELECT
+	 Cancel.NuAnoMes
+	,Cancel.DsTipoCanalProducao
+	,Cancel.NmSubEstruturaComercialA as NmSubEstruturaComercialC
+	,Cancel.NmAreaEstruturaComercial as NmAreaEstruturaComercialC
+	,Cancel.FxIdade
+	,Cancel.FxScoreFim
+	,Cancel.FxParcela
+	,Cancel.DsLoginN1 as DsLoginN1C
+	,Cancel.DsLoginN2A as DsLoginN2C
+	,Cancel.DsLoginN3A as DsLoginN3C
+	,Cancel.LstSubstituicao as LstSubstituicaoC
+	,ColaboradorFocal.LstColaboradorFocal
+	,Cancel.NmCanalEstruturaComercial
+	,Cancel.CdColaborador
+	,Cancel.NmColaborador
+	,Cancel.CdParceiroComercial
+	,Cancel.NmParceiroComercial
+	,Cancel.NmGrupoProdutoMeta
+	,Cancel.DtAtualizacao
+	,"COMPLETO" as Seguro
+	,sum(Cancel.FlCompleto) AS QtSeguros_GAP
+	,sum(Cancel.VrCompleto) as VrSeguros_GAP
+
+FROM Bases.TbSegurosProducaoCancelados as Cancel
+	 LEFT JOIN basegrc.TbColaboradorFocal as ColaboradorFocal
+			ON Cancel.CdFilial = ColaboradorFocal.CdFilial
+			AND ColaboradorFocal.NmGrupoProdutoMeta = 'Seguros'
+
+	 WHERE NuAnoMes >= &mesbase_Ini. AND FlCompleto NE 0
+	 GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19;
+Quit;
+
+/***********************************************************************/
+/*base cancelamentos SPF*/
+
+PROC SQL;
+CREATE TABLE Cancelamentos_Mensais_SPF as
+SELECT
+	Cancel.NuAnoMes
+	,Cancel.DsTipoCanalProducao
+	,Cancel.NmSubEstruturaComercialA as NmSubEstruturaComercialC
+	,Cancel.NmAreaEstruturaComercial as NmAreaEstruturaComercialC
+	,Cancel.FxIdade
+	,Cancel.FxScoreFim
+	,Cancel.FxParcela
+	,Cancel.DsLoginN1 as DsLoginN1C
+	,Cancel.DsLoginN2A as DsLoginN2C
+	,Cancel.DsLoginN3A as DsLoginN3C
+	,Cancel.LstSubstituicao as LstSubstituicaoC
+	,ColaboradorFocal.LstColaboradorFocal
+	,Cancel.NmCanalEstruturaComercial
+	,Cancel.CdColaborador
+	,Cancel.NmColaborador
+	,Cancel.CdParceiroComercial
+	,Cancel.NmParceiroComercial
+	,Cancel.NmGrupoProdutoMeta
+	,Cancel.DtAtualizacao
+	,"BVMais" as Seguro
+	,sum(Cancel.FlBVMais) AS QtSeguros_GAP
+	,sum(Cancel.VrBVMais) as VrSeguros_GAP
+FROM Bases.TbSegurosProducaoCancelados as Cancel
+	 LEFT JOIN basegrc.TbColaboradorFocal as ColaboradorFocal
+			ON Cancel.CdFilial = ColaboradorFocal.CdFilial
+			AND ColaboradorFocal.NmGrupoProdutoMeta = 'Seguros'
+
+	WHERE NuAnoMes >= &mesbase_Ini. AND FlBVMais NE 0
+	 GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+Quit;
+
+/***********************************************************************/
+
+/*base cancelamentos CAP*/
+PROC SQL;
+CREATE TABLE Cancelamentos_Mensais_CAP as
+SELECT
+	Cancel.NuAnoMes
+	,Cancel.DsTipoCanalProducao
+	,Cancel.NmSubEstruturaComercialA as NmSubEstruturaComercialC
+	,Cancel.NmAreaEstruturaComercial as NmAreaEstruturaComercialC
+	,Cancel.FxIdade
+	,Cancel.FxScoreFim
+	,Cancel.FxParcela
+	,Cancel.DsLoginN1 as DsLoginN1C
+	,Cancel.DsLoginN2A as DsLoginN2C
+	,Cancel.DsLoginN3A as DsLoginN3C
+	,Cancel.LstSubstituicao as LstSubstituicaoC
+	,ColaboradorFocal.LstColaboradorFocal
+	,Cancel.NmCanalEstruturaComercial
+	,Cancel.CdColaborador
+	,Cancel.NmColaborador
+	,Cancel.CdParceiroComercial
+	,Cancel.NmParceiroComercial
+	,Cancel.NmGrupoProdutoMeta
+	,Cancel.DtAtualizacao
+	,"CAP" as Seguro
+	,sum(Cancel.FlCAP) AS QtSeguros_GAP
+	,sum(Cancel.VrCAP) as VrSeguros_GAP
+
+FROM Bases.TbSegurosProducaoCancelados as Cancel
+	 LEFT JOIN basegrc.TbColaboradorFocal as ColaboradorFocal
+			ON Cancel.CdFilial = ColaboradorFocal.CdFilial
+			AND ColaboradorFocal.NmGrupoProdutoMeta = 'Seguros'
+
+	 WHERE NuAnoMes >= &mesbase_Ini. AND FlCAP NE 0
+	 GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19;
+Quit;
+
+/*base cancelamentos DEMAIS*/
+PROC SQL;
+CREATE TABLE Cancelamentos_Mensais_DEMAIS as
+SELECT
+	Cancel.NuAnoMes
+	,Cancel.DsTipoCanalProducao
+	,Cancel.NmSubEstruturaComercialA as NmSubEstruturaComercialC
+	,Cancel.NmAreaEstruturaComercial as NmAreaEstruturaComercialC
+	,Cancel.FxIdade
+	,Cancel.FxScoreFim
+	,Cancel.FxParcela
+	,Cancel.DsLoginN1 as DsLoginN1C
+	,Cancel.DsLoginN2A as DsLoginN2C
+	,Cancel.DsLoginN3A as DsLoginN3C
+	,Cancel.LstSubstituicao as LstSubstituicaoC
+	,ColaboradorFocal.LstColaboradorFocal
+	,Cancel.NmCanalEstruturaComercial
+	,Cancel.CdColaborador
+	,Cancel.NmColaborador
+	,Cancel.CdParceiroComercial
+	,Cancel.NmParceiroComercial
+	,Cancel.NmGrupoProdutoMeta
+	,Cancel.DtAtualizacao
+	,"DEMAIS" as Seguro
+	,sum(Cancel.FlDemaisSemCompleto) AS QtSeguros_GAP
+	,sum(Cancel.VrDemaisSemCompletoMax) as VrSeguros_GAP
+
+FROM Bases.TbSegurosProducaoCancelados as Cancel
+	 LEFT JOIN basegrc.TbColaboradorFocal as ColaboradorFocal
+			ON Cancel.CdFilial = ColaboradorFocal.CdFilial
+			AND ColaboradorFocal.NmGrupoProdutoMeta = 'Seguros'
+
+	 WHERE NuAnoMes >= &mesbase_Ini. AND FlDemaisSemCompleto NE 0
+	 GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+Quit;
+
+Data TbSegurosNaMira_Saida;
+SET Base_Seguros_COMPLETO
+	Base_Seguros_SPF
+	Base_Seguros_CAP
+	Base_Seguros_DEMAIS
+	Cancelamentos_Mensais_COMPLETO
+	Cancelamentos_Mensais_SPF
+	Cancelamentos_Mensais_CAP
+	Cancelamentos_Mensais_DEMAIS
+;run;
+
+/*Inclusão de PORTE PDV*/
+
+PROC SQL;
+CREATE TABLE ParceiroComercial AS
+SELECT
+	TbParceiroComercial.CdParceiroComercial
+	,TbParceiroComercial.NmParceiroComercial
+	,TbParceiroComercial.NmGrupoConcessionaria
+	,TbParceiroComercial.NmBandeiraGrupoConcessionaria
+	,CASE WHEN TbParceiroComercial.PredominanciaProduto = 'Motos' THEN  FlPorteNovoMotos ELSE FlPorteA END as FlPorteA
+	,TbParceiroComercial.PredominanciaProduto
+	,TbParceiroComercial.DsGrupoParceiroLocadoras
+	,TbParceiroComercial.NmAutoShopping
+	,NmCidade
+	,CdUF
+	,NmBairro
+	,NmLogradouro
+	,NuEndereco
+	,CdCep
+FROM tmp.TbParceiroComercial TbParceiroComercial
+	left join basegrc.TbPortepdv PortePDV
+		on TbParceiroComercial.NuCnpjLoja = PortePDV.NuCnpjLoja
+		AND PortePDV.NuAno = year(today())
+/*WHERE FlAtivo = 'S'*/
+;run;
+
+proc sql;
+Create Table TbSegurosNaMira as
+Select
+		TbSegurosNaMira.NuAnoMes
+		,TbSegurosNaMira.DsTipoCanalProducao
+		,TbSegurosNaMira.NmSubEstruturaComercialC
+		,TbSegurosNaMira.NmAreaEstruturaComercialC
+		,TbSegurosNaMira.FxIdade
+		,TbSegurosNaMira.FxScoreFim
+		,TbSegurosNaMira.FxParcela
+		,TbSegurosNaMira.DsLoginN1C
+		,TbSegurosNaMira.DsLoginN2C
+		,TbSegurosNaMira.DsLoginN3C
+		,TbSegurosNaMira.LstSubstituicaoC
+		,TbSegurosNaMira.LstColaboradorFocal
+		,TbSegurosNaMira.NmCanalEstruturaComercial
+		,TbSegurosNaMira.CdColaborador
+		,TbSegurosNaMira.NmColaborador
+		,TbSegurosNaMira.CdParceiroComercial
+		,TbSegurosNaMira.NmParceiroComercial
+		,TbSegurosNaMira.NmGrupoProdutoMeta
+		,TbSegurosNaMira.DtAtualizacao
+		,TbSegurosNaMira.Seguro
+		,ParceiroComercial.FlPorteA
+		,Sum(Coalesce(TbSegurosNaMira.QtdContrato,0)) as QtdContrato
+		,Sum(Coalesce(TbSegurosNaMira.Producao,0)) as Producao
+		,Sum(Coalesce(TbSegurosNaMira.Margem,0)) as Margem
+		,Sum(Coalesce(TbSegurosNaMira.QtElegíveis,0)) as QtElegíveis
+		,Sum(Coalesce(TbSegurosNaMira.QtRealizado,0)) as QtRealizado
+		,Sum(Coalesce(TbSegurosNaMira.VrProdução,0)) as VrProdução
+		,Sum(Coalesce(TbSegurosNaMira.QtSeguros_Cancel,0)) as QtSeguros_Cancel
+		,Sum(Coalesce(TbSegurosNaMira.VrSeguros_Cancel,0)) as VrSeguros_Cancel
+		,Sum(Coalesce(TbSegurosNaMira.QtSeguros_GAP,0)) as QtSeguros_GAP
+		,Sum(Coalesce(TbSegurosNaMira.VrSeguros_GAP,0)) as VrSeguros_GAP
+From TbSegurosNaMira_Saida TbSegurosNaMira
+LEFT JOIN ParceiroComercial ParceiroComercial
+		ON TbSegurosNaMira.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21;
+Quit;
+
+%ExportaCSV(TbSegurosNaMira,TbSegurosNaMira);
+
+/*PROC EXPORT */
+/*data=TbSegurosNaMira*/
+/*file='/riscosbvf/BA/processos/output/TbSegurosNaMira.csv' replace*/
+/*file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbSegurosNaMira.csv' replace*/
+/*dbms=dlm;*/
+/*delimiter=';';*/
+/*run;*/
+
+/*X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbSegurosNaMira.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";*/
+/*X "mv  /riscosbvf/BA/processos/tmp/TbResultadoFeirao.csv  /riscosbvf/BA/processos/output/ ";		*/

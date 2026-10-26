@@ -1,0 +1,287 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_Batimento_Consig_PJ_v1
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:06 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 25)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 23
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC FORMAT (1x | +25)
+----------------------------------------
+LINES_OF_CODE: 172
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: EXPORT, FORMAT, FREQ, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ARQNEG = /riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Negativacao/Negativacao; NEGATIVA = //riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Negativacao; NPRIVADO = /riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Carga; PRIVADO = /riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Nova_Carga
+DETECTED_MACROS_DEFINED: DATA_ARQ_ATU, DT_EXEC
+DETECTED_MACROS_USED: DATA_ARQ_ATU, DT_EXEC
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): PRIVADO.BASE_CADASTRO_EMPRESAS [SAS/Local], PRIVADO.CARGA_PJ_PRIVADO_20260303 [SAS/Local], PRIVADO.CART_CONTENCIOSA_20260303 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: PRIVADO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\MIS\01_Rotinas_MIS\Torre_de_Controle\Fora_de_cobranca\Input_Negativacao\Serasa\230430_PJ.TXT
+TEMP/DISCARDED_FILE_INPUT: WORK.ARQUIVO_ORG_PJ <- N:\DVMD\Cobrança\MIS\01_Rotinas_MIS\Torre_de_Controle\Fora_de_cobranca\Input_Negativacao\Serasa\230430_PJ.TXT
+TABLE_READ_PROVENANCE (Flow): PRIVADO.BASE_CADASTRO_EMPRESAS [PROC SQL - JOIN], PRIVADO.CARGA_PJ_PRIVADO_20260303 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], PRIVADO.CART_CONTENCIOSA_20260303 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): \\bvnet.bv\global\DVMD\Cobrança\Projetos_Processos\Rotinas\Processos\55 - BATIMENTO SCPC_SERASA\Resultado\PJ\CONFERENCIA_PF.xlsx
+TEMP/DISCARDED OUTPUTS: BA_RESULTADO_BATIMENTO, CONFERENCIA_PF, FOTO_CARTEIRA_PJ, SELECAO_ATUAL, SELECAO_ATUAL_CONTENCIOSO, SELECAO_NEGATIVACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET DATA_ARQ_ATU=20260303;
+%LET DT_EXEC=%SYSFUNC(TODAY());
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\MIS\01_Rotinas_MIS\Torre_de_Controle\Fora_de_cobranca\Input_Negativacao\Serasa\230430_PJ.TXT|N:/DVMD/COBRANÇA/MIS/01_ROTINAS_MIS/TORRE_DE_CONTROLE/FORA_DE_COBRANCA/INPUT_NEGATIVACAO/SERASA|230430_PJ.TXT||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Parametros */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Parametros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-kJdwOLYCThZmImyp/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname PRIVADO '/riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Nova_Carga';
+libname NPRIVADO '/riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Carga';
+libname NEGATIVA '//riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Negativacao';
+
+libname ARQNEG '/riscosbv/cobranca/csaure/Dist_Consg/PJ_PRIVADO/Negativacao/Negativacao';
+
+OPTIONS
+SYMBOLGEN
+MLOGIC
+NOMPRINT;
+
+%LET DATA_ARQ_ATU = 20260303; 
+
+%LET DT_EXEC = %SYSFUNC(TODAY());
+
+PROC FORMAT;
+
+		VALUE FX_ATRASO
+						LOW-<10=	"1. em dia"
+
+						11<-29=	"2. 11 a 29"
+						30<-60=	"3. 30 a 60"
+						60<-90=	"5. 61 a 90"
+						90<-180="6. 91 a 180"
+						180<-360="7. 180 a 360"
+						361<-540="8. 361 a 540"
+						540<-720="9. 541 a 720"
+						720<-900="10. 721 a 900"
+						900<-1080="11. 901 a 1080"
+						1080<-1260="12. 1081 a 1260"
+						1260<-1440="13. 1261 a 1440"
+						1440<-1620="14. 1441 a 1620"
+						1620<-1790="15. 1621 a 1790"
+						1790<-high="16. ACIMA 1790";
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Parametros */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Motor_de_decisao */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Motor_de_decisao */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Yor6EJAh5cIDyM1o/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE SELECAO_ATUAL AS SELECT
+
+	CODWEB,
+	EMPRESA,
+	FLAG_ACORDO_ATIVO,
+	FLAG_CONTENCIOSO,
+
+	MIN(DT_VCT_CONVENIO) AS DT_VCT_CONVENIO_ATU FORMAT DDMMYY10.,
+	MAX(ATRASO) AS MAIOR_ATRASO_ATU,
+
+	SUM(VALOR_ATRASO_REPASSE_ATU) AS RISCO_ATRASO_ATU
+
+FROM PRIVADO.CARGA_PJ_PRIVADO_&DATA_ARQ_ATU.
+WHERE
+	STATUS_COB IN ('ESTOQUE','ATUALIZACAO','NOVO','RETIRAR - PGTO')
+AND
+	FLAG_EMP_GRUPO='NAO'
+AND
+	FLAG_PROIBIDO='NAO'
+AND
+	FLAG_CONTENCIOSO='NAO'
+
+GROUP BY
+	CODWEB,
+	EMPRESA,
+	FLAG_ACORDO_ATIVO,
+	FLAG_CONTENCIOSO;
+QUIT;
+
+
+
+PROC SQL;
+CREATE TABLE SELECAO_ATUAL_CONTENCIOSO AS SELECT
+
+	CODWEB,
+	EMPRESA,
+	FLAG_ACORDO_ATIVO,
+	FLAG_CONTENCIOSO,
+
+	MIN(DT_VCT_CONVENIO) AS DT_VCT_CONVENIO_ATU FORMAT DDMMYY10.,
+	MAX(ATRASO) AS MAIOR_ATRASO_ATU,
+
+	SUM(VALOR_ATRASO_REPASSE_ATU) AS RISCO_ATRASO_ATU
+
+FROM PRIVADO.CART_CONTENCIOSA_&DATA_ARQ_ATU.
+WHERE
+	STATUS_COB IN ('ESTOQUE','ATUALIZACAO','NOVO')
+AND
+	FLAG_EMP_GRUPO='NAO'
+AND
+	FLAG_PROIBIDO='NAO'
+AND
+	FLAG_CONTENCIOSO='SIM'
+
+GROUP BY
+	CODWEB,
+	EMPRESA,
+	FLAG_ACORDO_ATIVO,
+	FLAG_CONTENCIOSO;
+QUIT;
+
+
+
+DATA FOTO_CARTEIRA_PJ;
+SET SELECAO_ATUAL
+	SELECAO_ATUAL_CONTENCIOSO;
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE FOTO_CARTEIRA_PJ AS SELECT distinct
+	A.*,
+	B.CNPJ,
+	put(MAIOR_ATRASO_ATU,FX_ATRASO.) as FXATRASO
+
+FROM FOTO_CARTEIRA_PJ A left JOIN PRIVADO.BASE_CADASTRO_EMPRESAS B
+ON A.CODWEB=B.CODWEB;
+QUIT;
+
+
+
+DATA FOTO_CARTEIRA_PJ;
+SET FOTO_CARTEIRA_PJ;
+
+	IF  MAIOR_ATRASO_ATU >= 60 AND MAIOR_ATRASO_ATU =< 1790 AND FLAG_ACORDO_ATIVO = 'SEM ACORDO'
+	AND RISCO_ATRASO_ATU > 5000 THEN FLAG_ELEG_BCO=1 ; ELSE FLAG_ELEG_BCO=0;
+
+	FORMAT CNPJ_CONVENIO BEST15.;
+	CNPJ_CONVENIO = INPUT(CNPJ,BEST15.);
+
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE SELECAO_NEGATIVACAO AS SELECT DISTINCT
+
+	A.*,
+
+	CASE WHEN (B.CNPJ_CONVENIO IS NOT NULL) THEN 1 ELSE 0 END AS FLAG_NEGATIVADO_ORG
+
+FROM  FOTO_CARTEIRA_PJ A LEFT JOIN ARQUIVO_ORG_PJ B
+ON A.CNPJ_CONVENIO=B.CNPJ_CONVENIO;
+QUIT;
+
+PROC FREQ DATA=SELECAO_NEGATIVACAO;
+TABLE FLAG_ELEG_BCO*FLAG_NEGATIVADO_ORG / LIST MISSING;
+RUN;
+
+DATA BA_RESULTADO_BATIMENTO;
+SET SELECAO_NEGATIVACAO;
+
+FORMAT DTREF DATA_NEGATIVACAO ;
+DTREF=&DT_EXEC.;
+
+FORMAT DECISAO $30.;
+
+	IF (FLAG_ELEG_BCO=1 AND FLAG_NEGATIVADO_ORG=1) or (FLAG_ELEG_BCO=0 AND FLAG_NEGATIVADO_ORG=0)  THEN DO;
+
+	DECISAO='OK';
+END;
+
+ELSE ;
+
+	IF FLAG_ELEG_BCO=0 AND FLAG_NEGATIVADO_ORG=1 THEN DO;
+
+		DECISAO='REABILITAR';
+END;
+
+ELSE ;
+
+	IF FLAG_ELEG_BCO=1 AND FLAG_NEGATIVADO_ORG=0 THEN DO;
+
+	DECISAO='NEGATIVAR';
+END;
+
+RUN;
+
+PROC FREQ DATA=BA_RESULTADO_BATIMENTO;
+TABLE DECISAO DECISAO*fxatraso / LIST MISSING;
+
+RUN;
+
+data CONFERENCIA_PF;
+set BA_RESULTADO_BATIMENTO;
+where DECISAO in ('NEGATIVAR','REABILITAR');
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Motor_de_decisao */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CONFERENCIA_PF
+    OUTFILE='\\bvnet.bv\global\DVMD\Cobrança\Projetos_Processos\Rotinas\Processos\55 - BATIMENTO SCPC_SERASA\Resultado\PJ\CONFERENCIA_PF.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

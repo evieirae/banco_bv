@@ -1,0 +1,823 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Crédito__VisãoSCR
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:25 UTC
+BUSINESS_AREA: Crédito
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 724
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ATACADO = /riscosbvf/gbinfra/atacado; GCSERASA = /riscosbvf/insight/GCarteira; INSIGHT = /riscosbvf/insight; MISCRED = /riscosbv/credito/MISCREDITO; PLCA = /riscosbv/credito/rgustavo/ESTRATEGIA/SME/PLCA; PME = /riscosbv/credito/SME; SHAREATA = /riscosbvf/plan_mesas/shared/atacado; SME = /riscosbv/credito/rgustavo/ESTRATEGIA/SME; SOCIOS = /riscosbvf/plan_mesas/comp_total
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): INSIGHT.TBBRUTA [SAS/Local], PME.BASE_BACEN [SAS/Local], SHAREATA.TBCARTEIRAGRUPO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: INSIGHT, PME, SHAREATA
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): INSIGHT.TBBRUTA [PROC SQL - FROM], PME.BASE_BACEN [PROC SQL - FROM], SHAREATA.TBCARTEIRAGRUPO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DCCR\File Server Grupos Econômicos\Gestão de Portfólio\3. Indicadores\1. Esteiras\CarteiraSCR.xlsx
+TEMP/DISCARDED OUTPUTS: BRUTA, CARTEIRA, CARTEIRA_BRUTA, CARTEIRA_BRUTA_SCR, DEPARA_BRUTA, SCR, SCRSUM
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Libname */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-nQ3EhJxpWKTIqaeA/code.sas */
+/* =========================INÍCIO TASK========================= */
+OPTIONS COMPRESS = BINARY;
+
+
+
+LIBNAME PME         '/riscosbv/credito/SME'                           ;
+LIBNAME PLCA        '/riscosbv/credito/rgustavo/ESTRATEGIA/SME/PLCA'  ACCESS = READONLY;
+LIBNAME SME 		'/riscosbv/credito/rgustavo/ESTRATEGIA/SME'       ACCESS = READONLY;
+LIBNAME MISCRED		'/riscosbv/credito/MISCREDITO'                    ACCESS = READONLY;
+LIBNAME INSIGHT 	'/riscosbvf/insight'                              ACCESS = READONLY;
+LIBNAME SHAREATA 	'/riscosbvf/plan_mesas/shared/atacado'            ACCESS = READONLY;
+LIBNAME ATACADO		'/riscosbvf/gbinfra/atacado'                      ACCESS = READONLY;
+LIBNAME GCSERASA 	'/riscosbvf/insight/GCarteira'                    ACCESS = READONLY;
+LIBNAME SOCIOS 		'/riscosbvf/plan_mesas/comp_total'                ACCESS = READONLY;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Carteira */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Carteira */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-cgz4KXIvRpbVjPZH/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE CARTEIRA AS SELECT
+
+		 A.CdGrupoEconomico
+		,A.NmGrupoEconomico
+		,A.NmGerenteExecutivo
+		,A.NmAnalistaCredito
+		,A.Cluster
+
+	FROM SHAREATA.TBCARTEIRAGRUPO AS A
+
+	WHERE A.Carteira IN ('CORE','Core','AE') OR (A.Carteira = 'PME' AND A.NmGerenteExecutivo = 'FLAVIA.LUSTOSA')
+
+; QUIT;
+
+PROC SQL;
+
+	CREATE TABLE DEPARA_BRUTA AS SELECT DISTINCT
+
+		 A.CdGpEconomico
+		,A.NuCpfCnpjRaiz
+
+	FROM INSIGHT.TBBRUTA AS A
+
+	WHERE CdGpEconomico NE .
+
+; QUIT;
+
+PROC SQL;
+
+	CREATE TABLE BRUTA AS SELECT
+
+		 A.CdGpEconomico
+		,MAX(A.NmOfficer) AS NmOfficer
+		,MAX(A.DsClassificacaoGP) AS DsClassificacaoGP
+		,MAX(A.DtVencLimiteGrupo) AS DtVencLimiteGrupo FORMAT = DDMMYY10.
+		,MAX(A.VrTotalAprovadoGrupo) AS VrTotalAprovadoGrupo
+		,MAX(A.VrTotalRiscoGrupo) AS VrTotalRiscoGrupo
+		,MAX(A.DsRatingGp) AS DsRatingGp
+		,MAX(A.VrFaturamentoGP) AS VrFaturamentoGP
+
+	FROM INSIGHT.TBBRUTA AS A
+
+	GROUP BY 1
+
+; QUIT;
+
+PROC SQL;
+
+	CREATE TABLE CARTEIRA_BRUTA AS SELECT
+
+		 A.CdGrupoEconomico
+		,A.NmGrupoEconomico
+		,A.NmGerenteExecutivo
+		,A.NmAnalistaCredito
+		,A.Cluster
+		,B.NmOfficer
+		,B.DsClassificacaoGP
+		,B.DtVencLimiteGrupo FORMAT = DDMMYY10.
+		,B.VrTotalAprovadoGrupo
+		,B.VrTotalRiscoGrupo
+		,B.DsRatingGp
+		,B.VrFaturamentoGP
+
+	FROM CARTEIRA AS A
+
+	LEFT JOIN BRUTA AS B
+
+	ON A.CdGrupoEconomico = B.CdGpEconomico
+
+; QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Carteira */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. SCR */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. SCR */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1zfGQFEishdfsqLj/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+	CREATE TABLE SCR AS SELECT
+
+		 A.*
+		,B.CdGpEconomico AS NumeroGrupo
+
+	FROM PME.BASE_BACEN AS A
+
+	LEFT JOIN DEPARA_BRUTA AS B
+
+	ON A.raiz_cnpj = B.NuCpfCnpjRaiz
+
+; QUIT;
+
+PROC SQL;
+
+	CREATE TABLE SCRSUM AS SELECT
+
+		 NumeroGrupo
+		,SUM(svl_total_m01) AS svl_total_m01
+		,SUM(svl_creditos_aliberar_m01) AS svl_creditos_aliberar_m01
+		,SUM(svl_creditos_avencer_m01) AS svl_creditos_avencer_m01
+		,SUM(svl_creditos_vencidos_m01) AS svl_creditos_vencidos_m01
+		,SUM(svl_prejuizo_m01) AS svl_prejuizo_m01
+		,SUM(svl_outros_creditos_m01) AS svl_outros_creditos_m01
+		,SUM(svl_cred_vencer_030_m01) AS svl_cred_vencer_030_m01
+		,SUM(svl_cred_vencer_060_m01) AS svl_cred_vencer_060_m01
+	    ,SUM(svl_cred_vencer_090_m01) AS svl_cred_vencer_090_m01
+		,SUM(svl_cred_vencer_180_m01) AS svl_cred_vencer_180_m01
+		,SUM(svl_cred_vencer_360_m01) AS svl_cred_vencer_360_m01
+		,SUM(svl_cred_vencer_361_m01) AS svl_cred_vencer_361_m01
+		,SUM(svl_cred_vencer_ind_m01) AS svl_cred_vencer_ind_m01
+		,SUM(svl_prazo_ate_030d_m01) AS svl_prazo_ate_030d_m01
+		,SUM(svl_prazo_ate_060d_m01) AS svl_prazo_ate_060d_m01
+		,SUM(svl_prazo_ate_090d_m01) AS svl_prazo_ate_090d_m01
+		,SUM(svl_prazo_ate_180d_m01) AS svl_prazo_ate_180d_m01
+		,SUM(svl_prazo_ate_360d_m01) AS svl_prazo_ate_360d_m01
+		,SUM(svl_prazo_acm_360d_m01) AS svl_prazo_acm_360d_m01
+		,SUM(svl_prazo_indeterminado_m01) AS svl_prazo_indeterminado_m01
+		,SUM(svl_curto_prazo_m01) AS svl_curto_prazo_m01
+		,SUM(svl_longo_prazo_m01) AS svl_longo_prazo_m01
+		,SUM(svl_adian_dep_m01) AS svl_adian_dep_m01
+		,SUM(svl_empres_m01) AS svl_empres_m01
+		,SUM(svl_empres_cap_giro_m01) AS svl_empres_cap_giro_m01
+		,SUM(svl_empres_rotativos_m01) AS svl_empres_rotativos_m01
+		,SUM(svl_empres_outros_m01) AS svl_empres_outros_m01
+		,SUM(svl_dir_cred_des_m01) AS svl_dir_cred_des_m01
+		,SUM(svl_dir_cred_des_dupl_m01) AS svl_dir_cred_des_dupl_m01
+		,SUM(svl_dir_cred_des_outros_m01) AS svl_dir_cred_des_outros_m01
+		,SUM(svl_financ_m01) AS svl_financ_m01
+		,SUM(svl_financ_proj_m01) AS svl_financ_proj_m01
+		,SUM(svl_financ_veic_m01) AS svl_financ_veic_m01
+		,SUM(svl_financ_outros_m01) AS svl_financ_outros_m01
+		,SUM(svl_financ_ex_m01) AS svl_financ_ex_m01
+		,SUM(svl_financ_ex_acc_m01) AS svl_financ_ex_acc_m01
+		,SUM(svl_financ_ex_outros_m01) AS svl_financ_ex_outros_m01
+		,SUM(svl_financ_im_m01) AS svl_financ_im_m01
+		,SUM(svl_financ_interv_m01) AS svl_financ_interv_m01
+		,SUM(svl_financ_rurais_m01) AS svl_financ_rurais_m01
+		,SUM(svl_financ_imob_m01) AS svl_financ_imob_m01
+		,SUM(svl_financ_tit_m01) AS svl_financ_tit_m01
+		,SUM(svl_financ_infra_m01) AS svl_financ_infra_m01
+		,SUM(svl_oper_arren_m01) AS svl_oper_arren_m01
+		,SUM(svl_outros_cred_m01) AS svl_outros_cred_m01
+		,SUM(svl_relac_interf_m01) AS svl_relac_interf_m01
+		,SUM(svl_coobg_m01) AS svl_coobg_m01
+		,SUM(svl_tit_cred_m01) AS svl_tit_cred_m01
+		,SUM(svl_limite_m01) AS svl_limite_m01
+		,SUM(svl_total_m02) AS svl_total_m02
+		,SUM(svl_creditos_aliberar_m02) AS svl_creditos_aliberar_m02
+		,SUM(svl_creditos_avencer_m02) AS svl_creditos_avencer_m02
+		,SUM(svl_creditos_vencidos_m02) AS svl_creditos_vencidos_m02
+		,SUM(svl_prejuizo_m02) AS svl_prejuizo_m02
+		,SUM(svl_outros_creditos_m02) AS svl_outros_creditos_m02
+		,SUM(svl_cred_vencer_030_m02) AS svl_cred_vencer_030_m02
+		,SUM(svl_cred_vencer_060_m02) AS svl_cred_vencer_060_m02
+	    ,SUM(svl_cred_vencer_090_m02) AS svl_cred_vencer_090_m02
+		,SUM(svl_cred_vencer_180_m02) AS svl_cred_vencer_180_m02
+		,SUM(svl_cred_vencer_360_m02) AS svl_cred_vencer_360_m02
+		,SUM(svl_cred_vencer_361_m02) AS svl_cred_vencer_361_m02
+		,SUM(svl_cred_vencer_ind_m02) AS svl_cred_vencer_ind_m02
+		,SUM(svl_prazo_ate_030d_m02) AS svl_prazo_ate_030d_m02
+		,SUM(svl_prazo_ate_060d_m02) AS svl_prazo_ate_060d_m02
+		,SUM(svl_prazo_ate_090d_m02) AS svl_prazo_ate_090d_m02
+		,SUM(svl_prazo_ate_180d_m02) AS svl_prazo_ate_180d_m02
+		,SUM(svl_prazo_ate_360d_m02) AS svl_prazo_ate_360d_m02
+		,SUM(svl_prazo_acm_360d_m02) AS svl_prazo_acm_360d_m02
+		,SUM(svl_prazo_indeterminado_m02) AS svl_prazo_indeterminado_m02
+		,SUM(svl_curto_prazo_m02) AS svl_curto_prazo_m02
+		,SUM(svl_longo_prazo_m02) AS svl_longo_prazo_m02
+		,SUM(svl_adian_dep_m02) AS svl_adian_dep_m02
+		,SUM(svl_empres_m02) AS svl_empres_m02
+		,SUM(svl_empres_cap_giro_m02) AS svl_empres_cap_giro_m02
+		,SUM(svl_empres_rotativos_m02) AS svl_empres_rotativos_m02
+		,SUM(svl_empres_outros_m02) AS svl_empres_outros_m02
+		,SUM(svl_dir_cred_des_m02) AS svl_dir_cred_des_m02
+		,SUM(svl_dir_cred_des_dupl_m02) AS svl_dir_cred_des_dupl_m02
+		,SUM(svl_dir_cred_des_outros_m02) AS svl_dir_cred_des_outros_m02
+		,SUM(svl_financ_m02) AS svl_financ_m02
+		,SUM(svl_financ_proj_m02) AS svl_financ_proj_m02
+		,SUM(svl_financ_veic_m02) AS svl_financ_veic_m02
+		,SUM(svl_financ_outros_m02) AS svl_financ_outros_m02
+		,SUM(svl_financ_ex_m02) AS svl_financ_ex_m02
+		,SUM(svl_financ_ex_acc_m02) AS svl_financ_ex_acc_m02
+		,SUM(svl_financ_ex_outros_m02) AS svl_financ_ex_outros_m02
+		,SUM(svl_financ_im_m02) AS svl_financ_im_m02
+		,SUM(svl_financ_interv_m02) AS svl_financ_interv_m02
+		,SUM(svl_financ_rurais_m02) AS svl_financ_rurais_m02
+		,SUM(svl_financ_imob_m02) AS svl_financ_imob_m02
+		,SUM(svl_financ_tit_m02) AS svl_financ_tit_m02
+		,SUM(svl_financ_infra_m02) AS svl_financ_infra_m02
+		,SUM(svl_oper_arren_m02) AS svl_oper_arren_m02
+		,SUM(svl_outros_cred_m02) AS svl_outros_cred_m02
+		,SUM(svl_relac_interf_m02 ) AS svl_relac_interf_m02
+		,SUM(svl_coobg_m02) AS svl_coobg_m02
+		,SUM(svl_tit_cred_m02) AS svl_tit_cred_m02
+		,SUM(svl_limite_m02) AS svl_limite_m02
+		,SUM(svl_total_m03) AS svl_total_m03
+		,SUM(svl_creditos_aliberar_m03) AS svl_creditos_aliberar_m03
+		,SUM(svl_creditos_avencer_m03) AS svl_creditos_avencer_m03
+		,SUM(svl_creditos_vencidos_m03) AS svl_creditos_vencidos_m03
+		,SUM(svl_prejuizo_m03) AS svl_prejuizo_m03
+		,SUM(svl_outros_creditos_m03) AS svl_outros_creditos_m03
+		,SUM(svl_cred_vencer_030_m03) AS svl_cred_vencer_030_m03
+		,SUM(svl_cred_vencer_060_m03) AS svl_cred_vencer_060_m03
+	    ,SUM(svl_cred_vencer_090_m03) AS svl_cred_vencer_090_m03
+		,SUM(svl_cred_vencer_180_m03) AS svl_cred_vencer_180_m03
+		,SUM(svl_cred_vencer_360_m03) AS svl_cred_vencer_360_m03
+		,SUM(svl_cred_vencer_361_m03) AS svl_cred_vencer_361_m03
+		,SUM(svl_cred_vencer_ind_m03) AS svl_cred_vencer_ind_m03
+		,SUM(svl_prazo_ate_030d_m03) AS svl_prazo_ate_030d_m03
+		,SUM(svl_prazo_ate_060d_m03) AS svl_prazo_ate_060d_m03
+		,SUM(svl_prazo_ate_090d_m03) AS svl_prazo_ate_090d_m03
+		,SUM(svl_prazo_ate_180d_m03) AS svl_prazo_ate_180d_m03
+		,SUM(svl_prazo_ate_360d_m03) AS svl_prazo_ate_360d_m03
+		,SUM(svl_prazo_acm_360d_m03) AS svl_prazo_acm_360d_m03
+		,SUM(svl_prazo_indeterminado_m03) AS svl_prazo_indeterminado_m03
+		,SUM(svl_curto_prazo_m03) AS svl_curto_prazo_m03
+		,SUM(svl_longo_prazo_m03) AS svl_longo_prazo_m03
+		,SUM(svl_adian_dep_m03) AS svl_adian_dep_m03
+		,SUM(svl_empres_m03) AS svl_empres_m03
+		,SUM(svl_empres_cap_giro_m03) AS svl_empres_cap_giro_m03
+		,SUM(svl_empres_rotativos_m03) AS svl_empres_rotativos_m03
+		,SUM(svl_empres_outros_m03) AS svl_empres_outros_m03
+		,SUM(svl_dir_cred_des_m03) AS svl_dir_cred_des_m03
+		,SUM(svl_dir_cred_des_dupl_m03) AS svl_dir_cred_des_dupl_m03
+		,SUM(svl_dir_cred_des_outros_m03) AS svl_dir_cred_des_outros_m03
+		,SUM(svl_financ_m03) AS svl_financ_m03
+		,SUM(svl_financ_proj_m03) AS svl_financ_proj_m03
+		,SUM(svl_financ_veic_m03) AS svl_financ_veic_m03
+		,SUM(svl_financ_outros_m03) AS svl_financ_outros_m03
+		,SUM(svl_financ_ex_m03) AS svl_financ_ex_m03
+		,SUM(svl_financ_ex_acc_m03) AS svl_financ_ex_acc_m03
+		,SUM(svl_financ_ex_outros_m03) AS svl_financ_ex_outros_m03
+		,SUM(svl_financ_im_m03) AS svl_financ_im_m03
+		,SUM(svl_financ_interv_m03) AS svl_financ_interv_m03
+		,SUM(svl_financ_rurais_m03) AS svl_financ_rurais_m03
+		,SUM(svl_financ_imob_m03) AS svl_financ_imob_m03
+		,SUM(svl_financ_tit_m03) AS svl_financ_tit_m03
+		,SUM(svl_financ_infra_m03) AS svl_financ_infra_m03
+		,SUM(svl_oper_arren_m03) AS svl_oper_arren_m03
+		,SUM(svl_outros_cred_m03) AS svl_outros_cred_m03
+		,SUM(svl_relac_interf_m03) AS svl_relac_interf_m03
+		,SUM(svl_coobg_m03) AS svl_coobg_m03
+		,SUM(svl_tit_cred_m03) AS svl_tit_cred_m03
+		,SUM(svl_limite_m03) AS svl_limite_m03
+		,SUM(svl_total_m04) AS svl_total_m04
+		,SUM(svl_creditos_aliberar_m04) AS svl_creditos_aliberar_m04
+		,SUM(svl_creditos_avencer_m04) AS svl_creditos_avencer_m04
+		,SUM(svl_creditos_vencidos_m04) AS svl_creditos_vencidos_m04
+		,SUM(svl_prejuizo_m04) AS svl_prejuizo_m04
+		,SUM(svl_outros_creditos_m04) AS svl_outros_creditos_m04
+		,SUM(svl_cred_vencer_030_m04) AS svl_cred_vencer_030_m04
+		,SUM(svl_cred_vencer_060_m04) AS svl_cred_vencer_060_m04
+	    ,SUM(svl_cred_vencer_090_m04) AS svl_cred_vencer_090_m04
+		,SUM(svl_cred_vencer_180_m04) AS svl_cred_vencer_180_m04
+		,SUM(svl_cred_vencer_360_m04) AS svl_cred_vencer_360_m04
+		,SUM(svl_cred_vencer_361_m04) AS svl_cred_vencer_361_m04
+		,SUM(svl_cred_vencer_ind_m04) AS svl_cred_vencer_ind_m04
+		,SUM(svl_prazo_ate_030d_m04) AS svl_prazo_ate_030d_m04
+		,SUM(svl_prazo_ate_060d_m04) AS svl_prazo_ate_060d_m04
+		,SUM(svl_prazo_ate_090d_m04) AS svl_prazo_ate_090d_m04
+		,SUM(svl_prazo_ate_180d_m04) AS svl_prazo_ate_180d_m04
+		,SUM(svl_prazo_ate_360d_m04) AS svl_prazo_ate_360d_m04
+		,SUM(svl_prazo_acm_360d_m04) AS svl_prazo_acm_360d_m04
+		,SUM(svl_prazo_indeterminado_m04) AS svl_prazo_indeterminado_m04
+		,SUM(svl_curto_prazo_m04) AS svl_curto_prazo_m04
+		,SUM(svl_longo_prazo_m04) AS svl_longo_prazo_m04
+		,SUM(svl_adian_dep_m04) AS svl_adian_dep_m04
+		,SUM(svl_empres_m04) AS svl_empres_m04
+		,SUM(svl_empres_cap_giro_m04) AS svl_empres_cap_giro_m04
+		,SUM(svl_empres_rotativos_m04) AS svl_empres_rotativos_m04
+		,SUM(svl_empres_outros_m04) AS svl_empres_outros_m04
+		,SUM(svl_dir_cred_des_m04) AS svl_dir_cred_des_m04
+		,SUM(svl_dir_cred_des_dupl_m04) AS svl_dir_cred_des_dupl_m04
+		,SUM(svl_dir_cred_des_outros_m04) AS svl_dir_cred_des_outros_m04
+		,SUM(svl_financ_m04) AS svl_financ_m04
+		,SUM(svl_financ_proj_m04) AS svl_financ_proj_m04
+		,SUM(svl_financ_veic_m04) AS svl_financ_veic_m04
+		,SUM(svl_financ_outros_m04) AS svl_financ_outros_m04
+		,SUM(svl_financ_ex_m04) AS svl_financ_ex_m04
+		,SUM(svl_financ_ex_acc_m04) AS svl_financ_ex_acc_m04
+		,SUM(svl_financ_ex_outros_m04) AS svl_financ_ex_outros_m04
+		,SUM(svl_financ_im_m04) AS svl_financ_im_m04
+		,SUM(svl_financ_interv_m04) AS svl_financ_interv_m04
+		,SUM(svl_financ_rurais_m04) AS svl_financ_rurais_m04
+		,SUM(svl_financ_imob_m04) AS svl_financ_imob_m04
+		,SUM(svl_financ_tit_m04) AS svl_financ_tit_m04
+		,SUM(svl_financ_infra_m04) AS svl_financ_infra_m04
+		,SUM(svl_oper_arren_m04) AS svl_oper_arren_m04
+		,SUM(svl_outros_cred_m04) AS svl_outros_cred_m04
+		,SUM(svl_relac_interf_m04) AS svl_relac_interf_m04
+		,SUM(svl_coobg_m04) AS svl_coobg_m04
+		,SUM(svl_tit_cred_m04) AS svl_tit_cred_m04
+		,SUM(svl_limite_m04) AS svl_limite_m04
+		,SUM(svl_total_m05) AS svl_total_m05
+		,SUM(svl_creditos_aliberar_m05) AS svl_creditos_aliberar_m05
+		,SUM(svl_creditos_avencer_m05) AS svl_creditos_avencer_m05
+		,SUM(svl_creditos_vencidos_m05) AS svl_creditos_vencidos_m05
+		,SUM(svl_prejuizo_m05) AS svl_prejuizo_m05
+		,SUM(svl_outros_creditos_m05) AS svl_outros_creditos_m05
+		,SUM(svl_cred_vencer_030_m05) AS svl_cred_vencer_030_m05
+		,SUM(svl_cred_vencer_060_m05) AS svl_cred_vencer_060_m05
+	    ,SUM(svl_cred_vencer_090_m05) AS svl_cred_vencer_090_m05
+		,SUM(svl_cred_vencer_180_m05) AS svl_cred_vencer_180_m05
+		,SUM(svl_cred_vencer_360_m05) AS svl_cred_vencer_360_m05
+		,SUM(svl_cred_vencer_361_m05) AS svl_cred_vencer_361_m05
+		,SUM(svl_cred_vencer_ind_m05) AS svl_cred_vencer_ind_m05
+		,SUM(svl_prazo_ate_030d_m05) AS svl_prazo_ate_030d_m05
+		,SUM(svl_prazo_ate_060d_m05) AS svl_prazo_ate_060d_m05
+		,SUM(svl_prazo_ate_090d_m05) AS svl_prazo_ate_090d_m05
+		,SUM(svl_prazo_ate_180d_m05) AS svl_prazo_ate_180d_m05
+		,SUM(svl_prazo_ate_360d_m05) AS svl_prazo_ate_360d_m05
+		,SUM(svl_prazo_acm_360d_m05) AS svl_prazo_acm_360d_m05
+		,SUM(svl_prazo_indeterminado_m05) AS svl_prazo_indeterminado_m05
+		,SUM(svl_curto_prazo_m05) AS svl_curto_prazo_m05
+		,SUM(svl_longo_prazo_m05) AS svl_longo_prazo_m05
+		,SUM(svl_adian_dep_m05) AS svl_adian_dep_m05
+		,SUM(svl_empres_m05) AS svl_empres_m05
+		,SUM(svl_empres_cap_giro_m05) AS svl_empres_cap_giro_m05
+		,SUM(svl_empres_rotativos_m05) AS svl_empres_rotativos_m05
+		,SUM(svl_empres_outros_m05) AS svl_empres_outros_m05
+		,SUM(svl_dir_cred_des_m05) AS svl_dir_cred_des_m05
+		,SUM(svl_dir_cred_des_dupl_m05) AS svl_dir_cred_des_dupl_m05
+		,SUM(svl_dir_cred_des_outros_m05) AS svl_dir_cred_des_outros_m05
+		,SUM(svl_financ_m05) AS svl_financ_m05
+		,SUM(svl_financ_proj_m05) AS svl_financ_proj_m05
+		,SUM(svl_financ_veic_m05) AS svl_financ_veic_m05
+		,SUM(svl_financ_outros_m05) AS svl_financ_outros_m05
+		,SUM(svl_financ_ex_m05) AS svl_financ_ex_m05
+		,SUM(svl_financ_ex_acc_m05) AS svl_financ_ex_acc_m05
+		,SUM(svl_financ_ex_outros_m05) AS svl_financ_ex_outros_m05
+		,SUM(svl_financ_im_m05) AS svl_financ_im_m05
+		,SUM(svl_financ_interv_m05) AS svl_financ_interv_m05
+		,SUM(svl_financ_rurais_m05) AS svl_financ_rurais_m05
+		,SUM(svl_financ_imob_m05) AS svl_financ_imob_m05
+		,SUM(svl_financ_tit_m05) AS svl_financ_tit_m05
+		,SUM(svl_financ_infra_m05) AS svl_financ_infra_m05
+		,SUM(svl_oper_arren_m05) AS svl_oper_arren_m05
+		,SUM(svl_outros_cred_m05) AS svl_outros_cred_m05
+		,SUM(svl_relac_interf_m05) AS svl_relac_interf_m05
+		,SUM(svl_coobg_m05) AS svl_coobg_m05
+		,SUM(svl_tit_cred_m05) AS svl_tit_cred_m05
+		,SUM(svl_limite_m05) AS svl_limite_m05
+		,SUM(svl_total_m06) AS svl_total_m06
+		,SUM(svl_creditos_aliberar_m06) AS svl_creditos_aliberar_m06
+		,SUM(svl_creditos_avencer_m06) AS svl_creditos_avencer_m06
+		,SUM(svl_creditos_vencidos_m06) AS svl_creditos_vencidos_m06
+		,SUM(svl_prejuizo_m06) AS svl_prejuizo_m06
+		,SUM(svl_outros_creditos_m06) AS svl_outros_creditos_m06
+		,SUM(svl_cred_vencer_030_m06) AS svl_cred_vencer_030_m06
+		,SUM(svl_cred_vencer_060_m06) AS svl_cred_vencer_060_m06
+	    ,SUM(svl_cred_vencer_090_m06) AS svl_cred_vencer_090_m06
+		,SUM(svl_cred_vencer_180_m06) AS svl_cred_vencer_180_m06
+		,SUM(svl_cred_vencer_360_m06) AS svl_cred_vencer_360_m06
+		,SUM(svl_cred_vencer_361_m06) AS svl_cred_vencer_361_m06
+		,SUM(svl_cred_vencer_ind_m06) AS svl_cred_vencer_ind_m06
+		,SUM(svl_prazo_ate_030d_m06) AS svl_prazo_ate_030d_m06
+		,SUM(svl_prazo_ate_060d_m06) AS svl_prazo_ate_060d_m06
+		,SUM(svl_prazo_ate_090d_m06) AS svl_prazo_ate_090d_m06
+		,SUM(svl_prazo_ate_180d_m06) AS svl_prazo_ate_180d_m06
+		,SUM(svl_prazo_ate_360d_m06) AS svl_prazo_ate_360d_m06
+		,SUM(svl_prazo_acm_360d_m06) AS svl_prazo_acm_360d_m06
+		,SUM(svl_prazo_indeterminado_m06) AS svl_prazo_indeterminado_m06
+		,SUM(svl_curto_prazo_m06) AS svl_curto_prazo_m06
+		,SUM(svl_longo_prazo_m06) AS svl_longo_prazo_m06
+		,SUM(svl_adian_dep_m06) AS svl_adian_dep_m06
+		,SUM(svl_empres_m06) AS svl_empres_m06
+		,SUM(svl_empres_cap_giro_m06) AS svl_empres_cap_giro_m06
+		,SUM(svl_empres_rotativos_m06) AS svl_empres_rotativos_m06
+		,SUM(svl_empres_outros_m06) AS svl_empres_outros_m06
+		,SUM(svl_dir_cred_des_m06) AS svl_dir_cred_des_m06
+		,SUM(svl_dir_cred_des_dupl_m06) AS svl_dir_cred_des_dupl_m06
+		,SUM(svl_dir_cred_des_outros_m06) AS svl_dir_cred_des_outros_m06
+		,SUM(svl_financ_m06) AS svl_financ_m06
+		,SUM(svl_financ_proj_m06) AS svl_financ_proj_m06
+		,SUM(svl_financ_veic_m06) AS svl_financ_veic_m06
+		,SUM(svl_financ_outros_m06) AS svl_financ_outros_m06
+		,SUM(svl_financ_ex_m06) AS svl_financ_ex_m06
+		,SUM(svl_financ_ex_acc_m06) AS svl_financ_ex_acc_m06
+		,SUM(svl_financ_ex_outros_m06) AS svl_financ_ex_outros_m06
+		,SUM(svl_financ_im_m06) AS svl_financ_im_m06
+		,SUM(svl_financ_interv_m06) AS svl_financ_interv_m06
+		,SUM(svl_financ_rurais_m06) AS svl_financ_rurais_m06
+		,SUM(svl_financ_imob_m06  ) AS svl_financ_imob_m06
+		,SUM(svl_financ_tit_m06) AS svl_financ_tit_m06
+		,SUM(svl_financ_infra_m06) AS svl_financ_infra_m06
+		,SUM(svl_oper_arren_m06) AS svl_oper_arren_m06
+		,SUM(svl_outros_cred_m06) AS svl_outros_cred_m06
+		,SUM(svl_relac_interf_m06) AS svl_relac_interf_m06
+		,SUM(svl_coobg_m06) AS svl_coobg_m06
+		,SUM(svl_tit_cred_m06) AS svl_tit_cred_m06
+		,SUM(svl_limite_m06) AS svl_limite_m06
+		,SUM(svl_total_m07) AS svl_total_m07
+		,SUM(svl_creditos_aliberar_m07) AS svl_creditos_aliberar_m07
+		,SUM(svl_creditos_avencer_m07) AS svl_creditos_avencer_m07
+		,SUM(svl_creditos_vencidos_m07) AS svl_creditos_vencidos_m07
+		,SUM(svl_prejuizo_m07) AS svl_prejuizo_m07
+		,SUM(svl_outros_creditos_m07) AS svl_outros_creditos_m07
+		,SUM(svl_cred_vencer_030_m07) AS svl_cred_vencer_030_m07
+		,SUM(svl_cred_vencer_060_m07) AS svl_cred_vencer_060_m07
+	    ,SUM(svl_cred_vencer_090_m07) AS svl_cred_vencer_090_m07
+		,SUM(svl_cred_vencer_180_m07) AS svl_cred_vencer_180_m07
+		,SUM(svl_cred_vencer_360_m07) AS svl_cred_vencer_360_m07
+		,SUM(svl_cred_vencer_361_m07) AS svl_cred_vencer_361_m07
+		,SUM(svl_cred_vencer_ind_m07) AS svl_cred_vencer_ind_m07
+		,SUM(svl_prazo_ate_030d_m07) AS svl_prazo_ate_030d_m07
+		,SUM(svl_prazo_ate_060d_m07) AS svl_prazo_ate_060d_m07
+		,SUM(svl_prazo_ate_090d_m07) AS svl_prazo_ate_090d_m07
+		,SUM(svl_prazo_ate_180d_m07) AS svl_prazo_ate_180d_m07
+		,SUM(svl_prazo_ate_360d_m07) AS svl_prazo_ate_360d_m07
+		,SUM(svl_prazo_acm_360d_m07) AS svl_prazo_acm_360d_m07
+		,SUM(svl_prazo_indeterminado_m07) AS svl_prazo_indeterminado_m07
+		,SUM(svl_curto_prazo_m07) AS svl_curto_prazo_m07
+		,SUM(svl_longo_prazo_m07) AS svl_longo_prazo_m07
+		,SUM(svl_adian_dep_m07) AS svl_adian_dep_m07
+		,SUM(svl_empres_m07) AS svl_empres_m07
+		,SUM(svl_empres_cap_giro_m07) AS svl_empres_cap_giro_m07
+		,SUM(svl_empres_rotativos_m07) AS svl_empres_rotativos_m07
+		,SUM(svl_empres_outros_m07) AS svl_empres_outros_m07
+		,SUM(svl_dir_cred_des_m07) AS svl_dir_cred_des_m07
+		,SUM(svl_dir_cred_des_dupl_m07) AS svl_dir_cred_des_dupl_m07
+		,SUM(svl_dir_cred_des_outros_m07) AS svl_dir_cred_des_outros_m07
+		,SUM(svl_financ_m07) AS svl_financ_m07
+		,SUM(svl_financ_proj_m07) AS svl_financ_proj_m07
+		,SUM(svl_financ_veic_m07) AS svl_financ_veic_m07
+		,SUM(svl_financ_outros_m07) AS svl_financ_outros_m07
+		,SUM(svl_financ_ex_m07) AS svl_financ_ex_m07
+		,SUM(svl_financ_ex_acc_m07) AS svl_financ_ex_acc_m07
+		,SUM(svl_financ_ex_outros_m07) AS svl_financ_ex_outros_m07
+		,SUM(svl_financ_im_m07) AS svl_financ_im_m07
+		,SUM(svl_financ_interv_m07) AS svl_financ_interv_m07
+		,SUM(svl_financ_rurais_m07) AS svl_financ_rurais_m07
+		,SUM(svl_financ_imob_m07) AS svl_financ_imob_m07
+		,SUM(svl_financ_tit_m07) AS svl_financ_tit_m07
+		,SUM(svl_financ_infra_m07) AS svl_financ_infra_m07
+		,SUM(svl_oper_arren_m07) AS svl_oper_arren_m07
+		,SUM(svl_outros_cred_m07) AS svl_outros_cred_m07
+		,SUM(svl_relac_interf_m07) AS svl_relac_interf_m07
+		,SUM(svl_coobg_m07) AS svl_coobg_m07
+		,SUM(svl_tit_cred_m07) AS svl_tit_cred_m07
+		,SUM(svl_limite_m07) AS svl_limite_m07
+		,SUM(svl_total_m08) AS svl_total_m08
+		,SUM(svl_creditos_aliberar_m08) AS svl_creditos_aliberar_m08
+		,SUM(svl_creditos_avencer_m08) AS svl_creditos_avencer_m08
+		,SUM(svl_creditos_vencidos_m08) AS svl_creditos_vencidos_m08
+		,SUM(svl_prejuizo_m08) AS svl_prejuizo_m08
+		,SUM(svl_outros_creditos_m08) AS svl_outros_creditos_m08
+		,SUM(svl_cred_vencer_030_m08) AS svl_cred_vencer_030_m08
+		,SUM(svl_cred_vencer_060_m08) AS svl_cred_vencer_060_m08
+	    ,SUM(svl_cred_vencer_090_m08) AS svl_cred_vencer_090_m08
+		,SUM(svl_cred_vencer_180_m08) AS svl_cred_vencer_180_m08
+		,SUM(svl_cred_vencer_360_m08) AS svl_cred_vencer_360_m08
+		,SUM(svl_cred_vencer_361_m08) AS svl_cred_vencer_361_m08
+		,SUM(svl_cred_vencer_ind_m08) AS svl_cred_vencer_ind_m08
+		,SUM(svl_prazo_ate_030d_m08) AS svl_prazo_ate_030d_m08
+		,SUM(svl_prazo_ate_060d_m08) AS svl_prazo_ate_060d_m08
+		,SUM(svl_prazo_ate_090d_m08) AS svl_prazo_ate_090d_m08
+		,SUM(svl_prazo_ate_180d_m08) AS svl_prazo_ate_180d_m08
+		,SUM(svl_prazo_ate_360d_m08) AS svl_prazo_ate_360d_m08
+		,SUM(svl_prazo_acm_360d_m08) AS svl_prazo_acm_360d_m08
+		,SUM(svl_prazo_indeterminado_m08) AS svl_prazo_indeterminado_m08
+		,SUM(svl_curto_prazo_m08) AS svl_curto_prazo_m08
+		,SUM(svl_longo_prazo_m08) AS svl_longo_prazo_m08
+		,SUM(svl_adian_dep_m08) AS svl_adian_dep_m08
+		,SUM(svl_empres_m08) AS svl_empres_m08
+		,SUM(svl_empres_cap_giro_m08) AS svl_empres_cap_giro_m08
+		,SUM(svl_empres_rotativos_m08) AS svl_empres_rotativos_m08
+		,SUM(svl_empres_outros_m08) AS svl_empres_outros_m08
+		,SUM(svl_dir_cred_des_m08) AS svl_dir_cred_des_m08
+		,SUM(svl_dir_cred_des_dupl_m08) AS svl_dir_cred_des_dupl_m08
+		,SUM(svl_dir_cred_des_outros_m08) AS svl_dir_cred_des_outros_m08
+		,SUM(svl_financ_m08) AS svl_financ_m08
+		,SUM(svl_financ_proj_m08) AS svl_financ_proj_m08
+		,SUM(svl_financ_veic_m08) AS svl_financ_veic_m08
+		,SUM(svl_financ_outros_m08) AS svl_financ_outros_m08
+		,SUM(svl_financ_ex_m08) AS svl_financ_ex_m08
+		,SUM(svl_financ_ex_acc_m08) AS svl_financ_ex_acc_m08
+		,SUM(svl_financ_ex_outros_m08) AS svl_financ_ex_outros_m08
+		,SUM(svl_financ_im_m08) AS svl_financ_im_m08
+		,SUM(svl_financ_interv_m08) AS svl_financ_interv_m08
+		,SUM(svl_financ_rurais_m08) AS svl_financ_rurais_m08
+		,SUM(svl_financ_imob_m08  ) AS svl_financ_imob_m08
+		,SUM(svl_financ_tit_m08) AS svl_financ_tit_m08
+		,SUM(svl_financ_infra_m08) AS svl_financ_infra_m08
+		,SUM(svl_oper_arren_m08) AS svl_oper_arren_m08
+		,SUM(svl_outros_cred_m08) AS svl_outros_cred_m08
+		,SUM(svl_relac_interf_m08) AS svl_relac_interf_m08
+		,SUM(svl_coobg_m08) AS svl_coobg_m08
+		,SUM(svl_tit_cred_m08) AS svl_tit_cred_m08
+		,SUM(svl_limite_m08) AS svl_limite_m08
+		,SUM(svl_total_m09) AS svl_total_m09
+		,SUM(svl_creditos_aliberar_m09) AS svl_creditos_aliberar_m09
+		,SUM(svl_creditos_avencer_m09) AS svl_creditos_avencer_m09
+		,SUM(svl_creditos_vencidos_m09) AS svl_creditos_vencidos_m09
+		,SUM(svl_prejuizo_m09) AS svl_prejuizo_m09
+		,SUM(svl_outros_creditos_m09) AS svl_outros_creditos_m09
+		,SUM(svl_cred_vencer_030_m09) AS svl_cred_vencer_030_m09
+		,SUM(svl_cred_vencer_060_m09) AS svl_cred_vencer_060_m09
+	    ,SUM(svl_cred_vencer_090_m09) AS svl_cred_vencer_090_m09
+		,SUM(svl_cred_vencer_180_m09) AS svl_cred_vencer_180_m09
+		,SUM(svl_cred_vencer_360_m09) AS svl_cred_vencer_360_m09
+		,SUM(svl_cred_vencer_361_m09) AS svl_cred_vencer_361_m09
+		,SUM(svl_cred_vencer_ind_m09) AS svl_cred_vencer_ind_m09
+		,SUM(svl_prazo_ate_030d_m09) AS svl_prazo_ate_030d_m09
+		,SUM(svl_prazo_ate_060d_m09) AS svl_prazo_ate_060d_m09
+		,SUM(svl_prazo_ate_090d_m09) AS svl_prazo_ate_090d_m09
+		,SUM(svl_prazo_ate_180d_m09) AS svl_prazo_ate_180d_m09
+		,SUM(svl_prazo_ate_360d_m09) AS svl_prazo_ate_360d_m09
+		,SUM(svl_prazo_acm_360d_m09) AS svl_prazo_acm_360d_m09
+		,SUM(svl_prazo_indeterminado_m09) AS svl_prazo_indeterminado_m09
+		,SUM(svl_curto_prazo_m09) AS svl_curto_prazo_m09
+		,SUM(svl_longo_prazo_m09) AS svl_longo_prazo_m09
+		,SUM(svl_adian_dep_m09) AS svl_adian_dep_m09
+		,SUM(svl_empres_m09) AS svl_empres_m09
+		,SUM(svl_empres_cap_giro_m09) AS svl_empres_cap_giro_m09
+		,SUM(svl_empres_rotativos_m09) AS svl_empres_rotativos_m09
+		,SUM(svl_empres_outros_m09) AS svl_empres_outros_m09
+		,SUM(svl_dir_cred_des_m09) AS svl_dir_cred_des_m09
+		,SUM(svl_dir_cred_des_dupl_m09) AS svl_dir_cred_des_dupl_m09
+		,SUM(svl_dir_cred_des_outros_m09) AS svl_dir_cred_des_outros_m09
+		,SUM(svl_financ_m09) AS svl_financ_m09
+		,SUM(svl_financ_proj_m09) AS svl_financ_proj_m09
+		,SUM(svl_financ_veic_m09) AS svl_financ_veic_m09
+		,SUM(svl_financ_outros_m09) AS svl_financ_outros_m09
+		,SUM(svl_financ_ex_m09) AS svl_financ_ex_m09
+		,SUM(svl_financ_ex_acc_m09) AS svl_financ_ex_acc_m09
+		,SUM(svl_financ_ex_outros_m09) AS svl_financ_ex_outros_m09
+		,SUM(svl_financ_im_m09) AS svl_financ_im_m09
+		,SUM(svl_financ_interv_m09) AS svl_financ_interv_m09
+		,SUM(svl_financ_rurais_m09) AS svl_financ_rurais_m09
+		,SUM(svl_financ_imob_m09) AS svl_financ_imob_m09
+		,SUM(svl_financ_tit_m09) AS svl_financ_tit_m09
+		,SUM(svl_financ_infra_m09) AS svl_financ_infra_m09
+		,SUM(svl_oper_arren_m09) AS svl_oper_arren_m09
+		,SUM(svl_outros_cred_m09) AS svl_outros_cred_m09
+		,SUM(svl_relac_interf_m09) AS svl_relac_interf_m09
+		,SUM(svl_coobg_m09) AS svl_coobg_m09
+		,SUM(svl_tit_cred_m09) AS svl_tit_cred_m09
+		,SUM(svl_limite_m09) AS svl_limite_m09
+		,SUM(svl_total_m10) AS svl_total_m10
+		,SUM(svl_creditos_aliberar_m10) AS svl_creditos_aliberar_m10
+		,SUM(svl_creditos_avencer_m10) AS svl_creditos_avencer_m10
+		,SUM(svl_creditos_vencidos_m10) AS svl_creditos_vencidos_m10
+		,SUM(svl_prejuizo_m10) AS svl_prejuizo_m10
+		,SUM(svl_outros_creditos_m10) AS svl_outros_creditos_m10
+		,SUM(svl_cred_vencer_030_m10) AS svl_cred_vencer_030_m10
+		,SUM(svl_cred_vencer_060_m10) AS svl_cred_vencer_060_m10
+	    ,SUM(svl_cred_vencer_090_m10) AS svl_cred_vencer_090_m10
+		,SUM(svl_cred_vencer_180_m10) AS svl_cred_vencer_180_m10
+		,SUM(svl_cred_vencer_360_m10) AS svl_cred_vencer_360_m10
+		,SUM(svl_cred_vencer_361_m10) AS svl_cred_vencer_361_m10
+		,SUM(svl_cred_vencer_ind_m10) AS svl_cred_vencer_ind_m10
+		,SUM(svl_prazo_ate_030d_m10) AS svl_prazo_ate_030d_m10
+		,SUM(svl_prazo_ate_060d_m10) AS svl_prazo_ate_060d_m10
+		,SUM(svl_prazo_ate_090d_m10) AS svl_prazo_ate_090d_m10
+		,SUM(svl_prazo_ate_180d_m10) AS svl_prazo_ate_180d_m10
+		,SUM(svl_prazo_ate_360d_m10) AS svl_prazo_ate_360d_m10
+		,SUM(svl_prazo_acm_360d_m10) AS svl_prazo_acm_360d_m10
+		,SUM(svl_prazo_indeterminado_m10) AS svl_prazo_indeterminado_m10
+		,SUM(svl_curto_prazo_m10) AS svl_curto_prazo_m10
+		,SUM(svl_longo_prazo_m10) AS svl_longo_prazo_m10
+		,SUM(svl_adian_dep_m10) AS svl_adian_dep_m10
+		,SUM(svl_empres_m10) AS svl_empres_m10
+		,SUM(svl_empres_cap_giro_m10) AS svl_empres_cap_giro_m10
+		,SUM(svl_empres_rotativos_m10) AS svl_empres_rotativos_m10
+		,SUM(svl_empres_outros_m10) AS svl_empres_outros_m10
+		,SUM(svl_dir_cred_des_m10) AS svl_dir_cred_des_m10
+		,SUM(svl_dir_cred_des_dupl_m10) AS svl_dir_cred_des_dupl_m10
+		,SUM(svl_dir_cred_des_outros_m10) AS svl_dir_cred_des_outros_m10
+		,SUM(svl_financ_m10) AS svl_financ_m10
+		,SUM(svl_financ_proj_m10) AS svl_financ_proj_m10
+		,SUM(svl_financ_veic_m10) AS svl_financ_veic_m10
+		,SUM(svl_financ_outros_m10) AS svl_financ_outros_m10
+		,SUM(svl_financ_ex_m10) AS svl_financ_ex_m10
+		,SUM(svl_financ_ex_acc_m10) AS svl_financ_ex_acc_m10
+		,SUM(svl_financ_ex_outros_m10) AS svl_financ_ex_outros_m10
+		,SUM(svl_financ_im_m10) AS svl_financ_im_m10
+		,SUM(svl_financ_interv_m10) AS svl_financ_interv_m10
+		,SUM(svl_financ_rurais_m10) AS svl_financ_rurais_m10
+		,SUM(svl_financ_imob_m10) AS svl_financ_imob_m10
+		,SUM(svl_financ_tit_m10) AS svl_financ_tit_m10
+		,SUM(svl_financ_infra_m10) AS svl_financ_infra_m10
+		,SUM(svl_oper_arren_m10) AS svl_oper_arren_m10
+		,SUM(svl_outros_cred_m10) AS svl_outros_cred_m10
+		,SUM(svl_relac_interf_m10) AS svl_relac_interf_m10
+		,SUM(svl_coobg_m10) AS svl_coobg_m10
+		,SUM(svl_tit_cred_m10) AS svl_tit_cred_m10
+		,SUM(svl_limite_m10) AS svl_limite_m10
+		,SUM(svl_total_m11) AS svl_total_m11
+		,SUM(svl_creditos_aliberar_m11) AS svl_creditos_aliberar_m11
+		,SUM(svl_creditos_avencer_m11) AS svl_creditos_avencer_m11
+		,SUM(svl_creditos_vencidos_m11) AS svl_creditos_vencidos_m11
+		,SUM(svl_prejuizo_m11) AS svl_prejuizo_m11
+		,SUM(svl_outros_creditos_m11) AS svl_outros_creditos_m11
+		,SUM(svl_cred_vencer_030_m11) AS svl_cred_vencer_030_m11
+		,SUM(svl_cred_vencer_060_m11) AS svl_cred_vencer_060_m11
+	    ,SUM(svl_cred_vencer_090_m11) AS svl_cred_vencer_090_m11
+		,SUM(svl_cred_vencer_180_m11) AS svl_cred_vencer_180_m11
+		,SUM(svl_cred_vencer_360_m11) AS svl_cred_vencer_360_m11
+		,SUM(svl_cred_vencer_361_m11) AS svl_cred_vencer_361_m11
+		,SUM(svl_cred_vencer_ind_m11) AS svl_cred_vencer_ind_m11
+		,SUM(svl_prazo_ate_030d_m11) AS svl_prazo_ate_030d_m11
+		,SUM(svl_prazo_ate_060d_m11) AS svl_prazo_ate_060d_m11
+		,SUM(svl_prazo_ate_090d_m11) AS svl_prazo_ate_090d_m11
+		,SUM(svl_prazo_ate_180d_m11) AS svl_prazo_ate_180d_m11
+		,SUM(svl_prazo_ate_360d_m11) AS svl_prazo_ate_360d_m11
+		,SUM(svl_prazo_acm_360d_m11) AS svl_prazo_acm_360d_m11
+		,SUM(svl_prazo_indeterminado_m11) AS svl_prazo_indeterminado_m11
+		,SUM(svl_curto_prazo_m11) AS svl_curto_prazo_m11
+		,SUM(svl_longo_prazo_m11) AS svl_longo_prazo_m11
+		,SUM(svl_adian_dep_m11) AS svl_adian_dep_m11
+		,SUM(svl_empres_m11) AS svl_empres_m11
+		,SUM(svl_empres_cap_giro_m11) AS svl_empres_cap_giro_m11
+		,SUM(svl_empres_rotativos_m11) AS svl_empres_rotativos_m11
+		,SUM(svl_empres_outros_m11) AS svl_empres_outros_m11
+		,SUM(svl_dir_cred_des_m11) AS svl_dir_cred_des_m11
+		,SUM(svl_dir_cred_des_dupl_m11) AS svl_dir_cred_des_dupl_m11
+		,SUM(svl_dir_cred_des_outros_m11) AS svl_dir_cred_des_outros_m11
+		,SUM(svl_financ_m11) AS svl_financ_m11
+		,SUM(svl_financ_proj_m11) AS svl_financ_proj_m11
+		,SUM(svl_financ_veic_m11) AS svl_financ_veic_m11
+		,SUM(svl_financ_outros_m11) AS svl_financ_outros_m11
+		,SUM(svl_financ_ex_m11) AS svl_financ_ex_m11
+		,SUM(svl_financ_ex_acc_m11) AS svl_financ_ex_acc_m11
+		,SUM(svl_financ_ex_outros_m11) AS svl_financ_ex_outros_m11
+		,SUM(svl_financ_im_m11) AS svl_financ_im_m11
+		,SUM(svl_financ_interv_m11) AS svl_financ_interv_m11
+		,SUM(svl_financ_rurais_m11) AS svl_financ_rurais_m11
+		,SUM(svl_financ_imob_m11) AS svl_financ_imob_m11
+		,SUM(svl_financ_tit_m11) AS svl_financ_tit_m11
+		,SUM(svl_financ_infra_m11) AS svl_financ_infra_m11
+		,SUM(svl_oper_arren_m11) AS svl_oper_arren_m11
+		,SUM(svl_outros_cred_m11) AS svl_outros_cred_m11
+		,SUM(svl_relac_interf_m11) AS svl_relac_interf_m11
+		,SUM(svl_coobg_m11) AS svl_coobg_m11
+		,SUM(svl_tit_cred_m11) AS svl_tit_cred_m11
+		,SUM(svl_limite_m11) AS svl_limite_m11
+		,SUM(svl_total_m12) AS svl_total_m12
+		,SUM(svl_creditos_aliberar_m12) AS svl_creditos_aliberar_m12
+		,SUM(svl_creditos_avencer_m12) AS svl_creditos_avencer_m12
+		,SUM(svl_creditos_vencidos_m12) AS svl_creditos_vencidos_m12
+		,SUM(svl_prejuizo_m12) AS svl_prejuizo_m12
+		,SUM(svl_outros_creditos_m12) AS svl_outros_creditos_m12
+		,SUM(svl_cred_vencer_030_m12) AS svl_cred_vencer_030_m12
+		,SUM(svl_cred_vencer_060_m12) AS svl_cred_vencer_060_m12
+	    ,SUM(svl_cred_vencer_090_m12) AS svl_cred_vencer_090_m12
+		,SUM(svl_cred_vencer_180_m12) AS svl_cred_vencer_180_m12
+		,SUM(svl_cred_vencer_360_m12) AS svl_cred_vencer_360_m12
+		,SUM(svl_cred_vencer_361_m12) AS svl_cred_vencer_361_m12
+		,SUM(svl_cred_vencer_ind_m12) AS svl_cred_vencer_ind_m12
+		,SUM(svl_prazo_ate_030d_m12) AS svl_prazo_ate_030d_m12
+		,SUM(svl_prazo_ate_060d_m12) AS svl_prazo_ate_060d_m12
+		,SUM(svl_prazo_ate_090d_m12) AS svl_prazo_ate_090d_m12
+		,SUM(svl_prazo_ate_180d_m12) AS svl_prazo_ate_180d_m12
+		,SUM(svl_prazo_ate_360d_m12) AS svl_prazo_ate_360d_m12
+		,SUM(svl_prazo_acm_360d_m12) AS svl_prazo_acm_360d_m12
+		,SUM(svl_prazo_indeterminado_m12) AS svl_prazo_indeterminado_m12
+		,SUM(svl_curto_prazo_m12) AS svl_curto_prazo_m12
+		,SUM(svl_longo_prazo_m12) AS svl_longo_prazo_m12
+		,SUM(svl_adian_dep_m12) AS svl_adian_dep_m12
+		,SUM(svl_empres_m12) AS svl_empres_m12
+		,SUM(svl_empres_cap_giro_m12) AS svl_empres_cap_giro_m12
+		,SUM(svl_empres_rotativos_m12) AS svl_empres_rotativos_m12
+		,SUM(svl_empres_outros_m12) AS svl_empres_outros_m12
+		,SUM(svl_dir_cred_des_m12) AS svl_dir_cred_des_m12
+		,SUM(svl_dir_cred_des_dupl_m12) AS svl_dir_cred_des_dupl_m12
+		,SUM(svl_dir_cred_des_outros_m12) AS svl_dir_cred_des_outros_m12
+		,SUM(svl_financ_m12) AS svl_financ_m12
+		,SUM(svl_financ_proj_m12) AS svl_financ_proj_m12
+		,SUM(svl_financ_veic_m12) AS svl_financ_veic_m12
+		,SUM(svl_financ_outros_m12) AS svl_financ_outros_m12
+		,SUM(svl_financ_ex_m12) AS svl_financ_ex_m12
+		,SUM(svl_financ_ex_acc_m12) AS svl_financ_ex_acc_m12
+		,SUM(svl_financ_ex_outros_m12) AS svl_financ_ex_outros_m12
+		,SUM(svl_financ_im_m12) AS svl_financ_im_m12
+		,SUM(svl_financ_interv_m12) AS svl_financ_interv_m12
+		,SUM(svl_financ_rurais_m12) AS svl_financ_rurais_m12
+		,SUM(svl_financ_imob_m12) AS svl_financ_imob_m12
+		,SUM(svl_financ_tit_m12) AS svl_financ_tit_m12
+		,SUM(svl_financ_infra_m12) AS svl_financ_infra_m12
+		,SUM(svl_oper_arren_m12) AS svl_oper_arren_m12
+		,SUM(svl_outros_cred_m12) AS svl_outros_cred_m12
+		,SUM(svl_relac_interf_m12) AS svl_relac_interf_m12
+		,SUM(svl_coobg_m12) AS svl_coobg_m12
+		,SUM(svl_tit_cred_m12) AS svl_tit_cred_m12
+		,SUM(svl_limite_m12) AS svl_limite_m12
+
+	FROM SCR
+
+	GROUP BY 1
+
+; QUIT;
+
+PROC SQL;
+
+	CREATE TABLE CARTEIRA_BRUTA_SCR AS SELECT
+
+		 A.*
+		,B.*
+
+	FROM CARTEIRA_BRUTA AS A
+
+	LEFT JOIN SCRSUM AS B
+
+	ON A.CdGrupoEconomico = B.NumeroGrupo
+
+; QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. SCR */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CARTEIRA_BRUTA_SCR
+    OUTFILE='N:\DCCR\File Server Grupos Econômicos\Gestão de Portfólio\3. Indicadores\1. Esteiras\CarteiraSCR.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,489 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__TRATAMENTO_PROJURISv2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:11 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -456
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 361
+CODE_TASKS_COUNT: 9
+DETECTED_PROCS: EXPORT, FREQ, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SYSSCPL, _SASSERVERNAME
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BD_FLAG, WORK.VOL_CONTRATACAO, WORK.VOL_CONTRATADO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\Controles_Qualidade\Qualidade\21.AUDITORIAS\05. Selfs\1. Contratação de Assessoria\2.Dashboard\BD_CONTROLE.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.BD_CONTROLE <- N:\DVMD\Cobrança\Controles_Qualidade\Qualidade\21.AUDITORIAS\05. Selfs\1. Contratação de Assessoria\2.Dashboard\BD_CONTROLE.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BD_CONTROLE, WORK.BD_FLAG, WORK.FILTER_FOR_BD_CONTROLE, WORK.FILTER_FOR_BD_CONTROLE_0000, WORK.FILTER_FOR_BD_CONTROLE_0001, WORK.SORT, WORK.VOL_CONTRATACAO, WORK.VOL_CONTRATADO
+TABLE_READ_PROVENANCE (Flow): WORK.BD_CONTROLE [PROC SQL - FROM], WORK.BD_FLAG [PROC SQL - FROM], WORK.FILTER_FOR_BD_CONTROLE [PROC SQL - FROM], WORK.FILTER_FOR_BD_CONTROLE_0000 [PROC SQL - FROM], WORK.FILTER_FOR_BD_CONTROLE_0001 [PROC SQL - FROM], WORK.SORT [PROC FREQ - DATA=], WORK.VOL_CONTRATACAO [PROC SQL - JOIN], WORK.VOL_CONTRATADO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DVMD\Cobrança\Controles_Qualidade\Qualidade\21.AUDITORIAS\05. Selfs\1. Contratação de Assessoria\2.Dashboard\BD_DASH\VOL_FINAL.csv
+TEMP/DISCARDED OUTPUTS: BD_FLAG, VOL_CONTRATACAO, VOL_CONTRATADO, VOL_FINAL, VOL_JUR, VOL_SINTETICO1, WORK.FILTER_FOR_BD_CONTROLE, WORK.FILTER_FOR_BD_CONTROLE_0000, WORK.FILTER_FOR_BD_CONTROLE_0001, WORK.SORT, WORK.VOL_SINTETICO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.BD_CONTROLE;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\Controles_Qualidade\Qualidade\21.AUDITORIAS\05. Selfs\1. Contratação de Assessoria\2.Dashboard\BD_CONTROLE.csv|N:/DVMD/COBRANÇA/CONTROLES_QUALIDADE/QUALIDADE/21.AUDITORIAS/05. SELFS/1. CONTRATAÇÃO DE ASSESSORIA/2.DASHBOARD|BD_CONTROLE.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-lDtcaYveg7nRjIc6/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE BD_FLAG AS
+
+SELECT *,
+
+CASE
+WHEN 'DATA DA SUBSTITUIÇÃO'N IS NULL AND 'SUB-MOTIVO'N IN ('COBRANÇA VEXATÓRIA', 'AUSÊNCIA/DEMORA NA BAIXA DO PROTESTO/PROTESTO INDEVIDO') THEN '1 - Não Distribuido Para Cob.'
+WHEN 'Advogado Substituto'N IN ('Leticia Noguchi (ela/dela)' ) AND 'SUB-MOTIVO'N IN ('COBRANÇA VEXATÓRIA', 'AUSÊNCIA/DEMORA NA BAIXA DO PROTESTO/PROTESTO INDEVIDO') THEN '2 - Enviado Para Contratação'
+WHEN 'Advogado Subtituído'N IN ('Leticia Noguchi (ela/dela)') AND 'SUB-MOTIVO'N IN ('COBRANÇA VEXATÓRIA', 'AUSÊNCIA/DEMORA NA BAIXA DO PROTESTO/PROTESTO INDEVIDO') THEN '3 - Escritório Contratado'
+ELSE 'Fora do Escopo' END AS FLAG_SITUACAO
+
+FROM WORK.BD_CONTROLE
+WHERE 'SUB-MOTIVO'N IN ('COBRANÇA VEXATÓRIA', 'AUSÊNCIA/DEMORA NA BAIXA DO PROTESTO/PROTESTO INDEVIDO')
+ORDER BY PASTA
+
+;RUN;
+
+PROC SQL;
+
+CREATE TABLE VOL_JUR AS
+
+SELECT * FROM WORK.BD_FLAG
+
+WHERE FLAG_SITUACAO IN ('1 - Não Distribuido Para Cob.')
+
+;RUN;
+
+PROC SQL;
+
+CREATE TABLE VOL_CONTRATACAO AS
+
+SELECT * FROM WORK.BD_FLAG
+
+WHERE FLAG_SITUACAO IN ('2 - Enviado Para Contratação');
+RUN;
+
+PROC SQL;
+
+CREATE TABLE VOL_CONTRATADO AS
+
+SELECT * FROM WORK.BD_FLAG
+
+WHERE FLAG_SITUACAO IN ('3 - Escritório Contratado')
+
+;RUN;
+
+PROC SQL;
+
+CREATE TABLE VOL_SINTETICO1 AS
+
+SELECT DISTINCT A.PASTA,
+B.'Data da substituição'N AS DT_ENVIO_COB,
+C.'Data da substituição'N AS DT_CONTRATACAO,
+A.'SUB-MOTIVO'N AS SUBMOTIVO,
+
+CASE
+WHEN B.'Data da substituição'N IS NOT NULL AND C.'Data da substituição'N IS NOT NULL THEN '3.ESCRITÓRIO CONTRATADO'
+WHEN B.'Data da substituição'N IS NOT NULL AND C.'Data da substituição'N IS NULL THEN '2.AGUARDANDO CONTRATAÇÃO'
+WHEN B.'Data da substituição'N IS NULL AND C.'Data da substituição'N IS NULL THEN '1.AGUARDANDO ENVIO DO JURÍDICO'
+ELSE 'NULL' END AS FLAG_SITUACAO
+
+FROM WORK.BD_FLAG AS A
+LEFT JOIN WORK.VOL_CONTRATACAO AS B
+ON A.PASTA = B.PASTA
+
+LEFT JOIN WORK.VOL_CONTRATADO AS C
+ON A.PASTA = C.PASTA
+
+;RUN;
+
+DATA WORK.VOL_SINTETICO;
+SET VOL_SINTETICO1;
+
+IF MONTH(DT_ENVIO_COB) < 10 THEN SAFRA_ENVIO = COMPRESS(YEAR(DT_ENVIO_COB) || '0' || MONTH(DT_ENVIO_COB));
+ELSE SAFRA_ENVIO = COMPRESS(YEAR(DT_ENVIO_COB) || MONTH(DT_ENVIO_COB));
+
+IF MONTH(DT_CONTRATACAO) < 10 THEN SAFRA_CONTRATACAO = COMPRESS(YEAR(DT_CONTRATACAO) || '0' || MONTH(DT_CONTRATACAO));
+ELSE SAFRA_CONTRATACAO = COMPRESS(YEAR(DT_CONTRATACAO) || MONTH(DT_CONTRATACAO));
+
+SLA_CONTRATACAO = DATDIF(DT_ENVIO_COB,DT_CONTRATACAO,'ACT/ACT');
+SLA_A_CONTRATAR = DATDIF(DT_ENVIO_COB,TODAY(),'ACT/ACT');
+
+;RUN;
+
+PROC SQL;
+
+CREATE TABLE VOL_FINAL AS
+
+SELECT *,
+
+CASE
+WHEN DT_ENVIO_COB IS NOT NULL AND DT_CONTRATACAO IS NOT NULL AND SLA_CONTRATACAO BETWEEN 0 AND 3 THEN '4.CONTRATADO | NO PRAZO'
+WHEN DT_ENVIO_COB IS NOT NULL AND DT_CONTRATACAO IS NOT NULL AND SLA_CONTRATACAO >= 4 THEN '5.CONTRATADO | FORA PRAZO'
+WHEN DT_ENVIO_COB IS NOT NULL AND DT_CONTRATACAO IS NULL AND TODAY() - DT_ENVIO_COB < 4 THEN '2.A CONTRATAR | NO PRAZO'
+WHEN DT_ENVIO_COB IS NOT NULL AND DT_CONTRATACAO IS NULL AND TODAY() - DT_ENVIO_COB >= 4 THEN '3.A CONTRATAR | FORA DO PRAZO'
+WHEN DT_ENVIO_COB IS NULL AND DT_CONTRATACAO IS NULL THEN '1.AGUARDANDO JURÍDICO'
+ELSE 'NULL' END AS FLAG_RESULTADO_SLA
+
+FROM VOL_SINTETICO
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_BD_CONTROLE_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_BD_CONTROLE_0000 AS
+   SELECT t1.'Adverso Principal'n,
+          t1.'Advogado Principal do Cliente'n,
+          t1.'Data de cadastro'n,
+          t1.'Data de Início'n,
+          t1.'Data Fato Gerador'n,
+          t1.'Documento Autor'n,
+          t1.Motivo,
+          t1.'Motivo Encerramento'n,
+          t1.Natureza,
+          t1.'Natureza Unidade'n,
+          t1.Pasta,
+          t1.'Produto (Outros)'n,
+          t1.'Serial Import'n,
+          t1.Status,
+          t1.'Sub-Motivo'n,
+          t1.'Tipo de Ação'n,
+          t1.'Advogado Substituto'n,
+          t1.'Advogado Subtituído'n,
+          t1.'Cadastrado Por'n,
+          t1.'Data da substituição'n,
+          t1.'Número do Contrato'n
+      FROM WORK.BD_CONTROLE t1
+      WHERE t1.'Sub-Motivo'n IN
+           (
+           'COBRANÇA VEXATÓRIA',
+           'AUSÊNCIA/DEMORA NA BAIXA DO PROTESTO/PROTESTO INDEVIDO'
+           );
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+CREATE TABLE VOL_SINTETICO1 AS
+
+SELECT DISTINCT A.PASTA,
+B.'Data da substituição'N AS DT_ENVIO_COB,
+C.'Data da substituição'N AS DT_CONTRATACAO,
+A.'SUB-MOTIVO'N AS SUBMOTIVO,
+
+CASE
+WHEN B.'Data da substituição'N IS NOT NULL AND C.'Data da substituição'N IS NOT NULL THEN '3.ESCRITÓRIO CONTRATADO'
+WHEN B.'Data da substituição'N IS NOT NULL AND C.'Data da substituição'N IS NULL THEN '2.AGUARDANDO CONTRATAÇÃO'
+WHEN B.'Data da substituição'N IS NULL AND C.'Data da substituição'N IS NULL THEN '1.AGUARDANDO ENVIO DO JURÍDICO'
+ELSE 'NULL' END AS FLAG_SITUACAO
+
+FROM WORK.BD_FLAG AS A
+LEFT JOIN WORK.VOL_CONTRATACAO AS B
+ON A.PASTA = B.PASTA
+
+LEFT JOIN WORK.VOL_CONTRATADO AS C
+ON A.PASTA = C.PASTA
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_BD_CONTROLE);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_BD_CONTROLE AS
+   SELECT t1.'Adverso Principal'n,
+          t1.'Advogado Principal do Cliente'n,
+          t1.'Data de cadastro'n,
+          t1.'Data de Início'n,
+          t1.'Data Fato Gerador'n,
+          t1.'Documento Autor'n,
+          t1.Motivo,
+          t1.'Motivo Encerramento'n,
+          t1.Natureza,
+          t1.'Natureza Unidade'n,
+          t1.Pasta,
+          t1.'Produto (Outros)'n,
+          t1.'Serial Import'n,
+          t1.Status,
+          t1.'Sub-Motivo'n,
+          t1.'Tipo de Ação'n,
+          t1.'Advogado Substituto'n,
+          t1.'Advogado Subtituído'n,
+          t1.'Cadastrado Por'n,
+          t1.'Data da substituição'n,
+          t1.'Número do Contrato'n
+      FROM WORK.BD_CONTROLE t1
+      WHERE t1.'Sub-Motivo'n IN
+           (
+           'AUSÊNCIA / DEMORA NA REABILITAÇÃO DO AUTOR NOS ÓRGÃOS DE PROTEÇÃO AO CRÉDI',
+           'COBRANÇA VEXATÓRIA'
+           );
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.SORT);
+
+
+PROC SQL;
+	CREATE VIEW WORK.SORT AS
+		SELECT T."Data de cadastro"n
+	FROM WORK.FILTER_FOR_BD_CONTROLE as T
+;
+QUIT;
+
+TITLE;
+TITLE1 "One-Way Frequencies";
+TITLE2 "Results";
+FOOTNOTE;
+FOOTNOTE1 "Generated by the SAS System (&_SASSERVERNAME, &SYSSCPL) on %TRIM(%QSYSFUNC(DATE(), NLDATE20.)) at %TRIM(%SYSFUNC(TIME(), TIMEAMPM12.))";
+PROC FREQ DATA=WORK.SORT
+	ORDER=INTERNAL
+;
+	TABLES "Data de cadastro"n /  SCORES=TABLE;
+RUN;
+
+RUN; QUIT;
+%_eg_conditional_dropds(WORK.SORT);
+TITLE; FOOTNOTE;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.SORT);
+
+
+PROC SQL;
+	CREATE VIEW WORK.SORT AS
+		SELECT T."Advogado Substituto"n, T."Advogado Subtituído"n
+	FROM WORK.FILTER_FOR_BD_CONTROLE_0000 as T
+;
+QUIT;
+
+TITLE;
+TITLE1 "One-Way Frequencies";
+TITLE2 "Results";
+FOOTNOTE;
+FOOTNOTE1 "Generated by the SAS System (&_SASSERVERNAME, &SYSSCPL) on %TRIM(%QSYSFUNC(DATE(), NLDATE20.)) at %TRIM(%SYSFUNC(TIME(), TIMEAMPM12.))";
+PROC FREQ DATA=WORK.SORT
+	ORDER=INTERNAL
+;
+	TABLES "Advogado Substituto"n /  SCORES=TABLE;
+	TABLES "Advogado Subtituído"n /  SCORES=TABLE;
+RUN;
+
+RUN; QUIT;
+%_eg_conditional_dropds(WORK.SORT);
+TITLE; FOOTNOTE;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_BD_CONTROLE_0001);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_BD_CONTROLE_0001 AS
+   SELECT t1.'Adverso Principal'n,
+          t1.'Advogado Principal do Cliente'n,
+          t1.'Data de cadastro'n,
+          t1.'Data de Início'n,
+          t1.'Data Fato Gerador'n,
+          t1.'Documento Autor'n,
+          t1.Motivo,
+          t1.'Motivo Encerramento'n,
+          t1.Natureza,
+          t1.'Natureza Unidade'n,
+          t1.Pasta,
+          t1.'Produto (Outros)'n,
+          t1.'Serial Import'n,
+          t1.Status,
+          t1.'Sub-Motivo'n,
+          t1.'Tipo de Ação'n,
+          t1.'Advogado Substituto'n,
+          t1.'Advogado Subtituído'n,
+          t1.'Cadastrado Por'n,
+          t1.'Data da substituição'n,
+          t1.'Número do Contrato'n
+      FROM WORK.FILTER_FOR_BD_CONTROLE_0000 t1
+      WHERE t1.'Data da substituição'n > '1Aug2025'd;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.SORT);
+
+
+PROC SQL;
+	CREATE VIEW WORK.SORT AS
+		SELECT T."Advogado Substituto"n, T."Advogado Subtituído"n
+	FROM WORK.FILTER_FOR_BD_CONTROLE_0001 as T
+;
+QUIT;
+
+TITLE;
+TITLE1 "One-Way Frequencies";
+TITLE2 "Results";
+FOOTNOTE;
+FOOTNOTE1 "Generated by the SAS System (&_SASSERVERNAME, &SYSSCPL) on %TRIM(%QSYSFUNC(DATE(), NLDATE20.)) at %TRIM(%SYSFUNC(TIME(), TIMEAMPM12.))";
+PROC FREQ DATA=WORK.SORT
+	ORDER=INTERNAL
+;
+	TABLES "Advogado Substituto"n /  SCORES=TABLE;
+	TABLES "Advogado Subtituído"n /  SCORES=TABLE;
+RUN;
+
+RUN; QUIT;
+%_eg_conditional_dropds(WORK.SORT);
+TITLE; FOOTNOTE;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.VOL_FINAL
+    OUTFILE='N:\DVMD\Cobrança\Controles_Qualidade\Qualidade\21.AUDITORIAS\05. Selfs\1. Contratação de Assessoria\2.Dashboard\BD_DASH\VOL_FINAL.csv'
+    DBMS=csv REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */

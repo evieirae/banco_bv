@@ -1,0 +1,192 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Privado
+FILE_SAS: 15 - Gera tabela de parcelas Paketa.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -15
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 124
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISV = /projetos/MISV/data/bases; TEMP = /projetos/MISV/data/bases/tmp; TEMPW = &swork; TRIBO = /riscosbv/consignado
+DETECTED_MACROS_DEFINED: TIMESTAMP, TIMESTAMPDATA, TIMESTAMPHORA, database, database_fim, database_fim_lead, database_ini, database_ini_lead, databse, dir_csv
+DETECTED_MACROS_USED: dir_csv, swork
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], CPC.TBCONTRATOFINANCEIRO [DBCON], CPC.TBPARCELA [DBCON], DBA.TBPARCEIROCOMERCIAL [DBCON], DBA.TBPESSOA [DBCON], DBA.TBPROPOSTA [DBCON], TEMPW.CTRS_CANCELADOS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: TEMPW
+EXPORTED_LIBNAMES: TEMPW
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): CPC.TBCONTRATOFINANCEIRO [Pass-Through Native (DBCON) - JOIN], CPC.TBPARCELA [Pass-Through Native (DBCON) - FROM], DBA.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOA [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], TEMPW.CTRS_CANCELADOS [PROC SQL - JOIN], TEMPW.TB_PARCELAS_PAKETA [PROC SQL - FROM], TEMPW.TB_PARCELAS_PAKETA_2 [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): TEMPW.TB_PARCELAS_PAKETA, TEMPW.TB_PARCELAS_PAKETA_2
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TEMPW.CTRS_CANCELADOS, TEMPW.TB_PARCELAS_PAKETA, TEMPW.TB_PARCELAS_PAKETA_2
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TEMPW.TB_PARCELAS_PAKETA, TEMPW.TB_PARCELAS_PAKETA_2
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./Privado_PARCELAS_PAKETA.csv
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	15 - Gera tabela de parcelas Paketa.sas														| */
+/* | Descricao: Programa para gerar tabela de parcelas Paketa.					| */
+/* | Objetivo: 	Dash Consignado Privado					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+libname tribo "/riscosbv/consignado";
+libname misv "/projetos/MISV/data/bases";
+libname temp "/projetos/MISV/data/bases/tmp";
+libname tempw "&swork";
+
+%let database = '2021/01/01';
+%let database_ini = '2022/01/01';
+%let database_fim = '2023/06/30';
+%let database_ini_lead = '2023/05/30';
+%let database_fim_lead = '2023/06/01';
+%let databse = %sysfunc(date(),ddmmyy10.);
+OPTIONS COMPRESS=BINARY;
+%LET TIMESTAMP = %SYSFUNC(DATE(),ddmmyy10.);
+%LET TIMESTAMPDATA = %SYSFUNC(date(),YYMMDDN8.);
+%LET TIMESTAMPHORA = %sysfunc(TIME(),hour4.);
+
+/* ======================================================================================*/
+/* =====================Gera tabela de parcelas Paketa=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+%CONECTADB(server=PTA);
+
+  CREATE TABLE tempw.Tb_Parcelas_Paketa AS
+	SELECT *
+	FROM CONNECTION TO DBCON
+
+			(
+
+		SELECT
+		year(parc.dtvencimento)*100+month(parc.dtvencimento) AS anomes_vencimento,
+         Pessoa.NmPessoa,
+         Parceirocom.NmFantasia,
+         parc.NuContrato,
+         parc.SqContratoFinanceiro,
+         parc.NuParcela,
+         parc.VrPrincipal,
+         parc.VrJuros,
+         parc.VrParcela,
+         parc.StParcela,
+         cast(parc.DtVencimento as date) as DtVencimento,
+         parc.VrParcelaIndice,
+         parc.VrTarifaCobranca,
+         cast(parc.DtUltimoRecebimento as date) as DtUltimoRecebimento,
+         parc.VrUltRecebimento,
+         parc.VrResidual,
+         parc.VrResidualIndice,
+         parc.VrIss,
+         parc.VrPis,
+         cast(parc.DtProcessamentoUltRecebimento as date) as DtProcessamentoUltRecebimento,
+         cast(parc.DtInclusao as date) as DtInclusao,
+         cast(parc.DtAlteracao as date) as DtAlteracao,
+         parc.CdColaborador,
+         parc.TsReplicacao,
+         parc.VrJuroPagoParcela,
+         parc.VrJuroNaoPagoParcela,
+		 CTTFIN.CdTipoCobranca
+
+		FROM CPC.TbParcela parc
+/**************RETIRADO MAX SQ CONTRATOFINANCEIRO A PEDIDO DA CLAUDIA LAGE****************/
+
+/*			INNER JOIN */
+/*				(select nucontrato, MAX(SqContratoFinanceiro) as mxsqcontrato from CPC.TbParcela GROUP BY nucontrato) parc2*/
+/*				on parc.nucontrato = parc2.nucontrato */
+/*				and parc.SqContratoFinanceiro = parc2.mxsqcontrato*/
+
+/*******************************************************************************************************************/
+			INNER JOIN DBA.TbProposta Proposta ON parc.nucontrato = Proposta.nucontratogestao
+/*			INNER JOIN CPC.TbContrato ON Proposta.nucontratogestao = TbContrato.nucontrato AND TbContrato.CdSituacaoContrato = 1*/
+				LEFT JOIN DBA.TbParceiroComercial Parceiropessoa ON Parceiropessoa.CdParceiroComercial = Proposta.CdPessoa
+				LEFT JOIN DBA.TbParceiroComercial Parceirocom ON Parceirocom.CdParceiroComercial = Proposta.cdloja
+				LEFT JOIN DBA.TbPessoa Pessoa ON Pessoa.CdPessoa = Parceiropessoa.CdPessoa
+				LEFT JOIN CPC.TbContratoFinanceiro CTTFIN
+				ON CTTFIN.NUCONTRATO = Proposta.NUCONTRATOGESTAO AND CTTFIN.SqContratoFinanceiro = parc.SqContratoFinanceiro
+					WHERE Proposta.cdsubproduto = 12 AND
+						proposta.cdpessoa in (466420,465612) AND
+						/*month(parc.dtvencimento) = 5 AND */
+						year(parc.dtvencimento) >= 2024
+);
+RUN;
+
+proc sql;
+create table tempw.Tb_Parcelas_Paketa_2 as
+Select
+year(Parcelas.dtvencimento)*100+month(Parcelas.dtvencimento) AS anomes_vencimento,
+         Parcelas.NmPessoa,
+         Parcelas.NmFantasia,
+         Parcelas.NuContrato,
+         Parcelas.SqContratoFinanceiro,
+		 Parcelas.CdTipoCobranca,
+         Parcelas.NuParcela,
+         Parcelas.VrPrincipal format=commax12.2,
+         Parcelas.VrJuros format=commax12.2,
+         Parcelas.VrParcela format=commax12.2,
+         Parcelas.StParcela,
+         Parcelas.DtVencimento,
+         Parcelas.VrParcelaIndice format=commax12.2,
+         Parcelas.VrTarifaCobranca format=commax12.2,
+         Parcelas.DtUltimoRecebimento,
+         Parcelas.VrUltRecebimento format=commax12.2,
+         Parcelas.VrResidual format=commax12.2,
+         Parcelas.VrResidualIndice format=commax12.2,
+         Parcelas.VrIss format=commax12.2,
+         Parcelas.VrPis format=commax12.2,
+         Parcelas.DtProcessamentoUltRecebimento,
+         Parcelas.DtInclusao,
+         Parcelas.DtAlteracao,
+         Parcelas.CdColaborador,
+         Parcelas.TsReplicacao,
+         Parcelas.VrJuroPagoParcela format=commax12.2,
+         Parcelas.VrJuroNaoPagoParcela format=commax12.2,
+		 Case When Cancel.Contrato_Cancelado = 1 Then 'Sim' Else 'Não' End as Contrato_Cancelado
+
+from tempw.Tb_Parcelas_Paketa as Parcelas
+	 Left Join tempw.Ctrs_Cancelados as Cancel On Parcelas.NuContrato = Cancel.nucontratogestao
+
+;RUN;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+	DATA= tempw.Tb_Parcelas_Paketa_2
+	FILE="&dir_csv./Privado_PARCELAS_PAKETA.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

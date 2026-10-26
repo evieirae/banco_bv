@@ -1,0 +1,886 @@
+START_METADATA
+PROJECT: Rodas__visibilidade-potencial
+FILE_SAS: gera-visibilidade-potencial.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 778
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAt, DtAtApnp, DtAtSimu, M13, safraM12, safraM13
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], AUXL.TBCANALPARCEIROCOMERCIALCART [SAS/Local], BASEGRC.TBMETANAOISONOMICA [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], CONVPROP.BASEAPNP [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], DWBI_DTWH.TBAGENTEMIS [DBCON], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbpotencialrodas.sas7bdat
+TABLE_READ_PROVENANCE (Flow): AUXL.TBCANALPARCEIROCOMERCIALCART [PROC SQL - JOIN], BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], CONVPROP.BASEAPNP [PROC SQL - FROM], CONVSIMU.TBSIMULACOES [DATA Step - SET], DWBI_DTWH.TBAGENTEMIS [Pass-Through Native (DBCON) - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/convsimu/tbsimulacoes.sas7bdat, /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbpotencialrodas.sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.CONVERSAOMENSAGERIA, SOLITMP.TBVISIBILIDADEPOTENCIAL
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEAPNP, BASECONVPROPOSTA, BASECONVPROPOSTAMENSAGERIA, BASESIMULACOES, BASESIMULACOESMENSAGERIA, CONVERSAOMENSAGERIA, CONVERSAOTOTAL, CONVERSAO_01, CONVERSAO_02, CONVERSAO_SIMULACAO_V2, GRAVAMESBV, NMPARC, PARCEIROCOMERCIAL_POT, POTENCIALRODAS, TBAGENTE, TBCOLABORADORPDV, TBENCARTEIRAMENTONI, TBSIMULACOES, TBSIMULACOES_00, UF, VISIBILIDADEBV, VISIBILIDADEBV01, VISIBILIDADEBV_001, VISIBILIDADEBV_002, VISIBILIDADEBV_FINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (sas: 1, sas7bdat: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/convsimu/tbsimulacoes.sas7bdat
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/data/bases/tmp/tbpotencialrodas.sas7bdat
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Criacao:	09/02/2026													| */
+/* |	Responsavel: 	GUstavo Domingues - MIS IGE										| */
+/* |	Alt. Realizada:	- Reorganizado a ordem dos processsamentos para otimizar| */
+/* ====================================================================================== */
+
+%include '/infogrc/utils/all-includes.sas';
+
+/* Data máxima potencial rodas */
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tbpotencialrodas.sas7bdat,300,150);
+
+PROC SQL;
+  SELECT MAX(DtAtualizacaoCetip) INTO :DtAt FROM TMP.TBPOTENCIALRODAS;
+RUN;
+
+/* Busca base de mercado */
+PROC SQL;
+%CONECTADB(server = BI);
+CREATE TABLE TbAgente AS SELECT * FROM connection to dbcon (
+  SELECT CAST(trim(lpad(NuCnpjAgente,14,0)) AS CHAR) AS CnpjAgente, * FROM DWBI_DTWH.TbAgenteMIS
+  WHERE NuCnpjAgente <> 0
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE PotencialRodas AS
+  SELECT
+    POT.NuAnoMes AS Safra,
+    POT.NmGrupoProduto AS Produto,
+    POT.CdParceiroComercial,
+    CASE WHEN POT.FxIdade IS NULL THEN 'Desconhecido' WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+    COALESCE(POT.FxIdade,'Desconhecido') AS FxIdade,
+    CASE WHEN POT.CdParceiroComercial <> . THEN 'S' ELSE 'N' END AS FlCadastroBV,
+    COALESCE(POT.CdUF,'Desconhecido') AS CdUF,
+    COALESCE(POT.NmSubEstruturaComercialC,'Desconhecido') AS Regional,
+    COALESCE(POT.NmAreaEstruturaComercialC,'Desconhecido') AS Filial,
+    COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+    COALESCE(POT.FlPorteA,'Desconhecido') AS Porte,
+    CASE WHEN POT.QtBancos = . THEN 'Desconhecido'
+         WHEN POT.QtBancos >= 5 THEN '5 +'
+         ELSE PUT(POT.QtBancos,1.)
+    END AS QtBancos,
+    CASE WHEN POT.RankingCliente = . THEN 'Desconhecido'
+         WHEN POT.RankingCliente >= 3 THEN '3 +'
+         ELSE PUT(POT.RankingCliente,1.)
+    END AS Ranking,
+    COALESCE(CPC.DsTipoCanalProducao, 'Desconhecido') AS Canal,
+    COALESCE(POT.DsClassificacaoA,'Sem Classificação') AS Classificacao,
+    COALESCE(SUM(POT.QtGravamesMercado),0) AS Mercado
+  FROM
+    TMP.TbPotencialRodas POT
+  LEFT JOIN AUXL.TBCANALPARCEIROCOMERCIALCART CPC
+    ON CPC.CdParceiroComercial = POT.CdParceiroComercial
+  WHERE
+    NuAnoMes >= &safraM13.
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;
+RUN;
+
+/* Busca dados do Parceiro Comercial */
+PROC SQL;
+CREATE TABLE ParceiroComercial_POT AS
+  SELECT DISTINCT
+    POT.NuAnoMes,
+    POT.NmGrupoProduto AS Produto,
+    POT.CdParceiroComercial,
+    CASE WHEN POT.CdParceiroComercial <> . THEN 'S' ELSE 'N' END AS FlCadastroBV,
+    COALESCE(POT.NmAreaEstruturaComercialC,'Desconhecido') AS Filial,
+    COALESCE(POT.NmSubEstruturaComercialC,'Desconhecido') AS Regional,
+    COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+    COALESCE(POT.FlPorteA,'Desconhecido') AS Porte,
+    COALESCE(POT.DsClassificacaoA,'Sem Classificação') AS Classificacao,
+    CASE WHEN POT.QtBancos = . THEN 'Desconhecido'
+         WHEN POT.QtBancos >= 5 THEN '5 +'
+         ELSE PUT(POT.QtBancos,1.)
+    END AS QtBancos,
+    CASE WHEN POT.RankingCliente = . THEN 'Desconhecido'
+         WHEN POT.RankingCliente >= 3 THEN '3 +'
+         ELSE PUT(POT.RankingCliente,1.)
+    END AS Ranking,
+    COALESCE(CPC.DsTipoCanalProducao, 'Desconhecido') AS Canal
+  FROM
+    TMP.TbPotencialRodas POT
+  LEFT JOIN AUXL.TBCANALPARCEIROCOMERCIALCART CPC
+    ON CPC.CdParceiroComercial = POT.CdParceiroComercial
+  WHERE
+    POT.NuAnoMes >= &safraM13.
+    AND POT.CdParceiroComercial <> .;
+RUN;
+
+PROC SORT DATA=ParceiroComercial_POT NODUPKEY;
+BY NuAnoMes CdParceiroComercial Produto;
+RUN;
+
+/* Gera base de gravames BV */
+PROC SQL;
+CREATE TABLE GravamesBV AS
+  SELECT
+    POT.NuAnoMes AS Safra,
+    POT.NmGrupoProduto AS Produto,
+    POT.CdParceiroComercial,
+    CASE WHEN POT.FxIdade IS NULL THEN 'Desconhecido' WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+    COALESCE(POT.FxIdade,'Desconhecido') AS FxIdade,
+    CASE WHEN POT.CdParceiroComercial <> . THEN 'S' ELSE 'N' END AS FlCadastroBV,
+    COALESCE(POT.CdUF,'Desconhecido') AS CdUF,
+    COALESCE(POT.NmSubEstruturaComercialC,'Desconhecido') AS Regional,
+    COALESCE(POT.NmAreaEstruturaComercialC,'Desconhecido') AS Filial,
+    COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+    COALESCE(POT.FlPorteA,'Desconhecido') AS Porte,
+    COALESCE(POT.DsClassificacaoA,'Sem Classificação') AS Classificacao,
+    CASE WHEN POT.QtBancos = . THEN 'Desconhecido'
+         WHEN POT.QtBancos >= 5 THEN '5 +'
+         ELSE PUT(POT.QtBancos,1.)
+    END AS QtBancos,
+    CASE WHEN POT.RankingCliente = . THEN 'Desconhecido'
+         WHEN POT.RankingCliente >= 3 THEN '3 +'
+         ELSE PUT(POT.RankingCliente,1.)
+    END AS Ranking,
+    COALESCE(CPC.DsTipoCanalProducao, 'Desconhecido') AS Canal,
+    SUM(POT.QtContrato) AS ContratoBV
+  FROM
+    TMP.TbPotencialRodas POT
+  LEFT JOIN AUXL.TBCANALPARCEIROCOMERCIALCART CPC
+    ON CPC.CdParceiroComercial = POT.CdParceiroComercial
+  WHERE
+    POT.NuAnoMes >= &safraM13.
+    AND POT.FlAtualizacaoMercado = 1
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+  HAVING SUM(POT.QtContrato) > 0;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASEAPNP AS
+  SELECT
+    *,
+	CASE WHEN Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+							 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+              AND Mensageria2 NOT IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              THEN 'P'
+         WHEN Mensageria in ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              OR (Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+								 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+                  AND Mensageria2 IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')) THEN 'R'
+		WHEN Mensageria IN ('7. Plano Aprovado') THEN 'PA'
+		WHEN Mensageria IN ('6. Plano Recusado') THEN 'PR'
+         ELSE 'D'
+    END AS MensageriaGrupo
+  FROM CONVPROP.BASEAPNP
+/*	FROM BaseApnp_tmp*/
+  WHERE DtRetornoCetip >= "&M13."d
+    AND ProdutoAjuste IN ('Motos','Leves','Pesados')
+    AND Banco <> 'NÃO CONVERTIDO'
+    AND FlPropostaValida = 1
+    AND DtRetornoCetip < &DtAt.;
+RUN;
+
+/* Busca UF para bases de Simulação */
+PROC SQL;
+  CREATE TABLE UF AS
+    SELECT DISTINCT CdParceiroComercial, NmParceiroComercial, CdUf FROM BASES.TBPARCEIROCOMERCIAL;
+RUN;
+
+PROC SQL;
+  CREATE TABLE BaseConvProposta AS
+    SELECT
+      COALESCE(((YEAR(APNP.DtRetornoCetip) * 100) + MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada) AS Safra,
+      APNP.ProdutoAjuste AS Produto,
+      APNP.CdParceiroComercial,
+      COALESCE(POT.FlCadastroBV, 'N') AS FlCadastroBV,
+      COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+      COALESCE(POT.Porte,'Desconhecido') AS Porte,
+      COALESCE(POT.Classificacao,'Sem Classificação') AS Classificacao,
+      COALESCE(POT.Filial,'Desconhecido') AS Filial,
+      CASE WHEN APNP.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(APNP.FxIdade, 'Desconhecido') AS FxIdade,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      COALESCE(POT.Regional,'Desconhecido') AS Regional,
+      COALESCE(POT.QtBancos,'Desconhecido') AS QtBancos,
+      COALESCE(POT.Ranking,'Desconhecido') AS Ranking,
+      COALESCE(POT.Canal,'Desconhecido') AS Canal,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' AND MensageriaGrupo IN ('PA','P') THEN QtdPropostas END),0) AS NegadaP,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' AND MensageriaGrupo IN ('PR','R') THEN QtdPropostas END),0) AS NegadaR,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' AND MensageriaGrupo = 'D' THEN QtdPropostas END),0) AS NegadaD,
+
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' AND MensageriaGrupo IN ('PA','P') THEN QtdPropostas END),0) AS CanceladaP,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' AND MensageriaGrupo IN ('PR','R') THEN QtdPropostas END),0) AS CanceladaR,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' AND MensageriaGrupo = 'D' THEN QtdPropostas END),0) AS CanceladaD,
+
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' AND MensageriaGrupo IN ('PA','P') THEN QtdPropostas END),0) AS APNPP,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' AND MensageriaGrupo IN ('PR','R') THEN QtdPropostas END),0) AS APNPR,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' AND MensageriaGrupo = 'D' THEN QtdPropostas END),0) AS APNPD,
+
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' AND MensageriaGrupo IN ('PA','P') AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS NegadaPPgtoloja,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' AND MensageriaGrupo IN ('PR','R') AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS NegadaRPgtoloja,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Negada' AND MensageriaGrupo = 'D' AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS NegadaDPgtoloja,
+
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' AND MensageriaGrupo IN ('PA','P') AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS CanceladaPPgtoloja,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' AND MensageriaGrupo IN ('PR','R') AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS CanceladaRPgtoloja,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'Cancelada' AND MensageriaGrupo = 'D' AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS CanceladaDPgtoloja,
+
+	  COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' AND MensageriaGrupo IN ('PA','P') AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS APNPPPgtoloja,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' AND MensageriaGrupo IN ('PR','R') AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS APNPRPgtoloja,
+      COALESCE(SUM(CASE WHEN APNP.StatusProposta = 'APNP' AND MensageriaGrupo = 'D' AND APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS APNPDPgtoloja
+    FROM BASEAPNP APNP
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = APNP.CdParceiroComercial
+    LEFT JOIN ParceiroComercial_POT POT
+      ON POT.CdParceiroComercial = APNP.CdParceiroComercial
+     AND POT.NuAnoMes = COALESCE(((YEAR(APNP.DtRetornoCetip) * 100) + MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada)
+     AND POT.Produto = APNP.ProdutoAjuste
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;
+RUN;
+
+/* Corta TbSimulacoes */
+
+%VerificaAtualizacao(/infogrc/convsimu/tbsimulacoes.sas7bdat,300,150);
+
+data TBSIMULACOES_00 (Keep=NuAnoMes ProdutoGrupo FlSimuValida Banco DtInclusaoGravame CdParceiroComercial
+						   StatusSimulacao DtSimulacaoInicial Mensageria Mensageria2 FxEntradaMinima Regional
+							Filial FxIdade EntradaMinima DtAtualizacao NuCpfCnpj StPagoLoja);
+    set Convsimu.tbsimulacoes (where=(NuAnoMes >= &safraM12.))
+;run;
+
+data TBSIMULACOES ;
+    set TBSIMULACOES_00 (where=(ProdutoGrupo in ('Leves','Motos','Pesados')
+    							AND FlSimuValida = 1
+								AND Banco NOT IN ('N/A','BV')))
+;run;
+
+/* Gera dados para a base de mês fechado*/
+PROC SQL;
+CREATE TABLE CONVERSAO_SIMULACAO_V2 AS
+  SELECT
+    *,
+    CASE WHEN FxIdade = 'Acima 10 anos' THEN 'Acima de 10 anos' ELSE FxIdade END AS FxIdadeAjuste,
+
+	CASE WHEN Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+							 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+              AND Mensageria2 NOT IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              THEN 'P'
+         WHEN Mensageria in ('3. Recusado', '4. Recusado Reversível','6. Recusado')
+              OR (Mensageria IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+								 '0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+                  AND Mensageria2 IN ('3. Recusado', '4. Recusado Reversível','6. Recusado')) THEN 'R'
+		WHEN Mensageria IN ('7. Plano Aprovado') THEN 'PA'
+		WHEN Mensageria IN ('6. Plano Recusado') THEN 'PR'
+         ELSE 'D'
+    END AS MensageriaGrupo,
+
+    CASE WHEN EntradaMinima in ('00% a 4,99%','05% a 9,99%')   THEN 'MÍNIMA ATÉ 10%'
+         WHEN EntradaMinima in ('10% a 14,99%','15% a 19,99%') THEN 'MÍNIMA ATÉ 20%'
+	 WHEN EntradaMinima in ('20% a 24,99%','25% a 29,99%') THEN 'MÍNIMA ATÉ 30%'
+         WHEN EntradaMinima in ('30% a 34,99%','35% a 39,99%') THEN 'MÍNIMA ATÉ 40%'
+	 WHEN EntradaMinima in ('40% a 44,99%','45% a 49,99%','50% a 54,99%','55% a 59,99%','60% a 64,99%','65% a 69,99%',
+                                '70% a 74,99%','75% a 79,99%','80% a 84,99%','85% a 89,99%','90% a 94,99%','95% a 99,99%') THEN 'MÍNIMA ATÉ 50%'
+	      ELSE 'Desconhecido' END AS FxEntradaMinima
+  FROM TBSIMULACOES
+
+;RUN;
+
+PROC SQL;
+  CREATE TABLE BaseSimulacoes AS
+    SELECT
+      (YEAR(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))*100) + MONTH(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial)) AS Safra,
+      SMU.ProdutoGrupo AS Produto,
+      SMU.CdParceiroComercial,
+      COALESCE(POT.FlCadastroBV, 'N') AS FlCadastroBV,
+      COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+      COALESCE(POT.Porte,'Desconhecido') AS Porte,
+      COALESCE(POT.Classificacao,'Sem Classificação') AS Classificacao,
+      COALESCE(POT.Filial,'Desconhecido') AS Filial,
+      CASE WHEN FxIdadeAjuste = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(FxIdadeAjuste,'Desconhecido') AS FxIdade,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      COALESCE(POT.Regional,'Desconhecido') AS Regional,
+      COALESCE(POT.QtBancos,'Desconhecido') AS QtBancos,
+      COALESCE(POT.Ranking,'Desconhecido') AS Ranking,
+      COALESCE(POT.Canal,'Desconhecido') AS Canal,
+      MAX(DtAtualizacao) AS DtAtualizacao,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada','Simulação sem card') THEN NuCpfCnpj END),0) AS Card,
+	  COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Simulação sem card') THEN NuCpfCnpj END),0) AS SemCard,
+	  COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'P' THEN NuCpfCnpj END),0) AS CardP,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'R' THEN NuCpfCnpj END),0) AS CardR,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'D' THEN NuCpfCnpj END),0) AS CardD,
+	   	COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'PA' THEN NuCpfCnpj END),0) AS CardPA,
+		COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'PR' THEN NuCpfCnpj END),0) AS CardPR,
+
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'P' AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS CardPPgtoloja,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'R' AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS CardRPgtoloja,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'D' AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS CardDPgtoloja,
+      	COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'PA' AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS CardPAPgtoloja,
+		COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada') AND MensageriaGrupo = 'PR' AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS CardPRPgtoloja,
+
+	  COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Simulação sem card')  AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS SemCardPgtoLoja
+    FROM CONVERSAO_SIMULACAO_V2 SMU
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = SMU.CdParceiroComercial
+    LEFT JOIN ParceiroComercial_POT POT
+      ON POT.CdParceiroComercial = SMU.CdParceiroComercial
+     AND POT.NuAnoMes = SMU.NuAnoMes
+     AND POT.Produto = SMU.ProdutoGrupo
+    WHERE
+      UF.NmParceiroComercial NOT LIKE 'SIMULADOR%'
+      AND SMU.DtInclusaoGravame < &DtAt.
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+    HAVING(calculated card > 0);
+RUN;
+
+PROC SQL;
+CREATE TABLE Conversao_01 AS
+  SELECT * FROM BaseConvProposta
+  OUTER UNION CORRESPONDING
+  SELECT * FROM GravamesBV;
+RUN;
+
+PROC SQL;
+CREATE TABLE Conversao_02 AS
+  SELECT
+    Safra,
+    Produto,
+    CdParceiroComercial,
+    FlCadastroBV,
+    FlAtivo,
+    Porte,
+    Classificacao,
+    Filial,
+    StatusVeiculo,
+    FxIdade,
+    CdUF,
+    Regional,
+    QtBancos,
+    Ranking,
+    Canal,
+    SUM(ContratoBV) AS ContratoBV,
+    SUM(NegadaP) AS NegadaP,
+    SUM(NegadaR) AS NegadaR,
+    SUM(NegadaD) AS NegadaD,
+    SUM(CanceladaP) AS CanceladaP,
+    SUM(CanceladaR) AS CanceladaR,
+    SUM(CanceladaD) AS CanceladaD,
+    SUM(APNPP) AS APNPP,
+    SUM(APNPR) AS APNPR,
+    SUM(APNPD) AS APNPD,
+    SUM(NegadaPPgtoloja) AS NegadaPPgtoloja,
+    SUM(NegadaRPgtoloja) AS NegadaRPgtoloja,
+    SUM(NegadaDPgtoloja) AS NegadaDPgtoloja,
+    SUM(CanceladaPPgtoloja) AS CanceladaPPgtoloja,
+    SUM(CanceladaRPgtoloja) AS CanceladaRPgtoloja,
+    SUM(CanceladaDPgtoloja) AS CanceladaDPgtoloja,
+    SUM(APNPPPgtoloja) AS APNPPPgtoloja,
+    SUM(APNPRPgtoloja) AS APNPRPgtoloja,
+    SUM(APNPDPgtoloja) AS APNPDPgtoloja
+  FROM Conversao_01
+  GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;
+RUN;
+
+PROC SQL;
+  CREATE TABLE ConversaoTotal AS
+    SELECT
+      COALESCE(A.Safra,B.Safra) AS Safra,
+      COALESCE(A.Produto,B.Produto) AS Produto,
+      COALESCE(A.CdParceiroComercial,B.CdParceiroComercial) AS CdParceiroComercial,
+      COALESCE(A.FlCadastroBV,B.FlCadastroBV) AS FlCadastroBV,
+      COALESCE(A.FlAtivo,B.FlAtivo) AS FlAtivo,
+      COALESCE(A.Porte,B.Porte) AS Porte,
+      COALESCE(A.Classificacao,B.Classificacao) AS Classificacao,
+      COALESCE(A.CdUF,B.CdUF) AS CdUF,
+      COALESCE(A.Regional,B.Regional) AS Regional,
+      COALESCE(A.Filial,B.Filial) AS Filial,
+      COALESCE(A.StatusVeiculo,B.StatusVeiculo) AS StatusVeiculo,
+      COALESCE(A.FxIdade,B.FxIdade) AS FxIdade,
+      COALESCE(A.QtBancos,B.QtBancos) AS QtBancos,
+      COALESCE(A.Ranking,B.Ranking) AS Ranking,
+      COALESCE(A.Canal,B.Canal) AS Canal,
+      SUM(COALESCE(A.ContratoBV,0)) AS ContratoBV,
+      SUM(COALESCE(A.NegadaP,0)) AS NegadaP,
+      SUM(COALESCE(A.NegadaR,0)) AS NegadaR,
+      SUM(COALESCE(A.NegadaD,0)) AS NegadaD,
+      SUM(COALESCE(A.CanceladaP,0)) AS CanceladaP,
+      SUM(COALESCE(A.CanceladaR,0)) AS CanceladaR,
+      SUM(COALESCE(A.CanceladaD,0)) AS CanceladaD,
+      SUM(COALESCE(A.APNPP,0)) AS APNPP,
+      SUM(COALESCE(A.APNPR,0)) AS APNPR,
+      SUM(COALESCE(A.APNPD,0)) AS APNPD,
+      SUM(COALESCE(B.CardP,0)) AS CardP,
+      SUM(COALESCE(B.CardR,0)) AS CardR,
+      SUM(COALESCE(B.CardD,0)) AS CardD,
+	        SUM(COALESCE(B.CardPA,0)) AS CardPA,
+			SUM(COALESCE(B.CardPR,0)) AS CardPR,
+      SUM(COALESCE(A.NegadaPPgtoLoja,0)) AS NegadaPPgtoLoja,
+      SUM(COALESCE(A.NegadaRPgtoLoja,0)) AS NegadaRPgtoLoja,
+      SUM(COALESCE(A.NegadaDPgtoLoja,0)) AS NegadaDPgtoLoja,
+      SUM(COALESCE(A.CanceladaPPgtoLoja,0)) AS CanceladaPPgtoLoja,
+      SUM(COALESCE(A.CanceladaRPgtoLoja,0)) AS CanceladaRPgtoLoja,
+      SUM(COALESCE(A.CanceladaDPgtoLoja,0)) AS CanceladaDPgtoLoja,
+      SUM(COALESCE(A.APNPPPgtoLoja,0)) AS APNPPPgtoLoja,
+      SUM(COALESCE(A.APNPRPgtoLoja,0)) AS APNPRPgtoLoja,
+      SUM(COALESCE(A.APNPDPgtoLoja,0)) AS APNPDPgtoLoja,
+      SUM(COALESCE(B.CardPPgtoLoja,0)) AS CardPPgtoLoja,
+      SUM(COALESCE(B.CardRPgtoLoja,0)) AS CardRPgtoLoja,
+      SUM(COALESCE(B.CardDPgtoLoja,0)) AS CardDPgtoLoja,
+	        SUM(COALESCE(B.CardPAPgtoLoja,0)) AS CardPAPgtoLoja,
+			SUM(COALESCE(B.CardPRPgtoLoja,0)) AS CardPRPgtoLoja,
+	  SUM(COALESCE(B.SemCard,0)) AS SemCard,
+	  SUM(COALESCE(B.SemCardPgtoLoja,0)) AS SemCardPgtoLoja
+    FROM Conversao_02 A
+    FULL OUTER JOIN BaseSimulacoes B
+      ON A.Safra = B.Safra
+     AND A.Produto = B.Produto
+     AND A.CdParceiroComercial = B.CdParceiroComercial
+     AND A.FlCadastroBV = B.FlCadastroBV
+     AND A.FlAtivo = B.FlAtivo
+     AND A.Porte = B.Porte
+     AND A.Classificacao = B.Classificacao
+     AND A.CdUF = B.CdUF
+     AND A.Regional = B.Regional
+     AND A.Filial = B.Filial
+     AND A.StatusVeiculo = B.StatusVeiculo
+     AND A.FxIdade = B.FxIdade
+     AND A.QtBancos = B.QtBancos
+     AND A.Ranking = B.Ranking
+     AND A.Canal = B.Canal
+   GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;
+RUN;
+
+PROC SQL;
+  CREATE TABLE VisibilidadeBV_001 AS
+    SELECT
+      COALESCE(B.Safra,A.Safra) AS Safra,
+      COALESCE(B.Produto,A.Produto) AS Produto,
+      COALESCE(B.CdParceiroComercial,A.CdParceiroComercial) AS CdParceiroComercial,
+      COALESCE(B.FlCadastroBV,A.FlCadastroBV) AS FlCadastroBV,
+      COALESCE(B.FlAtivo,A.FlAtivo) AS FlAtivo,
+      COALESCE(B.Porte,A.Porte) AS Porte,
+      COALESCE(B.Classificacao,A.Classificacao) AS Classificacao,
+      COALESCE(B.CdUF,A.CdUF) AS CdUF,
+      COALESCE(B.Regional,A.Regional) AS Regional,
+      COALESCE(B.Filial,A.Filial) AS Filial,
+      COALESCE(B.StatusVeiculo,A.StatusVeiculo) AS StatusVeiculo,
+      COALESCE(B.FxIdade,A.FxIdade) AS FxIdade,
+      COALESCE(B.QtBancos,A.QtBancos) AS QtBancos,
+      COALESCE(B.Ranking,A.Ranking) AS Ranking,
+      COALESCE(B.Canal,A.Canal) AS Canal,
+      COALESCE(SUM(B.Mercado),0) - COALESCE(SUM(A.ContratoBV
+                                                + A.NegadaP + A.NegadaR + A.NegadaD
+                                                + A.CanceladaP + A.CanceladaR + A.CanceladaD
+                                                + A.APNPP + A.APNPR + A.APNPD
+                                                + A.CardP + A.CardR + A.CardD + A.CardPA + A.CardPR
+												+ A.SemCard),0) AS NaoPassouBV,
+      SUM(COALESCE(A.ContratoBV,0)) AS ContratoBV,
+      SUM(COALESCE(A.NegadaP,0)) AS NegadaP,
+      SUM(COALESCE(A.NegadaR,0)) AS NegadaR,
+      SUM(COALESCE(A.NegadaD,0)) AS NegadaD,
+      SUM(COALESCE(A.CanceladaP,0)) AS CanceladaP,
+      SUM(COALESCE(A.CanceladaR,0)) AS CanceladaR,
+      SUM(COALESCE(A.CanceladaD,0)) AS CanceladaD,
+      SUM(COALESCE(A.APNPP,0)) AS APNPP,
+      SUM(COALESCE(A.APNPR,0)) AS APNPR,
+      SUM(COALESCE(A.APNPD,0)) AS APNPD,
+      SUM(COALESCE(A.CardP,0)) AS CardP,
+      SUM(COALESCE(A.CardR,0)) AS CardR,
+      SUM(COALESCE(A.CardD,0)) AS CardD,
+	        SUM(COALESCE(A.CardPA,0)) AS CardPA,
+			SUM(COALESCE(A.CardPR,0)) AS CardPR,
+      COALESCE(SUM(B.Mercado),0) - COALESCE(SUM(A.ContratoBV
+                                                + A.NegadaPPgtoLoja + A.NegadaRPgtoLoja + A.NegadaDPgtoLoja
+                                                + A.CanceladaPPgtoLoja + A.CanceladaRPgtoLoja + A.CanceladaDPgtoLoja
+                                                + A.APNPPPgtoLoja + A.APNPRPgtoLoja + A.APNPDPgtoLoja + A.APNPDPgtoLoja
+                                                + A.CardPPgtoLoja + A.CardRPgtoLoja + A.CardDPgtoLoja + A.CardPAPgtoLoja + A.CardPRPgtoLoja
+												+ A.SemCardPgtoLoja),0) AS NaoPassouBVPgtoLoja,
+      SUM(COALESCE(A.NegadaPPgtoLoja,0)) AS NegadaPPgtoLoja,
+      SUM(COALESCE(A.NegadaRPgtoLoja,0)) AS NegadaRPgtoLoja,
+      SUM(COALESCE(A.NegadaDPgtoLoja,0)) AS NegadaDPgtoLoja,
+      SUM(COALESCE(A.CanceladaPPgtoLoja,0)) AS CanceladaPPgtoLoja,
+      SUM(COALESCE(A.CanceladaRPgtoLoja,0)) AS CanceladaRPgtoLoja,
+      SUM(COALESCE(A.CanceladaDPgtoLoja,0)) AS CanceladaDPgtoLoja,
+      SUM(COALESCE(A.APNPPPgtoLoja,0)) AS APNPPPgtoLoja,
+      SUM(COALESCE(A.APNPRPgtoLoja,0)) AS APNPRPgtoLoja,
+      SUM(COALESCE(A.APNPDPgtoLoja,0)) AS APNPDPgtoLoja,
+      SUM(COALESCE(A.CardPPgtoLoja,0)) AS CardPPgtoLoja,
+      SUM(COALESCE(A.CardRPgtoLoja,0)) AS CardRPgtoLoja,
+      SUM(COALESCE(A.CardDPgtoLoja,0)) AS CardDPgtoLoja,
+	        SUM(COALESCE(A.CardPAPgtoLoja,0)) AS CardPAPgtoLoja,
+			SUM(COALESCE(A.CardPAPgtoLoja,0)) AS CardPRPgtoLoja,
+	  SUM(COALESCE(A.SemCard,0)) AS SemCard,
+	  SUM(COALESCE(A.SemCardPgtoLoja,0)) AS SemCardPgtoLoja
+    FROM PotencialRodas B
+    FULL OUTER JOIN ConversaoTotal A
+      ON A.Safra = B.Safra
+     AND A.Produto = B.Produto
+     AND A.CdParceiroComercial = B.CdParceiroComercial
+     AND A.FlCadastroBV = B.FlCadastroBV
+     AND A.FlAtivo = B.FlAtivo
+     AND A.Porte = B.Porte
+     AND A.Classificacao = B.Classificacao
+     AND A.CdUF = B.CdUF
+     AND A.Regional = B.Regional
+     AND A.Filial = B.Filial
+     AND A.StatusVeiculo = B.StatusVeiculo
+     AND A.FxIdade = B.FxIdade
+     AND A.QtBancos = B.QtBancos
+     AND A.Ranking = B.Ranking
+     AND A.Canal = B.Canal
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+    ORDER BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;
+RUN;
+
+PROC TRANSPOSE DATA=VisibilidadeBV_001 OUT=VisibilidadeBV_002 NAME=Status PREFIX=Quantidade;
+  BY Safra
+     Produto
+     CdParceiroComercial
+     FlCadastroBV
+     FlAtivo
+     Porte
+     Classificacao
+     CdUF
+     Regional
+     Filial
+     StatusVeiculo
+     FxIdade
+     QtBancos
+     Ranking
+     Canal;
+ VAR NaoPassouBV
+     ContratoBV
+     NegadaP
+     NegadaR
+     NegadaD
+	 CanceladaP
+     CanceladaR
+     CanceladaD
+	 APNPP
+     APNPR
+     APNPD
+	 CardP
+     CardR
+     CardD
+	 CardPA
+	 CardPR
+     NaoPassouBVPgtoLoja
+     NegadaPPgtoLoja
+     NegadaRPgtoLoja
+     NegadaDPgtoLoja
+	 CanceladaPPgtoLoja
+     CanceladaRPgtoLoja
+     CanceladaDPgtoLoja
+	 APNPPPgtoLoja
+     APNPRPgtoLoja
+     APNPDPgtoLoja
+	 CardPPgtoLoja
+     CardRPgtoLoja
+     CardDPgtoLoja
+	 CardPAPgtoLoja
+	 CardPRPgtoLoja
+	 SemCard
+	 SemCardPgtoLoja;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbColaboradorPDV AS
+  SELECT DISTINCT
+    CdColaboradorC AS CdColaborador,
+    NmColaboradorC,
+    CdParceiroComercial,
+    (STRIP(PUT(CdParceiroComercial,8.)) || ' - ' || NmParceiroComercial) AS NmParceiroComercial,
+    NmTipoParceiroComercial AS TpParceiroComercial
+  FROM BASES.TbParceiroComercial
+  WHERE
+    CdParceiroComercial <> .
+    AND CdColaboradorC <> .;
+RUN;
+
+PROC SQL;
+CREATE TABLE NMPARC AS
+  SELECT
+    A.DsLoginN1 AS CdGR,
+    TRANSTRN(TRANSTRN(TRANSTRN(PROPCASE(A.NmColaborador), " Da ", " da "), " De ", " de "), " Dos ", " dos ") AS NmColaborador,
+    A.DsLoginN2A AS CdGF,
+    A.DsLoginN3A,
+    A.DsLoginN4A,
+    B.CdParceiroComercial,
+    B.NmParceiroComercial,
+    B.TpParceiroComercial
+  FROM
+    BASES.TbEstruturaComercial A
+  RIGHT JOIN
+    TbColaboradorPDV B
+    ON A.CdColaboradorAtivo = B.CdColaborador
+    AND TODAY() BETWEEN A.DtInicioVigencia AND A.DtFimVigencia
+  ORDER BY B.CdParceiroComercial, B.NmParceiroComercial DESC;
+RUN;
+
+PROC SORT DATA=NMPARC NODUPKEY;
+BY CdParceiroComercial;
+RUN;
+
+PROC SQL; CREATE INDEX CdParceiroComercial ON VisibilidadeBV_002; QUIT;
+PROC SQL; CREATE INDEX CdParceiroComercial ON NMPARC; QUIT;
+
+/* Gera encarteiramento - inclusão feita em 24/01/2025 por Flávio Pereira */
+
+PROC SQL;
+CREATE TABLE TbEncarteiramentoNI AS
+  SELECT DISTINCT
+    NI.NuAnoMes,
+	NI.DsLoginN1,
+	NI.CdParceiroComercial,
+	NI.Produto,
+	Parc.NuCnpjLoja
+  FROM
+    BASEGRC.TbMetaNaoisonomica as NI
+	Left Join tmp.tbParceiroComercial as Parc On Ni.CdParceiroComercial = Parc.CdParceiroComercial
+  WHERE
+    NI.DsLoginN1 IS NOT NULL
+	AND NI.CdParceiroComercial <> 414921
+;RUN;
+
+PROC SQL; CREATE INDEX NuAnoMes ON TbEncarteiramentoNI; QUIT;
+PROC SQL; CREATE INDEX CdParceiroComercial ON TbEncarteiramentoNI; QUIT;
+PROC SQL; CREATE INDEX Produto ON TbEncarteiramentoNI; QUIT;
+
+PROC SQL; CREATE INDEX Safra ON VisibilidadeBV_002; QUIT;
+PROC SQL; CREATE INDEX Produto ON VisibilidadeBV_002; QUIT;
+
+PROC SQL;
+CREATE TABLE VisibilidadeBV01 AS
+  SELECT
+    A.Safra,
+    A.Produto,
+    A.CdParceiroComercial,
+    B.NmParceiroComercial,
+    B.TpParceiroComercial,
+    B.NmColaborador,
+    B.CdGR,
+    B.CdGF,
+    B.DsLoginN3A,
+    B.DsLoginN4A,
+    C.CdParceiroComercial AS CdParceiroComercialC,/*inclusão feita em 24/01/2025 por Flávio Pereira*/
+    C.DsLoginN1,/*inclusão feita em 24/01/2025 por Flávio Pereira*/
+    A.FlCadastroBV,
+    A.FlAtivo,
+    A.Porte,
+    A.Classificacao,
+    A.CdUF,
+    A.Regional,
+    A.Filial,
+    A.StatusVeiculo,
+    A.FxIdade,
+    A.QtBancos,
+    A.Ranking,
+    A.Canal,
+    TRANSTRN(A.Status,'PgtoLoja',TRIMN('')) AS Status,
+    SUM(CASE WHEN A.Status NOT LIKE '%PgtoLoja' THEN A.Quantidade1 END) AS Quantidade,
+    SUM(CASE WHEN A.Status LIKE '%PgtoLoja' OR A.Status = 'ContratoBV' THEN A.Quantidade1 END) AS QuantidadePgtoLoja
+  FROM VisibilidadeBV_002 A
+  LEFT JOIN NmParc B
+    ON A.CdParceiroComercial = B.CdParceiroComercial
+  LEFT JOIN TbEncarteiramentoNI C
+	on C.CdParceiroComercial =  A.CdParceiroComercial AND
+		C.NuAnoMes = A.Safra AND
+		C.Produto = A.Produto
+  GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25;
+RUN;
+
+/* Gera Flag encarteiramento - inclusão feita em 24/01/2025 por Flávio Pereira */
+
+PROC SQL;
+   CREATE TABLE VISIBILIDADEBV AS
+   SELECT t1.Safra,
+          t1.Produto,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.TpParceiroComercial,
+          t1.NmColaborador,
+          t1.CdGR,
+          t1.CdGF,
+          t1.DsLoginN3A,
+          t1.DsLoginN4A,
+	  CASE WHEN t1.CdParceiroComercial = t1.CdParceiroComercialC THEN "S" ELSE "N" END AS FLCARTEIRA,
+          t1.CdParceiroComercialC,
+          t1.DsLoginN1,
+          t1.FlCadastroBV,
+          t1.FlAtivo,
+          t1.Porte,
+          t1.Classificacao,
+          t1.CdUF,
+          t1.Regional,
+          t1.Filial,
+          t1.StatusVeiculo,
+          t1.FxIdade,
+          t1.QtBancos,
+          t1.Ranking,
+          t1.Canal,
+          t1.Status,
+          t1.Quantidade,
+          t1.QuantidadePgtoLoja
+      FROM VISIBILIDADEBV01 t1;
+QUIT;
+
+/* Data de atualização */
+
+PROC SQL;
+  SELECT MAX(DtAtualizacao) INTO :DtAtApnp FROM CONVPROP.BASEAPNP;
+RUN;
+
+PROC SQL;
+  SELECT MAX(DtAtualizacao) INTO :DtAtSimu FROM BaseSimulacoes;
+RUN;
+
+PROC SQL;
+  CREATE TABLE VisibilidadeBV_Final AS
+    SELECT
+    PUT(&DtAt.,ddmmyy10.) AS DtAtualizacao,
+    "&DtAtApnp." AS DtAtualizacaoProp,
+    PUT(&DtAtSimu.,ddmmyy10.) AS DtAtualizacaoSimu,
+    *
+    FROM VisibilidadeBV
+    WHERE Safra >= &safraM13.;
+RUN;
+
+%ExportaCSV(TbVisibilidadePotencial, VisibilidadeBV_Final);
+
+options compress=yes;
+DATA SOLITMP.TbVisibilidadePotencial;
+SET VisibilidadeBV_Final;
+RUN;
+
+/* Gera base auxiliar para gráfico por de Conversão por Mensageria */
+PROC SQL;
+  CREATE TABLE BaseSimulacoesMensageria AS
+    SELECT
+      (YEAR(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))*100) + MONTH(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial)) AS Safra,
+      SMU.ProdutoGrupo AS Produto,
+      'Simulação sem proposta' AS Status,
+      COALESCE(SMU.Mensageria, '9. Não houve mensageria') AS Mensageria,
+      SMU.Mensageria2,
+      SMU.FxEntradaMinima,
+      COALESCE(POT.FlCadastroBV, 'N') AS FlCadastroBV,
+      COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+      COALESCE(POT.Porte,'Desconhecido') AS Porte,
+      COALESCE(POT.Classificacao,'Sem Classificação') AS Classificacao,
+      CASE WHEN FxIdadeAjuste = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(FxIdadeAjuste,'Desconhecido') AS FxIdade,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      COALESCE(SMU.Regional,'Desconhecido') AS Regional,
+	  COALESCE(SMU.Filial,'Desconhecido') AS Filial,
+      COALESCE(POT.QtBancos,'Desconhecido') AS QtBancos,
+      COALESCE(POT.Ranking,'Desconhecido') AS Ranking,
+      COALESCE(POT.Canal,'Desconhecido') AS Canal,
+      UPPER(SMU.Banco) AS Bancos,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada','Simulação sem card') THEN NuCpfCnpj END),0) AS Qtd,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada','Simulação sem card') AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS QtdPgtoloja
+    FROM CONVERSAO_SIMULACAO_V2 SMU
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = SMU.CdParceiroComercial
+    LEFT JOIN ParceiroComercial_POT POT
+      ON POT.CdParceiroComercial = SMU.CdParceiroComercial
+     AND POT.NuAnoMes = (YEAR(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))*100) + MONTH(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))
+     AND POT.Produto = SMU.ProdutoGrupo
+    WHERE UF.NmParceiroComercial NOT LIKE 'SIMULADOR%'
+      AND SMU.DtInclusaoGravame < &DtAt.
+      AND calculated Safra >= &safraM13.
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
+    HAVING(calculated Qtd > 0);
+RUN;
+
+PROC SQL;
+  CREATE TABLE BaseConvPropostaMensageria AS
+    SELECT
+      COALESCE(((YEAR(APNP.DtRetornoCetip) * 100) + MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada) AS Safra,
+      APNP.ProdutoAjuste AS Produto,
+      APNP.Mensageria,
+      CASE WHEN APNP.EntradaMinima in ('00% a 4,99%','05% a 9,99%')   THEN 'MÍNIMA ATÉ 10%'
+         WHEN APNP.EntradaMinima in ('10% a 14,99%','15% a 19,99%') THEN 'MÍNIMA ATÉ 20%'
+	 WHEN APNP.EntradaMinima in ('20% a 24,99%','25% a 29,99%') THEN 'MÍNIMA ATÉ 30%'
+         WHEN APNP.EntradaMinima in ('30% a 34,99%','35% a 39,99%') THEN 'MÍNIMA ATÉ 40%'
+	 WHEN APNP.EntradaMinima in ('40% a 44,99%','45% a 49,99%','50% a 54,99%','55% a 59,99%','60% a 64,99%','65% a 69,99%',
+                                     '70% a 74,99%','75% a 79,99%','80% a 84,99%','85% a 89,99%','90% a 94,99%','95% a 99,99%') THEN 'MÍNIMA ATÉ 50%'
+	      ELSE 'Desconhecido' END AS FxEntradaMinima,
+/*      APNP.Mensageria2,*/
+      APNP.StatusProposta AS Status,
+      COALESCE(POT.FlCadastroBV, 'N') AS FlCadastroBV,
+      COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+      COALESCE(POT.Porte,'Desconhecido') AS Porte,
+      COALESCE(POT.Classificacao,'Sem Classificação') AS Classificacao,
+      CASE WHEN APNP.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(APNP.FxIdade, 'Desconhecido') AS FxIdade,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      COALESCE(POT.Regional,'Desconhecido') AS Regional,
+	  COALESCE(POT.Filial,'Desconhecido') AS Filial,
+      COALESCE(POT.QtBancos,'Desconhecido') AS QtBancos,
+      COALESCE(POT.Ranking,'Desconhecido') AS Ranking,
+      COALESCE(POT.Canal,'Desconhecido') AS Canal,
+      CASE WHEN APNP.Banco = 'BANCO DO BRASIL' THEN 'BB'
+           WHEN APNP.Banco = 'BRADESCO' THEN 'BRADESCO'
+           WHEN APNP.Banco = 'ITAU' THEN 'ITAU'
+           WHEN APNP.Banco = 'MONTADORAS' THEN 'MONTADORAS'
+           WHEN APNP.Banco = 'PANAMERICANO' THEN 'PAN'
+           WHEN APNP.Banco = 'SAFRA' THEN 'SAFRA'
+           WHEN APNP.Banco = 'SANTANDER' THEN 'SANTANDER'
+		   WHEN APNP.Banco = 'C6' THEN 'C6'
+      ELSE 'OUTROS' END AS Bancos,
+      COALESCE(SUM(QtdPropostas),0) AS Qtd,
+      COALESCE(SUM(CASE WHEN APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS QtdPgtoloja
+    FROM CONVPROP.BASEAPNP APNP
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = APNP.CdParceiroComercial
+    LEFT JOIN ParceiroComercial_POT POT
+      ON POT.CdParceiroComercial = APNP.CdParceiroComercial
+     AND POT.NuAnoMes = COALESCE(((YEAR(APNP.DtRetornoCetip) * 100) + MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada)
+     AND POT.Produto = APNP.ProdutoAjuste
+    WHERE calculated Safra >= &safraM13. /*AND SafraEntrada < &SafraSimu.*/
+      AND ProdutoAjuste IN ('Motos','Leves','Pesados')
+      AND Banco <> 'NÃO CONVERTIDO'
+      AND FlPropostaValida = 1
+      AND APNP.DtRetornoCetip < &DtAt.
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18;
+RUN;
+
+PROC SQL;
+CREATE TABLE ConversaoMensageria AS
+  SELECT * FROM BaseSimulacoesMensageria
+  OUTER UNION CORRESPONDING
+  SELECT * FROM BaseConvPropostaMensageria;
+RUN;
+
+%ExportaCSV(TbConversaoMensageria,ConversaoMensageria);
+
+DATA SOLITMP.ConversaoMensageria;
+SET ConversaoMensageria;
+RUN;

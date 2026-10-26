@@ -1,0 +1,591 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Pricing__Visibilidade Total v5 - Pesados
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:20 UTC
+BUSINESS_AREA: Pricing
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 474
+CODE_TASKS_COUNT: 7
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: RELAT = /infogrc/marketshare/bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAt, safra13M
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/funcoes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /INFOGRC/UTILS/FUNCOES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], AUXL.TBCANALPARCEIROCOMERCIALCART [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], CONVPROP.BASEAPNP [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], DWBI_DTWH.TBAGENTEMIS [DBCON], RELAT.TBMARKETSHAREDIARIAABERTA [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_VISIBILIDADE_TOTAL
+IMPORTED_LIBNAMES: RELAT
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/funcoes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_VISIBILIDADE_TOTAL
+TABLE_READ_PROVENANCE (Flow): AUXL.TBCANALPARCEIROCOMERCIALCART [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], CONVPROP.BASEAPNP [PROC SQL - FROM], CONVSIMU.TBSIMULACOES [PROC SQL - FROM], DWBI_DTWH.TBAGENTEMIS [Pass-Through Native (DBCON) - FROM], RELAT.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM], TMP.TBPOTENCIALRODAS [PROC SQL - FROM], WORK.BASE_VISIBILIDADE_TOTAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas, /infogrc/utils/funcoes.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASECONVPROPOSTAMENSAGERIA, BASESIMULACOESMENSAGERIA, BASE_VISIBILIDADE_TOTAL, CONVERSAOMENSAGERIA_MES, CONVERSAO_MSG_MES, CONVERSAO_SIMULACAO_V2, GRAVAMESBV, PARCEIROCOMERCIAL_POT, POTENCIALRODAS, SHARE_MERCADO, TBAGENTE, TBSEMANAS_COM_DT_NUM, UF, WORK.QUERY_FOR_BASE_VISIBILIDADE_TOTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|/infogrc/utils/IQ.sas|/INFOGRC/UTILS|IQ.SAS||suspeito
+IN|/infogrc/utils/all-includes.sas|/INFOGRC/UTILS|ALL-INCLUDES.SAS||ok
+IN|/infogrc/utils/funcoes.sas|/INFOGRC/UTILS|FUNCOES.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1. Marcação Semana */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1. Marcação Semana */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-xgZ3bkJwyvCvnHSW/code.sas */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/funcoes.sas';
+%include '/infogrc/utils/IQ.sas';
+%CRIAVARDB;
+%Gerar_TbSemanas_InicioSegunda('20240101','20260331');
+
+
+DATA TBSEMANAS_COM_DT_NUM;
+    SET TBSEMANAS;
+    DtTempo_Num = INPUT(PUT(DtTempo, yymmddn8.), 8.);
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1. Marcação Semana */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 2. Código Atualização - Mês Fechado */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 2. Código Atualização - Mês Fechado */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-58NbZBjRlLUP8fzm/code.sas */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/all-includes.sas';
+
+
+DATA _NULL_;
+  hoje = TODAY();
+  ano13M = YEAR(hoje) - 1;
+  anohoje = YEAR(hoje);
+  safra13M = ((YEAR(hoje) - 1) * 100) + MONTH(hoje);
+
+  CALL SYMPUT('ano13M', PUT(ano13M,4.));
+  CALL SYMPUT('anoHoje', PUT(anoHoje,4.));
+  CALL SYMPUT('safra13M', safra13M);
+RUN;
+
+
+PROC SQL;
+  SELECT MAX(DtAtualizacao) INTO :DtAt FROM TMP.TBPOTENCIALRODAS;
+RUN;
+
+
+PROC SQL;
+%CONECTADB(server = BI);
+CREATE TABLE TbAgente AS SELECT * FROM connection to dbcon (
+  SELECT CAST(trim(lpad(NuCnpjAgente,14,0)) AS CHAR) AS CnpjAgente, * FROM DWBI_DTWH.TbAgenteMIS
+  WHERE NuCnpjAgente <> 0
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE PotencialRodas AS
+  SELECT
+    POT.NuAnoMes AS Safra,
+    POT.NmGrupoProduto AS Produto,
+    POT.CdParceiroComercial,
+    CASE WHEN POT.FxIdade IS NULL THEN 'Desconhecido' WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+    COALESCE(POT.FxIdade,'Desconhecido') AS FxIdade,
+    CASE WHEN POT.CdParceiroComercial <> . THEN 'S' ELSE 'N' END AS FlCadastroBV,
+    COALESCE(POT.CdUF,'Desconhecido') AS CdUF,
+    COALESCE(POT.NmSubEstruturaComercialC,'Desconhecido') AS Regional,
+    COALESCE(POT.NmAreaEstruturaComercialC,'Desconhecido') AS Filial,
+    COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+    COALESCE(POT.FlPorteA,'Desconhecido') AS Porte,
+    CASE WHEN POT.QtBancos = . THEN 'Desconhecido'
+         WHEN POT.QtBancos >= 5 THEN '5 +'
+         ELSE PUT(POT.QtBancos,1.)
+    END AS QtBancos,
+    CASE WHEN POT.RankingCliente = . THEN 'Desconhecido'
+         WHEN POT.RankingCliente >= 3 THEN '3 +'
+         ELSE PUT(POT.RankingCliente,1.)
+    END AS Ranking,
+    COALESCE(CPC.DsTipoCanalProducao, 'Desconhecido') AS Canal,
+    COALESCE(POT.DsClassificacaoA,'Sem Classificação') AS Classificacao,
+    COALESCE(SUM(POT.QtGravamesMercado),0) AS Mercado
+  FROM
+    TMP.TbPotencialRodas POT
+  LEFT JOIN AUXL.TBCANALPARCEIROCOMERCIALCART CPC
+    ON CPC.CdParceiroComercial = POT.CdParceiroComercial
+  WHERE
+    NuAnoMes >= &safra13M.
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE ParceiroComercial_POT AS
+  SELECT DISTINCT
+    POT.NuAnoMes,
+    POT.NmGrupoProduto AS Produto,
+    POT.CdParceiroComercial,
+    CASE WHEN POT.CdParceiroComercial <> . THEN 'S' ELSE 'N' END AS FlCadastroBV,
+    COALESCE(POT.NmAreaEstruturaComercialC,'Desconhecido') AS Filial,
+    COALESCE(POT.NmSubEstruturaComercialC,'Desconhecido') AS Regional,
+    COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+    COALESCE(POT.FlPorteA,'Desconhecido') AS Porte,
+    COALESCE(POT.DsClassificacaoA,'Sem Classificação') AS Classificacao,
+    CASE WHEN POT.QtBancos = . THEN 'Desconhecido'
+         WHEN POT.QtBancos >= 5 THEN '5 +'
+         ELSE PUT(POT.QtBancos,1.)
+    END AS QtBancos,
+    CASE WHEN POT.RankingCliente = . THEN 'Desconhecido'
+         WHEN POT.RankingCliente >= 3 THEN '3 +'
+         ELSE PUT(POT.RankingCliente,1.)
+    END AS Ranking,
+    COALESCE(CPC.DsTipoCanalProducao, 'Desconhecido') AS Canal
+  FROM
+    TMP.TbPotencialRodas POT
+  LEFT JOIN AUXL.TBCANALPARCEIROCOMERCIALCART CPC
+    ON CPC.CdParceiroComercial = POT.CdParceiroComercial
+  WHERE
+    POT.NuAnoMes >= &safra13M.
+    AND POT.CdParceiroComercial <> .;
+RUN;
+
+PROC SORT DATA=ParceiroComercial_POT NODUPKEY;
+BY NuAnoMes CdParceiroComercial Produto;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE GravamesBV AS
+  SELECT
+    POT.NuAnoMes AS Safra,
+    POT.NmGrupoProduto AS Produto,
+    POT.CdParceiroComercial,
+    CASE WHEN POT.FxIdade IS NULL THEN 'Desconhecido' WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+    COALESCE(POT.FxIdade,'Desconhecido') AS FxIdade,
+    CASE WHEN POT.CdParceiroComercial <> . THEN 'S' ELSE 'N' END AS FlCadastroBV,
+    COALESCE(POT.CdUF,'Desconhecido') AS CdUF,
+    COALESCE(POT.NmSubEstruturaComercialC,'Desconhecido') AS Regional,
+    COALESCE(POT.NmAreaEstruturaComercialC,'Desconhecido') AS Filial,
+    COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+    COALESCE(POT.FlPorteA,'Desconhecido') AS Porte,
+    COALESCE(POT.DsClassificacaoA,'Sem Classificação') AS Classificacao,
+    CASE WHEN POT.QtBancos = . THEN 'Desconhecido'
+         WHEN POT.QtBancos >= 5 THEN '5 +'
+         ELSE PUT(POT.QtBancos,1.)
+    END AS QtBancos,
+    CASE WHEN POT.RankingCliente = . THEN 'Desconhecido'
+         WHEN POT.RankingCliente >= 3 THEN '3 +'
+         ELSE PUT(POT.RankingCliente,1.)
+    END AS Ranking,
+    COALESCE(CPC.DsTipoCanalProducao, 'Desconhecido') AS Canal,
+    SUM(POT.QtContrato) AS ContratoBV
+  FROM
+    TMP.TbPotencialRodas POT
+  LEFT JOIN AUXL.TBCANALPARCEIROCOMERCIALCART CPC
+    ON CPC.CdParceiroComercial = POT.CdParceiroComercial
+  WHERE
+    POT.NuAnoMes >= &safra13M.
+    AND POT.FlAtualizacaoMercado = 1
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+  HAVING SUM(POT.QtContrato) > 0;
+RUN;
+
+
+PROC SQL;
+  CREATE TABLE UF AS
+    SELECT DISTINCT CdParceiroComercial, NmParceiroComercial, CdUf FROM BASES.TBPARCEIROCOMERCIAL;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE CONVERSAO_SIMULACAO_V2 AS
+SELECT*,
+CASE WHEN LOWER(Produto) LIKE '%leves%' THEN 'Leves'
+     WHEN LOWER(Produto) LIKE '%pesados' THEN 'Pesados'
+     ELSE Produto
+     END AS ProdutoAjuste,
+
+CASE WHEN FxIdade = 'Acima 10 anos' THEN 'Acima de 10 anos' ELSE FxIdade END AS FxIdadeAjuste,
+CASE WHEN Mensageria = '7. Plano Aprovado' THEN 'A'
+
+     WHEN Mensageria IN ('0. Aprovado','0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%')
+     AND Mensageria2 NOT IN ('3. Recusado', '4. Recusado Reversível')
+     THEN 'P'
+
+     WHEN Mensageria IN ('6. Recusado','3.Recusado')
+     OR (Mensageria IN ('0. Aprovado','0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%')
+     AND Mensageria2 IN ('3. Recusado', '4. Recusado Reversível') ) THEN 'R'
+
+ELSE 'D'
+END AS MensageriaGrupo
+
+FROM CONVSIMU.TBSIMULACOES
+WHERE calculated ProdutoAjuste = 'Pesados'
+AND Banco NOT IN ('N/A','BV')
+AND FlSimuValida = 1;
+
+RUN;
+
+
+PROC SQL;
+  CREATE TABLE BaseSimulacoesMensageria AS
+    SELECT
+      (YEAR(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))*100) + MONTH(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial)) AS Safra,
+      SMU.ProdutoAjuste AS Produto,
+      'Simulação sem proposta' AS Status,
+      COALESCE(SMU.Mensageria, '9. Não houve mensageria') AS Mensageria,
+      SMU.Mensageria2,
+      COALESCE(POT.FlCadastroBV, 'N') AS FlCadastroBV,
+      COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+      COALESCE(POT.Porte,'Desconhecido') AS Porte,
+      COALESCE(POT.Classificacao,'Sem Classificação') AS Classificacao,
+      CASE WHEN FxIdadeAjuste = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(FxIdadeAjuste,'Desconhecido') AS FxIdade,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      COALESCE(SMU.Regional,'Desconhecido') AS Regional,
+      COALESCE(SMU.Filial,'Desconhecido') AS Filial,
+      COALESCE(POT.QtBancos,'Desconhecido') AS QtBancos,
+      COALESCE(POT.Ranking,'Desconhecido') AS Ranking,
+      COALESCE(POT.Canal,'Desconhecido') AS Canal,
+	  COALESCE(SMU.TpPessoa,'Desconhecido') AS TpPessoa,
+      UPPER(SMU.Banco) AS Bancos,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada','Simulação sem card') THEN NuCpfCnpj END),0) AS Qtd,
+      COALESCE(COUNT(DISTINCT CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada','Simulação sem card') AND StPagoLoja = 'S' THEN NuCpfCnpj END),0) AS QtdPgtoloja,
+      COALESCE(SUM(CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada','Simulação sem card') THEN VrProposta END),0) AS VrProposta,
+      COALESCE(SUM(CASE WHEN SMU.StatusSimulacao IN ('Card sem proposta originada','Simulação sem card') AND StPagoLoja = 'S' THEN VrProposta END),0) AS VrPropostaPgtoLoja
+
+    FROM CONVERSAO_SIMULACAO_V2 SMU
+    LEFT JOIN UF
+      ON UF.CdParceiroComercial = SMU.CdParceiroComercial
+    LEFT JOIN ParceiroComercial_POT POT
+      ON POT.CdParceiroComercial = SMU.CdParceiroComercial
+     AND POT.NuAnoMes = (YEAR(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))*100) + MONTH(COALESCE(SMU.DtInclusaoGravame, SMU.DtSimulacaoInicial))
+     AND POT.Produto = SMU.ProdutoAjuste
+    WHERE UF.NmParceiroComercial NOT LIKE 'SIMULADOR%'
+      AND SMU.DtInclusaoGravame <= &DtAt.
+      AND calculated Safra >= &safra13M.
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
+    HAVING(calculated Qtd > 0);
+RUN;
+
+PROC SQL;
+  CREATE TABLE BaseConvPropostaMensageria AS
+    SELECT
+      COALESCE(((YEAR(APNP.DtRetornoCetip) * 100) + MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada) AS Safra,
+      APNP.ProdutoAjuste AS Produto,
+      APNP.Mensageria,
+
+      APNP.StatusProposta AS Status,
+      COALESCE(POT.FlCadastroBV, 'N') AS FlCadastroBV,
+      COALESCE(POT.FlAtivo,'Desconhecido') AS FlAtivo,
+      COALESCE(POT.Porte,'Desconhecido') AS Porte,
+      COALESCE(POT.Classificacao,'Sem Classificação') AS Classificacao,
+      CASE WHEN APNP.FxIdade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS StatusVeiculo,
+      COALESCE(APNP.FxIdade, 'Desconhecido') AS FxIdade,
+      COALESCE(UF.CdUf,'Desconhecido') AS CdUF,
+      COALESCE(POT.Regional,'Desconhecido') AS Regional,
+      COALESCE(POT.Filial,'Desconhecido') AS Filial,
+      COALESCE(POT.QtBancos,'Desconhecido') AS QtBancos,
+      COALESCE(POT.Ranking,'Desconhecido') AS Ranking,
+      COALESCE(POT.Canal,'Desconhecido') AS Canal,
+	  COALESCE(SMU.TpPessoa,'Desconhecido') AS TpPessoa,
+	  CASE WHEN APNP.Banco = 'BANCO DO BRASIL' THEN 'BB'
+           WHEN APNP.Banco = 'BRADESCO' THEN 'BRADESCO'
+           WHEN APNP.Banco = 'ITAU' THEN 'ITAU'
+           WHEN APNP.Banco = 'MONTADORAS' THEN 'MONTADORAS'
+           WHEN APNP.Banco = 'PANAMERICANO' THEN 'PAN'
+           WHEN APNP.Banco = 'SAFRA' THEN 'SAFRA'
+           WHEN APNP.Banco = 'SANTANDER' THEN 'SANTANDER'
+		   WHEN APNP.Banco = 'VOLKSWAGEN' THEN 'VOLKSWAGEN'
+		   WHEN APNP.Banco = 'C6' THEN 'C6'
+      ELSE 'OUTROS' END AS Bancos,
+      COALESCE(SUM(QtdPropostas),0) AS Qtd,
+      COALESCE(SUM(CASE WHEN APNP.PgtoLoja = 'S' THEN QtdPropostas END),0) AS QtdPgtoloja
+FROM CONVPROP.BASEAPNP APNP
+LEFT JOIN (
+    SELECT DISTINCT CdParceiroComercial, TpPessoa
+    FROM CONVERSAO_SIMULACAO_V2
+) SMU
+  ON SMU.CdParceiroComercial = APNP.CdParceiroComercial
+LEFT JOIN UF
+  ON UF.CdParceiroComercial = APNP.CdParceiroComercial
+LEFT JOIN ParceiroComercial_POT POT
+  ON POT.CdParceiroComercial = APNP.CdParceiroComercial
+ AND POT.NuAnoMes = COALESCE(((YEAR(APNP.DtRetornoCetip)*100)+MONTH(APNP.DtRetornoCetip)), APNP.SafraEntrada)
+ AND POT.Produto = APNP.ProdutoAjuste
+    WHERE calculated Safra >= &safra13M. 
+      AND ProdutoAjuste = 'Pesados'
+      AND Banco <> 'NÃO CONVERTIDO'
+      AND FlPropostaValida = 1
+      AND APNP.DtRetornoCetip <= &DtAt.
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18;
+RUN;
+
+PROC SQL;
+CREATE TABLE ConversaoMensageria_Mes AS
+  SELECT * FROM BaseSimulacoesMensageria
+  OUTER UNION CORRESPONDING
+  SELECT * FROM BaseConvPropostaMensageria;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 2. Código Atualização - Mês Fechado */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 3. Visibilidade Mês Fechado */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 3. Visibilidade Mês Fechado */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dNVevPFicIHpbkfr/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE CONVERSAO_MSG_MES AS
+SELECT
+
+'Conversao' as TpDados,
+CASE WHEN Safra in (202501) then '202501'
+	 WHEN Safra in (202502) then '202502'
+	 WHEN Safra in (202503) then '202503'
+	 WHEN Safra in (202504) then '202504'
+	 WHEN Safra in (202505) then '202505'
+	 WHEN Safra in (202506) then '202506'
+	 WHEN Safra in (202507) then '202507'
+	 WHEN Safra in (202508) then '202508'
+	 WHEN Safra in (202509) then '202509'
+	 WHEN Safra in (202510) then '202510'
+	 WHEN Safra in (202511) then '202511'
+	 WHEN Safra in (202512) then '202512'
+	 WHEN Safra in (202601) then '202601'
+	 WHEN Safra in (202602) then '202602'
+	 WHEN Safra in (202603) then '202603'
+ELSE 'ERRO' END as Safra,
+'' as TpArquivo,
+Status,
+PRODUTO,
+A.Mensageria,
+CASE WHEN FxIdade = 'Acima de 10 anos' then 'Acima 10 anos'
+     else FxIdade end as FxIdade,
+
+CASE WHEN A.Mensageria in ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+'0. Aprovado','1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+
+AND Mensageria2 not in ('3. Recusado', '4. Recusado Reversível') then 'Mensageria Positiva'
+
+WHEN A.Mensageria in ('6. Recusado' ,'3. Recusado') or
+A.Mensageria in('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%','0. Aprovado',
+'1. Aprovado com rastreador','2. Reanálise psicométrico','0. Aprovado','1. Alta chance','2. Tem chance')
+
+AND Mensageria2 in ('3. Recusado', '4. Recusado Reversível') then 'Recusado'
+
+WHEN A.Mensageria = '7. Plano Aprovado' THEN 'Plano Aprovado'
+WHEN A.Mensageria = '6. Plano Recusado' THEN 'Plano Recusado'
+
+else 'Demais Msgs'
+end as AGRUPAMENTO_MSG,
+
+TpPessoa,
+
+CASE WHEN Bancos = 'SANTANDER' THEN 'Santander'
+     WHEN Bancos = 'BRADESCO' THEN 'Bradesco'
+	 WHEN Bancos = 'ITAU' THEN 'Itau'
+	 WHEN Bancos in ('PANAMERICANO','PAN') THEN 'PAN'
+	 WHEN Bancos = 'C6' THEN 'C6'
+	 WHEN Bancos = 'SAFRA' THEN 'SAFRA'
+	 WHEN Bancos = 'VOLKSWAGEN' THEN 'VOLKS'
+	 else 'Demais Bancos' end as FG_BANCO,
+
+SUM(Qtd) AS Qtd_Convertida,
+SUM(VrProposta) as VrProposta
+
+from ConversaoMensageria_Mes AS A
+WHERE Safra >= 202501 and FlCadastroBV = 'S' and FlAtivo = 'S'
+and PRODUTO = 'Pesados'
+group by 1,2,3,4,5,6,7,8,9,10;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 3. Visibilidade Mês Fechado */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 7. Final */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 7. Final */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-uasQpHdfFc1QDbbg/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA BASE_VISIBILIDADE_TOTAL;
+SET SHARE_MERCADO CONVERSAO_MSG_MES;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 7. Final */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 6. Share - v4 */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 6. Share - v4 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-3GVwjtjbpNWM64B2/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RELAT '/infogrc/marketshare/bases';
+
+PROC SQL;
+CREATE TABLE SHARE_MERCADO AS
+SELECT
+  'ShareMerc' AS TpDados,
+
+  CASE WHEN NuAnoMes = 202501 THEN '202501'
+    WHEN NuAnoMes = 202502 THEN '202502'
+    WHEN NuAnoMes = 202503 THEN '202503'
+    WHEN NuAnoMes = 202504 THEN '202504'
+    WHEN NuAnoMes = 202505 THEN '202505'
+    WHEN NuAnoMes = 202506 THEN '202506'
+    WHEN NuAnoMes = 202507 THEN '202507'
+    WHEN NuAnoMes = 202508 THEN '202508'
+    WHEN NuAnoMes = 202509 THEN '202509'
+ 	WHEN NuAnoMes = 202510 THEN '202510'
+ 	WHEN NuAnoMes = 202511 THEN '202511'
+	WHEN NuAnoMes = 202512 THEN '202512'
+	WHEN NuAnoMes = 202601 THEN '202601'
+	WHEN NuAnoMes = 202602 THEN '202602'
+	WHEN NuAnoMes = 202603 THEN '202603'
+    ELSE 'ERRO'
+  END AS Safra,
+
+  TpArquivo,
+  TpVeiculo,
+  StVeiculo,
+
+  CASE
+    WHEN FxIdade IN ('11 a 14 anos','15 a 19 anos','20 anos e acima') THEN 'Acima 10 anos'
+    ELSE FxIdade
+  END AS FxIdade,
+
+  CASE
+    WHEN Bancos = 'BV' THEN 'BV'
+    WHEN Bancos = 'SANTANDER' THEN 'SANTANDER'
+    WHEN Bancos = 'BRADESCO' THEN 'BRADESCO'
+    WHEN Bancos = 'ITAU' THEN 'ITAU'
+    WHEN Bancos = 'C6' THEN 'C6'
+    WHEN Bancos = 'PANAMERICANO' THEN 'PAN'
+    WHEN Bancos = 'SAFRA' THEN 'SAFRA'
+    WHEN Bancos = 'VOLKSWAGEN' THEN 'VOLKS'
+    ELSE 'DEMAIS BANCOS'
+  END AS FG_BANCO,
+
+  DtGravame,
+  FlCvg AS FlagEGV,
+  StatusGravame,
+
+  SUM(CASE WHEN Bancos = 'BV' THEN GravTotal ELSE 0 END) AS Gravames_BV,
+  SUM(CASE WHEN Bancos = 'SANTANDER' THEN GravTotal ELSE 0 END) AS Gravames_STD,
+  SUM(CASE WHEN Bancos = 'BRADESCO' THEN GravTotal ELSE 0 END) AS Gravames_BRAD,
+  SUM(CASE WHEN Bancos = 'ITAU' THEN GravTotal ELSE 0 END) AS Gravames_ITAU,
+  SUM(CASE WHEN Bancos = 'PANAMERICANO' THEN GravTotal ELSE 0 END) AS Gravames_PAN,
+  SUM(CASE WHEN Bancos = 'C6' THEN GravTotal ELSE 0 END) AS Gravames_C6,
+  SUM(CASE WHEN Bancos = 'SAFRA' THEN GravTotal ELSE 0 END) AS Gravames_SAFRA,
+  SUM(CASE WHEN Bancos = 'VOLKSWAGEN' THEN GravTotal ELSE 0 END) AS Gravames_VOLKS,
+  SUM(GravTotal) AS GravTotal
+
+FROM RELAT.TBMARKETSHAREDIARIAABERTA
+WHERE NuAnoMes >= 202501
+  AND AjusteManual = 'N'
+  AND TpAgenteProdutoMIS <> '3'
+  AND DtGravame >= 20250101
+  AND StatusGravame = 'Ativo'
+
+GROUP BY
+  TpDados, Safra, TpArquivo, TpVeiculo, StVeiculo, FxIdade, FG_BANCO, DtGravame, FlagEGV, StatusGravame;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 6. Share - v4 */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE ConversaoMensageria_Mes AS
+  SELECT * FROM BaseSimulacoesMensageria
+  OUTER UNION CORRESPONDING
+  SELECT * FROM BaseConvPropostaMensageria;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_VISIBILIDADE_TOTA);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_VISIBILIDADE_TOTA AS
+   SELECT DISTINCT t1.TpVeiculo
+      FROM WORK.BASE_VISIBILIDADE_TOTAL t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */

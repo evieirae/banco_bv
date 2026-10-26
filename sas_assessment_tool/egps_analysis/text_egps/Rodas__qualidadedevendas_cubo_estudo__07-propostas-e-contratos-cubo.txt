@@ -1,0 +1,634 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_cubo_estudo
+FILE_SAS: 07-propostas-e-contratos-cubo.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), CALL EXECUTE (1x | +45), PROC DATASETS (1x | +20), RETAIN (1x | +10), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 562
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Condicao, TpDados, TpProposta
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: CONDICAO, TPDADOS, TPPROPOSTA
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.TBMOLICAR_SUV [SAS/Local], AUXL.TBROLLOUTMENSAGERIA [SAS/Local], BASEGRC.TBFILTROCVG [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], CONVPROP.CONVERSAOPROPOSTAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/apnp/propostas/conversaopropostas.sas7bdat
+TABLE_READ_PROVENANCE (Flow): AUXL.TBMOLICAR_SUV [PROC SQL - JOIN], AUXL.TBROLLOUTMENSAGERIA [PROC SQL - JOIN], BASEGRC.TBFILTROCVG [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - JOIN], CONVPROP.CONVERSAOPROPOSTAS [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/apnp/propostas/conversaopropostas.sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CONSOLIDADOCUBO, PROPOSTASPARAMETROS, PROPOSTASPARAMETROS001, QDV&TPDADOS, QDVCONTRATOS, QDVPROPOSTAS, TBFLAGPRODUCAO, TBFLAGPRODUCAO001
+DYNAMIC REFS (Ambiguous): ORI.FL{TPPROPOSTA}, ORI.VR{TPPROPOSTA}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/apnp/propostas/conversaopropostas.sas7bdat
+
+END_METADATA
+================================================================================
+/* |	Atualizacao:	12/07/2023  													| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Incluido campos de banco digital								| */
+/* ====================================================================================== */
+/* |	Atualizacao:	19/09/2023  													| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Incluido Origem de leads em Originao e producao				| */
+/* ====================================================================================== */
+/* |	Atualizacao:	01/03/2024  													| */
+/* |	Responsavel: 	Gustavo Domingues - MIS IGE				                        | */
+/* |	Alt. Realizada:	- Incluido coluna TIPO PARCEIROCOMERCIAL				| */
+/* ====================================================================================== */
+
+/* Propostas */
+DATA PropostasParametros001;
+INPUT tpdados$1-10  condicao$ 11-38 tpproposta$ 39-55;
+CARDS;
+OriginacaoORI.VrPropostaOriginada > 0 PropostaOriginada
+Aprovacao ORI.FlPropostaAprovada eq 1 PropostaAprovada
+EfetivacaoORI.FlPropostaEfetivada eq 1PropostaEfetivada
+;
+RUN;
+
+PROC SQL;
+CREATE TABLE PropostasParametros AS
+  SELECT
+    STRIP(tpdados) AS TpDados,
+    STRIP(condicao) AS Condicao,
+    STRIP(tpproposta) AS TpProposta
+  FROM PropostasParametros001;
+RUN;
+
+%MACRO GeraBasePropostas(TpDados,Condicao,TpProposta);
+PROC SQL;
+CREATE TABLE QDV&TpDados. AS
+  SELECT
+    ORI.DtAtualizacao AS DtAtualizacaoOriginacao FORMAT mmddyy10.,
+    CASE WHEN ORI.DtEntradaProposta >= TODAY() - 30 THEN ORI.DtEntradaProposta
+         ELSE INTNX('MONTH', ORI.DtEntradaProposta, 0, 'BEGINNING')
+         END AS DtReferencia FORMAT mmddyy10.,
+    "&TpDados." AS TpDados,
+    ORI.NuAnoMes,
+    CASE WHEN CLI.QtAnosIdadePessoa = . THEN .
+         WHEN CLI.QtAnosIdadePessoa <= 24 THEN 24
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 25 AND 34 THEN 34
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 35 AND 44 THEN 44
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 45 AND 54 THEN 54
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 55 AND 64 THEN 64
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 65 AND 71 THEN 71
+         WHEN CLI.QtAnosIdadePessoa >= 72 THEN QtAnosIdadePessoa
+    END AS QtAnosIdadePessoa,
+    CLI.Genero,
+    CLI.UFCliente,
+    CLI.FxRenda,
+    ORI.TpPessoa,
+    case when BVO.CdParceiroComercial<>. and ORI.NmGrupoProdutoMeta = 'Leves' and
+    ORI.fxidade ='ZeroKM' then 'Leves-BVO' else ORI.NmGrupoProdutoMeta end as NmGrupoProdutoMeta,
+    ORI.NmTipoParceiroComercial,
+    ORI.CdModelo,
+    ORI.DsTipoCanalProducao,
+    ORI.NmAreaEstruturaComercial,
+    ORI.NmSubEstruturaComercialA,
+	STRIP(PUT(ORI.CdParceiroComercial,6.)) || " - " || ORI.NmParceiroComercial AS NmParceiroComercial,
+    ORI.FxParcela,
+	ORI.QtAnosIdade,
+    CASE WHEN ORI.QtAnosIdade BETWEEN 11 AND 14 THEN '11 a 14 anos'
+         WHEN ORI.QtAnosIdade BETWEEN 15 AND 19 THEN '15 a 19 anos'
+         WHEN ORI.QtAnosIdade >= 20 THEN '20 anos e acima'
+         ELSE ORI.FxIdade
+    END AS FxIdade,
+    ORI.FxEntrada,
+    CASE WHEN ORI.NuScoreFim <= 5.5 THEN 'SCORE 5 - 5.5'
+         WHEN ORI.NuScoreFim > 5.5 AND ORI.NuScoreFim <= 6.5 THEN 'SCORE 6 - 6.5'
+         WHEN ORI.NuScoreFim > 6.5 AND ORI.NuScoreFim <= 7.5 THEN 'SCORE 7 - 7.5'
+         WHEN ORI.NuScoreFim > 7.5 AND ORI.NuScoreFim <= 8.5 THEN 'SCORE 8 - 8.5'
+         WHEN ORI.NuScoreFim > 8.5 THEN 'SCORE 9 - 10'
+    END AS FxScore,
+    CASE WHEN ORI.NuRating = . THEN ''
+         WHEN ORI.NuRating <= 5.5 THEN 'RATING 5 - 5.5'
+         WHEN ORI.NuRating > 5.5 AND ORI.NuRating <= 6.5 THEN 'RATING 6 - 6.5'
+         WHEN ORI.NuRating > 6.5 AND ORI.NuRating <= 7.5 THEN 'RATING 7 - 7.5'
+         WHEN ORI.NuRating > 7.5 AND ORI.NuRating <= 8.5 THEN 'RATING 8 - 8.5'
+         WHEN ORI.NuRating > 8.5 THEN 'RATING 9 - 10'
+    END AS FxRating,
+    CASE WHEN calculated DtReferencia >= today() - 1 THEN 1
+         WHEN calculated DtReferencia >= today() - 2 THEN 2
+         WHEN calculated DtReferencia >= today() - 7 THEN 7
+         WHEN calculated DtReferencia >= today() - 14 THEN 14
+         END AS FlDiaComparacao,
+    ORI.QtCorridosDiaUtilMes,
+    ORI.QtTotalDiaUtilMes,
+    ORI.FlPropostaAprovada,
+    ORI.FlTxAlterada,
+    COALESCE(SUV.DsMolicarConfiguracao,'N') AS DsMolicarConfiguracao,
+    ESG.Combustivel,
+	MT.CilindradaBV as Cilindradas,
+	MT.CilindradaMercado as CilindradasMercado,
+    COALESCE(MSG.Mensageria,'9. Não houve mensageria') AS Mensageria,
+    MSG.Mensageria2,
+    MSG.MotivoRecusa,
+    MSG.MsgEntradaMinima,
+    MSG.EntradaMinima,
+    MBV.Onda AS FlOndaMotorBV,
+    MBV.DataRollout as DataRollout FORMAT=mmddyy10.,
+    TXP.TpOrigemTaxa,
+    CASE WHEN INPUT(SUBSTR(ORI.NuCpfCnpj,6,2),2.) BETWEEN 00 AND 19 THEN 'Sem PPR'
+         WHEN INPUT(SUBSTR(ORI.NuCpfCnpj,6,2),2.) BETWEEN 20 AND 59 THEN 'Controle'
+         WHEN INPUT(SUBSTR(ORI.NuCpfCnpj,6,2),2.) BETWEEN 60 AND 99 THEN 'Ação'
+    END AS FlagCPFPPR,
+    TXP.DeltaAplicado,
+    CLI.FlPAP,
+	COALESCE(CVG.FiltroCVG,'OUTROS PRODUTOS') as FiltroCVG,
+    ORI.FxPrestacao,
+    ORI.FxFinanciamento,
+    CNP.StatusProposta AS StatusPropostaConversao,
+    CASE WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) = . THEN ''
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) < 0 THEN '< 0'
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) BETWEEN 0 AND 3 THEN '0 - 3'
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) BETWEEN 4 AND 5 THEN '4 - 5'
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) BETWEEN 6 AND 7 THEN '6 - 7'
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) BETWEEN 8 AND 14 THEN '8 - 14'
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) BETWEEN 15 AND 21 THEN '15 - 21'
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) BETWEEN 22 AND 30 THEN '22 - 30'
+         WHEN COALESCE(ORI.DiasEfetivacao,CNP.DiasConversao) > 30 THEN '> 30'
+    END AS FxDiasConversao,
+    CNP.FxValorAprovado AS FxValorAprovadoConversao,
+    CASE WHEN ORI.NuContratoGestao <> . THEN 'BV' ELSE COALESCE(CNP.Banco,'NÃO CONVERTIDO') END AS BancoConversao,
+    Led.CompraLeads,
+    CASE WHEN FNI.NuProposta <> . THEN 'S' ELSE 'N' END AS FlFNI,
+    COALESCE(ORI.FlLeilao,'N') AS FlLeilao,
+	COALESCE(ORI.FlC2C,'N') AS FlC2C,
+	ORI.CdMarca,
+    CLI.TipoPolitica,
+    CASE WHEN ORI.NuRating = . THEN 0 ELSE 1 END AS FlRating,
+	CVS.FlRatingC,
+	CVS.FlRatingS,
+	Led.flagproducao AS FlComissaoLead,
+	ORI.FlRastreador,
+	Led.Origem,
+	CASE 			 WHEN ORI.NMTIPOPARCEIROCOMERCIAL LIKE '%PARCEIRO DE INDICAÇÃO - CANAL PRÓPRIO%' THEN 'PARCEIRO DE INDICAÇÃO'
+					 WHEN ORI.NMTIPOPARCEIROCOMERCIAL LIKE '%Loja%' AND  ( ORI.NMPARCEIROCOMERCIAL LIKE '%FINANZERO%'
+																		OR ORI.NMPARCEIROCOMERCIAL LIKE '%QUERO FINANCIAR%'
+																		OR ORI.NMPARCEIROCOMERCIAL LIKE '%TATOS GESTAO DE NEGOCIOS%'
+																		OR ORI.NMPARCEIROCOMERCIAL LIKE '%EASYC S.A.%'
+																		OR ORI.NMPARCEIROCOMERCIAL LIKE '%JUROS BAIXOS JA%'
+																		OR ORI.NMPARCEIROCOMERCIAL LIKE '%FINANCIA TUDO%'
+                          AND ORI.DSTIPOCANALPRODUCAO IN ('LOJA CANAL NEGOCIOS','PROMOTORA','BV FINANCEIRA - OPERACAO ESPECIAL'))
+                          THEN 'PARCEIRO DIGITAL'
+                     WHEN ORI.CDPARCEIROCOMERCIAL IN(424584 , 452470) THEN 'CVG ÁREA ABERTA SITE'
+                     WHEN ORI.DSTIPOCANALPRODUCAO IN ('MULTIMARCAS','CONCESSIONARIAS') THEN 'CANAL VEÍCULOS'
+                     WHEN (ORI.CDPARCEIROCOMERCIAL = 407516 AND ORI.DTENTRADAPROPOSTA BETWEEN '01JUL2020'D AND '31AUG2020'D)
+                          OR (ORI.CDPARCEIROCOMERCIAL = 416382 AND ORI.DTENTRADAPROPOSTA >= '01AUG2020'D)
+                          THEN 'JUST'
+                     WHEN ORI.NMPARCEIROCOMERCIAL LIKE '%CP GARAN TMLKT%' THEN 'GR CONSULTOR - TELEMARKETING'
+                     WHEN ORI.CDPARCEIROCOMERCIAL = 414643 THEN 'MINHA BV'
+                     WHEN ORI.CDPARCEIROCOMERCIAL IN (448756, 449109, 452671, 460298) THEN 'PARCEIRO 100% DIGITAL - EPS'
+                     WHEN ORI.NMPARCEIROCOMERCIAL CONTAINS 'BV' AND ORI.NMPARCEIROCOMERCIAL CONTAINS 'CONSULT' THEN 'GR CONSULTOR'
+                     WHEN ORI.NMPARCEIROCOMERCIAL CONTAINS 'BV' AND ORI.NMPARCEIROCOMERCIAL CONTAINS 'COCKPIT' THEN 'GR COCKPIT'
+					 WHEN ORI.NMPARCEIROCOMERCIAL CONTAINS 'BV'
+							AND (ORI.NMPARCEIROCOMERCIAL CONTAINS 'GARAN'
+							OR ORI.NMPARCEIROCOMERCIAL CONTAINS 'PARTICULAR')
+							AND ORI.NMPARCEIROCOMERCIAL NOT CONTAINS 'COCKPIT'
+							AND ORI.NMPARCEIROCOMERCIAL NOT CONTAINS 'CONSULT'
+							OR (ORI.NMPARCEIROCOMERCIAL CONTAINS 'CP'
+							AND ORI.NMPARCEIROCOMERCIAL CONTAINS 'BV') THEN 'BV BALCÃO'
+							ELSE 'COBANS TRADICIONAIS'
+	                 END AS TIPOPARCEIROCOMERCIAL,
+
+	case when BVOonda.CdParceiroComercial<>. then 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.) else 'Demais' end as FlGrupoBVO,
+
+	DPA.Porte,
+	DPA.UfParceiro,
+	DPA.NmGrupoConcessionaria,
+
+    SUM(ORI.Fl&TpProposta.) AS Qtd FORMAT num18.,
+    SUM(ORI.VrMargemLiquida) AS VrMargemContribuicao FORMAT num18.2,
+    SUM(ORI.Vr&TpProposta.) AS VrLiberado FORMAT num18.2,
+    SUM(ORI.VrPDD) AS VrPerdaEsperada FORMAT num18.2,
+    SUM(ORI.VrFinanciamento) AS VrFinanciamento FORMAT num18.2,
+    SUM(CASE WHEN ORI.NmGrupoProdutoMeta IN ('Leves','Motos','Pesados') THEN ORI.VpTxGerencial ELSE ORI.VpTxGerencialRebate END) AS VpTxGerencial FORMAT num18.2,
+    SUM(ORI.VpTxPactuada) AS VpTxPactuada FORMAT num18.2,
+    SUM(CASE WHEN ORI.NmGrupoProdutoMeta IN ('Leves','Motos','Pesados') THEN ORI.VpSpread2 ELSE ORI.VpSpreadRebate2 END) AS VpSpread FORMAT num18.2,
+    SUM(((1+(ORI.VpTxPactuada/ORI.VrLiberado)) / (1+(((ORI.TxTirContabil/100) * (ORI.VrLiberado))/ORI.VrLiberado)) -1 ) * ORI.VrLiberado) AS VpSpreadPactuado FORMAT num18.2,
+    SUM(ORI.VpTirContabil) AS VpTirContabil FORMAT num18.2,
+    SUM(ORI.FlTxAlterada) AS QtTxAlterada FORMAT num18.,
+    SUM(ORI.VpIdade) AS VpIdade FORMAT num18.2,
+    SUM(ORI.VpPrazo) AS VpPrazo FORMAT num18.2,
+    /*SUM((ORI.PcEntrada/100) * ORI.Vr&TpProposta.) AS VpEntrada FORMAT num18.2,*/
+    SUM(ORI.VpEntrada) AS VpEntrada FORMAT num18.2,
+    SUM(ORI.VpScore) AS VpScore FORMAT num18.2,
+    SUM(ORI.NuRating * ORI.Vr&TpProposta.) AS VpRating FORMAT num18.2,
+    SUM(ORI.VrLiberadoProjetado) AS VrLiberadoProjetado FORMAT num18.2,
+    SUM(ORI.Vr&TpProposta. * COALESCE(TXP.VarTaxaAlterada,0)) AS VpTamanhoPATodo FORMAT num18.2,
+    SUM(CASE WHEN ORI.FlTxAlterada = 1 THEN ORI.Vr&TpProposta. * COALESCE(TXP.VarTaxaAlterada,0) ELSE 0 END) AS VpTamanhoPA FORMAT num18.2,
+	SUM(CVS.VpRatingCliente) AS VpRatingCliente FORMAT num18.2,
+    SUM(CVS.VpRatingSimulacao) AS VpRatingSimulacao FORMAT num18.2,
+	SUM(CVS.VrSimulacao) AS VrSimulacao FORMAT num18.2
+  FROM
+    Originacao ORI
+  LEFT JOIN
+    AUXL.TbMolicar_SUV SUV
+    ON SUV.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    TbModeloMolicar ESG
+    ON ESG.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    TbModeloMolicarMotos MT
+    ON MT.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    TaxasPropostas TXP
+    ON TXP.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    InfoCliente CLI
+    ON CLI.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    MsgProposta MSG
+    ON ORI.NuProposta = MSG.NuProposta
+  LEFT JOIN
+    AUXL.TBROLLOUTMENSAGERIA MBV
+    ON MBV.CdParceiroComercial = ORI.CdParceiroComercial
+  LEFT JOIN
+    CONVPROP.CONVERSAOPROPOSTAS CNP
+    ON CNP.Nuproposta = ORI.NuProposta
+  LEFT JOIN
+    Leads Led
+    ON Ori.NuProposta = Led.NuProposta
+  LEFT JOIN
+	BASEGRC.TbFiltroCVG CVG
+	ON CVG.nuproposta = ORI.nuproposta
+  LEFT JOIN
+    FNI ON FNI.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    Convsimu CVS
+	ON CVS.NuProposta = ORI.NuProposta
+
+  LEFT JOIN
+    BASEGRC.TbLevesNovosBVO BVO
+    ON BVO.CdParceiroComercial = ORI.CdParceiroComercial
+	and BVO.nuanomes = ORI.nuanomes
+  LEFT JOIN
+    TbOndaBVO BVOonda
+    ON BVOonda.CdParceiroComercial = ORI.CdParceiroComercial
+   LEFT JOIN
+    DadosParceiro DPA
+	ON DPA.CdParceiroComercial = ORI.CdParceiroComercial
+
+  WHERE
+    &Condicao.
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+    21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+    41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,
+	61,62,63,64,65,66;
+RUN;
+%MEND;
+
+%VerificaAtualizacao(/infogrc/apnp/propostas/conversaopropostas.sas7bdat,12,300);
+
+DATA _null_;
+SET PropostasParametros;
+  CALL EXECUTE('%GeraBasePropostas('||TpDados||','||Condicao||','||TpProposta||')');
+RUN;
+
+PROC SQL;
+  CREATE TABLE QDVPropostas AS
+    SELECT * FROM QDVOriginacao
+    OUTER UNION CORRESPONDING
+    SELECT * FROM QDVAprovacao
+    OUTER UNION CORRESPONDING
+    SELECT * FROM QDVEfetivacao;
+RUN;
+
+/* Contratos */
+PROC SQL;
+CREATE TABLE TbFlagProducao001 AS
+  SELECT DISTINCT
+    DtContrato AS DtReferencia
+  FROM Producao
+  WHERE DtContrato > TODAY() - 31
+  ORDER BY DtContrato DESC;
+QUIT;
+
+DATA TbFlagProducao;
+SET TbFlagProducao001;
+  BY DESCENDING DtReferencia;
+  RETAIN FlDiaComparacao 0;
+  FlDiaComparacao + 1;
+RUN;
+
+PROC SQL;
+CREATE TABLE QDVContratos AS
+  SELECT
+    PRD.DtAtualizacao AS DtAtualizacaoProducao FORMAT mmddyy10.,
+    CASE WHEN PRD.DtContrato >= TODAY()-30 THEN PRD.DtContrato
+         ELSE INTNX('month', PRD.DtContrato, 0, 'BEGINNING')
+         END AS DtReferencia FORMAT mmddyy10.,
+    CASE WHEN FLP.FlDiaComparacao BETWEEN 3 AND 7 THEN 7
+         WHEN FLP.FlDiaComparacao BETWEEN 8 AND 14 THEN 14
+         ELSE FLP.FlDiaComparacao END AS FlDiaComparacao,
+    'Producao' AS TpDados,
+    PRD.NuAnoMes,
+    CASE WHEN CLI.QtAnosIdadePessoa = . THEN .
+         WHEN CLI.QtAnosIdadePessoa <= 24 THEN 24
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 25 AND 34 THEN 34
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 35 AND 44 THEN 44
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 45 AND 54 THEN 54
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 55 AND 64 THEN 64
+         WHEN CLI.QtAnosIdadePessoa BETWEEN 65 AND 71 THEN 71
+         WHEN CLI.QtAnosIdadePessoa >= 72 THEN 72
+    END AS QtAnosIdadePessoa,
+    CLI.Genero,
+    CLI.UFCliente,
+    CLI.FxRenda,
+    PRD.TpPessoa,
+    case when BVO.CdParceiroComercial<>. and PRD.NmGrupoProdutoMeta = 'Leves' and
+    PRD.fxidade ='ZeroKM' then 'Leves-BVO' else PRD.NmGrupoProdutoMeta end as NmGrupoProdutoMeta,
+    PRD.NmTipoParceiroComercial,
+	MT.CilindradaBV as Cilindradas,
+	MT.CilindradaMercado as CilindradasMercado,
+    ESG.Combustivel,
+    PRD.DsTipoCanalProducao,
+    PRD.NmAreaEstruturaComercial,
+    PRD.NmSubEstruturaComercialA,
+	STRIP(PUT(PRD.CdParceiroComercial,6.)) || " - " || PRD.NmParceiroComercial AS NmParceiroComercial,
+    PRD.FxParcela,
+	PRD.QtAnosIdade,
+    CASE WHEN PRD.QtAnosIdade BETWEEN 11 AND 14 THEN '11 a 14 anos'
+         WHEN PRD.QtAnosIdade BETWEEN 15 AND 19 THEN '15 a 19 anos'
+         WHEN PRD.QtAnosIdade >= 20 THEN '20 anos e acima'
+         ELSE PRD.FxIdade
+    END AS FxIdade,
+    PRD.FxEntrada,
+    CASE WHEN PRD.NuScoreFim <= 5.5 THEN 'SCORE 5 - 5.5'
+         WHEN PRD.NuScoreFim > 5.5 AND PRD.NuScoreFim <= 6.5 THEN 'SCORE 6 - 6.5'
+         WHEN PRD.NuScoreFim > 6.5 AND PRD.NuScoreFim <= 7.5 THEN 'SCORE 7 - 7.5'
+         WHEN PRD.NuScoreFim > 7.5 AND PRD.NuScoreFim <= 8.5 THEN 'SCORE 8 - 8.5'
+         WHEN PRD.NuScoreFim > 8.5 THEN 'SCORE 9 - 10'
+    END AS Fx_Score,
+    CASE WHEN PRD.NuRating = . THEN ''
+         WHEN PRD.NuRating <= 5.5 THEN 'RATING 5 - 5.5'
+         WHEN PRD.NuRating > 5.5 AND PRD.NuRating <= 6.5 THEN 'RATING 6 - 6.5'
+         WHEN PRD.NuRating > 6.5 AND PRD.NuRating <= 7.5 THEN 'RATING 7 - 7.5'
+         WHEN PRD.NuRating > 7.5 AND PRD.NuRating <= 8.5 THEN 'RATING 8 - 8.5'
+         WHEN PRD.NuRating > 8.5 THEN 'RATING 9 - 10'
+    END AS FxRating,
+    PRD.QtCorridosDiaUtilMes,
+    PRD.QtTotalDiaUtilMes,
+    1 AS FlPropostaAprovada,
+    COALESCE(SUV.DsMolicarConfiguracao,'N') AS DsMolicarConfiguracao,
+    CASE WHEN PRD.VrTarifaCadastro > 0 THEN 1 ELSE 0 END AS FlTarifaCadastro,
+    CASE WHEN PRD.VrTarifaAvaliacaoBem > 0 THEN 1 ELSE 0 END AS FlTarifaAvaliacaoBem,
+    PRD.FlBVMais AS PossuiSPF,
+    PRD.FlCap AS PossuiCap,
+    PRD.FlDemaisSemCompleto AS PossuiAuto,
+    PRD.FlCompleto AS PossuiCompleto,
+    PRD.FlTxAlterada,
+    COALESCE(MSG.Mensageria,'9. Não houve mensageria') AS Mensageria,
+    MSG.Mensageria2,
+    MSG.MotivoRecusa,
+    MSG.MsgEntradaMinima,
+    MSG.EntradaMinima,
+    MBV.Onda AS FlOndaMotorBV,
+    MBV.DataRollout as DataRollout FORMAT=mmddyy10.,
+    TXP.TpOrigemTaxa,
+    CASE WHEN INPUT(SUBSTR(PRD.NuCpfCnpj,6,2),2.) BETWEEN 00 AND 19 THEN 'Sem PPR'
+         WHEN INPUT(SUBSTR(PRD.NuCpfCnpj,6,2),2.) BETWEEN 20 AND 59 THEN 'Controle'
+         WHEN INPUT(SUBSTR(PRD.NuCpfCnpj,6,2),2.) BETWEEN 60 AND 99 THEN 'Ação'
+    END AS FlagCPFPPR,
+    TXP.DeltaAplicado,
+    CLI.FlPAP,
+    COALESCE(CVG.FiltroCVG,'OUTROS PRODUTOS') as FiltroCVG,
+    PRD.FxPrestacao,
+    PRD.FxFinanciamento,
+    CASE WHEN PRD.DiasEfetivacao = . THEN ''
+         WHEN PRD.DiasEfetivacao < 0 THEN '< 0'
+         WHEN PRD.DiasEfetivacao BETWEEN 0 AND 3 THEN '0 - 3'
+         WHEN PRD.DiasEfetivacao BETWEEN 4 AND 5 THEN '4 - 5'
+         WHEN PRD.DiasEfetivacao BETWEEN 6 AND 7 THEN '6 - 7'
+         WHEN PRD.DiasEfetivacao BETWEEN 8 AND 14 THEN '8 - 14'
+         WHEN PRD.DiasEfetivacao BETWEEN 15 AND 21 THEN '15 - 21'
+         WHEN PRD.DiasEfetivacao BETWEEN 22 AND 30 THEN '22 - 30'
+         WHEN PRD.DiasEfetivacao > 30 THEN '> 30'
+    END AS FxDiasConversao,
+    'BV' AS BancoConversao,
+    Led.CompraLeads,
+    CASE WHEN FNI.NuProposta <> . THEN 'S' ELSE 'N' END AS FlFNI,
+    COALESCE(PRD.FlLeilao,'N') AS FlLeilao,
+	COALESCE(PRD.FlC2C,'N') AS FlC2C,
+    CLI.TipoPolitica,
+    CASE WHEN PRD.NuRating = . THEN 0 ELSE 1 END AS FlRating,
+	CVS.FlRatingC,
+	CVS.FlRatingS,
+	Led.flagproducao AS FlComissaoLead,
+    PRD.FlRastreador,
+	PRD.FlC2C,
+	PRD.CdMarca,
+	PRD.FlElegivel,
+	PRD.FlpenetracaocontacartaoD60,
+	PRD.FlpenetracaoD60,
+	Led.Origem,
+
+	CASE 			  WHEN PRD.NMTIPOPARCEIROCOMERCIAL LIKE '%PARCEIRO DE INDICAÇÃO - CANAL PRÓPRIO%' THEN 'PARCEIRO DE INDICAÇÃO'
+					 WHEN PRD.NMTIPOPARCEIROCOMERCIAL LIKE '%Loja%' AND  ( PRD.NMPARCEIROCOMERCIAL LIKE '%FINANZERO%'
+																		OR PRD.NMPARCEIROCOMERCIAL LIKE '%QUERO FINANCIAR%'
+																		OR PRD.NMPARCEIROCOMERCIAL LIKE '%TATOS GESTAO DE NEGOCIOS%'
+																		OR PRD.NMPARCEIROCOMERCIAL LIKE '%EASYC S.A.%'
+																		OR PRD.NMPARCEIROCOMERCIAL LIKE '%JUROS BAIXOS JA%'
+																		OR PRD.NMPARCEIROCOMERCIAL LIKE '%FINANCIA TUDO%'
+                          AND PRD.DSTIPOCANALPRODUCAO IN ('LOJA CANAL NEGOCIOS','PROMOTORA','BV FINANCEIRA - OPERACAO ESPECIAL'))
+                          THEN 'PARCEIRO DIGITAL'
+                     WHEN PRD.CDPARCEIROCOMERCIAL IN(424584 , 452470) THEN 'CVG ÁREA ABERTA SITE'
+                     WHEN PRD.DSTIPOCANALPRODUCAO IN ('MULTIMARCAS','CONCESSIONARIAS') THEN 'CANAL VEÍCULOS'
+                     WHEN (PRD.CDPARCEIROCOMERCIAL = 407516 AND PRD.DTENTRADAPROPOSTA BETWEEN '01JUL2020'D AND '31AUG2020'D)
+                          OR (PRD.CDPARCEIROCOMERCIAL = 416382 AND PRD.DTENTRADAPROPOSTA >= '01AUG2020'D)
+                          THEN 'JUST'
+                     WHEN PRD.NMPARCEIROCOMERCIAL LIKE '%CP GARAN TMLKT%' THEN 'GR CONSULTOR - TELEMARKETING'
+                     WHEN PRD.CDPARCEIROCOMERCIAL = 414643 THEN 'MINHA BV'
+                     WHEN PRD.CDPARCEIROCOMERCIAL IN (448756, 449109, 452671, 460298) THEN 'PARCEIRO 100% DIGITAL - EPS'
+                     WHEN PRD.NMPARCEIROCOMERCIAL CONTAINS 'BV' AND PRD.NMPARCEIROCOMERCIAL CONTAINS 'CONSULT' THEN 'GR CONSULTOR'
+                     WHEN PRD.NMPARCEIROCOMERCIAL CONTAINS 'BV' AND PRD.NMPARCEIROCOMERCIAL CONTAINS 'COCKPIT' THEN 'GR COCKPIT'
+					 WHEN PRD.NMPARCEIROCOMERCIAL CONTAINS 'BV'
+							AND (PRD.NMPARCEIROCOMERCIAL CONTAINS 'GARAN'
+							OR PRD.NMPARCEIROCOMERCIAL CONTAINS 'PARTICULAR')
+							AND PRD.NMPARCEIROCOMERCIAL NOT CONTAINS 'COCKPIT'
+							AND PRD.NMPARCEIROCOMERCIAL NOT CONTAINS 'CONSULT'
+							OR (PRD.NMPARCEIROCOMERCIAL CONTAINS 'CP'
+							AND PRD.NMPARCEIROCOMERCIAL CONTAINS 'BV') THEN 'BV BALCÃO'
+							ELSE 'COBANS TRADICIONAIS'
+	                 END AS TIPOPARCEIROCOMERCIAL,
+
+	case when bvoonda.CdParceiroComercial<>. then 'Grupo BVO'||'-'||put(bvoonda.nuanomes,6.) else 'Demais' end as FlGrupoBVO,
+
+	DPA.Porte,
+	DPA.UfParceiro,
+	DPA.NmGrupoConcessionaria,
+
+    SUM(CASE WHEN PRD.NuContrato IS NOT NULL THEN 1 ELSE 0 END) AS Qtd FORMAT num18.,
+    SUM(PRD.VrProducao) AS VrLiberado FORMAT num18.2,
+    SUM(PRD.VrPerdaEstimada) AS VrPerdaEsperada FORMAT num18.2,
+    SUM(PRD.VrFinanciamento) AS VrFinanciamento FORMAT num18.2,
+    SUM(PRD.VpTxGerencial) AS VpTxGerencial FORMAT num18.2,
+    SUM(PRD.VpTxJuros) AS VpTxPactuada FORMAT num18.2,
+    SUM(CASE WHEN PRD.NmGrupoProdutoMeta IN ('Leves','Motos','Pesados','CVG Leves','CVG Pesados') THEN PRD.VpSpread2 ELSE PRD.VpSpreadRebate2 END) AS VpSpread FORMAT num18.2,
+    SUM(((1+(PRD.VpTxJuros/PRD.VrProducao)) / (1+(((PRD.TxTirContabil/100) * (PRD.VrProducao))/PRD.VrProducao)) -1 ) * PRD.VrProducao) AS VpSpreadPactuado FORMAT num18.2,
+    SUM(PRD.VpTirContabil) AS VpTirContabil FORMAT num18.2,
+    SUM(PRD.FlTxAlterada) AS QtTxAlterada FORMAT num18.,
+    SUM(PRD.VpIdade) AS VpIdade FORMAT num18.2,
+    SUM(PRD.VpPrazo) AS VpPrazo FORMAT num18.2,
+    /*SUM((PRD.PcEntradaMolicar/100) * PRD.VrProducao) AS VpEntrada FORMAT num18.2,*/
+    SUM(PRD.VpEntrada) AS VpEntrada FORMAT num18.2,
+    SUM(PRD.VpScore) AS VpScore FORMAT num18.2,
+    SUM(PRD.NuRating * PRD.VrProducao) AS VpRating FORMAT num18.2,
+    SUM(PRD.VrMargem) AS VrMargemContribuicao FORMAT num18.2,
+    SUM(PRD.VrProducaoProjetado) AS VrLiberadoProjetado FORMAT num18.2,
+    SUM(PRD.VrTarifaCadastro) AS VrTarifaCadastro FORMAT num18.2,
+    SUM(PRD.VrTarifaAvaliacaoBem) AS VrTarifaAvaliacaoBem FORMAT num18.2,
+    SUM(PRD.QtSeguros) AS QtSeguros FORMAT num18.,
+    SUM(PRD.FlBVMais) AS FlBVMais FORMAT num18.,
+    SUM(PRD.FlCap) AS FlCap FORMAT num18.,
+    SUM(PRD.FlDemais) AS FlDemais FORMAT num18.,
+    SUM(PRD.FlDemaisSemCompleto) AS FlDemaisSemCompleto FORMAT num18.,
+    SUM(PRD.FlCap03) AS FlCap03 FORMAT num18.,
+    SUM(PRD.FlCap05) AS FlCap05 FORMAT num18.,
+    SUM(PRD.FlCap07) AS FlCap07 FORMAT num18.,
+    SUM(PRD.FlCap10) AS FlCap10 FORMAT num18.,
+    SUM(PRD.FlCap12) AS FlCap12 FORMAT num18.,
+    SUM(PRD.FlCap15) AS FlCap15 FORMAT num18.,
+    SUM(PRD.FlCap19) AS FlCap19 FORMAT num18.,
+    SUM(PRD.FlCompleto) AS FlCompleto FORMAT num18.,
+    SUM(PRD.FlGarantiaMecanica) AS FlGarantiaMecanica FORMAT num18.,
+    SUM(PRD.FlRCF) AS FlRCF FORMAT num18.,
+    SUM(PRD.FlCasco) AS FlCasco FORMAT num18.,
+    SUM(PRD.FlGap) AS FlGap FORMAT num18.,
+    SUM(PRD.FlDFI) AS FlDFI FORMAT num18.,
+    SUM(PRD.VrSeguros) AS VrSeguros FORMAT num18.2,
+    SUM(PRD.VrBVMais) AS VrBVMais FORMAT num18.2,
+    SUM(PRD.VrCap) AS VrCap FORMAT num18.2,
+    SUM(PRD.VrDemais) AS VrDemais FORMAT num18.2,
+    SUM(PRD.VrBVMaisProjetado) AS VrBVMaisProjetado FORMAT num18.2,
+    SUM(PRD.VrCapProjetado) AS VrCapProjetado FORMAT num18.2,
+    SUM(PRD.VrDemaisProjetado) AS VrDemaisProjetado FORMAT num18.2,
+    SUM(PRD.VrCap03) AS VrCap03 FORMAT num18.2,
+    SUM(PRD.VrCap05) AS VrCap05 FORMAT num18.2,
+    SUM(PRD.VrCap07) AS VrCap07 FORMAT num18.2,
+    SUM(PRD.VrCap10) AS VrCap10 FORMAT num18.2,
+    SUM(PRD.VrCap12) AS VrCap12 FORMAT num18.2,
+    SUM(PRD.VrCap15) AS VrCap15 FORMAT num18.2,
+    SUM(PRD.VrCap19) AS VrCap19 FORMAT num18.2,
+    SUM(PRD.VrCompleto) AS VrCompleto FORMAT num18.2,
+    SUM(PRD.VrGarantiaMecanica) AS VrGarantiaMecanica FORMAT num18.2,
+    SUM(PRD.VrRCF) AS VrRCF FORMAT num18.2,
+    SUM(PRD.VrCasco) AS VrCasco FORMAT num18.2,
+    SUM(PRD.VrGap) AS VrGap FORMAT num18.2,
+    SUM(PRD.VrDFI) AS VrDFI FORMAT num18.2,
+    SUM(PRD.FlBVMaisEleg) AS FlBVMaisEleg FORMAT num18.,
+    SUM(PRD.FlCapEleg) AS FlCapEleg FORMAT num18.,
+    SUM(PRD.FlDemaisEleg) AS FlDemaisEleg FORMAT num18.,
+    SUM(PRD.FlCompletoEleg) AS FlCompletoEleg FORMAT num18.,
+    SUM(PRD.VrProducao * COALESCE(TXP.VarTaxaAlterada,0)) AS VpTamanhoPATodo FORMAT num18.2,
+    SUM(CASE WHEN PRD.FlTxAlterada = 1 THEN PRD.VrProducao * COALESCE(TXP.VarTaxaAlterada,0) ELSE 0 END) AS VpTamanhoPA FORMAT num18.2,
+    SUM(PRD.VrComissaoParcelada) AS VrComissaoParcelada FORMAT num18.2,
+    SUM(PRD.VrComissaoTotal) AS VrComissaoTotal FORMAT num18.2,
+	SUM(CVS.VpRatingCliente) AS VpRatingCliente FORMAT num18.2,
+    SUM(CVS.VpRatingSimulacao) AS VpRatingSimulacao FORMAT num18.2,
+	SUM(CVS.VrSimulacao) AS VrSimulacao FORMAT num18.2
+  FROM
+    Producao PRD
+  LEFT JOIN
+    TbFlagProducao FLP
+    ON PRD.DtContrato = FLP.DtReferencia
+    AND FLP.FlDiaComparacao <= 14
+  LEFT JOIN TbModeloMolicar ESG
+    ON ESG.NuProposta = PRD.NuProposta
+  LEFT JOIN TbModeloMolicarMotos MT
+    ON MT.NuProposta = PRD.NuProposta
+  LEFT JOIN AUXL.TbMolicar_SUV SUV
+    ON SUV.NuProposta = Producao.NuProposta
+  LEFT JOIN
+    TaxasPropostasPrd TXP
+    ON TXP.NuContrato = PRD.NuContrato
+  LEFT JOIN
+    InfoCliente CLI
+    ON CLI.NuProposta = PRD.NuProposta
+  LEFT JOIN
+    MsgProposta MSG
+    ON PRD.NuProposta = MSG.NuProposta
+  LEFT JOIN
+    AUXL.TBROLLOUTMENSAGERIA MBV
+    ON MBV.CdParceiroComercial = PRD.CdParceiroComercial
+  LEFT JOIN
+    CONVPROP.CONVERSAOPROPOSTAS CNP
+    ON CNP.Nuproposta = PRD.NuProposta
+  LEFT JOIN
+    Leads Led
+    ON PRD.NuProposta = Led.NuProposta
+  LEFT JOIN
+	BASEGRC.TbFiltroCVG CVG
+	ON CVG.nuproposta = PRD.nuproposta
+  LEFT JOIN
+    FNI ON FNI.NuProposta = PRD.NuProposta
+  LEFT JOIN
+    Convsimu CVS
+	ON CVS.NuProposta = PRD.NuProposta
+ LEFT JOIN
+   BASEGRC.TbLevesNovosBVO BVO
+	ON BVO.CdParceiroComercial = PRD.CdParceiroComercial
+	and BVO.nuanomes = PRD.nuanomes
+  Left Join TbOndaBVO BVOonda
+	on BVOonda.cdparceirocomercial = PRD.cdparceirocomercial
+  LEFT JOIN
+    DadosParceiro DPA
+	ON DPA.CdParceiroComercial = PRD.CdParceiroComercial
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+    21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+    41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,
+	63,64,65,66,67,68,69,70,71,72,73;
+RUN;
+
+/* Unificar base principal */
+PROC SQL;
+  CREATE TABLE ConsolidadoCubo AS
+    SELECT * FROM QDVPropostas
+    OUTER UNION CORRESPONDING
+    SELECT * FROM QDVContratos;
+RUN;
+
+/* Limpar bases auxiliares */
+PROC DATASETS LIBRARY=WORK;
+  DELETE
+    TbFlagProducao001
+    TbFlagProducao
+    QDVOriginacao
+    QDVAprovacao
+    QDVEfetivacao
+    QDVPropostas
+    QDVContratos
+    PropostasParametros001
+    PropostasParametros;
+RUN;
+
+PROC SQL; CREATE INDEX NuAnoMes ON ConsolidadoCubo; QUIT;
+PROC SQL; CREATE INDEX NmGrupoProdutoMeta ON ConsolidadoCubo; QUIT;

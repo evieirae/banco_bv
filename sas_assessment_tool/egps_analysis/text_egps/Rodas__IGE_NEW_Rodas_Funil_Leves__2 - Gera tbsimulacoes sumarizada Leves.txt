@@ -1,0 +1,728 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_Funil_Leves
+FILE_SAS: 2 - Gera tbsimulacoes sumarizada Leves.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -8
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), PROC FORMAT (1x | +25), %INCLUDE (2x | +40), FILENAME  (2x | +24)
+----------------------------------------
+LINES_OF_CODE: 638
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, FORMAT, FREQ, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: MXDATASIMU, data_max, dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: BQ
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPRODUCAO [SAS/Local], BV-SAEM-DTM.MIS_VAREJO_RODAS_EMPRESTIMOS.PDEC_LEVES [BIGQUERY], CONVSIMU.TBSIMULACOES [SAS/Local], FUNIL.V7_ENTR_MIN_PDEC [SAS/Local], SOLITMP.CLASS_PDVS_CREDITO_HIST [SAS/Local], SOLITMP.CLASS_PDVS_CREDITO_NOVA [SAS/Local], SOLITMP.ROLLOUT_V7 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TRIBO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBPROPOSTAEDITADASUM
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], BASES.TBPRODUCAO [PROC SQL - FROM], BV-SAEM-DTM.MIS_VAREJO_RODAS_EMPRESTIMOS.PDEC_LEVES [Pass-Through Native (BIGQUERY) - BQ inferred 3-part identifier; Pass-Through Native (BIGQUERY) - FROM], CONVSIMU.TBSIMULACOES [PROC SQL - FROM], FUNIL.V7_ENTR_MIN_PDEC [PROC SQL - JOIN], SOLITMP.CLASS_PDVS_CREDITO_HIST [PROC SQL - JOIN], SOLITMP.CLASS_PDVS_CREDITO_NOVA [PROC SQL - JOIN], SOLITMP.ROLLOUT_V7 [PROC SQL - JOIN], TRIBO.CUBOSIMULACAOLEVES_ANALISE [DATA Step - SET; PROC EXPORT - DATA=; PROC SQL - FROM], TRIBO.MXDTSIMU [PROC SQL - FROM], WORK.TBPROPOSTAEDITADASUM [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): TRIBO.CUBOSIMULACAOLEVES_ANALISE, TRIBO.MXDTSIMU
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TRIBO.CUBOSIMULACAOLEVES_ANALISE, TRIBO.MXDTSIMU
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TRIBO.CUBOSIMULACAOLEVES_ANALISE, TRIBO.MXDTSIMU
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./leves_PDEC.csv
+TEMP/DISCARDED OUTPUTS: BASE, CUBOSIMULACAOLEVES_ANALISE, DATAX, DATAY, TBPROPLEVES, TBSIMULACOESLEVES, TBSIMULACOES_00_LEVES, TBSIMULACOES_00_LEVES_1, TBSIMULACOES_00_LEVES_2, TBSIMULEVES, TB_MOTIVO_RECUSA, TMPPRD, TMPPROPOSTAS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	2 - Gera tbsimulacoes sumarizada Leves.sas														| */
+/* | Descricao: Programa gerar o output de simulacoes o Dash funil leves.					| */
+/* | Objetivo: 	Apuração do Dash fUNIL Motos					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+proc sql print;
+	select (year(intnx('month',MXDATASIMU,-3))*100)+month(intnx('month',MXDATASIMU,-3)) as MXDATASIMU INTO :MXDATASIMU from tribo.MXDTSIMU;
+QUIT;
+
+/***********************************************************************************************|
+|					GERA INFOS DE DSSITUACAOCREDITO DA PDEC LEVES			|
+|***********************************************************************************************/
+proc sql ;
+connect to bigquery as BQ (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table tb_motivo_recusa as
+   select * from connection to BQ
+     (
+		SELECT DISTINCT
+			   dt_simulacao_proposta,
+			   cd_simulacao_proposta	as cd_simulacao_proposta,
+			   ds_situacao_credito_prean  as  ds_situacao_credito_pre
+		FROM bv-saem-dtm.mis_varejo_rodas_emprestimos.pdec_leves
+		) a
+/*	WHERE year(a.dt_simulacao_proposta)*100+month(a.dt_simulacao_proposta) >= 202501;*/
+WHERE year(a.dt_simulacao_proposta)*100+month(a.dt_simulacao_proposta) >= &MXDATASIMU.;
+   disconnect from BQ;
+quit;
+
+/* ======================================================================================*/
+/* ====================Gera tbsimulacoes sumarizada Leves=========================*/
+/* ======================================================================================*/
+
+proc sql;
+	create table TbSimulacoesleves as
+		select
+			A.Produto
+			,A.NuAnoMes
+			,A.CdSimulacaoInicial
+			,A.SistemaInicial
+			,A.SistemaFinal
+			,A.NuVersaoMotor
+			,A.StatusSimulacao
+			,A.CdParceiroComercial
+			,A.PcEntradaSimu
+			,
+		case
+			when A.PcEntradaSimu > 0.99
+			THEN 1
+		else round(A.PcEntradaSimu,0.01)
+		END
+	as  PcEntradaAjust
+		,A.NmParceiroComercial
+		,A.DsLoginN1 AS GerenteRegional
+		,A.NmColaborador
+		,A.DsLoginN2 AS GerenteFilial
+		,A.FxPrazo
+		,A.FlCard
+		,A.Regional
+		,A.Filial
+		,A.Canal
+		,A.Mensageria
+		,A.TpPessoa
+		,A.FlPorteA
+		,A.FlZeroKm
+		,A.FxIdade
+		,A.IdadeBem
+		,A.QtParcela
+		,
+	CASE
+		WHEN A.ProbabilidadeAprovacao < 0
+		THEN 0
+	ELSE A.ProbabilidadeAprovacao
+	END
+AS ProbabilidadeAprovacao/*Esse é o score*/
+
+	,A.DtSimulacaoInicial
+	,A.DtInclusaoGravame
+	,
+	case
+		when
+		intck('day',A.DtSimulacaoInicial,A.DtInclusaoGravame) >= 0
+			then intck('day',A.DtSimulacaoInicial,A.DtInclusaoGravame)
+	end
+	as MOBConc
+		,
+		case
+			when intck('day',A.DtSimulacaoInicial,A.DtContrato) >= 0
+				then intck('day',A.DtSimulacaoInicial,A.DtContrato)
+		end
+		as MOBConvContrato
+			,
+			case
+				when intck('day',A.DtEntradaProposta,A.DtContrato) >= 0
+					then intck('day',A.DtEntradaProposta,A.DtContrato)
+			end
+			as MOBEfet
+				,A.NuCpfCnpj
+				,A.FlSimulacao
+				,A.FlSimuValida
+				,A.FlSimuValidaBVO
+				,A.FlSimuValidaEfet
+				,A.FlSimuValidaDiaEfet
+				,A.FlSimuValidaSemanaEfet
+				,A.RatingCliente
+				,A.RatingSimulacao
+				,A.FlPropostaOriginada
+				,A.FlPropostaAprovada
+				,A.FlPropostaEfetivada
+				,A.FlPropostaPaga
+				,A.FlConversao
+				,A.FlConcorrente
+				,A.StPagoLoja
+				,A.MotivoRecusa
+				,A.DsSituacaoCredito
+				,A.faixaScoreHSPN
+				,A.FaixaMatriz
+				,A.NotaGarantia
+				,A.EntradaMinima
+				,A.PcEntradaMinima
+				,A.FlPap
+				,A.Banco
+				,A.VrVeiculoSimulacao
+				,A.VrEntrada
+				,A.VrProducao
+				,A.VrProposta
+				,
+				case
+					when A.FlSimulacao > 0
+					and A.DtEntradaProposta IS NOT NULL
+						THEN A.NuProposta
+				END
+				AS NuProposta
+					,A.NuContrato
+					From CONVSIMU.TbSimulacoes A
+						Where 1=1
+							and UPCASE(A.Produto) LIKE 'LEVES%'
+							and A.NuAnoMes >= &MXDATASIMU.
+/*											and A.NuAnomes >= 202501*/
+	and A.DtSimulacaoInicial < TODAY()
+
+	;
+QUIT;
+
+proc sql;
+	Create Table TRIBO.MXDTSIMU AS
+		Select max(DtSimulacaoInicial) format ddmmyy10. as mxdatasimu
+			from TbSimulacoesleves
+	;
+QUIT;
+
+proc sql;
+	Create Table TMPPROPOSTAS AS
+		Select
+			DISTINCT
+				NuProposta
+			FROM TbSimulacoesleves
+				WHERE NUPROPOSTA IS NOT NULL
+	;
+QUIT;
+
+PROC SQL;
+	Create Table TMPPRD AS
+		Select
+			/*YEAR(DTCONTRATO)*100+MONTH(DTCONTRATO) AS MESANO,*/
+	NUPROPOSTA,
+	cdparceirocomercial,
+	NmAreaEstruturaComercial,
+	NmAreaEstruturaComercialC,
+	DsTipoCanalProducao,
+	((1+(VpTxGerencial/VrProducao)) / (1+(((TxTirContabil/100) * (VrProducao))/VrProducao)) -1 ) * VrProducao AS VpSpread,
+	VrSeguros,
+	(VrBVMais) as VrSeguroSPF,
+	(VrCap) as VrSeguroAP,
+	(VrDemais) as VrSeguroDemais,
+	(VrCompleto) as VrSeguroCompleto,
+	coalesce(VrMargemContribuicaoFinal,VrMargemContribuicao) as VrMargemContribuicaoFinal
+	from BASES.TBPRODUCAO
+		WHERE NUPROPOSTA IN (SELECT NUPROPOSTA FROM TMPPROPOSTAS)
+	;
+QUIT;
+
+proc freq data=TbSimulacoesleves;
+	table nuanomes * flpap / missing nocol nopercent nofreq;
+run;
+
+data tbpropleves tbsimuleves;
+	set TbSimulacoesleves;
+
+	if FlPropostaOriginada = 1 then
+		output tbpropleves;
+	else output tbsimuleves;
+run;
+
+proc format;
+	value fmt_fx_ent_dash_leves
+		. = "Missing"
+		0.00 - 0.0499 = "00% a 4,99%"
+		0.05 - 0.0999 = "05% a 9,99%"
+		0.10 - 0.1499 = "10% a 14,99%"
+		0.15 - 0.1999 = "15% a 19,99%"
+		0.20 - 0.2499 = "20% a 24,99%"
+		0.25 - 0.2999 = "25% a 29,99%"
+		0.30 - 0.3499 = "30% a 34,99%"
+		0.35 - 0.3999 = "35% a 39,99%"
+		0.40 - 0.4499 = "40% a 44,99%"
+		0.45 - 0.4999 = "45% a 49,99%"
+		0.50 - 0.5499 = "50% a 54,99%"
+		0.55 - 0.5999 = "55% a 59,99%"
+		0.60 - 0.6499 = "60% a 64,99%"
+		0.65 - 0.6999 = "65% a 69,99%"
+		0.70 - 0.7499 = "70% a 74,99%"
+		0.75 - 0.7999 = "75% a 79,99%"
+		0.80 - 0.8499 = "80% a 84,99%"
+		0.85 - 0.8999 = "85% a 89,99%"
+		0.90 - 0.9499 = "90% a 94,99%"
+		0.95 - 1 = "95% a 100%"
+	;
+run;
+
+/* Ajuste PcEntrada */
+data tbsimulacoes_00_leves;
+	set tbsimulacoesleves;
+	length Msg_Agrup $20.;
+
+	if PcEntradaMinima > 1 then
+		pc_entrada_v1 = PcEntradaMinima/100;
+	else pc_entrada_v1 = PcEntradaMinima;
+
+	/* Format Faixa de Entrada Mínima */
+	fx_ent_min_v1 =  put(pc_entrada_v1,fmt_fx_ent_dash_leves.);
+
+	/* Msg Agrup */
+	If Mensageria IN ('0. Aprovado', '0. Aprovado 100%', '1. Muita chance >85%',
+		'2. Grande chance >70%', '3. Boa chance >50%')
+		AND Mensageria2 not in ('3. Recusado', '4. Recusado Reversível') Then
+		Msg_Agrup = 'Msg Positiva';
+	Else
+		If Mensageria in ('3. Recusado', '6. Recusado', '6. Plano Recusado')
+			OR (Mensageria in ('0. Aprovado', '0. Aprovado 100%', '1. Muita chance >85%',
+		'2. Grande chance >70%', '3. Boa chance >50%')
+		AND Mensageria2 in ('3. Recusado', '4. Recusado Reversível'))
+		Then
+		Msg_Agrup = 'Recusado';
+	Else Msg_Agrup = 'Demais Msg';
+run;
+
+PROC SQL;
+	CREATE TABLE  TbSimulacoes_00_leves_1 AS
+		select
+			TbSimu.*,
+		CASE
+			WHEN TbSimu.FxIdade = 'ZeroKM'
+			then 'Novos'
+		WHEN TbSimu.FxIdade = ''
+		then 'nd'
+	else 'Usados'
+		end
+	as Estado_Veiculo,
+		CASE
+			WHEN TbSimu.CdParceiroComercial = v7.Cod_Parceiro
+			then 'PILOTO_V7'
+		ELSE 'DEMAIS'
+		end
+	as PILOTO_V7,
+		v7.Ondas as ONDA_V7,
+		v7.V7 as V7,
+	CASE
+		WHEN TbSimu.CdParceiroComercial = Pdvcred.CdLoja and NuAnoMes <= 202402
+		then Pdvcred.class_pdv_fev24
+	WHEN TbSimu.CdParceiroComercial = Pdvcred.CdLoja and NuAnoMes >= 202403 then Pdvcred.class_pdv_mar24
+	ELSE 'Sem Classificação'
+	end
+as classificacao_pdv,
+	CASE
+		WHEN TbSimu.CdParceiroComercial = PdvcredNew.CdLoja
+		then PdvcredNew.class_pdv_nova
+	ELSE 'Sem Classificação'
+	end
+as classificacao_pdv_nova,
+	/*		TbSimu.PcEntradaAjust,*/
+	V7EntMin.ent_min_1_ch,
+	V7EntMin.ent_min_2_ch_v1 as ent_min_2_ch,
+	PC.NmAreaEstruturaComercialC,
+	MOTREC.ds_situacao_credito_pre
+
+	FROM TbSimulacoes_00_leves TbSimu
+		LEFT JOIN SOLITMP.ROLLOUT_V7 AS V7 ON TbSimu.CdParceiroComercial = V7.Cod_Parceiro
+		left join solitmp.CLASS_PDVS_CREDITO_HIST AS Pdvcred ON TbSimu.CdParceiroComercial = Pdvcred.CdLoja
+		left join solitmp.CLASS_PDVS_CREDITO_NOVA AS Pdvcrednew ON TbSimu.CdParceiroComercial = Pdvcrednew.CdLoja
+		left join funil.v7_entr_min_pdec V7EntMin on TbSimu.CdSimulacaoInicial = V7EntMin.cd_simulacao_proposta
+		left join BASES.TBPARCEIROCOMERCIAL AS PC ON PC.CDPARCEIROCOMERCIAL = TBSIMU.CDPARCEIROCOMERCIAL
+		left join tb_motivo_recusa AS motrec ON INPUT(MOTREC.cd_simulacao_proposta,BEST.) = TbSimu.CdSimulacaoInicial
+
+	;
+QUIT;
+
+PROC SQL;
+	CREATE TABLE  TbSimulacoes_00_leves_2 AS
+		SELECT  A.Produto,
+          A.NuAnoMes,
+          A.CdSimulacaoInicial,
+          A.SistemaInicial,
+          A.SistemaFinal,
+          A.NuVersaoMotor,
+          A.StatusSimulacao,
+          A.CdParceiroComercial,
+          A.PcEntradaSimu,
+          A.PcEntradaAjust,
+          A.NmParceiroComercial,
+          A.GerenteRegional,
+          A.NmColaborador,
+          A.GerenteFilial,
+          A.FxPrazo,
+          A.FlCard,
+          A.Regional,
+          A.Filial,
+          A.Canal,
+          A.Mensageria,
+          A.TpPessoa,
+          A.FlPorteA,
+		  A.FlZeroKm,
+          A.FxIdade,
+          A.IdadeBem,
+          A.QtParcela,
+          A.ProbabilidadeAprovacao,
+          A.DtSimulacaoInicial,
+          A.DtInclusaoGravame,
+          A.MOBConc,
+          A.MOBConvContrato,
+          A.MOBEfet,
+          A.NuCpfCnpj,
+          A.FlSimulacao,
+          A.FlSimuValida,
+          A.FlSimuValidaBVO,
+          A.FlSimuValidaEfet,
+          A.FlSimuValidaDiaEfet,
+          A.FlSimuValidaSemanaEfet,
+          A.RatingCliente,
+          A.RatingSimulacao,
+          A.FlPropostaOriginada,
+          A.FlPropostaAprovada,
+          A.FlPropostaEfetivada,
+          A.FlPropostaPaga,
+          A.FlConversao,
+          A.FlConcorrente,
+          A.StPagoLoja,
+          A.FaixaMatriz,
+          A.NotaGarantia,
+          A.EntradaMinima,
+          A.PcEntradaMinima,
+          A.FlPap,
+          A.Banco,
+          A.VrVeiculoSimulacao,
+          A.VrEntrada,
+          A.VrProducao,
+          A.VrProposta,
+          A.NuProposta,
+          A.NuContrato,
+          A.Msg_Agrup,
+          A.pc_entrada_v1,
+          A.fx_ent_min_v1,
+          A.Mensageria2,
+          A.Estado_Veiculo,
+          A.PILOTO_V7,
+          A.ONDA_V7,
+          A.V7,
+          A.classificacao_pdv,
+          A.classificacao_pdv_nova,
+          A.ent_min_1_ch,
+          A.ent_min_2_ch,
+          A.NmAreaEstruturaComercialC,
+			CASE
+				WHEN A.ProbabilidadeAprovacao <= 6.0
+					THEN 'ATÉ 6,0'
+				WHEN A.ProbabilidadeAprovacao <= 7.3
+					THEN '6,01-7,25'
+				WHEN A.ProbabilidadeAprovacao <= 7.9
+					THEN '7,26-7,99'
+				WHEN A.ProbabilidadeAprovacao <= 8.75
+					THEN '8,00-8,75'
+				WHEN A.ProbabilidadeAprovacao <= 9.99
+					THEN '8,76-9,99'
+				WHEN A.ProbabilidadeAprovacao = 10
+					THEN '10'
+				ELSE 'ZERO'
+			END
+			AS FxRating,
+			coalesce (A.MotivoRecusa,'Sem Recusa') as MotivoRecusa,
+			coalesce (A.DsSituacaoCredito,'Sem Situação') as DsSituacaoCredito,
+			coalesce (A.faixaScoreHSPN,'Sem Score') as faixaScoreHSPN,
+			CASE
+				WHEN A.ProbabilidadeAprovacao = .
+					THEN 'SEM RATING'
+				WHEN A.ProbabilidadeAprovacao >= 7
+					THEN 'EXCELENTE'
+				WHEN A.ProbabilidadeAprovacao >= 5.51 AND A.ProbabilidadeAprovacao <= 6.99
+					THEN 'ÓTIMO'
+				WHEN A.ProbabilidadeAprovacao <= 5.50
+					THEN 'BOM'
+			END
+			AS FarolRating,
+			CASE
+				WHEN A.MotivoRecusa = '' or A.MotivoRecusa = 'NAO RECUSADO' THEN 'Sem Recusa'
+				WHEN A.MotivoRecusa = 'REC_DESENROLA' then 'REC_DESENROLA'
+				WHEN A.MotivoRecusa = 'REC_GRAU_SEVERIDADE' then 'REC_GRAU_SEVERIDADE'
+				WHEN A.MotivoRecusa = 'REC_RATING_CPF' then 'REC_RATING_CPF'
+				ELSE 'Outros'
+			END
+			AS MotivoRecusa2,
+			COALESCE(A.ds_situacao_credito_pre,'Sem Classificação') AS ds_situacao_credito_pre,
+			B.DsTipoCanalProducao,
+			B.VpSpread,
+			B.VrSeguros,
+			B.VrSeguroSPF,
+			B.VrSeguroAP,
+			B.VrSeguroDemais,
+			B.VrSeguroCompleto,
+			B.VrMargemContribuicaoFinal,
+			C.TtlPropEdit,
+			C.TtlEdicoes,
+			Case when C.TtlPropEdit > 0 then A.FlPropostaOriginada else 0 end as PropEditOriginada,
+          Case when C.TtlPropEdit > 0 then A.FlPropostaAprovada else 0 end as PropEditAprovada,
+          Case when C.TtlPropEdit > 0 then A.FlPropostaEfetivada else 0 end as PropEditEfetivada,
+          Case when C.TtlPropEdit > 0 then A.FlPropostaPaga else 0 end as PropEditPaga
+		FROM TbSimulacoes_00_leves_1 A
+			LEFT JOIN
+				(SELECT
+					NUPROPOSTA,
+					DsTipoCanalProducao,
+					VpSpread,
+					VrSeguros,
+					VrSeguroSPF,
+					VrSeguroAP,
+					VrSeguroDemais,
+					VrSeguroCompleto,
+					VrMargemContribuicaoFinal
+				FROM TMPPRD WHERE NUPROPOSTA IS NOT NULL) B
+					ON A.NUPROPOSTA = B.NUPROPOSTA
+		      LEFT JOIN WORK.TBPROPOSTAEDITADASUM C
+			ON A.NUPROPOSTA = C.NUPROPOSTA
+
+;
+QUIT;
+
+/* Gerar base para o Cubo */
+PROC SQL;
+	CREATE TABLE CuboSimulacaoleves_Analise AS
+
+	SELECT
+		A.Produto,
+		/*			A.NuCpfCnpj,*/
+		A.NuAnoMes AS Safra,
+		A.Mensageria,
+		A.SistemaInicial,
+		A.SistemaFinal,
+		A.TpPessoa,
+		A.NuVersaoMotor,
+		A.PILOTO_V7,
+		A.ONDA_V7,
+		A.V7,
+		A.classificacao_pdv,
+		A.classificacao_pdv_nova,
+		A.CdParceiroComercial,
+		A.NmParceiroComercial,
+		A.NmAreaEstruturaComercialC,
+		A.DsTipoCanalProducao,
+		A.FlPorteA,
+		A.FlZeroKm,
+		A.FxIdade,
+		A.Regional,
+		A.Canal,
+		A.Filial,
+		A.FxRating,
+		A.MotivoRecusa,
+		A.DsSituacaoCredito,
+		A.faixaScoreHSPN,
+		A.FarolRating,
+		A.MotivoRecusa2,
+		A.ds_situacao_credito_pre,
+		A.fx_ent_min_v1 as EntradaMinima,
+		A.Msg_Agrup,
+		A.Banco,
+		B.MxDtSimu,
+				COUNT(
+					DISTINCT
+						CASE
+							WHEN FlSimuValida =1
+							then A.NuCpfCnpj
+							End)
+					AS QtdPreAnalise_Unico,
+					COUNT(
+						DISTINCT
+							CASE
+								WHEN A.FlSimuValida =1 AND A.FlCard <> 1
+								THEN  A.NuCpfCnpj
+					End)
+					AS FicaramPreAnalise,
+						COUNT(
+							DISTINCT
+								CASE
+									WHEN A.FlSimuValida =1 AND A.FlCard <> 1 and A.flconcorrente = 1
+									THEN A.NuCpfCnpj
+						End)
+						AS flConcPreAnalise,
+							COUNT(
+								DISTINCT
+									CASE
+										WHEN A.FlSimuValida =1 AND A.FlCard = 1
+										THEN A.NuCpfCnpj
+							End)
+							AS QtdCard_Unico,
+								COUNT(DISTINCT
+								CASE
+									WHEN A.FlSimuValida =1 AND A.FlCard = 1
+										THEN A.NuCpfCnpj
+								End)
+								- COUNT(
+										DISTINCT
+											CASE
+												WHEN A.FlPropostaOriginada = 1
+												then A.NuCpfCnpj
+								End)
+								AS FicaramCards,
+									COUNT(
+										DISTINCT
+									CASE
+											WHEN A.FlSimuValida =1 AND A.FlCard = 1 and A.FlPropostaOriginada <> 1 AND A.flconcorrente = 1
+											THEN A.NuCpfCnpj
+									End)
+									AS flConcCards,
+										SUM(A.FlPropostaOriginada) AS QtdOriginadas,
+										SUM(A.FlPropostaOriginada) - SUM(A.FlPropostaAprovada) AS FicaramPropostas,
+									sum(
+/*										DISTINCT	*/
+											CASE
+												WHEN
+/*											((A.PRODUTO = 'Leves-BVO' AND A.FlSimuValidaBVO = 1 AND A.FlSimuValida =1)*/
+/*												OR (A.PRODUTO in ('Leves','Leves-Multibanco') AND A.FlSimuValida =1))*/
+/*												AND */
+												A.FlPropostaAprovada <> 1
+												AND A.flconcorrente = 1
+													THEN (A.FlPropostaOriginada)
+											END)
+
+											AS flConcPropostas,
+												SUM(A.FlPropostaAprovada) AS QtdAprovadas,
+												SUM(A.FlPropostaAprovada) - SUM(A.FlPropostaPaga) AS FicaramAprovadas,
+												sum(
+/*												DISTINCT */
+													CASE
+														WHEN A.FlPropostaAprovada = 1
+														and A.FlPropostaPaga <> 1
+														and A.flconcorrente = 1
+															THEN  A.FlPropostaAprovada
+													END)
+													AS flConcAprovadas,
+														SUM(A.FlPropostaPaga) AS QtdPagas,
+														SUM(
+/*														DISTINCT */
+															CASE
+																WHEN A.FlPropostaPaga = 1
+																and A.flconcorrente = 1
+																	THEN  (A.FlPropostaPaga)
+															END)
+															AS flConcPagas,
+																SUM(A.FlConcorrente) AS QtdConcorrente,
+																SUM(A.VrProposta) FORMAT COMMAX12.2 as VrProposta,
+																SUM(A.VrProducao) FORMAT COMMAX12.2 as VrProducao,
+																SUM(A.VrSeguros) FORMAT COMMAX12.2 AS VrSeguros,
+																SUM(A.VrSeguroSPF) FORMAT COMMAX12.2 AS VrSeguroSPF,
+																SUM(A.VrSeguroAP) FORMAT COMMAX12.2 AS VrSeguroAP,
+																SUM(A.VrSeguroDemais) FORMAT COMMAX12.2 AS VrSeguroDemais,
+																SUM(A.VrSeguroCompleto) FORMAT COMMAX12.2 AS  VrSeguroCompleto,
+																SUM
+																(CASE
+																	WHEN Msg_Agrup = 'Mensageria Positiva' THEN A.PcEntradaMinima*A.VrProposta
+																	ELSE 0
+																END)
+																FORMAT COMMAX12.2 as ENTRADA_MINIMA_POND_P,
+																SUM
+																(CASE
+																	WHEN Msg_Agrup = 'Mensageria Positiva' THEN A.PcEntradaAjust*A.VrProposta
+																	ELSE 0
+																END)
+																FORMAT COMMAX12.2 as ENT_AJUST_POND_P,
+																sum(A.TtlPropEdit) AS TtlPropEdit,
+																sum(A.TtlEdicoes) AS TtlEdicoes,
+																sum(A.PropEditOriginada) AS TtlPropEditOriginada,
+																sum(A.PropEditAprovada) AS TtlPropEditAprovada,
+																sum(A.PropEditEfetivada) AS TtlPropEditEfetivada,
+																sum(A.PropEditPaga) AS TtlPropEditPaga,
+																AVG(A.MOBConc) FORMAT COMMAX12.2 AS MOBConc,
+																AVG(A.MOBConvContrato) FORMAT COMMAX12.2 AS MOBConvContrato,
+																AVG(A.MOBEfet) FORMAT COMMAX12.2 AS MOBEfet,
+																AVG(A.VpSpread) FORMAT COMMAX12.2 AS VpSpread,
+																AVG(A.VrMargemContribuicaoFinal) FORMAT COMMAX12.2 AS VrMargemContribuicaoFinal,
+																AVG(A.pc_entrada_v1) FORMAT COMMAX12.2 AS PcEntradaMinima,
+																AVG(A.PcEntradaAjust) FORMAT COMMAX12.2 AS PcEntradaAjust,
+																AVG(A.ent_min_1_ch) FORMAT COMMAX12.2 AS ent_min_1_ch,
+																AVG(A.ent_min_2_ch) FORMAT COMMAX12.2 AS ent_min_2_ch,
+																AVG(A.RatingCliente) FORMAT COMMAX12.2 AS RatingCliente,
+																AVG(A.RatingSimulacao) FORMAT COMMAX12.2 AS RatingSimulacao
+/*																AVG(A.ProbabilidadeAprovacao) FORMAT COMMAX12.2 AS ProbabilidadeAprovacao*/
+																FROM TbSimulacoes_00_leves_2 A
+																	INNER JOIN
+																		(SELECT MAX(DtSimulacaoInicial) format ddmmyy10. as MxDtSimu, NuAnoMes FROM	TbSimulacoes_00_leves_2 GROUP BY NuAnoMes) B
+																			ON A.NuAnoMes = B.NuAnoMes
+																			where 1=1
+																				/*									AND FlSimuValida = 1*/
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33;
+run;
+
+PROC SQL;
+	DELETE * FROM TRIBO.CUBOSIMULACAOleves_ANALISE WHERE SAFRA >= &MXDATASIMU.;
+QUIT;
+
+data TRIBO.CuboSimulacaoleves_Analise (compress=yes);
+	set
+		TRIBO.CuboSimulacaoleves_Analise
+		CuboSimulacaoleves_Analise;
+run;
+
+proc sql noprint;
+	select max(safra) into :data_max from TRIBO.CuboSimulacaoleves_Analise;
+quit;
+
+/* Configurando o envio de e-mails */
+filename mymail email
+	to="flavio.luis@bv.com.br"
+	subject="Falha na carga Funil leves";
+
+/* Lógica de comparação de datas */
+data _null_;
+	datax = &data_max.;
+	datay = year(today())*100+month(today()-1);
+
+	/* Comparando as datas */
+	if datax ne datay then
+		do;
+			/* Enviar o e-mail */
+			file mymail;
+			put "As datas são diferentes.";
+			put "Data Base Dash: " datax;
+			put "Data Sistema: " datay;
+
+			/* Finalizar o processo */
+			abort abend; /* Interrompe o processo */
+		end;
+	else
+		do;
+			put "Sucesso no processo";
+		end;
+
+	%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= TRIBO.CuboSimulacaoleves_Analise
+		FILE="&dir_csv./leves_PDEC.csv" REPLACE
+		DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+filename mymail clear;/* Fechar a referência de e-mail */

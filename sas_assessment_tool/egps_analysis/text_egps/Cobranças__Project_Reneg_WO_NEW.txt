@@ -1,0 +1,626 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_Reneg_WO_NEW
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:50 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 32)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -17
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: FILENAME  (1x | +12), INFILE  (1x | +10), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 476
+CODE_TASKS_COUNT: 16
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BRUNO = /riscosbv/cobranca/brunocardoso; BRUNO = /riscosbv/cobranca/bsilva; CAROL = /riscosbv/cobranca/cmatos; GUI = /riscosbv/cobranca/gtavares/Reneg; IPF_WO = /riscosbv/cobranca/erocha/120_180_WO
+DETECTED_MACROS_DEFINED: base, libname, path, work
+DETECTED_MACROS_USED: base, libname, path, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: BASE, LIBNAME
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): GUI.BASE_ELEG_CONT_202508 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ETL, WORK.PILARES_RECEBIMENTO
+IMPORTED_LIBNAMES: GUI
+EXPORTED_LIBNAMES: CAROL
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\15. PLANEJAMENTO E CONTROL DESK\27.0 OUTROS\BASE_DU_2029.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.BASE_DU_2029 <- N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\15. PLANEJAMENTO E CONTROL DESK\27.0 OUTROS\BASE_DU_2029.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_DU_2029, WORK.BASE_ELEG_CONT_202508, WORK.BASE_ESTUDO_PERFORMANCE_MIX, WORK.CARTEIRA_RENEG_202506, WORK.CARTEIRA_RENEG_202508, WORK.CUBO, WORK.ETL, WORK.PILARES_RECEBIMENTO
+TABLE_READ_PROVENANCE (Flow): GUI.BASE_ELEG_CONT_202508 [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], WORK.BASE_DU_2029 [PROC SQL - JOIN], WORK.BASE_ELEG_CONT_202508 [PROC SQL - FROM], WORK.BASE_ESTUDO_PERFORMANCE_MIX [PROC SQL - FROM], WORK.CARTEIRA_RENEG_202506 [PROC SQL - FROM], WORK.CARTEIRA_RENEG_202508 [PROC SQL - JOIN], WORK.CUBO [PROC SQL - FROM], WORK.ETL [PROC SQL - FROM], WORK.PILARES_RECEBIMENTO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CAROL.BASE_ESTUDO_PERFORMANCE_MIX
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202506_V2.xlsx, C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202506xlsx.xlsx, C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202507.xlsx, C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202508.xlsx, N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\1.GESTAO_CARTEIRA_PORTFOLIO\2.METAS\CUBO_WO_202505.xlsx, N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\1.GESTAO_CARTEIRA_PORTFOLIO\2.METAS\CUBO_WO_202506.xlsx
+TEMP/DISCARDED OUTPUTS: &BASE, ETL, PILARES_RECEBIMENTO, WORK.BASE_PERFORMANCE_MIX, WORK.CARTEIRA_RENEG_202508, WORK.CUBO, WORK.QUERY_FOR_CARTEIRA_RENEG_20, WORK.QUERY_FOR_CARTEIRA_RENEG_20_0000, WORK.QUERY_FOR_CUBO, WORK.QUERY_FOR_ETL, WORK.QUERY_FOR_PILARES_RECEBIMENTO, WORK.QUERY_FOR_PILARES_RECEBIMEN_0000
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET libname=%sysfunc(lowcase(&libname.));
+%LET base=%sysfunc(lowcase(&base.));
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\15. PLANEJAMENTO E CONTROL DESK\27.0 OUTROS\BASE_DU_2029.csv|N:/DVMD/COBRANÇA/GESTAO_OPERACIONAL/GESTAO_RESULTADOS_RODAS/15. PLANEJAMENTO E CONTROL DESK/27.0 OUTROS|BASE_DU_2029.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01.MapLib + ETL + CUBO */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 22 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01.MapLib + ETL + CUBO */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-L4TrtkKuf2f6nClW/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME IPF_WO '/riscosbv/cobranca/erocha/120_180_WO';
+LIBNAME BRUNO '/riscosbv/cobranca/brunocardoso';
+
+LIBNAME GUI  '/riscosbv/cobranca/gtavares/Reneg';
+
+
+
+PROC SQL;
+CREATE TABLE WORK.CARTEIRA_RENEG_202508 AS
+SELECT NUCONTRATO
+, SQCONTRATOFINANCEIRO
+, NOME_ASSES
+, VL_CAUSA
+, BASE
+, NUDIASATRASO
+, TESTE_CONTROLE_FINAL
+, CASE WHEN TESTE_CONTROLE_FINAL = 'Teste' THEN 1 ELSE 0 END AS ELEG_RENEG
+FROM WORK.base_eleg_cont_202508
+;QUIT;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DATA PILARES_RECEBIMENTO;
+SET
+
+
+
+
+
+
+
+
+
+;RUN;
+
+	PROC SQL;
+CREATE TABLE ETL AS
+SELECT A.*
+    , CASE
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-01-01' THEN '202501'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-02-01' THEN '202502'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-03-01' THEN '202503'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-04-01' THEN '202504'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-05-01' THEN '202505'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-06-01' THEN '202506'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-07-01' THEN '202507'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-08-01' THEN '202508'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-09-01' THEN '202509'
+	 WHEN PUT(MesCompetencia,YYMMDDD10.) = '2025-10-01' THEN '202510'
+	 ELSE 'VALIDAR'
+     END AS SAFRA
+	, CASE
+		WHEN GpAgente = 'BELLINATI' THEN 'BELLINATI'
+	 	WHEN GpAgente = 'CARVALHO' THEN 'CARVALHO'
+	 	WHEN GpAgente = 'LM_ANGELIS' THEN 'LM_ANGELIS'
+	 	WHEN GpAgente = 'MANDALITI' THEN 'MANDALITI'
+	 	WHEN GpAgente = 'MENDES_E_CUNHA' THEN 'MENDES_E_CUNHA'
+	 	WHEN GpAgente = 'PASQUALI' THEN 'PASQUALI'
+		WHEN GpAgente = 'RN_ADV' THEN 'RN_ADV'
+		WHEN GpAgente = 'SCHULZE' THEN 'SCHULZE'
+	 	WHEN GpAgente = 'TOLEDO' THEN 'TOLEDO'
+        ELSE 'OUT' END AS ASSESSORIA_2
+
+		, CASE WHEN VrApreensao <> 0 AND VrApreensao <> . THEN 1 ELSE 0 END AS FLAG_APREENSAO
+		, CASE WHEN VrEntrega <> 0 AND VrEntrega <> .  THEN 1 ELSE 0 END AS FLAG_ENTREGA
+		, CASE WHEN VrReneg <> 0 AND VrReneg <> .  THEN 1 ELSE 0 END AS FLAG_RENEG
+		, CASE WHEN VrRecebido <> 0 AND VrRecebido <> .  THEN 1 ELSE 0 END AS FLAG_CAIXA
+
+		, CASE
+		WHEN CALCULATED FLAG_APREENSAO = 1 THEN 'APREENSAO'
+		WHEN CALCULATED FLAG_ENTREGA = 1 THEN 'ENTREGA'
+		WHEN CALCULATED FLAG_RENEG = 1 THEN 'RENEG'
+		WHEN CALCULATED FLAG_CAIXA = 1 THEN 'CAIXA'
+		END AS TIPO_OFERTA
+       , CASE
+		WHEN AtrasoFinal <360 THEN 'A - ATÉ 360'
+		WHEN AtrasoFinal BETWEEN 360 AND 540 THEN 'B - 360 a 540'
+		WHEN AtrasoFinal BETWEEN 541 AND 720 THEN 'C - 541 a 720'
+		WHEN AtrasoFinal BETWEEN 721 AND 1080 THEN 'D - 721 a 1080'
+		WHEN AtrasoFinal BETWEEN 1081 AND 1800 THEN 'E - 1081 a 1800'
+		WHEN AtrasoFinal >=1801 THEN 'F - ACIMA 1800'
+		ELSE 'J - VERIFICAR' END AS MICRO_FAIXA
+		, B.Du AS DU_PGTO
+		, C.ELEG_RENEG
+FROM PILARES_RECEBIMENTO AS A
+LEFT JOIN WORK.BASE_DU_2029 AS B ON A.DTLANCAMENTO=B.DATA
+LEFT JOIN WORK.CARTEIRA_RENEG_202508 AS C ON PUT(A.NUCONTRATO,Z14.)=C.NUCONTRATO
+AND A.SqFinanceiraVisao=C.SqContratoFinanceiro
+;QUIT;
+
+
+
+PROC SQL;
+    CREATE TABLE WORK.CUBO AS
+    SELECT
+        FxMis,
+        COUNT(NuContrato) AS QTD,
+        STATUS,
+        SAFRA,
+        ASSESSORIA_2,
+        FLAG_APREENSAO,
+        FLAG_ENTREGA,
+        FLAG_RENEG,
+        FLAG_CAIXA,
+		ELEG_RENEG,
+        DU_PGTO,
+        SUM(VrRetomado) AS VRRETOMADO,
+        SUM(VrCaixa) AS VRCAIXA,
+        SUM(VrReneg) AS VRRENEG,
+        SUM(VrRiscoReng) AS VRRISCORENEG,
+        SUM(VrRisco) AS VRRISCO,
+        SUM(VrRecuperado) AS VRRECUPERADO,
+        SUM(VrDeposito) AS VRDEPOSITO,
+        FxAtraso,
+        MICRO_FAIXA,
+        TIPO_OFERTA
+    FROM WORK.ETL
+    GROUP BY
+        FxMis,
+        STATUS,
+        SAFRA,
+        ASSESSORIA_2,
+        FLAG_APREENSAO,
+        FLAG_ENTREGA,
+        FLAG_RENEG,
+        FLAG_CAIXA,
+		ELEG_RENEG,
+        DU_PGTO,
+        FxAtraso,
+        MICRO_FAIXA,
+        TIPO_OFERTA
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01.MapLib + ETL + CUBO */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02.DescompactaBase */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 22 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02.DescompactaBase */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-kvJxkrHievCbILtP/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME BRUNO '/riscosbv/cobranca/bsilva';
+filename BRUNO.BASE_PERFORMANCE_MIX pipe 'base_estudo_performance_mix.sas7bdat.gz';
+
+data work.BASE_PERFORMANCE_MIX;
+   infile inzip lrecl=32767;
+   input;
+run;
+
+LIBNAME GUI '/riscosbv/cobranca/gtavares/Reneg';           ;
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%DESCOMPACTA(GUI, base_eleg_cont_202508);
+
+LIBNAME CAROL '/riscosbv/cobranca/cmatos';
+
+PROC SQL;
+CREATE TABLE CAROL.BASE_ESTUDO_PERFORMANCE_MIX as
+SELECT *
+FROM WORK.BASE_ESTUDO_PERFORMANCE_MIX
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02.DescompactaBase */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+    CREATE TABLE WORK.CUBO AS
+    SELECT
+        FxMis,
+        COUNT(NuContrato) AS QTD,
+        STATUS,
+        SAFRA,
+        ASSESSORIA_2,
+        FLAG_APREENSAO,
+        FLAG_ENTREGA,
+        FLAG_RENEG,
+        FLAG_CAIXA,
+		ELEG_RENEG,
+        DU_PGTO,
+        SUM(VrRetomado) AS VRRETOMADO,
+        SUM(VrCaixa) AS VRCAIXA,
+        SUM(VrReneg) AS VRRENEG,
+        SUM(VrRiscoReng) AS VRRISCORENEG,
+        SUM(VrRisco) AS VRRISCO,
+        SUM(VrRecuperado) AS VRRECUPERADO,
+        SUM(VrDeposito) AS VRDEPOSITO,
+        FxAtraso,
+        MICRO_FAIXA,
+        TIPO_OFERTA
+    FROM WORK.ETL
+    GROUP BY
+        FxMis,
+        STATUS,
+        SAFRA,
+        ASSESSORIA_2,
+        FLAG_APREENSAO,
+        FLAG_ENTREGA,
+        FLAG_RENEG,
+        FLAG_CAIXA,
+		ELEG_RENEG,
+        DU_PGTO,
+        FxAtraso,
+        MICRO_FAIXA,
+        TIPO_OFERTA
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_PILARES_RECEBIMENTO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PILARES_RECEBIMENTO AS
+   SELECT t1.MesCompetencia,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.PILARES_RECEBIMENTO t1
+      GROUP BY t1.MesCompetencia;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_PILARES_RECEBIMEN_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PILARES_RECEBIMEN_0000 AS
+   SELECT t1.GpAgente,
+          t1.MesCompetencia,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.PILARES_RECEBIMENTO t1
+      GROUP BY t1.GpAgente,
+               t1.MesCompetencia;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ETL);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ETL AS
+   SELECT t1.DU_PGTO,
+          t1.SAFRA,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.ETL t1
+      GROUP BY t1.DU_PGTO,
+               t1.SAFRA;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTEIRA_RENEG_20);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTEIRA_RENEG_20 AS
+   SELECT t1.ELEG_RENEG,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.CARTEIRA_RENEG_202506 t1
+      GROUP BY t1.ELEG_RENEG;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTEIRA_RENEG_20_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTEIRA_RENEG_20_0000 AS
+   SELECT t1.ELEG_RENEG,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.CARTEIRA_RENEG_202506 t1
+      GROUP BY t1.ELEG_RENEG;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME GUI '/riscosbv/cobranca/gtavares/Reneg';           ;
+
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+%DESCOMPACTA(GUI, base_eleg_cont_202508);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CUBO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CUBO AS
+   SELECT t1.FxMis,
+          t1.ASSESSORIA_2,
+          
+            (SUM(t1.VRRENEG)) AS SUM_of_VRRENEG
+      FROM WORK.CUBO t1
+      GROUP BY t1.FxMis,
+               t1.ASSESSORIA_2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CUBO
+    OUTFILE='N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\1.GESTAO_CARTEIRA_PORTFOLIO\2.METAS\CUBO_WO_202506.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 012 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CUBO
+    OUTFILE='N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\1.GESTAO_CARTEIRA_PORTFOLIO\2.METAS\CUBO_WO_202505.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 012 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 013 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CUBO
+    OUTFILE='C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202506xlsx.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 013 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 014 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CUBO
+    OUTFILE='C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202507.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 014 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 015 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CUBO
+    OUTFILE='C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202506_V2.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 015 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 016 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CUBO
+    OUTFILE='C:\Users\daniel.vitor\OneDrive - Banco Votorantim S.A\Documentos\CUBO_202508.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 016 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,285 @@
+START_METADATA
+PROJECT: Rodas__inad
+FILE_SAS: 04-base-final.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 218
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: AnoAtual
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.TBCHASSILEILAO [SAS/Local], AUXL.TBMOLICAR_SUV [SAS/Local], AUXL.TBROLLOUTMENSAGERIA [SAS/Local], BASEGRC.TBFILTROCVG [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBEXTPROPOSTA [SAS/Local], BASES.TBTIPOCANALPRODUCAOPROPOSTA [SAS/Local], CONTRATO.CONTRATACAO_C2C [SAS/Local], FUNIL.ROLLOUT_V7 [SAS/Local], RISCOS.TBINADPRIMEIRAPARCELA_ANO&ANOATUAL [SAS/Local], RISCOS.TBINADPRIMEIRAPARCELA_ANO2020 [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: INAD
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.TBCHASSILEILAO [PROC SQL - JOIN], AUXL.TBMOLICAR_SUV [PROC SQL - JOIN], AUXL.TBROLLOUTMENSAGERIA [PROC SQL - JOIN], BASEGRC.TBFILTROCVG [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBEXTPROPOSTA [PROC SQL - JOIN], BASES.TBTIPOCANALPRODUCAOPROPOSTA [PROC SQL - JOIN], CONTRATO.CONTRATACAO_C2C [PROC SQL - JOIN], FUNIL.ROLLOUT_V7 [PROC SQL - JOIN], RISCOS.TBINADPRIMEIRAPARCELA_ANO&ANOATUAL [DATA Step - SET], RISCOS.TBINADPRIMEIRAPARCELA_ANO2020 [DATA Step - SET], TMP.TBORIGINACAO [PROC SQL - JOIN], TMP.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): INAD.INADHISTORICA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEUNICAINAD, TBINADPRIMEIRAPARCELA
+DYNAMIC REFS (Ambiguous): RISCOS.TBINADPRIMEIRAPARCELA_ANO{ANOATUAL}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+DATA TbInadPrimeiraParcela (KEEP=
+  DtEntradaProposta
+  NuProposta
+  Inad_90_1pmt
+  Val_prt_90_1pmt
+  qtd_cto_elegiveis_inad90
+  Inad_60_1pmt
+  Val_prt_60_1pmt
+  qtd_cto_elegiveis_inad60
+  Inad_45_1pmt
+  Val_prt_45_1pmt
+  qtd_cto_elegiveis_inad45
+  Inad_30_1pmt
+  Val_prt_30_1pmt
+  qtd_cto_elegiveis_inad30
+  Inad_15_1pmt
+  Val_prt_15_1pmt
+  qtd_cto_elegiveis_inad15
+  Inad_7_1pmt
+  Val_prt_7_1pmt
+  qtd_cto_elegiveis_inad7
+  Safra_Proposta
+);
+SET riscos.TbInadPrimeiraParcela_Ano2020 - riscos.TbInadPrimeiraParcela_Ano&AnoAtual.;
+  Safra_Proposta = PUT(YEAR(DATEPART(DtEntradaProposta)),4.) || "." || PUT(MONTH(DATEPART(DtEntradaProposta)),z2.);
+   where CdMotivoContratoFinanceiro not in (4,5); /*incluido em 22/10/2024 Gustavo Domingues*/
+RUN;
+
+PROC SQL;
+CREATE TABLE BaseUnicaInad AS
+  SELECT
+    COALESCE(A.Safra_Proposta, B.Safra_Proposta) AS Safra_Proposta,
+    COALESCE(A.NuProposta,B.NuProposta) AS NuProposta,
+    A.NuContrato,
+    A.produto,
+    A.FlPAP,
+    A.CdSexo,
+    A.UF_Cliente,
+    A.Renda,
+    A.TipoPolitica,
+    B.Inad_90_1pmt,
+    B.Val_prt_90_1pmt,
+    B.Qtd_Cto_Elegiveis_Inad90,
+    B.Inad_60_1pmt,
+    B.Val_prt_60_1pmt,
+    B.Qtd_Cto_Elegiveis_Inad60,
+    B.Inad_45_1pmt,
+    B.Val_prt_45_1pmt,
+    B.Qtd_Cto_Elegiveis_Inad45,
+    COALESCE(A.Inad_30_1pmt,B.Inad_30_1pmt) AS Inad_30_1pmt,
+    COALESCE(A.Val_prt_30_1pmt,B.Val_prt_30_1pmt) AS Val_prt_30_1pmt,
+    COALESCE(A.Qtd_Cto_Elegiveis_Inad30,B.Qtd_Cto_Elegiveis_Inad30) AS Qtd_Cto_Elegiveis_Inad30,
+    COALESCE(A.Inad_15_1pmt,B.Inad_15_1pmt) AS Inad_15_1pmt,
+    COALESCE(A.Val_prt_15_1pmt,B.Val_prt_15_1pmt) AS Val_prt_15_1pmt,
+    COALESCE(A.Qtd_Cto_Elegiveis_Inad15,B.Qtd_Cto_Elegiveis_Inad15) AS Qtd_Cto_Elegiveis_Inad15,
+    COALESCE(A.Inad_7_1pmt,B.Inad_7_1pmt) AS Inad_7_1pmt,
+    COALESCE(A.Val_prt_7_1pmt,B.Val_prt_7_1pmt) AS Val_prt_7_1pmt,
+    COALESCE(A.qtd_cto_elegiveis_inad7,B.qtd_cto_elegiveis_inad7) AS qtd_cto_elegiveis_inad7
+  FROM
+    BaseUnicaRodas A
+  FULL OUTER JOIN
+    TbInadPrimeiraParcela B
+    ON A.NuProposta = B.NuProposta;
+RUN;
+
+PROC SQL;
+CREATE TABLE INAD.InadHistorica AS
+  SELECT
+    'INAD' AS TpDados,
+    INPUT(TRANSTRN(BU.Safra_Proposta,'.',TRIMN('')),6.) AS SafraProposta,
+    COALESCE(ORI.nuanomes,INPUT(TRANSTRN(BU.Safra_Proposta,'.',TRIMN('')),6.)) as nuanomes,
+    CASE WHEN ORI.DtEntradaProposta >= TODAY()-90 THEN ORI.DtEntradaProposta
+         ELSE intnx('month',ORI.DtEntradaProposta,0,'BEGINNING')
+         END AS DtReferencia format mmddyy10.,
+    coalesce(ORI.NmGrupoProdutoMeta,TRANSTRN(BU.produto,'CPG','CVG')) as NmGrupoProdutoMeta,
+    ORI.DsTipoCanalProducao as DsTipoCanalProducao,
+    ORI.NmAreaEstruturaComercial,
+    ORI.NmSubEstruturaComercialA AS NmSubEstruturaComercialA,
+    STRIP(PUT(ORI.CdParceiroComercial,6.)) || " - " || ORI.NmParceiroComercial AS NmParceiroComercial,
+    ORI.QtAnosIdade,
+    CASE WHEN ORI.QtAnosIdade BETWEEN 11 AND 14 THEN '11 a 14 anos'
+         WHEN ORI.QtAnosIdade BETWEEN 15 AND 19 THEN '15 a 19 anos'
+         WHEN ORI.QtAnosIdade >= 20 THEN '20 anos e acima'
+         ELSE ORI.FxIdade
+    END AS FxIdade,
+    ORI.FxParcela,
+    ORI.FxEntrada,
+    CASE WHEN ORI.NuScoreFim <= 5.5 THEN 'SCORE 5 - 5.5'
+         WHEN ORI.NuScoreFim > 5.5 AND ORI.NuScoreFim <= 6.5 THEN 'SCORE 6 - 6.5'
+         WHEN ORI.NuScoreFim > 6.5 AND ORI.NuScoreFim <= 7.5 THEN 'SCORE 7 - 7.5'
+         WHEN ORI.NuScoreFim > 7.5 AND ORI.NuScoreFim <= 8.5 THEN 'SCORE 8 - 8.5'
+         WHEN ORI.NuScoreFim > 8.5 THEN 'SCORE 9 - 10'
+    END AS Fx_Score,
+    CASE WHEN ORI.NuRating = . THEN ''
+         WHEN ORI.NuRating <= 5.5 THEN 'RATING 5 - 5.5'
+         WHEN ORI.NuRating > 5.5 AND ORI.NuRating <= 6.5 THEN 'RATING 6 - 6.5'
+         WHEN ORI.NuRating > 6.5 AND ORI.NuRating <= 7.5 THEN 'RATING 7 - 7.5'
+         WHEN ORI.NuRating > 7.5 AND ORI.NuRating <= 8.5 THEN 'RATING 8 - 8.5'
+         WHEN ORI.NuRating > 8.5 THEN 'RATING 9 - 10'
+    END AS FxRating,
+    MLC.combustivel,
+    COALESCE(MSG.Mensageria,'9. Não houve mensageria') AS Mensageria,
+    MSG.Mensageria2,
+    COALESCE(SUV.DsMolicarConfiguracao,'N') AS DsMolicarConfiguracao,
+    PRD.FlBVMais AS PossuiSPF,
+    PRD.FlCap AS PossuiCap,
+    PRD.FlDemaisSemCompleto AS PossuiAuto,
+    PRD.FlCompleto AS PossuiCompleto,
+    BU.FlPAP,
+    BU.CdSexo AS Genero,
+    BU.UF_Cliente AS UFCliente,
+    CASE WHEN BU.Renda = . THEN ''
+         WHEN BU.Renda BETWEEN 0 AND 1100 THEN 'Até R$ 1.100'
+         WHEN BU.Renda BETWEEN 1100.01 AND 2500 THEN 'Até R$ 2.500'
+         WHEN BU.Renda BETWEEN 2500.01 AND 5000 THEN 'Até R$ 5.000'
+         WHEN BU.Renda BETWEEN 5000.01 AND 7500 THEN 'Até R$ 7.500'
+         WHEN BU.Renda BETWEEN 7500.01 AND 10000 THEN 'Até R$ 10.000'
+         WHEN BU.Renda > 10000 THEN 'Acima de R$ 10.000'
+    END AS FxRenda,
+    CASE WHEN ORI.VrPrestacao = . THEN ''
+         WHEN ORI.VrPrestacao BETWEEN 0 AND 100 THEN 'Até R$ 100'
+         WHEN ORI.VrPrestacao BETWEEN 100 AND 250 THEN 'Até R$ 250'
+         WHEN ORI.VrPrestacao BETWEEN 250 AND 500 THEN 'Até R$ 500'
+         WHEN ORI.VrPrestacao BETWEEN 500 AND 750 THEN 'Até R$ 750'
+         WHEN ORI.VrPrestacao BETWEEN 750 AND 1000 THEN 'Até R$ 1000'
+         WHEN ORI.VrPrestacao BETWEEN 1000 AND 1500 THEN 'Até R$ 1500'
+         WHEN ORI.VrPrestacao BETWEEN 1500 AND 2000 THEN 'Até R$ 2000'
+         WHEN ORI.VrPrestacao > 2000 THEN 'Acima de R$ 2000'
+    END AS FxPrestacao,
+    CASE WHEN ORI.VrFinanciamento = . THEN ''
+         WHEN ORI.VrFinanciamento BETWEEN 0 AND 15000 THEN 'Até R$ 15.000'
+         WHEN ORI.VrFinanciamento BETWEEN 15000 AND 20000 THEN 'Até R$ 20.000'
+         WHEN ORI.VrFinanciamento BETWEEN 20000 AND 30000 THEN 'Até R$ 30.000'
+         WHEN ORI.VrFinanciamento BETWEEN 30000 AND 40000 THEN 'Até R$ 40.000'
+         WHEN ORI.VrFinanciamento BETWEEN 40000 AND 50000 THEN 'Até R$ 50.000'
+         WHEN ORI.VrFinanciamento > 50000 THEN 'Acima de R$ 50.000'
+    END AS FxFinanciamento,
+    Led.CompraLeads,
+	Led.OrigemSiteBV,
+    UPCASE(ORI.CdMarca) AS CdMarca,
+    BU.TipoPolitica as TipoPolitica,
+    COALESCE(PRD.FlRastreador,ORI.FlRastreador) as FlRastreador,
+
+	Ori.NmTipoParceiroComercial as NmTipoParceiroComercial,
+
+	case when BVOonda.CdParceiroComercial<>. then 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.) else 'Demais' end as FlGrupoBVO,
+	V7.Ondas as MotorV7,
+	COALESCE(CVG.FiltroCVG,'OUTROS PRODUTOS') as FiltroCVG,
+
+	SUM(CASE WHEN COALESCE(ori.stproposta,ext.stproposta) = 'AP' THEN 1 ELSE 0 END) AS Denominador_Eleg,
+    SUM(BU.Inad_90_1pmt) AS Inad_90_1pmt,
+    SUM(BU.Val_prt_90_1pmt) AS Val_prt_90_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad90) AS Qtd_Cto_Elegiveis_Inad90,
+    SUM(BU.Inad_60_1pmt) AS Inad_60_1pmt,
+    SUM(BU.Val_prt_60_1pmt) AS Val_prt_60_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad60) AS Qtd_Cto_Elegiveis_Inad60,
+    SUM(BU.Inad_45_1pmt) AS Inad_45_1pmt,
+    SUM(BU.Val_prt_45_1pmt) AS Val_prt_45_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad45) AS Qtd_Cto_Elegiveis_Inad45,
+    SUM(BU.Inad_30_1pmt) AS Inad_30_1pmt,
+    SUM(BU.Val_prt_30_1pmt) AS Val_prt_30_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad30) AS Qtd_Cto_Elegiveis_Inad30,
+    SUM(BU.Inad_15_1pmt) AS Inad_15_1pmt,
+    SUM(BU.Val_prt_15_1pmt) AS Val_prt_15_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad15) AS Qtd_Cto_Elegiveis_Inad15,
+    SUM(BU.Inad_7_1pmt) AS Inad_7_1pmt,
+    SUM(BU.Val_prt_7_1pmt) AS Val_prt_7_1pmt,
+    SUM(BU.qtd_cto_elegiveis_inad7) AS Qtd_Cto_Elegiveis_Inad7,
+	SUM(PRD.VrMargem) AS VrMargemContribuicao FORMAT=num12.2,
+	SUM(PRD.VrProducao) AS VrLiberado FORMAT=num12.2
+  FROM
+    BaseUnicaInad BU
+  LEFT JOIN
+    TMP.tbOriginacao ORI
+    ON BU.NuProposta = ORI.NuProposta
+    AND BU.Produto = ORI.NmGrupoProdutoMeta
+  LEFT JOIN
+    TMP.tbProducao PRD
+	ON BU.NuContrato = PRD.NuContrato
+  LEFT JOIN
+    TbModeloMolicar MLC
+    ON MLC.NuProposta = BU.NuProposta
+  LEFT JOIN
+    AUXL.TbMolicar_SUV SUV
+    ON SUV.NuProposta = BU.NuProposta
+  LEFT JOIN
+    AUXL.TBROLLOUTMENSAGERIA MBV
+	ON MBV.CdParceiroComercial = ORI.CdParceiroComercial
+  LEFT JOIN
+    MsgProposta MSG
+	ON BU.NuProposta = MSG.NuProposta
+
+  LEFT JOIN BASES.TBEXTPROPOSTA EXT
+    ON BU.NuProposta = EXT.NuProposta
+
+  LEFT JOIN AUXL.TbChassiLeilao LEI
+    ON EXT.DtEntradaProposta BETWEEN LEI.DataPesquisa AND INTNX('DAY', LEI.DataPesquisa, 30)
+   AND EXT.NuChassis = LEI.Chassi
+
+  LEFT JOIN BASES.TBTIPOCANALPRODUCAOPROPOSTA TbCanal
+    ON BU.NuProposta = tbcanal.NuProposta
+
+  LEFT JOIN Leads Led
+	ON BU.NuProposta = Led.NuProposta
+
+  left join bases.TbEstruturaComercial TPC
+		on  EXT.CdFilial = TPC.CdFilial
+		and EXT.NuAnoMes  = TPC.NuAnoMes
+		and TPC.NmNivel = 'N2'
+
+LEFT JOIN
+    BASEGRC.TbLevesNovosBVO BVO
+    ON BVO.CdParceiroComercial = ORI.CdParceiroComercial
+	and BVO.nuanomes = ORI.nuanomes
+
+  LEFT JOIN
+    TbOndaBVO BVOonda
+    ON BVOonda.CdParceiroComercial = ORI.CdParceiroComercial
+
+  LEFT JOIN CONTRATO.CONTRATACAO_C2C C2C
+    ON BU.NuProposta = C2C.NuProposta
+
+LEFT JOIN Funil.ROLLOUT_V7 as V7
+	on V7.cod_parceiro = ORI.CdParceiroComercial
+
+  LEFT JOIN	BASEGRC.TbFiltroCVG CVG
+	ON CVG.nuproposta = PRD.nuproposta
+
+GROUP BY
+	1,2,3,4,5,6,7,8,9,10,
+    11,12,13,14,15,16,17,18,19,20,
+    21,22,23,24,25,26,27,28,29,30,
+    31,32,33,34,35,36,36,37,38
+;RUN;

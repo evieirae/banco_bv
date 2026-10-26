@@ -1,0 +1,142 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Privado
+FILE_SAS: 7 - Gera tabela logs de propostas Aprovadas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 74
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISV = /projetos/MISV/data/bases; TEMP = /projetos/MISV/data/bases/tmp; TEMPW = &swork; TRIBO = /riscosbv/consignado
+DETECTED_MACROS_DEFINED: TIMESTAMP, TIMESTAMPDATA, TIMESTAMPHORA, database, database_fim, database_fim_lead, database_ini, database_ini_lead, databse, dir_csv
+DETECTED_MACROS_USED: dir_csv, swork
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], DBA.TBLOGSTATUSPROPOSTA [DBCON], DBA.TBPROPOSTA [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TEMPW
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): DBA.TBLOGSTATUSPROPOSTA [Pass-Through Native (DBCON) - FROM], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], TEMPW.PROPOSTAS_APROVADAS [PROC EXPORT - DATA=], TEMPW.PROPOSTAS_APROVADAS_0 [PROC SQL - FROM], TEMPW.PROPOSTAS_APROVADAS_1 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): TEMPW.PROPOSTAS_APROVADAS, TEMPW.PROPOSTAS_APROVADAS_0, TEMPW.PROPOSTAS_APROVADAS_1
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TEMPW.PROPOSTAS_APROVADAS, TEMPW.PROPOSTAS_APROVADAS_0, TEMPW.PROPOSTAS_APROVADAS_1
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TEMPW.PROPOSTAS_APROVADAS, TEMPW.PROPOSTAS_APROVADAS_0, TEMPW.PROPOSTAS_APROVADAS_1
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./Privado_Propostas_Aprovadas.csv
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	7 - Gera tabela logs de propostas Aprovadas.sas														| */
+/* | Descricao: Programa para gerar tabela logs de propostas aprovadas.					| */
+/* | Objetivo: 	Dash Consignado Privado					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+libname tribo "/riscosbv/consignado";
+libname misv "/projetos/MISV/data/bases";
+libname temp "/projetos/MISV/data/bases/tmp";
+libname tempw "&swork";
+
+%let database = '2021/01/01';
+%let database_ini = '2022/01/01';
+%let database_fim = '2023/06/30';
+%let database_ini_lead = '2023/05/30';
+%let database_fim_lead = '2023/06/01';
+%let databse = %sysfunc(date(),ddmmyy10.);
+OPTIONS COMPRESS=BINARY;
+%LET TIMESTAMP = %SYSFUNC(DATE(),ddmmyy10.);
+%LET TIMESTAMPDATA = %SYSFUNC(date(),YYMMDDN8.);
+%LET TIMESTAMPHORA = %sysfunc(TIME(),hour4.);
+
+/* ======================================================================================*/
+/* =====================Gera tabela logs de propostas Aprovadas=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+%CONECTADB(server=PTA);
+
+  CREATE TABLE tempw.Propostas_Aprovadas_0 AS
+	SELECT *
+	FROM CONNECTION TO DBCON
+				(
+
+SELECT
+cast(a.dtStatusProposta as date) AS dtaprovacao,
+month(a.dtStatusProposta)||year(a.dtStatusProposta) AS mesano,
+b.cdloja,
+a.nuproposta,
+b.VrProposta
+FROM DBA.TbLogStatusProposta a
+INNER JOIN DBA.TbProposta b
+ON a.nuproposta = b.nuproposta
+WHERE b.CdSubProduto = 12
+AND a.stproposta = 'A'
+and year(a.dtStatusProposta) >= year(getdate())-1
+/*AND b.cdloja in (&cobans.)*/
+/*GROUP BY cast(a.dtStatusProposta as date), month(a.dtStatusProposta)||year(a.dtStatusProposta),b.cdloja*/
+ORDER BY cast(a.dtStatusProposta as date) DESC);RUN;
+
+proc sql;
+
+create table tempw.Propostas_Aprovadas_1 as
+
+select dtaprovacao,
+mesano,
+cdloja,
+nuproposta,
+VrProposta format commax12.2  as VrProposta
+from tempw.Propostas_Aprovadas_0;RUN;
+
+proc sql;
+
+create table tempw.Propostas_Aprovadas as
+
+select dtaprovacao,
+mesano,
+cdloja,
+count(nuproposta) as ttl_pp_aprovadas,
+sum(VrProposta) format commax12.2  as vlr_pp_aprovadas
+
+from tempw.Propostas_Aprovadas_1
+GROUP BY dtaprovacao, mesano, cdloja;RUN;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+proc export
+	data=tempw.Propostas_Aprovadas
+	dbms=csv
+	OUTFILE= "&dir_csv./Privado_Propostas_Aprovadas.csv"
+	replace;
+run;

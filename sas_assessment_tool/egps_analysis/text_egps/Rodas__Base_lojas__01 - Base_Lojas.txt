@@ -1,0 +1,210 @@
+START_METADATA
+PROJECT: Rodas__Base_lojas
+FILE_SAS: 01 - Base_Lojas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (1x | +12), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 132
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BL = /infogrc/Base_Lojas
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DBA.TBCOLABORADOR [DBCON], DBA.TBFILIAL [DBCON], DBA.TBPARCEIROCOMERCIAL [DBCON], DBA.TBPESSOA [DBCON], DBA.TBREGIAO [DBCON], DBCOR.TBPARCEIROCOMERCIALCOLABORADOR [DBCON], DBCOR.TBTIPOPARCEIROCOMERCIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BL
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASELOJASATIVAS
+TABLE_READ_PROVENANCE (Flow): BL.BASELOJASATIVAS_HIST [PROC SQL - FROM], DBA.TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DBA.TBFILIAL [Pass-Through Native (DBCON) - JOIN], DBA.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - FROM], DBA.TBPESSOA [Pass-Through Native (DBCON) - JOIN], DBA.TBREGIAO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBPARCEIROCOMERCIALCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTIPOPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN], WORK.BASELOJASATIVAS [DATA Step - SET; PROC APPEND - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): BL.BASELOJASATIVAS_HIST
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): BL.BASELOJASATIVAS_HIST
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): BL.BASELOJASATIVAS
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BL.BASELOJASATIVAS_HIST
+APPEND_ONLY_OUTPUTS: BL.BASELOJASATIVAS_HIST
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): BL.BASELOJASATIVAS_HIST
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASELOJASATIVAS, VALIDA, WORK.BASELOJASATIVAS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+LIBNAME BL '/infogrc/Base_Lojas';
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE BaseLojasAtivas AS
+SELECT * FROM connection to dbcon
+(
+
+SELECT
+	pc.CdParceiroComercial AS CdConvenio
+	,pe.NuCpfCnpj
+	,pc.NmFantasia AS NmConvenio
+	,pcc.cdcolaborador AS CdColaboradorConvenio
+	,Col.CdOperador AS CdOperadorConvenio
+	,Col.NmColaborador AS NmOpConvenio
+  	,F.CdGerenteRegional
+	,Col1.NmColaborador AS NmRegional
+	,F.cdGerenteComercial
+	,Col2.NmColaborador AS NmGerenteComercial
+	,f.CdFilial
+	,DsFilial
+	,PC.flativo
+	,MAX(PC.DtUltimaAtualizacao) AS MaxAtu
+	,pc.CdTipoParceiroComercial
+	,TPC.NmTipoParceiroComercial
+	,PC.NmFantasia
+	,Pe.NmPessoa
+	,PC.DtCadastro
+	,pcc.TsReplicacao AS TsReplicacao_ParcComerColab
+
+INTO #BVMCN
+FROM dba.TbParceiroComercial PC
+
+	INNER JOIN 	dba.TbPessoa 						 PE 		ON PE.CdPessoa 			   		=	 pc.CdPessoa
+	LEFT JOIN 	dbcor.Tbparceirocomercialcolaborador pcc 		ON pcc.CdParceiroComercial 		= 	 pc.CdParceiroComercial
+	LEFT JOIN 	dba.TBcolaborador 					 Col    	ON Col.Cdcolaborador 	   		=    pcc.cdcolaborador
+	LEFT JOIN 	DBA.TbRegiao 						 R			ON Pc.CdRegiao			   		= 	 R.cdregiao
+	LEFT JOIN	DBA.TbFilial						 F			ON F.CdFilial			   		= 	 R.CdFilial
+	LEFT JOIN 	DBCOR.TBTIPOPARCEIROCOMERCIAL		 TPC 		ON TPC.CdTipoParceiroComercial 	= 	 PC.CdTipoParceiroComercial
+	LEFT JOIN 	DBA.TbColaborador					 Col1   	ON Col1.CdColaborador      		= 	 F.CdGerenteRegional
+	LEFT JOIN 	DBA.TbColaborador					 Col2   	ON Col2.CdColaborador      		= 	 F.cdGerenteComercial
+
+WHERE
+	TPC.CdTipoParceiroComercial IN (2, 5)
+	AND F.DsFilial NOT LIKE 'CP_%'
+	AND F.DsFilial NOT LIKE 'BV_%'
+/*--	AND PC.cdparceirocomercial = 220639*/
+
+GROUP BY
+	pc.CdParceiroComercial
+	,pe.NuCpfCnpj
+	,pc.NmFantasia
+	,pcc.cdcolaborador
+	,Col.CdOperador
+	,Col.NmColaborador
+	,DsFilial
+	,f.cdfilial
+	,PC.flativo
+	,pc.CdTipoParceiroComercial
+	, TPC.NmTipoParceiroComercial
+	,f.CdGerenteRegional
+	,Col1.NmColaborador
+	,F.cdGerenteComercial
+	,Col2.NmColaborador
+	,PC.NmFantasia
+	,PC.DtCadastro
+	,PE.NmPessoa
+	,TsReplicacao_ParcComerColab
+
+ORDER BY
+DsFilial
+,pc.CdParceiroComercial
+
+SELECT
+B.NmRegional,
+B.DsFilial AS Filial,
+B.NmGerenteComercial,
+B.NmOpConvenio AS GerenteRelacionamento,
+b.CdColaboradorConvenio,
+B.CdOperadorConvenio AS URA,
+B.CdFilial,
+B.CdConvenio AS CodigoLoja,
+B.NmPessoa AS NomeLoja,
+B.NmFantasia,
+B.DtCadastro,
+B.flativo AS Ativo,
+B.nucpfcnpj AS CNPJ,
+B.NmTipoParceiroComercial AS Parceiro,
+b.TsReplicacao_ParcComerColab,
+today() as DtAtualizacaoBase
+
+FROM #BVMCN B
+
+WHERE B.flativo = 'S'
+
+ORDER BY b.TsReplicacao_ParcComerColab DESC, B.DsFilial, b.CdColaboradorConvenio
+
+)
+;run;
+
+DATA WORK.BASELOJASATIVAS;
+SET WORK.BASELOJASATIVAS;
+FORMAT TsReplicacao_ParcComerColab datetime19.;
+;RUN;
+
+/*DATA BL.BASELOJASATIVAS;
+SET WORK.baselojasativas;
+;RUN;*/
+
+PROC SQL;
+DELETE FROM BL.BASELOJASATIVAS_HIST
+WHERE DtAtualizacaoBase = TODAY();
+;RUN;
+
+PROC APPEND BASE=BL.BASELOJASATIVAS_HIST DATA=WORK.BaseLojasAtivas FORCE;RUN;
+
+PROC SQL;
+CREATE TABLE VALIDA AS
+SELECT
+DtAtualizacaoBase,
+MAX(TsReplicacao_ParcComerColab) AS Max_TsReplicacao_ParcComerColab FORMAT datetime19.,
+count(DISTINCT CodigoLoja) as QtdLojas FORMAT COMMAX20.0
+
+FROM BL.BASELOJASATIVAS_HIST
+
+GROUP BY 1
+;RUN;
+
+/************************************/
+/* Envio de Email BASES ATUALIZADAS */
+/************************************/
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	/*TO=("inf-gerenciais@bv.com.br")*/
+	TO=("guilherme.mendes@bv.com.br")
+
+SUBJECT="Base de Lojas Ativas Hist atualizada | BL.BASELOJASATIVAS_HIST";
+
+DATA _NULL_;
+	FILE MAIL;
+		PUT "Prezados,";
+		PUT ;
+		PUT "Tabelas atualizadas com sucesso | BL.BASELOJASATIVAS_HIST";
+		PUT ;
+		PUT "Favor não responder este e-mail.";
+		PUT ;
+		PUT "Atenciosamente,";
+		PUT ;
+		PUT "Informações Gerenciais Estratégicas";
+		PUT ;
+RUN;

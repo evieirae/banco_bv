@@ -1,0 +1,916 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__perf_maior90
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:05 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (6x | +30)
+----------------------------------------
+LINES_OF_CODE: 657
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (10x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: PRETER = /riscosbv/cobranca/preter; RENEG = /riscosbv/cobranca/gtavares/Reneg
+DETECTED_MACROS_DEFINED: TABELA, base, libname, path, work
+DETECTED_MACROS_USED: TABELA, anomes, base, fim_mes_m0, fim_mes_m1, libname, path, tabela, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES, BASE, FIM_MES_M0, FIM_MES_M1, INICIO_MES, LIBNAME
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_AGENTE [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_PROCESSO [BIGQUERY], RENEG.&TABELA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: RENEG
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_DBGESTAOCDCCG.TBCONTRATOFINANCEIRO [PROC SQL - JOIN], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM; Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_AGENTE [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_PROCESSO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], RENEG.&TABELA [%DESCOMPACTA macro (x cp/gunzip copy to WORK)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, BASE_ASSESSORIA_V0, BASE_ASSESSORIA_V1, BASE_ELEG, CUBO_EXPORT, RENEG_MAIOR90, RENEG_MAIOR90_FINAL, RENEG_MAIOR90_V1, RENEG_MAIOR90_V2_202507
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET libname=%sysfunc(lowcase(&libname.));
+%LET base=%sysfunc(lowcase(&base.));
+%LET fim_mes_m0='2025-06-30';
+%LET fim_mes_m1='2025-07-31';
+%LET inicio_mes_m1='2025-07-01';
+%LET SAFRA_M0=202506;
+%LET anomes=202507;
+%LET TABELA=base_eleg_cont_&anomes.;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-SqkQf2GgtIwcIloC/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro performance_reneg (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = base_eleg_cont_&anomes.;
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V0 AS
+SELECT
+	*
+
+FROM CONNECTION TO PERM (
+		SELECT
+			B.NuContrato,
+			B.SqContratoFinanceiro,
+			B.NuDiasAtraso,
+			A.NuContratoGestao,
+			DATE(A.dt_asses) as dt_asses,
+			A.cod_asses
+
+		FROM bv-pdbd-prd.trusted_scc_fin.saj_processo AS A
+		JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+		ON a.NuContratoGestao = B.NuContrato AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE a.cod_acao IN (1,3,39,59,60)
+		AND (DATE(a.dt_asses) <= &fim_mes_m1. AND (a.Dt_Ret_Asses IS NULL OR DATE(a.Dt_Ret_Asses) > &fim_mes_m1.))
+		AND B.DtProcessamento = &fim_mes_m1.
+
+);
+
+QUIT;
+
+proc sort data=Base_assessoria_V0; by NuContrato SqContratoFinanceiro descending NuDiasAtraso;
+proc sort data=Base_assessoria_V0 nodupkey; by NuContrato SqContratoFinanceiro;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V1 AS
+SELECT
+	A.*,
+	B.RAZAO_NOME,
+	CASE
+	WHEN B.RAZAO_NOME LIKE '%NA - HOEPERS%'    	  		THEN 'NA-HOEPERS'
+	WHEN B.RAZAO_NOME LIKE '%NA - RN_ADV%' 		  		THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PASCHOALOTTO%' 	  	THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PORTINHO%' 		  	THEN 'NA-PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%NA - REALE%' 		  		THEN 'NA-REALE'
+	WHEN B.RAZAO_NOME LIKE '%NA - MBM%' 			  	THEN 'NA-MBM'
+	WHEN B.RAZAO_NOME LIKE '%NA - ANASTASSOPOULOS%' 	THEN 'NA-A.COSTA'
+	WHEN B.RAZAO_NOME LIKE '%MELHADO%'       			THEN 'MELHADO'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI_2%'       		THEN 'BELLINATI_2'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI%'       			THEN 'BELLINATI'
+	WHEN B.RAZAO_NOME LIKE '%CARVALHO%'       			THEN 'CARVALHO'
+	WHEN B.RAZAO_NOME LIKE '%PASQUALI%'       			THEN 'PASQUALI'
+	WHEN B.RAZAO_NOME LIKE '%REALE%'        			THEN 'REALE'
+	WHEN B.RAZAO_NOME LIKE '%SCHULZE%'       			THEN 'SCHULZE'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO_2%'        			THEN 'TOLEDO_2'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO%'        			THEN 'TOLEDO'
+	WHEN B.RAZAO_NOME LIKE '%MARCONDES%'       			THEN 'MARCONDES'
+	WHEN B.RAZAO_NOME LIKE '%FIGUEIREDO%'       		THEN 'FIGUEIREDO'
+	WHEN B.RAZAO_NOME LIKE '%RN_ADV%'      				THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%PASCHOALOTTO%'      		THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%CONT_RN%'      			THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%LM_ANGELIS%'      			THEN 'LM_ANGELIS'
+	WHEN B.RAZAO_NOME LIKE '%PORTINHO%'          		THEN 'PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%GASPARIM%'          		THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%CARDOSO%'          		THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%AYRES%'          			THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%REDE BRASIL%'          	THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%ANTONIO BRAZ%'          	THEN 'ANTONIO BRAZ'
+	WHEN B.RAZAO_NOME LIKE '%COB_MENDES E CUNHA%'       THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%CONT_MENDES E CUNHA%'		THEN 'CRC'
+ELSE 'OUTRAS'
+END AS ASSESSORIA
+
+FROM Base_assessoria_V0 AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			COD_AGENTE,
+			RAZAO_NOME
+		FROM
+			bv-pdbd-prd.trusted_scc_fin.saj_agente
+) AS B
+ON A.cod_asses = B.COD_AGENTE;
+QUIT;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.);
+QUIT;
+
+
+DATA reneg_maior90_v1;
+SET reneg_maior90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF nudiasatraso > atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+
+PROC SQL;
+CREATE TABLE reneg_maior90_v2_&anomes. AS
+SELECT
+	A.*,
+	B.ASSESSORIA
+FROM reneg_maior90_v1 AS A
+LEFT JOIN Base_assessoria_V1 AS B
+ON A.NUCONTRATO = INPUT(B.NUCONTRATO,BEST32.);
+QUIT;
+
+%mend;
+
+%macro performance_reneg_GCP (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = base_eleg_cont_&anomes.;
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V0 AS
+SELECT
+	*
+
+FROM CONNECTION TO PERM (
+		SELECT
+			B.NuContrato,
+			B.SqContratoFinanceiro,
+			B.NuDiasAtraso,
+			A.NuContratoGestao,
+			DATE(A.dt_asses) as dt_asses,
+			A.cod_asses
+
+		FROM bv-pdbd-prd.trusted_scc_fin.saj_processo AS A
+		JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+		ON a.NuContratoGestao = B.NuContrato AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE a.cod_acao IN (1,3,39,59,60)
+		AND (DATE(a.dt_asses) <= &fim_mes_m1. AND (a.Dt_Ret_Asses IS NULL OR DATE(a.Dt_Ret_Asses) > &fim_mes_m1.))
+		AND B.DtProcessamento = &fim_mes_m1.
+
+);
+
+QUIT;
+
+proc sort data=Base_assessoria_V0; by NuContrato SqContratoFinanceiro descending NuDiasAtraso;
+proc sort data=Base_assessoria_V0 nodupkey; by NuContrato SqContratoFinanceiro;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V1 AS
+SELECT
+	A.*,
+	B.RAZAO_NOME,
+	CASE
+	WHEN B.RAZAO_NOME LIKE '%NA - HOEPERS%'    	  		THEN 'NA-HOEPERS'
+	WHEN B.RAZAO_NOME LIKE '%NA - RN_ADV%' 		  		THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PASCHOALOTTO%' 	  	THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PORTINHO%' 		  	THEN 'NA-PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%NA - REALE%' 		  		THEN 'NA-REALE'
+	WHEN B.RAZAO_NOME LIKE '%NA - MBM%' 			  	THEN 'NA-MBM'
+	WHEN B.RAZAO_NOME LIKE '%NA - ANASTASSOPOULOS%' 	THEN 'NA-A.COSTA'
+	WHEN B.RAZAO_NOME LIKE '%MELHADO%'       			THEN 'MELHADO'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI_2%'       		THEN 'BELLINATI_2'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI%'       			THEN 'BELLINATI'
+	WHEN B.RAZAO_NOME LIKE '%CARVALHO%'       			THEN 'CARVALHO'
+	WHEN B.RAZAO_NOME LIKE '%PASQUALI%'       			THEN 'PASQUALI'
+	WHEN B.RAZAO_NOME LIKE '%REALE%'        			THEN 'REALE'
+	WHEN B.RAZAO_NOME LIKE '%SCHULZE%'       			THEN 'SCHULZE'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO_2%'        			THEN 'TOLEDO_2'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO%'        			THEN 'TOLEDO'
+	WHEN B.RAZAO_NOME LIKE '%MARCONDES%'       			THEN 'MARCONDES'
+	WHEN B.RAZAO_NOME LIKE '%FIGUEIREDO%'       		THEN 'FIGUEIREDO'
+	WHEN B.RAZAO_NOME LIKE '%RN_ADV%'      				THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%PASCHOALOTTO%'      		THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%CONT_RN%'      			THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%LM_ANGELIS%'      			THEN 'LM_ANGELIS'
+	WHEN B.RAZAO_NOME LIKE '%PORTINHO%'          		THEN 'PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%GASPARIM%'          		THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%CARDOSO%'          		THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%AYRES%'          			THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%REDE BRASIL%'          	THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%ANTONIO BRAZ%'          	THEN 'ANTONIO BRAZ'
+	WHEN B.RAZAO_NOME LIKE '%COB_MENDES E CUNHA%'       THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%CONT_MENDES E CUNHA%'		THEN 'CRC'
+ELSE 'OUTRAS'
+END AS ASSESSORIA
+
+FROM Base_assessoria_V0 AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			COD_AGENTE,
+			RAZAO_NOME
+		FROM
+			bv-pdbd-prd.trusted_scc_fin.saj_agente
+) AS B
+ON A.cod_asses = B.COD_AGENTE;
+QUIT;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = B.NUCONTRATO
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = C.NUCONTRATO;
+QUIT;
+
+
+DATA reneg_maior90_v1;
+SET reneg_maior90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF nudiasatraso > atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+
+PROC SQL;
+CREATE TABLE reneg_maior90_v2_&anomes. AS
+SELECT
+	A.*,
+	B.ASSESSORIA
+FROM reneg_maior90_v1 AS A
+LEFT JOIN Base_assessoria_V1 AS B
+ON A.NUCONTRATO = B.NUCONTRATO;
+QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%performance_reneg_GCP (202510, '2025-10-01', '2025-10-31', '2025-09-30');
+%performance_reneg_GCP (202511, '2025-11-01', '2025-11-30', '2025-10-31');
+%performance_reneg_GCP (202512, '2025-11-01', '2025-12-31', '2025-11-30');
+
+DATA reneg_maior90_final;
+SET reneg_maior90_v2_:
+;RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT AS
+SELECT
+	BASE,
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	FILTRO_FINAL,
+	Teste_Controle_Final,
+	Modelo_Final,
+	RESULTADO,
+
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_maior90_final
+GROUP BY
+	BASE,
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	FILTRO_FINAL,
+	Teste_Controle_Final,
+	Modelo_Final,
+	RESULTADO
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME RENEG    '/riscosbv/cobranca/gtavares/Reneg';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+
+ 
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+
+
+
+
+
+
+
+
+%macro performance_reneg (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = base_eleg_cont_&anomes.;
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V0 AS
+SELECT
+	*
+
+FROM CONNECTION TO PERM (
+		SELECT
+			B.NuContrato,
+			B.SqContratoFinanceiro,
+			B.NuDiasAtraso,
+			A.NuContratoGestao,
+			DATE(A.dt_asses) as dt_asses,
+			A.cod_asses
+
+		FROM bv-pdbd-prd.trusted_scc_fin.saj_processo AS A
+		JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+		ON a.NuContratoGestao = B.NuContrato AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE a.cod_acao IN (1,3,39,59,60)
+		AND (DATE(a.dt_asses) <= &fim_mes_m1. AND (a.Dt_Ret_Asses IS NULL OR DATE(a.Dt_Ret_Asses) > &fim_mes_m1.))
+		AND B.DtProcessamento = &fim_mes_m1.
+
+);
+
+QUIT;
+
+proc sort data=Base_assessoria_V0; by NuContrato SqContratoFinanceiro descending NuDiasAtraso;
+proc sort data=Base_assessoria_V0 nodupkey; by NuContrato SqContratoFinanceiro;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V1 AS
+SELECT
+	A.*,
+	B.RAZAO_NOME,
+	CASE
+	WHEN B.RAZAO_NOME LIKE '%NA - HOEPERS%'    	  		THEN 'NA-HOEPERS'
+	WHEN B.RAZAO_NOME LIKE '%NA - RN_ADV%' 		  		THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PASCHOALOTTO%' 	  	THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PORTINHO%' 		  	THEN 'NA-PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%NA - REALE%' 		  		THEN 'NA-REALE'
+	WHEN B.RAZAO_NOME LIKE '%NA - MBM%' 			  	THEN 'NA-MBM'
+	WHEN B.RAZAO_NOME LIKE '%NA - ANASTASSOPOULOS%' 	THEN 'NA-A.COSTA'
+	WHEN B.RAZAO_NOME LIKE '%MELHADO%'       			THEN 'MELHADO'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI_2%'       		THEN 'BELLINATI_2'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI%'       			THEN 'BELLINATI'
+	WHEN B.RAZAO_NOME LIKE '%CARVALHO%'       			THEN 'CARVALHO'
+	WHEN B.RAZAO_NOME LIKE '%PASQUALI%'       			THEN 'PASQUALI'
+	WHEN B.RAZAO_NOME LIKE '%REALE%'        			THEN 'REALE'
+	WHEN B.RAZAO_NOME LIKE '%SCHULZE%'       			THEN 'SCHULZE'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO_2%'        			THEN 'TOLEDO_2'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO%'        			THEN 'TOLEDO'
+	WHEN B.RAZAO_NOME LIKE '%MARCONDES%'       			THEN 'MARCONDES'
+	WHEN B.RAZAO_NOME LIKE '%FIGUEIREDO%'       		THEN 'FIGUEIREDO'
+	WHEN B.RAZAO_NOME LIKE '%RN_ADV%'      				THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%PASCHOALOTTO%'      		THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%CONT_RN%'      			THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%LM_ANGELIS%'      			THEN 'LM_ANGELIS'
+	WHEN B.RAZAO_NOME LIKE '%PORTINHO%'          		THEN 'PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%GASPARIM%'          		THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%CARDOSO%'          		THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%AYRES%'          			THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%REDE BRASIL%'          	THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%ANTONIO BRAZ%'          	THEN 'ANTONIO BRAZ'
+	WHEN B.RAZAO_NOME LIKE '%COB_MENDES E CUNHA%'       THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%CONT_MENDES E CUNHA%'		THEN 'CRC'
+ELSE 'OUTRAS'
+END AS ASSESSORIA
+
+FROM Base_assessoria_V0 AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			COD_AGENTE,
+			RAZAO_NOME
+		FROM
+			bv-pdbd-prd.trusted_scc_fin.saj_agente
+) AS B
+ON A.cod_asses = B.COD_AGENTE;
+QUIT;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = INPUT(B.NUCONTRATO,BEST32.)
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = INPUT(C.NUCONTRATO,BEST32.);
+QUIT;
+
+
+DATA reneg_maior90_v1;
+SET reneg_maior90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF nudiasatraso > atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+
+PROC SQL;
+CREATE TABLE reneg_maior90_v2_&anomes. AS
+SELECT
+	A.*,
+	B.ASSESSORIA
+FROM reneg_maior90_v1 AS A
+LEFT JOIN Base_assessoria_V1 AS B
+ON A.NUCONTRATO = INPUT(B.NUCONTRATO,BEST32.);
+QUIT;
+
+%mend;
+
+%macro performance_reneg_GCP (anomes, inicio_mes, fim_mes_m1, fim_mes_m0);
+
+%LET TABELA = base_eleg_cont_&anomes.;
+%DESCOMPACTA(RENEG, &tabela.);
+
+DATA BASE_ELEG;
+SET &TABELA.;
+RUN;
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V0 AS
+SELECT
+	*
+
+FROM CONNECTION TO PERM (
+		SELECT
+			B.NuContrato,
+			B.SqContratoFinanceiro,
+			B.NuDiasAtraso,
+			A.NuContratoGestao,
+			DATE(A.dt_asses) as dt_asses,
+			A.cod_asses
+
+		FROM bv-pdbd-prd.trusted_scc_fin.saj_processo AS A
+		JOIN bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS B
+		ON a.NuContratoGestao = B.NuContrato AND A.SqContratoFinanceiro = B.SqContratoFinanceiro
+
+		WHERE a.cod_acao IN (1,3,39,59,60)
+		AND (DATE(a.dt_asses) <= &fim_mes_m1. AND (a.Dt_Ret_Asses IS NULL OR DATE(a.Dt_Ret_Asses) > &fim_mes_m1.))
+		AND B.DtProcessamento = &fim_mes_m1.
+
+);
+
+QUIT;
+
+proc sort data=Base_assessoria_V0; by NuContrato SqContratoFinanceiro descending NuDiasAtraso;
+proc sort data=Base_assessoria_V0 nodupkey; by NuContrato SqContratoFinanceiro;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE Base_assessoria_V1 AS
+SELECT
+	A.*,
+	B.RAZAO_NOME,
+	CASE
+	WHEN B.RAZAO_NOME LIKE '%NA - HOEPERS%'    	  		THEN 'NA-HOEPERS'
+	WHEN B.RAZAO_NOME LIKE '%NA - RN_ADV%' 		  		THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PASCHOALOTTO%' 	  	THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PORTINHO%' 		  	THEN 'NA-PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%NA - REALE%' 		  		THEN 'NA-REALE'
+	WHEN B.RAZAO_NOME LIKE '%NA - MBM%' 			  	THEN 'NA-MBM'
+	WHEN B.RAZAO_NOME LIKE '%NA - ANASTASSOPOULOS%' 	THEN 'NA-A.COSTA'
+	WHEN B.RAZAO_NOME LIKE '%MELHADO%'       			THEN 'MELHADO'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI_2%'       		THEN 'BELLINATI_2'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI%'       			THEN 'BELLINATI'
+	WHEN B.RAZAO_NOME LIKE '%CARVALHO%'       			THEN 'CARVALHO'
+	WHEN B.RAZAO_NOME LIKE '%PASQUALI%'       			THEN 'PASQUALI'
+	WHEN B.RAZAO_NOME LIKE '%REALE%'        			THEN 'REALE'
+	WHEN B.RAZAO_NOME LIKE '%SCHULZE%'       			THEN 'SCHULZE'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO_2%'        			THEN 'TOLEDO_2'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO%'        			THEN 'TOLEDO'
+	WHEN B.RAZAO_NOME LIKE '%MARCONDES%'       			THEN 'MARCONDES'
+	WHEN B.RAZAO_NOME LIKE '%FIGUEIREDO%'       		THEN 'FIGUEIREDO'
+	WHEN B.RAZAO_NOME LIKE '%RN_ADV%'      				THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%PASCHOALOTTO%'      		THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%CONT_RN%'      			THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%LM_ANGELIS%'      			THEN 'LM_ANGELIS'
+	WHEN B.RAZAO_NOME LIKE '%PORTINHO%'          		THEN 'PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%GASPARIM%'          		THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%CARDOSO%'          		THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%AYRES%'          			THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%REDE BRASIL%'          	THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%ANTONIO BRAZ%'          	THEN 'ANTONIO BRAZ'
+	WHEN B.RAZAO_NOME LIKE '%COB_MENDES E CUNHA%'       THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%CONT_MENDES E CUNHA%'		THEN 'CRC'
+ELSE 'OUTRAS'
+END AS ASSESSORIA
+
+FROM Base_assessoria_V0 AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			COD_AGENTE,
+			RAZAO_NOME
+		FROM
+			bv-pdbd-prd.trusted_scc_fin.saj_agente
+) AS B
+ON A.cod_asses = B.COD_AGENTE;
+QUIT;
+
+
+
+
+
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=15);
+CREATE TABLE reneg_maior90 AS
+SELECT
+	A.*,
+	B.atraso_m0,
+	B.sqcontratofinanceiro_m0,
+	C.atraso_m1,
+	C.sqcontratofinanceiro_m1,
+	B.SALDO_M0
+
+FROM BASE_ELEG AS A
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			A.Nucontrato,
+			MAX(A.sqcontratofinanceiro) as sqcontratofinanceiro_m0,
+			MAX(A.nudiasatraso) as atraso_m0,
+			CASE
+				WHEN J.FlRestruturacaoContrato = 'S' THEN SUM(CAST(A.vrpermanenciaapropriado AS FLOAT64)+CAST(A.VrTaxaContratoRestruturacao AS FLOAT64))
+				ELSE SUM(CAST(A.VrTaxaContrato AS FLOAT64) + CAST(A.VrPermanenciaApropriado AS FLOAT64))
+			END AS SALDO_M0
+
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+
+		LEFT JOIN bv-pdbd-prd.trusted_dbgestaocdccg.tbcontratofinanceiro AS J
+		ON A.NUCONTRATO = J.NUCONTRATO
+		AND A.SqContratoFinanceiro = J.SqContratoFinanceiro
+
+		WHERE DATE(A.dtprocessamento) = &fim_mes_m0.
+		GROUP BY A.nucontrato, A.CdSituacaoContabil, J.FlRestruturacaoContrato
+) AS B
+ON A.nucontrato = B.NUCONTRATO
+
+LEFT JOIN CONNECTION TO PERM (
+		SELECT DISTINCT
+			Nucontrato,
+			max(sqcontratofinanceiro) as sqcontratofinanceiro_m1,
+			max(nudiasatraso) as atraso_m1
+		FROM bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil
+		where DATE(dtprocessamento) = &fim_mes_m1.
+		group by nucontrato
+) AS C
+ON A.nucontrato = C.NUCONTRATO;
+QUIT;
+
+
+DATA reneg_maior90_v1;
+SET reneg_maior90;
+FORMAT RESULTADO $15.;
+IF atraso_m1 = 0 AND sqcontratofinanceiro_m1 > sqcontratofinanceiro_m0 		THEN RESULTADO = "Reneg"; ELSE
+IF nudiasatraso > atraso_m1 												THEN RESULTADO = "Pagamento";
+ELSE RESULTADO = "Sem acao";
+RUN;
+
+
+PROC SQL;
+CREATE TABLE reneg_maior90_v2_&anomes. AS
+SELECT
+	A.*,
+	B.ASSESSORIA
+FROM reneg_maior90_v1 AS A
+LEFT JOIN Base_assessoria_V1 AS B
+ON A.NUCONTRATO = B.NUCONTRATO;
+QUIT;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%performance_reneg_GCP (202510, '2025-10-01', '2025-10-31', '2025-09-30');
+%performance_reneg_GCP (202511, '2025-11-01', '2025-11-30', '2025-10-31');
+%performance_reneg_GCP (202512, '2025-11-01', '2025-12-31', '2025-11-30');
+
+DATA reneg_maior90_final;
+SET reneg_maior90_v2_:
+;RUN;
+
+PROC SQL;
+CREATE TABLE CUBO_EXPORT AS
+SELECT
+	BASE,
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	FILTRO_FINAL,
+	Teste_Controle_Final,
+	Modelo_Final,
+	RESULTADO,
+	ASSESSORIA,
+	SUM(SALDO_M0) AS SALDO_M0,
+	COUNT(NUCONTRATO) AS QNT
+
+FROM reneg_maior90_final
+GROUP BY
+	BASE,
+	PRODUTO,
+	SAFRA,
+	FX_ATRASO,
+	FILTRO_FINAL,
+	Teste_Controle_Final,
+	Modelo_Final,
+	RESULTADO,
+	ASSESSORIA
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

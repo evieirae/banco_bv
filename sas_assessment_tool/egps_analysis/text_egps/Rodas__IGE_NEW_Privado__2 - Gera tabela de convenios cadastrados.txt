@@ -1,0 +1,185 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Privado
+FILE_SAS: 2 - Gera tabela de convenios cadastrados.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 125
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISV = /projetos/MISV/data/bases; TEMP = /projetos/MISV/data/bases/tmp; TEMPW = &swork; TRIBO = /riscosbv/consignado
+DETECTED_MACROS_DEFINED: TIMESTAMP, TIMESTAMPDATA, TIMESTAMPHORA, database, database_fim, database_fim_lead, database_ini, database_ini_lead, databse, dir_csv
+DETECTED_MACROS_USED: swork
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], MISV.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: MISV
+EXPORTED_LIBNAMES: TEMPW
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): MISV.TBPARCEIROCOMERCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): MISV.TBPARCEIROCOMERCIAL
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TEMPW.BASE_CONV_CADSTRADOS_PRIVADO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	2 - Gera tabela de convenios cadastrados.sas														| */
+/* | Descricao: Programa para gerar tabela de convenios cadastrados.					| */
+/* | Objetivo: 	Dash Consignado Privado					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+libname tribo "/riscosbv/consignado";
+libname misv "/projetos/MISV/data/bases";
+libname temp "/projetos/MISV/data/bases/tmp";
+libname tempw "&swork";
+
+%let database = '2021/01/01';
+%let database_ini = '2022/01/01';
+%let database_fim = '2023/06/30';
+%let database_ini_lead = '2023/05/30';
+%let database_fim_lead = '2023/06/01';
+%let databse = %sysfunc(date(),ddmmyy10.);
+OPTIONS COMPRESS=BINARY;
+%LET TIMESTAMP = %SYSFUNC(DATE(),ddmmyy10.);
+%LET TIMESTAMPDATA = %SYSFUNC(date(),YYMMDDN8.);
+%LET TIMESTAMPHORA = %sysfunc(TIME(),hour4.);
+
+/***********************************************************************************************|
+|					Gera tabela de convenios cadastrados			|
+|***********************************************************************************************/
+
+proc sql;
+
+create table tempw.BASE_CONV_CADSTRADOS_PRIVADO as
+
+   SELECT t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.NuCnpjLoja,
+          t1.DsRazaoSocial,
+          t1.CdGrupoParceiro,
+          t1.NmGrupoParceiro,
+          t1.NmPromotora,
+          t1.DsGrupoParceiroLocadoras,
+          t1.NmAutoShopping,
+          t1.NmCorredor,
+          t1.NmGrupoConcessionaria,
+          t1.NmBandeiraGrupoConcessionaria,
+          t1.CdTipoParceiroComercial,
+          t1.NmTipoParceiroComercial,
+          t1.TpAtividade,
+          t1.DsAtividadeFinanciamento,
+          t1.FlIntegracaoParceiroFeI,
+          t1.NmLogradouro,
+          t1.NuEndereco,
+          t1.DsComplementoEndereco,
+          t1.NmBairro,
+          t1.NmCidade,
+          t1.CdUf,
+          t1.CdCep,
+          t1.NuDddTelefone,
+          t1.NuTelefone,
+          t1.NuDddFax,
+          t1.NuFax,
+          t1.DsEnderecoEletronico,
+          t1.CdColaboradorC,
+          t1.NmColaboradorC,
+          t1.CdFilialC,
+          t1.NmFilialC,
+          t1.CdAreaEstruturaComercialC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmSubEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+          t1.DsLoginN1C,
+          t1.DsLoginN2C,
+          t1.DsLoginN3C,
+          t1.LstSubstituicaoC,
+          t1.StBloqueioEmpresa,
+          t1.DsBloqueioEmpresa,
+          t1.CdSituacaoCadastral,
+          t1.DsSituacaoCadastral,
+          t1.CtMatrizTicketMedio,
+          t1.DsMatrizTicketMedio,
+          t1.CtPerfomance6m,
+          t1.DsPerfomance6m,
+          t1.CtPerfomance12m,
+          t1.DsPerfomance12m,
+          t1.CtPerfomance36m,
+          t1.DsPerfomance36m,
+          t1.CtQualidadeCarteira,
+          t1.DsQualidadeCarteira,
+          t1.CtPerdaCarteira,
+          t1.DsPerdaCarteira,
+          t1.QtFuncionarios,
+          t1.CtQuantidadeVidas,
+          t1.DsQuantidadeVidas,
+          t1.CtPenetracaoVidas,
+          t1.DsPenetracaoVidas,
+          t1.VrLimiteOperacional,
+          t1.VrLimiteOperacionalAnterior,
+          t1.VrSaldoContabilConvenio,
+          t1.CdClassificacaoLimiteConvenio,
+          t1.NmClassificacaoLimiteConvenio,
+          t1.FlHabilitadoParla,
+          t1.FlHabilitadoLoja,
+          t1.FlHabilitadoCoban,
+          t1.CdCobanAtendimento,
+          t1.NmCobanAtendimento,
+          t1.DtAtualizacaoTabelaPrincing,
+          t1.FlConvenioBipartido,
+          t1.FlConvenioUtilizacaoFgts,
+          t1.SgTipoPiloto,
+          t1.DsTipoCanalPromotora,
+          t1.CdClassificacaoRiscos,
+          t1.DsClassificacaoRiscos,
+          t1.CdCnae,
+		  0 as CdCnaeRiscos,
+/*          t1.CdCnaeRiscos, */
+          datepart(t1.DtCadastro) format  ddmmyy10. AS DtCadastro,
+          t1.CtTempoCadastro,
+          t1.DsTempoCadastro,
+          datepart(t1.DtUltimaAtualizacao) format  ddmmyy10. AS DtUltimaAtualizacao,
+          t1.FlAtivo,
+          t1.FlPrioridade,
+          t1.FlSeguradora,
+          t1.DtProcessamento
+      FROM MISV.TBPARCEIROCOMERCIAL t1
+
+ WHERE t1.NmCanalEstruturaComercialC in ("Canal Privado e FGTS","Canal Negocios") or
+ t1.NmTipoParceiroComercial = "Empresa Conveniada - Privada"
+;RUN;

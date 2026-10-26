@@ -1,0 +1,474 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_egv
+FILE_SAS: 04 - Tabelao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 336
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtCtpSim, LstD0CSm, LstD3CSm
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.TAXAS_PROPOSTAS [SAS/Local], BASEGRC.TBFILTROCVG [SAS/Local], INFOGRC.PPR_ANALITICO [SAS/Local], PROJETOS.TBPARCEIROCOMERCIAL [SAS/Local], SOLITMP.TBSHARECVG [SAS/Local], TUYRA.TB_TOTAL_SIMU_PROP_EVG_6 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.TAXAS_PROPOSTAS [PROC SQL - JOIN], BASEGRC.TBFILTROCVG [PROC SQL - JOIN], INFOGRC.PPR_ANALITICO [PROC SQL - FROM], PROJETOS.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], SOLITMP.TBSHARECVG [PROC SQL - FROM], TUYRA.TB_TOTAL_SIMU_PROP_EVG_6 [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.FUNIL_PRICING_EGV
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: MKT_SHARE, PA_ORIGINADAS, PROD, PROPOSTAS, SIMU_LEVES_MSG_DIA, SPREAD_ORIGINADAS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE SIMU_LEVES_MSG_DIA AS
+SELECT
+'Simu_Leves_Msg' as TpDados,
+A.NuAnoMes as Safra,
+A.DtSimulacaoInicial,
+A.Canal,
+A.Filial,
+D.NuSemana as FG_SEMANA,
+A.SistemaInicial,
+
+CASE WHEN A.Regional = 'Canal Rodas e EGV - Regional I' THEN 'C1R1'
+     WHEN A.Regional = 'Canal Rodas e EGV - Regional II' THEN 'C1R2'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional III','Canal Rodas e EGV II - Regional II') THEN 'C1R3'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional IV','Canal Rodas e EGV II - Regional I')  THEN 'C2R4'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional V','Canal Rodas e EGV III - Regional I')  THEN 'C2R5'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional VI','Canal Rodas e EGV III - Regional II')THEN 'C2R6'
+ELSE 'DEMAIS' END AS Regional,
+
+CASE WHEN A.Produto IN ('CVG Leves','CVG Pesados') THEN
+
+         CASE WHEN A.Canal IN ('MULTIMARCAS','CONCESSIONARIAS')
+                   THEN 'Canal veículos'
+			  WHEN A.NmParceiroComercial LIKE '%FINANZERO%' OR A.NmParceiroComercial LIKE '%QUERO FINANCIAR%'
+				OR A.NmParceiroComercial LIKE '%EAI CLUBE%' OR A.NmParceiroComercial LIKE '%GRINGO O MELHOR%'
+				OR A.NmParceiroComercial LIKE '%AME DIGITAL%' OR A.NmParceiroComercial LIKE '%ECOM COMUNICACOES%'
+                   THEN 'Parceiro digital'
+
+              WHEN A.NmParceiroComercial LIKE '%GARAN TMLKT%' OR A.NmParceiroComercial LIKE '%GARAN TELEMARKETING%' OR A.NmParceiroComercial LIKE '%CP GARAN TLMK CALL%'
+                   THEN 'Telemarketing'
+
+              WHEN A.CdParceiroComercial = 414643
+                   THEN 'Minha BV'
+              WHEN A.CdParceiroComercial = 424584 OR A.CdParceiroComercial = 452470 OR A.CdParceiroComercial = 465399
+                   THEN 'CVG Área Aberta Site'
+
+              WHEN A.Canal IN ('LOJA CANAL NEGOCIOS','PROMOTORA','BV FINANCEIRA - OPERACAO ESPECIAL')
+               AND
+				   A.NmParceiroComercial NOT LIKE '%GARAN TMLKT%' OR A.NmParceiroComercial NOT LIKE '%GARAN TELEMARKETING%'  OR A.NmParceiroComercial NOT LIKE '%CP GARAN TLMK CALL%'
+				OR A.NmParceiroComercial NOT LIKE '%FINANZERO%' OR A.NmParceiroComercial NOT LIKE '%QUERO FINANCIAR%'
+				OR A.NmParceiroComercial NOT LIKE '%EAI CLUBE%' OR A.NmParceiroComercial NOT LIKE '%GRINGO O MELHOR%'
+     			OR A.NmParceiroComercial NOT LIKE '%AME DIGITAL%' OR A.NmParceiroComercial NOT LIKE '%ECOM COMUNICACOES%'
+
+                   THEN 'Canal negócios'
+              ELSE 'Canal negócios'
+              END
+         ELSE 'Outros produtos'
+    END AS FiltroCVG,
+
+SUM(FlSimuValidaDiaEfet) as SIMU_VALDIA,
+/*Quantidade de Simulações Total e em D0 e D3*/
+
+/*simulações cpf único*/
+COUNT (distinct (CASE WHEN flcard>=1 then A.NuCpfCnpj END)) as Qtd_Simulacao_Unica,
+
+/*/*Indicadores de Entrada, Taxa, Rating, Aprovação e Efetivação Total e em D0 e D3*/
+
+SUM(A.TxFinanciamentoSolicitada*A.VrProposta) as TAXA_PND_S,
+SUM(A.TxTirContabil*A.VrProposta) as TIR_PND_S,
+SUM(A.FlPropostaOriginada) as FlPropostaOriginada,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN A.ProbabilidadeAprovacao*A.VrProposta ELSE 0 END) as Rating_Prop_PND,
+SUM(CASE WHEN A.FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) as VrProposta,
+SUM(A.FlPropostaAprovada) as FlPropostaAprovada,
+SUM(A.FlPropostaEfetivada) as FlPropostaEfetivada,
+SUM(CASE WHEN A.DtContrato <= D0 and A.DtContrato >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaEfetivada ELSE 0 END) AS EFETIVADASD0,
+SUM(CASE WHEN A.DtContrato <= D3 and A.DtContrato >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaEfetivada ELSE 0 END) AS EFETIVADASD3,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaAprovada else 0 end) as FlPropostaAprovadaD3,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaAprovada else 0 end) as FlPropostaAprovadaD0,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaOriginada else 0 end) as FlPropostaOriginadaD3,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaOriginada else 0 end) as FlPropostaOriginadaD0,
+
+/*/*Quantidade de Convertidas Totais*/
+
+COUNT(DISTINCT (CASE WHEN DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Convertidas,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_D3,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_D0,
+
+/*/*Quantidade de Convertidas Recusadas Totais*/
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_D3,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_D0,
+
+/*/*Quantidade de Convertidas Totais  ITAU*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_ITAU_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_ITAU_D0,
+
+/*/*Quantidade de Convertidas Recusadas Totais ITAU*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_ITAU_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_ITAU_D0,
+
+/*/*Quantidade de Convertidas Totais  STD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_STD_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_STD_D0,
+
+/*/*Quantidade de Convertidas Recusadas Totais  STD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_STD_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_STD_D0,
+
+/*/*Quantidade de Convertidas Totais BRAD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_BRA_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_BRA_D0,
+
+/*/*Quantidade de Convertidas Recusadas BRAD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_BRA_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_BRA_D0,
+
+/*/*Quantidade de Convertidas Totais  PAN*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Panamericano' AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_PAN,
+COUNT(DISTINCT (CASE WHEN Banco = 'Panamericano' AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_PAN,
+COUNT(DISTINCT (CASE WHEN Banco = 'Panamericano' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_PAN_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Panamericano' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_PAN_D0,
+
+/*/*Quantidade de Convertidas Recusadas Totais  PAN*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Panamericano' AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_PAN,
+COUNT(DISTINCT (CASE WHEN Banco = 'Panamericano' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_PAN_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Panamericano' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_PAN_D0,
+
+/*/*Quantidade de Convertidas Totais  Omni*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Omni' AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_OMNI,
+COUNT(DISTINCT (CASE WHEN Banco = 'Omni' AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_OMNI,
+COUNT(DISTINCT (CASE WHEN Banco = 'Omni' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_OMNI_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Omni' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_OMNI_D0,
+
+/*/*Quantidade de Convertidas Recusadas Omni*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Omni' AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_OMNI,
+COUNT(DISTINCT (CASE WHEN Banco = 'Omni' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_OMNI_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Omni' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_OMNI_D0,
+
+/*/*Quantidade de Convertidas Totais Creditas*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Creditas' AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_CRED,
+COUNT(DISTINCT (CASE WHEN Banco = 'Creditas' AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_CRED,
+COUNT(DISTINCT (CASE WHEN Banco = 'Creditas' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_CRED_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Creditas' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_CRED_D0,
+
+/*/*Quantidade de Convertidas Recusadas Creditas*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Creditas' AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_CRED,
+COUNT(DISTINCT (CASE WHEN Banco = 'Creditas' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_CRED_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Creditas' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_CRED_D0,
+
+/*/*Quantidade de Convertidas Totais Porto Seguro*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Porto Seguro' AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_PORT,
+COUNT(DISTINCT (CASE WHEN Banco = 'Porto Seguro' AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_PORT,
+COUNT(DISTINCT (CASE WHEN Banco = 'Porto Seguro' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_PORT_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Porto Seguro' AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_PORT_D0,
+
+/*/*Quantidade de Convertidas Recusadas Poto Seguro*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Porto Seguro' AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_PORT,
+COUNT(DISTINCT (CASE WHEN Banco = 'Porto Seguro' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_PORT_D3,
+COUNT(DISTINCT (CASE WHEN Banco = 'Porto Seguro' AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_PORT_D0,
+
+/*/*Quantidade de Convertidas Totais  Demais Bancos*/
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','Panamericano','Omni','Creditas', 'Porto Seguro') AND DtInclusaoGravame >= DtSimulacaoInicial AND A.FlPropostaOriginada = 0 AND A.FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','Panamericano','Omni','Creditas', 'Porto Seguro') AND StatusSimulacao = 'Proposta APNP' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','Panamericano','Omni','Creditas', 'Porto Seguro') AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_DB_D3,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','Panamericano','Omni','Creditas', 'Porto Seguro') AND StatusSimulacao = 'Proposta APNP' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_DB_D0,
+
+/*/*Quantidade de Convertidas Recusadas Totais Demais Bancos*/
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','Panamericano','Omni','Creditas', 'Porto Seguro') AND StatusSimulacao = 'Proposta negada' and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','Panamericano','Omni','Creditas', 'Porto Seguro') AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D3 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_DB_D3,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','Panamericano','Omni','Creditas', 'Porto Seguro') AND StatusSimulacao = 'Proposta negada' AND DtInclusaoGravame <= D0 and DtInclusaoGravame >= A.DtEntradaProposta and A.FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_DB_D0
+
+FROM MENSAGERIA AS A
+LEFT JOIN TBSEMANAS as D ON A.DtSimulacaoInicial=D.DtTempo
+LEFT JOIN TBD0 AS F ON A.DtSimulacaoInicial=F.DtTempo
+LEFT JOIN TBD1 AS G ON A.DtSimulacaoInicial=G.DtTempo
+LEFT JOIN TBD3 AS H ON A.DtSimulacaoInicial=H.DtTempo
+
+WHERE
+A.DtSimulacaoInicial <= &DtCtpSim.  AND A.FlSimuValidaDiaEfet = 1
+AND A.Produto = 'CVG Leves'
+group by 1,2,3,4,5,6,7,8,9;
+quit;
+
+/*PRODUÇÃO*/
+
+PROC SQL;
+CREATE TABLE PROD AS
+SELECT
+'PROD' as TpDados,
+NuAnoMes as Safra,
+
+D.NuSemana as FG_SEMANA,
+CASE WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV I - Regional I' THEN 'C1R1'
+WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV I - Regional II' THEN 'C1R2'
+WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV II - Regional I' THEN 'C2R1'
+WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV II - Regional II' THEN 'C2R2'
+WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV III - Regional I' THEN 'C3R1'
+WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV III - Regional II' THEN 'C3R2'
+ELSE 'DEMAIS' END AS Regional,
+A.NmAreaEstruturaComercialC as Filial,
+A.DsTipoCanalProducao As Canal,
+C.DS_DECISAO_PDEC,
+C.DsMotivoRecusa,
+C.PoliticaSimu,
+COALESCE(CVG.FiltroCVG,'OUTROS PRODUTOS') as FiltroCVG,
+SUM(INPUT(C.RatingEVGInt, 9.)*A.VrProducao) AS Rating_prod_PND,
+SUM(A.VrFinanciamento) AS VrFinanciamento,
+SUM(A.VrMargemContribuicao) AS VrMargemContribuicao,
+SUM(A.VrPerdaEstimada) AS VrPerdaEstimada,
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VpSpread) as VpSpread,
+SUM(A.VpTxGerencial) as VpTxGerencial,
+SUM(A.VpTirContabil) as VpTirContabil,
+COUNT(A.NuContrato) as QtdContratos
+
+from BASE_CVGLEVES AS A
+LEFT JOIN TUYRA.TB_TOTAL_SIMU_PROP_EVG_6 AS C ON (A.NUPROPOSTA = C.NUPROPOSTA)
+LEFT JOIN TBSEMANAS as D ON A.DtContrato=D.DtTempo
+LEFT JOIN BASEGRC.TbFiltroCVG CVG
+	ON CVG.nuproposta = A.nuproposta
+WHERE A.NmGrupoProdutoMeta = 'CVG Leves' and A.VrProducao <> .
+and A.DtContrato <= &DtCtpSim.
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10;
+
+/*SHARE*/
+
+PROC SQL;
+CREATE TABLE MKT_SHARE AS SELECT
+
+'SHARE' as TpDados,
+ano_mes_competencia as Safra,
+
+SUM(CASE WHEN NmAgenteMIS = "BV" THEN total_contratos END) AS CONTRATOS_BV,
+SUM (total_contratos) AS TOTAL_CONTRATOS
+
+FROM SOLITMP.TBSHARECVG WHERE cat_veiculo = "LEVES"
+GROUP BY 1,2;
+RUN;
+
+/*~~~~~~~~TESTE NÚMERO DE PA~~~~~~~~~~*/
+
+PROC SQL;
+CREATE TABLE PA_ORIGINADAS AS SELECT
+
+'PA_Originadas' as TpDados,
+ORI.Safra,
+ORI.DsTipoCanalProducao AS Canal,
+ORI.DsFilial as Filial,
+D.NuSemana as FG_SEMANA,
+B.NmAreaEstruturaComercialC AS FilialC,
+C.DS_DECISAO_PDEC,
+C.DsMotivoRecusa,
+C.PoliticaSimu,
+
+CASE WHEN ORI.Regional = 'Canal Rodas e EGV I - Regional I' THEN 'C1R1'
+     WHEN ORI.Regional = 'Canal Rodas e EGV I - Regional II' THEN 'C1R2'
+     WHEN ORI.Regional = 'Canal Rodas e EGV II - Regional I' THEN 'C2R1'
+     WHEN ORI.Regional = 'Canal Rodas e EGV II - Regional II' THEN 'C2R2'
+     WHEN ORI.Regional = 'Canal Rodas e EGV III - Regional I' THEN 'C3R1'
+     WHEN ORI.Regional = 'Canal Rodas e EGV III - Regional II' THEN 'C3R2'
+	 ELSE 'DEMAIS' END AS Regional,
+
+COALESCE(CVG.FiltroCVG,'OUTROS PRODUTOS') as FiltroCVG,
+SUM(ORI.VrProducao) AS VrProducao,
+SUM(INPUT(C.RatingEVGInt, 9.)*ORI.VrProducao) AS Rating_PROD_PND,
+SUM(CASE WHEN ORI.FlTxAlterada = 1 THEN ORI.VrPropostaOriginada * COALESCE(TXP.VarTaxaAlterada,0) ELSE 0 END) AS VpTamanhoPA,
+SUM(CASE WHEN ORI.FlTxAlterada = 1 THEN ORI.VrPropostaOriginada ELSE 0 END) AS VpTamanhoTotal,
+SUM(FlPropostaOriginada) AS QTD_ORIGINADAS,
+SUM(ORI.FlTxAlterada) AS QTD_PA
+
+FROM INFOGRC.PPR_ANALITICO AS ORI LEFT JOIN AUXL.Taxas_Propostas AS TXP ON (ORI.NUPROPOSTA = TXP.NUPROPOSTA)
+LEFT JOIN TBSEMANAS as D ON ORI.DtEntradaProposta = D.DtTempo
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS B ON (ORI.CdConvenio = B.CdParceiroComercial)
+LEFT JOIN TUYRA.TB_TOTAL_SIMU_PROP_EVG_6 AS C ON (ORI.NUPROPOSTA = C.NUPROPOSTA)
+LEFT JOIN BASEGRC.TbFiltroCVG CVG ON CVG.nuproposta = ORI.nuproposta
+
+WHERE ORI.FlPropostaEfetivada = 1 AND ORI.Produto = 'CVG Leves'
+and ORI.DtEntradaProposta <= &DtCtpSim.
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11;RUN;
+
+PROC SQL;
+CREATE TABLE PROPOSTAS AS SELECT
+
+'PROPOSTAS' as TpDados,
+ORI.Safra,
+ORI.DsTipoCanalProducao AS Canal,
+ORI.DsFilial as Filial,
+ORI.StProposta,
+D.NuSemana as FG_SEMANA,
+B.NmAreaEstruturaComercialC AS FilialC,
+C.DS_DECISAO_PDEC,
+C.DsMotivoRecusa,
+C.PoliticaSimu,
+
+CASE WHEN ORI.Regional = 'Canal Rodas e EGV I - Regional I' THEN 'C1R1'
+     WHEN ORI.Regional = 'Canal Rodas e EGV I - Regional II' THEN 'C1R2'
+     WHEN ORI.Regional = 'Canal Rodas e EGV II - Regional I' THEN 'C2R1'
+     WHEN ORI.Regional = 'Canal Rodas e EGV II - Regional II' THEN 'C2R2'
+     WHEN ORI.Regional = 'Canal Rodas e EGV III - Regional I' THEN 'C3R1'
+     WHEN ORI.Regional = 'Canal Rodas e EGV III - Regional II' THEN 'C3R2'
+	 ELSE 'DEMAIS' END AS Regional,
+
+ COALESCE(CVG.FiltroCVG,'OUTROS PRODUTOS') as FiltroCVG,
+
+SUM(ORI.VrProducao) AS VrProducao,
+SUM(INPUT(C.RatingEVGInt, 9.)*ORI.VrPropostaOriginada) AS Rating_ORI_PND,
+SUM(ORI.VrPropostaOriginada) AS VrPropostaOriginada,
+SUM(ORI.FlPropostaOriginada) AS QTD_ORIGINADAS,
+SUM(ORI.FlPropostaAprovada) AS FlPropostaAprovada
+
+FROM INFOGRC.PPR_ANALITICO AS ORI
+LEFT JOIN TBSEMANAS as D ON ORI.DtEntradaProposta = D.DtTempo
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS B ON (ORI.CdConvenio = B.CdParceiroComercial)
+LEFT JOIN TUYRA.TB_TOTAL_SIMU_PROP_EVG_6 AS C ON (ORI.NUPROPOSTA = C.NUPROPOSTA)
+LEFT JOIN BASEGRC.TbFiltroCVG CVG	ON CVG.nuproposta = ORI.nuproposta
+
+WHERE ORI.Produto = 'CVG Leves'
+and ORI.DtEntradaProposta <= &DtCtpSim.
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12;RUN;
+
+/*spread originadas*/
+
+PROC SQL;
+CREATE TABLE SPREAD_ORIGINADAS AS
+SELECT
+'SPREAD_ORIGINADAS' as TpDados,
+A.NuAnoMes as Safra,
+A.DtSimulacaoInicial,
+A.Canal,
+A.Filial,
+D.NuSemana as FG_SEMANA,
+A.SistemaInicial,
+A.FlPropostaAprovada,
+
+CASE WHEN A.Regional = 'Canal Rodas e EGV I - Regional I' THEN 'C1R1'
+WHEN A.Regional = 'Canal Rodas e EGV I - Regional II' THEN 'C1R2'
+WHEN A.Regional = 'Canal Rodas e EGV II - Regional I' THEN 'C2R1'
+WHEN A.Regional = 'Canal Rodas e EGV II - Regional II' THEN 'C2R2'
+WHEN A.Regional = 'Canal Rodas e EGV III - Regional I' THEN 'C3R1'
+WHEN A.Regional = 'Canal Rodas e EGV III - Regional II' THEN 'C3R2'
+ELSE 'DEMAIS' END AS Regional,
+
+CASE WHEN CDTABELAFINANCIAMENTO IN ('BV3E8','BV3G2','BV3G3','BV3G4','BV3G5','BV3G6',
+'BV3G7','BV3G8','BV3G9','BV3G0','BV3HG','BV3HV','BV3HX','BV3HW','BV3HZ','BV3HY','BV3H1',
+'BV3H3','BV3H2','BV3H4','BV3K7','BV3L7','BV3L8','BV3L9','BV3L0','BV3MA','BV3MB','BV3MC',
+'BV3MD','BV3ME') THEN "NOVAS"
+ELSE "ANTIGAS" END AS FL_TABELAS,
+
+CASE WHEN A.Produto IN ('CVG Leves','CVG Pesados') THEN
+
+         CASE WHEN A.Canal IN ('MULTIMARCAS','CONCESSIONARIAS')
+                   THEN 'Canal veículos'
+			  WHEN A.NmParceiroComercial LIKE '%FINANZERO%' OR A.NmParceiroComercial LIKE '%QUERO FINANCIAR%'
+				OR A.NmParceiroComercial LIKE '%EAI CLUBE%' OR A.NmParceiroComercial LIKE '%GRINGO O MELHOR%'
+				OR A.NmParceiroComercial LIKE '%AME DIGITAL%' OR A.NmParceiroComercial LIKE '%ECOM COMUNICACOES%'
+                   THEN 'Parceiro digital'
+
+              WHEN A.NmParceiroComercial LIKE '%GARAN TMLKT%' OR A.NmParceiroComercial LIKE '%GARAN TELEMARKETING%' OR A.NmParceiroComercial LIKE '%CP GARAN TLMK CALL%'
+                   THEN 'Telemarketing'
+
+              WHEN A.CdParceiroComercial = 414643
+                   THEN 'Minha BV'
+              WHEN A.CdParceiroComercial = 424584 OR A.CdParceiroComercial = 452470 OR A.CdParceiroComercial = 465399
+                   THEN 'CVG Área Aberta Site'
+
+              WHEN A.Canal IN ('LOJA CANAL NEGOCIOS','PROMOTORA','BV FINANCEIRA - OPERACAO ESPECIAL')
+               AND
+				   A.NmParceiroComercial NOT LIKE '%GARAN TMLKT%' OR A.NmParceiroComercial NOT LIKE '%GARAN TELEMARKETING%' OR A.NmParceiroComercial NOT LIKE '%CP GARAN TLMK CALL%'
+				OR A.NmParceiroComercial NOT LIKE '%FINANZERO%' OR A.NmParceiroComercial NOT LIKE '%QUERO FINANCIAR%'
+				OR A.NmParceiroComercial NOT LIKE '%EAI CLUBE%' OR A.NmParceiroComercial NOT LIKE '%GRINGO O MELHOR%'
+     			OR A.NmParceiroComercial NOT LIKE '%AME DIGITAL%' OR A.NmParceiroComercial NOT LIKE '%ECOM COMUNICACOES%'
+
+                   THEN 'Canal negócios'
+              ELSE 'Canal negócios'
+              END
+         ELSE 'Outros produtos'
+    END AS FiltroCVG,
+
+/*/*Indicadores de Entrada, Taxa, Rating, Aprovação e Efetivação Total e em D0 e D3*/
+SUM(A.TxFinanciamentoSolicitada*A.VrProposta) as TAXA_PND_S,
+SUM(A.TxTirContabil*A.VrProposta) as TIR_PND_S,
+SUM(A.VrProposta) AS VrProposta,
+SUM(FlPropostaOriginada) as QtdOriginadas
+
+from MENSAGERIA AS A
+LEFT JOIN TBSEMANAS as D ON A.DtSimulacaoInicial=D.DtTempo
+LEFT JOIN TBD0 AS F ON A.DtSimulacaoInicial=F.DtTempo
+LEFT JOIN TBD1 AS G ON A.DtSimulacaoInicial=G.DtTempo
+LEFT JOIN TBD3 AS H ON A.DtSimulacaoInicial=H.DtTempo
+LEFT JOIN TUYRA.TB_TOTAL_SIMU_PROP_EVG_6 AS C ON (A.NUPROPOSTA = C.NUPROPOSTA)
+
+WHERE
+A.DtSimulacaoInicial <= &DtCtpSim.  AND A.FlSimuValidaDiaEfet = 1
+AND A.Produto = 'CVG Leves' AND FlPropostaOriginada = 1
+group by 1,2,3,4,5,6,7,8,9,10,11;
+quit;
+
+DATA SOLITMP.FUNIL_PRICING_EGV;
+
+SET SIMU_LEVES_MSG_DIA
+	PROPOSTAS
+	SPREAD_ORIGINADAS
+	MKT_SHARE
+	PA_ORIGINADAS
+	PROD;
+RUN;

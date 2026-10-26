@@ -1,0 +1,392 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Atacado__Monitoramento
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:28 UTC
+BUSINESS_AREA: Atacado
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 239
+CODE_TASKS_COUNT: 7
+DETECTED_PROCS: DELETE, EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (12x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: PME = /riscosbv/credito/SME
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_EXTE_GFD.TBBASEFATPRESUMIDOSERASAPJ [BIGQUERY], PME.BASE_HISTORICA_GESTAO_OMIE [SAS/Local], PME.BASE_HISTORICA_OMIE_CEDENTES [SAS/Local], PME.BASE_HISTORICA_PMUM_SF [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: PME
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_EXTE_GFD.TBBASEFATPRESUMIDOSERASAPJ [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], PME.BASE_HISTORICA_GESTAO_OMIE [DATA Step - SET], PME.BASE_HISTORICA_OMIE_CEDENTES [DATA Step - SET], PME.BASE_HISTORICA_PMUM_SF [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\32. Faturamento Serasa\TBCONSOLIDADA.xlsx
+TEMP/DISCARDED OUTPUTS: TBAUXSAFRA, TBAUXSAFRA2, TBBASEFAT, TBBASEFATPRESUMIDOSERASAPJ, TBCONSOLIDADA, TBFATURAMENTOSERASA, TBFATURMARCADO, TBFATURSUB, TBINDICADOR1, TBINDICADOR2, TBINDICADOR3, TBINDICADORSI, TBINDICADORSUB, TBINDICADORSUB1, TBINDICADORSUB2, TBINDICADORSUB3, TBOMIECEDENTES, TBOMIECEDENTES2, TBSALESFINANCE, TBSALESFINANCE2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Libname */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-cdg5oehcRqf4gyeq/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PME		'/riscosbv/credito/SME'		ACCESS = READONLY;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Libname */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Base de faturamento */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Base de faturamento */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-FrGj4EWVWpKevSnz/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql ;
+connect to bigquery as perm (project='bv-saop-dtm' credfile='/projetos/acessos/bq/op/saop-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=110
+);
+create table tbbasefatpresumidoserasapj as
+   select * from connection to perm
+    (select *
+      from bv-pdbd-prd.trusted_exte_gfd.tbbasefatpresumidoserasapj);
+   disconnect from perm;
+quit;
+
+data tbbasefat;
+
+set tbbasefatpresumidoserasapj;
+
+	fat_ajustado = compress(compress(fat_presumido,".","")," ","");
+	vlfaturpresumido = input(fat_ajustado,best32.);
+
+	where modelo = 'HFE3';
+
+    texto = put(safra, 8.);
+
+    ano = substr(texto, 5, 4);
+
+    ano_num = input(ano, 4.)+1;
+
+	keep documento vlfaturpresumido ano_num;
+
+run;
+
+proc sql;
+
+create table TbFaturamentoSerasa as select
+
+documento as NuDocumento,
+ano_num as NuAnoModelo,
+vlfaturpresumido as VlFaturModelo
+
+from tbbasefat;
+
+run;
+
+proc delete data=tbbasefatpresumidoserasapj tbbasefat; run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Base de faturamento */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02. Scatter Index */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02. Scatter Index */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-56ExZXHemSsj4tfA/code.sas */
+/* =========================INÍCIO TASK========================= */
+data TbOMIECedentes;
+
+set PME.BASE_HISTORICA_OMIE_CEDENTES (keep=DtEnvio CNPJCedente FaturamentoAnual)
+    PME.BASE_HISTORICA_GESTAO_OMIE (keep=DtEnvio CNPJCedente FaturamentoAnual);
+
+	where FaturamentoAnual not in (.,0);
+
+	Safra = year(DtEnvio)*100+month(DtEnvio);
+	Ano = year(DtEnvio);
+
+	drop DtEnvio;
+
+run;
+
+proc sort data=TbOMIECedentes out=TbOMIECedentes2 nodupkey; by Safra Ano CNPJCedente; run;
+
+proc sql;
+
+create table TbFaturMarcado as select
+
+a.*,
+b.VlFaturModelo
+
+from TbOMIECedentes2 as a
+left join TbFaturamentoSerasa as b
+on a.CNPJCedente = b.NuDocumento and a.Ano = b.NuAnoModelo;
+
+run;
+
+data TbIndicador1;
+
+set TbFaturMarcado;
+
+where VlFaturModelo not in (.,0);
+
+run;
+
+data TbIndicador2;
+
+set TbIndicador1;
+
+VlDifSq = (FaturamentoAnual - VlFaturModelo)**2;
+
+run;
+
+proc sql;
+
+create table TbIndicador3 as select
+
+Safra,
+sum(VlDifSq) as VlDifSq,
+count(*) as QtObs,
+mean(FaturamentoAnual) as VlFaturMedio
+
+from TbIndicador2
+group by 1;
+
+run;
+
+data TbIndicadorSI;
+
+set TbIndicador3;
+
+VlRMSE = sqrt(VlDifSq/QtObs);
+
+VlSI = VlRMSE/VlFaturMedio;
+
+run;
+
+proc delete data=TbOMIECedentes TbOMIECedentes2 TbFaturMarcado TbIndicador1 TbIndicador2 TbIndicador3; run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02. Scatter Index */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03. Subestimação */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03. Subestimação */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-NC9nhYjmF1HaJKpv/code.sas */
+/* =========================INÍCIO TASK========================= */
+data TbSalesFinance;
+
+set PME.BASE_HISTORICA_PMUM_SF (keep=DT_ESTEIRA CNPJ_SACADO FATUR_SACADO);
+
+	where FATUR_SACADO not in (.,0);
+
+	Safra = year(DT_ESTEIRA)*100+month(DT_ESTEIRA);
+	Ano = year(DT_ESTEIRA);
+
+	drop DT_ESTEIRA;
+
+run;
+
+proc sort data=TbSalesFinance out=TbSalesFinance2 nodupkey; by Safra Ano CNPJ_SACADO; run;
+
+proc sql;
+
+create table TbFaturSub as select
+
+a.*,
+b.VlFaturModelo
+
+from TbSalesFinance2 as a
+left join TbFaturamentoSerasa as b
+on put(a.CNPJ_SACADO,z14.) = b.NuDocumento and a.Ano = b.NuAnoModelo;
+
+run;
+
+data TbIndicadorSub1;
+
+set TbFaturSub;
+
+where VlFaturModelo not in (.,0);
+
+run;
+
+data TbIndicadorSub2;
+
+set TbIndicadorSub1;
+
+if VlFaturModelo < FATUR_SACADO then FlSub = 1; else FlSub = 0;
+
+run;
+
+proc sql;
+
+create table TbIndicadorSub3 as select
+
+Safra,
+sum(FlSub) as QtSub,
+count(*) as QtObs
+
+from TbIndicadorSub2
+group by 1;
+
+run;
+
+data TbIndicadorSub;
+
+set TbIndicadorSub3;
+
+PcSub = QtSub/QtObs;
+
+run;
+
+proc delete data=TbSalesFinance TbSalesFinance2 TbFaturSub TbIndicadorSub1 TbIndicadorSub2 TbIndicadorSub3; run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03. Subestimação */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 04. Triggers */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 04. Triggers */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vUkfQUXw5PKhllPI/code.sas */
+/* =========================INÍCIO TASK========================= */
+data TbAuxSafra;
+set TbIndicadorSI (keep=Safra)
+	TbIndicadorSub (keep=Safra);
+
+run;
+
+proc sort data=TbAuxSafra out=TbAuxSafra2 nodupkey; by Safra; run;
+
+proc sql;
+
+create table TbConsolidada as select
+
+a.Safra as 'Safra de análise'n,
+b.VlSI as 'Scatter index'n,
+c.PcSub as '% de subestimação'n,
+CASE
+    WHEN b.VlSI < 1 THEN 1
+    WHEN b.VlSI < 4 THEN 2
+    ELSE 3
+END AS 'Faixa'n
+
+from TbAuxSafra2 as a
+left join TbIndicadorSI as b on a.Safra=b.Safra
+left join TbIndicadorSub as c on a.Safra=c.Safra;
+
+run;
+
+proc delete data=TbAuxSafra TbAuxSafra2; run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 04. Triggers */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data TbIndicador1;
+
+set TbFaturMarcado;
+
+where VlFaturModelo not in (.,0);
+
+run;
+
+data TbIndicador2;
+
+set TbIndicador1;
+
+VlDifSq = (FaturamentoAnual - VlFaturModelo)**2;
+
+run;
+
+proc sql;
+
+create table TbIndicador3 as select
+
+Safra,
+sum(VlDifSq) as VlDifSq,
+count(*) as QtObs,
+mean(FaturamentoAnual) as VlFaturMedio
+
+from TbIndicador2
+group by 1;
+
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TBCONSOLIDADA
+    OUTFILE='N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\32. Faturamento Serasa\TBCONSOLIDADA.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */

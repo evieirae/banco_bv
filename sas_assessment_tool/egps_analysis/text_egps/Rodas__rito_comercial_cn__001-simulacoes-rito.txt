@@ -1,0 +1,228 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 001-simulacoes-rito.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 158
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM0, safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], AUXL.GRUPO_MENSAGERIA [SAS/Local], CNTSQL.TBRELATORIODECONTRATOS [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): AUXL.GRUPO_MENSAGERIA [PROC SQL - JOIN], CNTSQL.TBRELATORIODECONTRATOS [PROC SORT - DATA=], CONVSIMU.TBSIMULACOES [PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: RESUMOSIMULACOESRITO, SIMULACOESRITO, TBRELATORIODECONTRATOS, TIPODOC
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+/******************************************************/
+/*BASE DE TIPO DE DOCUMENTO DE CONTRATCAO*/
+/******************************************************/
+
+PROC SORT DATA=CNTSQL.TBRELATORIODECONTRATOS DUPOUT=DUPLI OUT=TBRELATORIODECONTRATOS NODUPKEY;
+BY NuContratoGestao
+;RUN;
+
+proc sql;
+create table TipoDoc as
+select distinct
+NuContratoGestao,
+CASE WHEN TipoDocumento = 1 THEN 'CNH'
+	 WHEN TipoDocumento = 2 THEN 'RG'
+	 WHEN TipoDocumento = 3 THEN 'OUTROS'
+	 ELSE 'NÃO IDENTIFICADO'
+	 END as TipoDocumento
+from TBRELATORIODECONTRATOS
+where StatusDownload  = 'SUCCESS'
+and TipoDocumento in (1,2,3)
+;
+run;
+
+/* Gerar base para o Cubo */
+PROC SQL;
+CREATE TABLE SimulacoesRito AS
+  SELECT
+	a.nucpfcnpj as nucpfcnpj,
+	a.DtInclusaoGravame,
+	a.DtSimulacaoInicial,
+	A.CdSimulacaoInicial,
+    A.NuAnoMes,
+    A.SistemaInicial,
+    A.StatusSimulacao,
+    A.CdParceiroComercial,
+    tranwrd(A.NmParceiroComercial, " - ", "-") as NmParceiroComercial,
+	C.Flativo,
+    A.FlCard,
+    COALESCE(A.Mensageria,'9. Não houve mensageria') AS Mensageria,
+	A.FxEntrada,
+    A.Banco,
+	A.ProbabilidadeAprovacao,
+    INTCK('DAY', A.DtSimulacaoInicial, A.DtInclusaoGravame) AS DiasConversao,
+	/*INTCK('DAY', A.DtSimulacaoInicial, A.DtRetornoCetip) AS DiasConversao,*/
+    A.FxIdade,
+    A.FlSimuValidaEfet AS FlSimuValida,
+    A.FlSimuValidaDiaEfet AS FlSimuValidaDia,
+    A.FlSimuValidaSemanaEfet AS FlSimuValidaSemana,
+    A.MotivoRecusa,
+    A.FlPropostaOriginada AS FlPropostaOriginada,
+    A.FlPropostaAprovada AS FlPropostaAprovada,
+    A.FlPropostaEfetivada AS FlPropostaEfetivada,
+    A.FlPropostaPaga AS FlPropostaPaga,
+    A.FlConversao AS FlConversao,
+    A.FlConcorrente AS FlConcorrente,
+	a.StPagoLoja as StPagoLoja,
+	M.GrupoMsg,
+	A.nuproposta,
+	a.Regional,
+    a.Filial,
+	SUM(A.VrVeiculoMolicar) AS VrVeiculoMolicar,
+	SUM(A.VrVeiculoSimulacao) AS VrVeiculoSimulacao,
+	SUM(A.VrProposta) as VrSimulacao,
+	SUM(case when  A.PcEntradaMinima > 1 then  A.PcEntradaMinima /100 else  A.PcEntradaMinima end) AS PcEntradaMinima,
+	SUM(case when  A.PcEntradaMinima > 1 then  A.PcEntradaMinima /100
+			else  A.PcEntradaMinima end * A.VrProposta) AS VpEntradaMinima FORMAT=num18.2,
+
+	case when calculated VpEntradaMinima / calculated VrSimulacao between 0.0  and 0.10 then '01 - até 10%'
+		 when calculated VpEntradaMinima / calculated VrSimulacao between 0.11 and 0.20 then '02 - até 20%'
+		 when calculated VpEntradaMinima / calculated VrSimulacao between 0.21 and 0.30 then '03 - até 30%'
+		 when calculated VpEntradaMinima / calculated VrSimulacao between 0.31 and 0.40 then '04 - até 40%'
+		 when calculated VpEntradaMinima / calculated VrSimulacao between 0.41 and 10 	then '05 - Acima 40%'
+		 end as FxEntradaMinima,
+
+    coalesce(COUNT(DISTINCT A.CdSimulacaoInicial),0) AS QtdPreAnalise,
+    coalesce(SUM(A.FlPropostaOriginada),0) AS QtdOriginadas,
+    coalesce(SUM(A.FlPropostaAprovada),0) AS QtdAprovadas,
+    coalesce(SUM(A.FlPropostaEfetivada),0) AS QtdEfetivadas,
+    coalesce(SUM(A.FlPropostaPaga),0) AS QtdPagas,
+    coalesce(SUM(A.FlConversao),0) AS QtdConvertidas,
+    coalesce(SUM(A.FlConcorrente),0) AS QtdConcorrente,
+	coalesce(Sum(VrPropostaEfetivada),0) as VrPropostaEfetivada,
+
+	coalesce(SUM(CASE WHEN doc.NuContratoGestao IS NOT NULL THEN 1 ELSE 0 END), 0) AS QtdSimuRG
+
+  FROM CONVSIMU.TBSIMULACOES A
+  	Left join auxl.Grupo_Mensageria as M
+		on M.Mensageria = A.Mensageria
+	LEFT JOIN tmp.tbparceirocomercial C
+		ON A.CDPARCEIROCOMERCIAL = C.CDPARCEIROCOMERCIAL
+	LEFT JOIN tmp.TBPRODUCAO as D
+		ON A.NuProposta = D.NuProposta
+		AND A.NuAnoMes = D.NuAnoMes
+	LEFT JOIN TipoDoc as doc
+		on doc.NuContratoGestao = D.NuContrato and tipodocumento = 'RG'
+where 1=1
+and a.NuAnoMes between &safraM6. and &safraM0.
+/*and A.SistemaInicial='PPAR'*/
+and TRANSTRN(A.Produto, "CVG ", TRIMN("")) IN('Leves')
+and A.Canal IN ('LOJA CANAL NEGOCIOS')
+and A.FlSimuValidaPDV=1
+and C.NmSubEstruturaComercialC = 'Canal de Negócios'
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32;
+RUN;
+
+proc sql;
+create table ResumoSimulacoesRito as
+Select
+a.NuanoMes
+,a.CdParceiroComercial
+,a.NmParceiroComercial
+,a.FxEntradaMinima
+,a.Banco
+,a.FxIdade
+
+,B.NmColaboradorC
+,B.NmAreaEstruturaComercialC
+,B.NmSubEstruturaComercialC
+
+,coalesce(Sum(case when GrupoMsg = 'P' then VpEntradaMinima else 0 end),0) as VpEntradaMinima
+,coalesce(Sum(case when GrupoMsg = 'P' then VrSimulacao else 0 end),0) as VrSimulacao
+,count(distinct case when GrupoMsg = 'P' then input(nucpfcnpj,14.) else 0 end)  as Qtd_Simulacoes
+
+,coalesce(Sum(case when GrupoMsg = 'P' then QtdOriginadas else 0 end),0) as Qtd_Originadas
+,coalesce(Sum(case when GrupoMsg = 'P' then QtdAprovadas else 0 end),0) as Qtd_Aprovadas
+,coalesce(Sum(case when GrupoMsg = 'P' then Qtdefetivadas else 0 end),0) as Qtd_efetivadas
+,coalesce(Sum(case when GrupoMsg = 'P' then VrPropostaEfetivada else 0 end),0) as VrPropostaEfetivada
+
+,coalesce(SUM(case when GrupoMsg = 'P' then QtdSimuRG else 0 end),0) AS QtdSimuRG
+
+,coalesce(sum(case when StatusSimulacao = 'Proposta APNP'
+				and GrupoMsg = 'P'
+				and FlConcorrente = 1 then 1
+			else 0 end),0) as Qtd_APNP_Conco
+
+,coalesce(sum(case when StatusSimulacao = 'Proposta APNP'
+				and FlConcorrente = 1
+				and GrupoMsg = 'P'
+				and StPagoLoja='S' then 1
+			else 0 end),0) as Qtd_APNP_Conco_MesmaLoja
+
+,coalesce(sum(case when StatusSimulacao = 'Proposta APNP'  then 1
+			else 0 end),0) as Qtd_APNP
+
+,coalesce(sum(case when FlConcorrente = 1 and FlPropostaOriginada = 0
+				and Banco <> 'BV'
+				and GrupoMsg = 'P'
+				and StatusSimulacao not in ('Proposta cancelada','Simulação sem card')
+				and GrupoMsg = 'P' then 1
+			else 0 end),0)	as Qtd_Sem_Prop
+
+,coalesce(sum(case when FlConcorrente = 1
+				and FlPropostaOriginada = 0
+				and Banco <> 'BV'
+				and StPagoLoja='S'
+				and GrupoMsg = 'P'
+				and StatusSimulacao not in ('Proposta cancelada','Simulação sem card')	then 1
+			else 0 end),0) as Qtd_Sem_Prop_MesmaLoja
+
+,coalesce(sum(case when FlConcorrente = 1
+				and FlPropostaOriginada = 0
+				and Banco <> 'BV'
+				and StPagoLoja='S'
+				and GrupoMsg = 'R'
+				and StatusSimulacao not in ('Proposta cancelada','Simulação sem card')	then 1
+			else 0 end),0) as Qtd_Sem_Prop_MesmaLojaRec
+
+from SimulacoesRito as a
+	LEFT JOIN TMP.TBPARCEIROCOMERCIAL b
+		ON A.CDPARCEIROCOMERCIAL = b.CDPARCEIROCOMERCIAL
+where 1=1
+and a.NuanoMes >= &safraM6.
+AND A.FxIdade <>'ZeroKM'
+group by 1,2,3,4,5,6,7,8,9
+ORDER BY 2,3,4,1
+;run;

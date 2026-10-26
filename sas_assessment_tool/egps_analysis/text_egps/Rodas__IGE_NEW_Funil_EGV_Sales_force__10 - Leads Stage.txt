@@ -1,0 +1,178 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 10 - Leads Stage.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -40
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 106
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], PRIVADO.DGT_CTA_GR_RAW [SAS/Local], PRIVADO.DGT_CTA_LEADS_RAW2 [SAS/Local], PRIVADO.DGT_CTA_MOTIVO_STAGE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.DGT_BI_2
+IMPORTED_LIBNAMES: PRIVADO
+EXPORTED_LIBNAMES: PRIVADO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.DEPARA_DIGITAL, WORK.DGT_BI_2
+TABLE_READ_PROVENANCE (Flow): PRIVADO.DGT_CTA_GR_RAW [PROC SQL - FROM], PRIVADO.DGT_CTA_LEADS_RAW2 [PROC SQL - FROM], PRIVADO.DGT_CTA_LEADS_STAGE [PROC EXPORT - DATA=], PRIVADO.DGT_CTA_MOTIVO_STAGE [PROC SQL - JOIN], WORK.DEPARA_DIGITAL [PROC SQL - JOIN], WORK.DGT_BI_2 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): PRIVADO.DGT_CTA_LEADS_STAGE
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): PRIVADO.DGT_CTA_GR_RAW, PRIVADO.DGT_CTA_LEADS_RAW2, PRIVADO.DGT_CTA_LEADS_STAGE, PRIVADO.DGT_CTA_MOTIVO_STAGE
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PRIVADO.DGT_CTA_LEADS_STAGE
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./EGV_SALESFORCE_CTA_LEADS.csv
+TEMP/DISCARDED OUTPUTS: DGT_BI_1, DGT_BI_2, TEL, TIMESTAMP, WORK.DGT_BI_3
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	8 - Leads Stage.sas														| */
+/* | Descricao: Programa finalização do tratametno de leadas do salesforce canal de négocios egv.					| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de Leads Stage atualizada=========================*/
+/* ======================================================================================*/
+
+options datestyle=dmy;
+
+PROC SQL;
+
+CREATE TABLE DGT_BI_1 AS
+
+SELECT distinct
+ 		  A.TEL AS TEL,
+          datepart(a.DATA) format ddmmyy10. as DATA,
+		  a.DATA as DATETIME,
+/*          A.Canal, */
+ 		  input(substr(Trim(left(SCAN(tranwrd(SCAN(A.Message,-5,':'),'"',''),1,","))),1,11),11.) AS timestamp,
+		  Trim(left(SCAN(tranwrd(SCAN(A.Message,-5,':'),'"',''),1,","))) AS timestamp2,
+		  Trim(left(SCAN(SCAN(tranwrd(SCAN(A.Message,-1,'{'),'"',''),2,':'),-2,'}'))) AS Message,
+      	  B.TEL AS TEL2,
+		  B.DATA AS DATA2,
+		  B.Atendente AS NMGR,
+		  B.NUCPF,
+		  B.OportunitStage,
+		  CASE WHEN C.TEL IS NOT NULL AND C.MotivoPerda IS NULL THEN "SEM MARCAÇÃO" ELSE C.MotivoPerda END AS MotivoPerda
+FROM
+
+(
+SELECT
+CASE WHEN length(compress('Send Time Phone Number'n))=12 THEN
+INPUT(substr(compress('Send Time Phone Number'n),length(compress('Send Time Phone Number'n))-9,13),13.)
+WHEN length(compress('Send Time Phone Number'n))=13 THEN
+INPUT(substr(compress('Send Time Phone Number'n),length(compress('Send Time Phone Number'n))-10,14),13.)
+END AS TEL,
+
+		 input(put(input('Engagement Date Time'n,DDMMYY10.),DDMMYY10.)||" "||put(input(substr('Engagement Date Time'n,length('Engagement Date Time'n)-4,5), TIME8.),TIME8.),ANYDTDTM32.) format datetime16. AS DATA ,
+          'Sender Display Name'n as Canal,
+          Message,
+          'Sender Code'n as SenderId
+
+     FROM PRIVADO.DGT_CTA_LEADS_RAW2
+Where 'Engagement Channel Action'n = "INBOUND"
+and SCAN(tranwrd( SCAN(Message,-1,'{'),'"',''),1,':') contains "body"
+and Trim(left(SCAN(SCAN(tranwrd(SCAN(Message,-1,'{'),'"',''),2,':'),-2,'}'))) is not null
+) A
+LEFT JOIN
+
+(SELECT  TEL,
+          'Hora de início'n AS DATA,
+		  'Conta: CPF/CNPJ'n AS NUCPF,
+		  'Oportunidade: Fase'n AS OportunitStage,
+          Atendente
+FROM PRIVADO.DGT_CTA_GR_RAW) B
+ON A.TEL = B.TEL
+AND A.DATA = B.DATA
+LEFT JOIN
+PRIVADO.DGT_CTA_MOTIVO_STAGE C
+ON C.TEL = A.TEL AND
+C.DTCRIACAO = datepart(a.DATA)
+
+;quit;
+
+PROC SORT DATA=DGT_BI_1
+	OUT=DGT_BI_2;
+	BY DATA TEL timestamp ;
+RUN;
+
+data work.DGT_BI_3;
+	set work.DGT_BI_2;
+	BY DATA TEL timestamp;
+
+	if first.TEL then
+		n=1;
+	else n+1;
+run;
+
+PROC SQL;
+CREATE TABLE PRIVADO.DGT_CTA_LEADS_STAGE as
+
+/*CREATE TABLE DGT_CTA_LEADS_STAGE AS */
+SELECT
+  a.TEL as TEL,
+  a.DATA,
+  a.DATETIME,
+  a.timestamp,
+  a.Message,
+  a.NUCPF,
+  a.NMGR,
+  a.OportunitStage,
+  a.MotivoPerda,
+  dpdig.Origem,
+  dpdig.Detalhamento,
+  dpdig.CTA
+
+  FROM DGT_BI_3 a
+left join WORK.DEPARA_DIGITAL dpdig
+on UPCASE(a.Message) = UPCASE(dpdig.CTA)
+WHERE a.n = 1;
+QUIT;
+/*PROC SQL;*/
+/*delete * from PRIVADO.DGT_CTA_LEADS_STAGE WHERE DATA >= '1Nov2024'd;quit;*/
+	%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= PRIVADO.DGT_CTA_LEADS_STAGE
+		FILE="&dir_csv./EGV_SALESFORCE_CTA_LEADS.csv" REPLACE
+		DBMS=DLM;
+	DELIMITER=';';
+RUN;

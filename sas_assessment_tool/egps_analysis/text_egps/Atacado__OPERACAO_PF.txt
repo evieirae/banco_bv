@@ -1,0 +1,643 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Atacado__OPERACAO_PF
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:37 UTC
+BUSINESS_AREA: Atacado
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 512
+CODE_TASKS_COUNT: 10
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: SYBASE
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): INSIGHT.BASE_CADASTRAL_SERASA_PJ_2025 [SAS/Local], INSIGHT.TBBRUTA [SAS/Local], INSIGHT.TBPESSOA [SAS/Local], PLCA.TBSISTEMAPLCA [SAS/Local], PME.BASE_HISTORICA_GESTAO_OMIE [SAS/Local], PME.BASE_HISTORICA_OMIE_CEDENTES [SAS/Local], PME.BASE_HISTORICA_OMIE_SACADOS [SAS/Local], PME.BASE_HISTORICA_PMUM_SF [SAS/Local], PME.BASE_SOCIOS_SERASA_PJ [SAS/Local], _INSIGHT.TBBRUTA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ANALISE_MOTORES, WORK.EMPILHAR, WORK.PLCA_EMPILHADO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\12.Estudos\OPERACAO_PF\Input_avaliaçoes.xlsx[SHEET='Plan1']
+TEMP/DISCARDED_FILE_INPUT: WORK.Input_avaliaçoes <- N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\12.Estudos\OPERACAO_PF\Input_avaliaçoes.xlsx[SHEET='Plan1']
+TEMP/DISCARDED_TABLE_INPUT: WORK.ANALISE_MOTORES, WORK.EMPILHAR, WORK.PLCA_EMPILHADO
+TABLE_READ_PROVENANCE (Flow): INSIGHT.BASE_CADASTRAL_SERASA_PJ_2025 [DATA Step - SET], INSIGHT.TBBRUTA [PROC SQL - FROM], INSIGHT.TBPESSOA [PROC SQL - JOIN], PLCA.TBSISTEMAPLCA [PROC SQL - FROM], PME.BASE_HISTORICA_GESTAO_OMIE [PROC SQL - JOIN], PME.BASE_HISTORICA_OMIE_CEDENTES [PROC SQL - JOIN], PME.BASE_HISTORICA_OMIE_SACADOS [PROC SQL - JOIN], PME.BASE_HISTORICA_PMUM_SF [PROC SQL - JOIN], PME.BASE_SOCIOS_SERASA_PJ [PROC SQL - FROM], WORK.ANALISE_MOTORES [PROC SQL - FROM], WORK.EMPILHAR [PROC SQL - FROM], WORK.PLCA_EMPILHADO [PROC SQL - FROM], _INSIGHT.TBBRUTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ANALISE_MOTORES, ANALISE_MOTORES_ELEGIVEIS_LIM, BASE_SOCIOS, BATIMENTO_OPERACAO_PF_PLCA, BATIMENTO_OPERACAO_PF_PLCA_INTER, CADASTRO, CDGRUPO, CNPJS_EMPRESAS, EMPILHAR, EMPILHA_OUTRAS_EMPRESAS_SOCIOS, EMPRESAS_NO_CADASTRO, OUTRAS_EMPRESAS, OUTRAS_GRUPO_ECO, PLCA_EMPILHADO, QUADRO_SOCIETARIO, QUERY_FOR_BV, QUERY_FOR_BV_2, QUERY_FOR_TBBRUTA, SOCIOS, SOCIO_OUTRAS_EMPRESAS_NA_BRUTA, SOCIO_OUTRAS_EMPRESAS_NA_PLCA, SOCIO_OUTRAS_EMPS_NO_CADASTRO, WORK.QUERY_FOR_ANALISE_MOTORES, WORK.QUERY_FOR_PLCA_EMPILHADO, WORK.QUERY_FOR_TBBRUTA, WORK.QUERY_FOR_TBSISTEMAPLCA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|N:\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\09.Monitoramento\12.Estudos\OPERACAO_PF\Input_avaliaçoes.xlsx[SHEET='Plan1']|N:/DCCR/MONITORAMENTO E PLANEJAMENTO/PLANEJAMENTO/INDICADORES/02 - ATACADO/09.MONITORAMENTO/12.ESTUDOS/OPERACAO_PF|INPUT_AVALIAÇOES.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: CADASTRO */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: CADASTRO */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hnY8BZDHTv7tkKkB/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+	CREATE TABLE CNPJS_EMPRESAS AS SELECT DISTINCT
+
+		Tema,
+		Fonte,
+		Documento ,
+		RaizDocumento as raiz,
+		TpDocumento
+
+	FROM INPUT_AVALIAÇOES
+;QUIT;
+
+PROC SQL;
+CREATE TABLE EMPRESAS_NO_CADASTRO AS SELECT
+	'CADASTRO' AS JOIN,
+	A.*,
+	B.*
+FROM CNPJS_EMPRESAS AS A
+LEFT JOIN INSIGHT.TBPESSOA AS B ON(A.RAIZ = B.NuCpfCnpjRaiz)
+WHERE B.DtInclusao IS NOT NULL AND TpDocumento EQ 'CNPJ'
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CDGRUPO AS SELECT DISTINCT
+	A.CdGpEconomico,
+	A.TEMA,
+	A.FONTE
+
+FROM EMPRESAS_NO_CADASTRO AS A
+WHERE CdGpEconomico NE .
+;QUIT;
+
+PROC SQL;
+CREATE TABLE OUTRAS_GRUPO_ECO AS SELECT DISTINCT
+	'GRUPO_ECO' AS JOIN,
+	A.TEMA,
+	A.FONTE,
+	B.*
+
+FROM CDGRUPO AS A
+LEFT JOIN INSIGHT.TBPESSOA AS B ON( A.CdGpEconomico = B.CdGpEconomico )
+LEFT JOIN EMPRESAS_NO_CADASTRO AS C ON ( B.NuCpfCnpjRaiz = C.NuCpfCnpjRaiz)
+WHERE C.RAIZ IS NULL AND A.CdGpEconomico NOT IS NULL
+;QUIT;
+
+DATA EMPILHAR;
+SET EMPRESAS_NO_CADASTRO OUTRAS_GRUPO_ECO;
+DROP Documento raiz TpDocumento;
+RUN;
+
+PROC SQL;
+   CREATE TABLE QUERY_FOR_BV AS SELECT DISTINCT
+		  t1.Tema,
+          t1.Fonte,
+          t1.DtInclusao,
+          t1.CdPessoa,
+          t1.NmPessoa,
+          t1.NuCpfCnpj AS CNPJ,
+          t1.NuCpfCnpjRaiz AS RAIZ,
+          t1.CdGpEconomico,
+          t1.NmGpEconomico,
+          t1.CdFilial,
+          t1.NmFilial,
+          t1.CdOfficer,
+          t1.NmOfficer
+      FROM WORK.EMPILHAR t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: CADASTRO */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: LIMITES */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: LIMITES */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-HVdFCCe9w4ljrEYn/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBSISTEMAPLCA AS
+   SELECT DISTINCT t1.DOC_RAIZ,
+          t1.NOME_CLIENTE,
+          t1.STATUS_CLIENTE_NO_PROGRAMA,
+ 		  t1.STATUS_CLIENTE,
+	 	  t1.STATUS_RAIZ,
+          t1.NOME_PROGRAMA_PLRC,
+          t1.ID_PROGRAMA_PLCA,
+          t1.ID_PROGRAMA_PLRC,
+          t1.STATUS_PROGRAMA,
+		  T1.LIMITE_OPERACIONAL_RAIZ_NO_PROGR,
+          t1.LIMITE_CONSUMIDO_RAIZ_NO_PROGRAM
+      FROM PLCA.TBSISTEMAPLCA t1
+
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE BATIMENTO_OPERACAO_PF_PLCA AS SELECT DISTINCT
+A.*,
+B.RAIZ,
+B.Documento as CNPJ
+
+FROM QUERY_FOR_TBSISTEMAPLCA AS A
+LEFT JOIN CNPJS_EMPRESAS AS B ON(A.DOC_RAIZ = B.RAIZ )
+WHERE B.RAIZ NOT IS NULL
+;QUIT;
+
+PROC SQL;
+CREATE TABLE BATIMENTO_OPERACAO_PF_PLCA_INTER AS SELECT DISTINCT
+A.*,
+B.RAIZ,
+B.CNPJ
+
+FROM QUERY_FOR_TBSISTEMAPLCA AS A
+LEFT JOIN QUERY_FOR_BV AS B ON(A.DOC_RAIZ = B.RAIZ )
+WHERE B.RAIZ NOT IS NULL
+;QUIT;
+
+DATA PLCA_EMPILHADO;
+SET BATIMENTO_OPERACAO_PF_PLCA_INTER BATIMENTO_OPERACAO_PF_PLCA;
+RUN;
+
+proc sort data=PLCA_EMPILHADO nodupkey out=PLCA_EMPILHADO;
+    by _all_;
+run;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PLCA_EMPILHADO AS SELECT DISTINCT
+		  t1.RAIZ,
+          t1.STATUS_RAIZ AS STATUS_PLCA,
+          t1.LIMITE_OPERACIONAL_RAIZ_NO_PROGR AS LIM_PLCA,
+          t1.LIMITE_CONSUMIDO_RAIZ_NO_PROGRAM AS RISCO_PLCA
+
+      FROM WORK.PLCA_EMPILHADO t1;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE QUERY_FOR_TBBRUTA AS SELECT DISTINCT
+		t1.NuCpfCnpjRaiz,
+        t1.DtVencLimiteGrupo,
+        t1.VrTotalAprovadoGrupo,
+		B.*
+
+      FROM _INSIGHT.TBBRUTA t1
+	  LEFT JOIN CNPJS_EMPRESAS AS B ON(T1.NuCpfCnpjRaiz = B.RAIZ )
+
+      WHERE t1.TpLancamento = 'Pessoa' AND t1.FlAtivoP = 1 AND B.RAIZ NOT IS NULL;
+QUIT;
+
+PROC SQL;
+	CREATE TABLE QUERY_FOR_BV_2 AS SELECT DISTINCT
+
+		A.*,
+		C.DtVencLimiteGrupo AS DET_VENC_GL,
+		C.VrTotalAprovadoGrupo AS VL_GL_GRUPO,
+		B.STATUS_PLCA,
+		CASE WHEN B.LIM_PLCA EQ . THEN 0 ELSE B.LIM_PLCA END AS LIM_PLCA,
+		CASE WHEN B.RISCO_PLCA EQ . THEN 0 ELSE B.RISCO_PLCA END AS RISCO_PLCA
+
+	FROM QUERY_FOR_BV AS A
+	LEFT JOIN QUERY_FOR_PLCA_EMPILHADO AS B ON (A.RAIZ = B.RAIZ )
+	LEFT JOIN QUERY_FOR_TBBRUTA AS C ON (A.RAIZ = C.NuCpfCnpjRaiz )
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: LIMITES */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Quadro_societario */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Quadro_societario */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ikxEVdb7Dii8JKAX/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+    create table BASE_SOCIOS as
+    select distinct
+        substr(put(CNPJ_CONSULTADO, Z14.),1,8) as raiz,
+		*
+    from PME.BASE_SOCIOS_SERASA_PJ;
+quit;
+
+
+PROC SQL;
+	CREATE TABLE QUADRO_SOCIETARIO AS SELECT DISTINCT
+	A.*,
+	B.*
+
+	FROM BASE_SOCIOS AS A
+	LEFT JOIN CNPJS_EMPRESAS AS B ON(A.raiz = B.RAIZ)
+	WHERE B.RAIZ IS NOT NULL AND A.CAPITAL_TOTAL NOT IN (. 0) AND A.CAPITAL_TOTAL > 30
+;QUIT;
+
+PROC SQL;
+	CREATE TABLE SOCIOS AS SELECT DISTINCT
+	A.DOCUMENTO_SOCIO
+	FROM QUADRO_SOCIETARIO AS A
+;QUIT;
+
+PROC SQL;
+	CREATE TABLE OUTRAS_EMPRESAS AS SELECT DISTINCT
+	B.DOCUMENTO_SOCIO,
+	B.CAPITAL_TOTAL,
+	B.CNPJ_CONSULTADO AS OUTRAS_EMPRESAS,
+	substr(put(B.CNPJ_CONSULTADO, Z14.),1,8) as OUTRAS_EMPRESAS_RAIZ
+
+	FROM SOCIOS AS A
+	LEFT JOIN BASE_SOCIOS 		AS B ON(A.DOCUMENTO_SOCIO = B.DOCUMENTO_SOCIO )
+	LEFT JOIN QUADRO_SOCIETARIO AS C ON(B.RAIZ = C.RAIZ)
+	WHERE C.RAIZ IS NULL AND B.CAPITAL_TOTAL > 0
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBBRUTA AS SELECT
+   	  *
+      FROM INSIGHT.TBBRUTA
+      WHERE TpLancamento = 'Pessoa';
+QUIT;
+
+PROC SQL;
+	CREATE TABLE SOCIO_OUTRAS_EMPRESAS_NA_PLCA AS SELECT DISTINCT
+	'PLCA' AS JOIN,
+	A.OUTRAS_EMPRESAS_RAIZ,
+	C.NmPessoa,
+	C.CdPessoa,
+	C.NmGpEconomico,
+	C.CdGpEconomico,
+	A.DOCUMENTO_SOCIO,
+	A.CAPITAL_TOTAL,
+	B.*
+
+	FROM OUTRAS_EMPRESAS AS A
+	LEFT JOIN QUERY_FOR_TBSISTEMAPLCA AS B ON(A.OUTRAS_EMPRESAS_RAIZ = B.DOC_RAIZ )
+	LEFT JOIN QUERY_FOR_TBBRUTA AS C ON(A.OUTRAS_EMPRESAS_RAIZ = C.NuCpfCnpjRaiz)
+	WHERE B.LIMITE_OPERACIONAL_RAIZ_NO_PROGR > 0 AND B.STATUS_RAIZ EQ 'Ativo'
+;QUIT;
+
+PROC SQL;
+	CREATE TABLE SOCIO_OUTRAS_EMPRESAS_NA_BRUTA AS SELECT DISTINCT
+	'BRUTA' AS JOIN,
+	A.OUTRAS_EMPRESAS_RAIZ,
+	C.NmPessoa,
+	C.CdPessoa,
+	C.NmGpEconomico,
+	C.CdGpEconomico,
+	A.DOCUMENTO_SOCIO,
+	A.CAPITAL_TOTAL,
+	C.NmAnalistaCredito,
+	C.NmGerenteCredito,
+	C.DtVencLimiteGrupo,
+	C.VrTotalAprovadoGrupo
+
+	FROM OUTRAS_EMPRESAS AS A
+	LEFT JOIN QUERY_FOR_TBBRUTA AS C ON(A.OUTRAS_EMPRESAS_RAIZ = C.NuCpfCnpjRaiz)
+	WHERE C.FlAtivoP EQ 1
+;QUIT;
+
+PROC SQL;
+	CREATE TABLE SOCIO_OUTRAS_EMPS_NO_CADASTRO AS SELECT DISTINCT
+	'CADASTRO' AS JOIN,
+	A.OUTRAS_EMPRESAS_RAIZ,
+	C.NmPessoa,
+	C.CdPessoa,
+	C.NmGpEconomico,
+	C.CdGpEconomico,
+	A.DOCUMENTO_SOCIO,
+	A.CAPITAL_TOTAL,
+	C.DtInclusao,
+	C.DtAlteracao,
+	C.NmOfficer,
+	C.NmSegmentoContabil
+
+	FROM OUTRAS_EMPRESAS AS A
+	LEFT JOIN INSIGHT.TBPESSOA AS C ON(A.OUTRAS_EMPRESAS_RAIZ = C.NuCpfCnpjRaiz)
+	WHERE C.CdPessoa NOT IS NULL
+;QUIT;
+
+DATA EMPILHA_OUTRAS_EMPRESAS_SOCIOS;
+SET SOCIO_OUTRAS_EMPS_NO_CADASTRO SOCIO_OUTRAS_EMPRESAS_NA_BRUTA SOCIO_OUTRAS_EMPRESAS_NA_PLCA;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Quadro_societario */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: MOTORES */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: MOTORES */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-GX37Lk6wnOG7Bx4Z/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+
+create table analise_MOTORES as select DISTINCT
+a.*,
+b.DecisaoFinal as DecisaoOMIECedentes,
+c.DecisaoFinal as DecisaoOMIESacados,
+d.DsStatusAtivo as DecisaoOMIECedentesRev,
+e.DECISAO as DecisaoSalesFinance
+
+from CNPJS_EMPRESAS as a
+
+left join PME.BASE_HISTORICA_OMIE_CEDENTES as b
+on a.RAIZ=substr(b.CNPJCedente,1,8)
+
+left join PME.BASE_HISTORICA_OMIE_SACADOS as c
+on a.RAIZ=substr(c.CNPJSacado,1,8)
+
+left join PME.BASE_HISTORICA_GESTAO_OMIE as d
+on a.RAIZ=substr(d.CNPJCedente,1,8)
+
+left join PME.BASE_HISTORICA_PMUM_SF as e
+on a.RAIZ=e.CNPJ_RAIZ_SACADO
+
+WHERE
+b.DecisaoFinal NE '' OR
+c.DecisaoFinal NE '' OR
+d.DsStatusAtivo NE '' OR
+e.DECISAO NE ''
+;quit;
+
+PROC SQL;
+	CREATE TABLE analise_MOTORES_ELEGIVEIS_LIM AS SELECT DISTINCT
+	A.*,
+	t1.STATUS_RAIZ,
+    t1.STATUS_CLIENTE,
+    t1.LIMITE_CONSUMIDO_RAIZ_NO_PROGRAM as lim_consumido_plca,
+	T1.LIMITE_OPERACIONAL_RAIZ_NO_PROGR as lim_aprovado_plca
+
+	FROM analise_MOTORES AS A
+	LEFT JOIN QUERY_FOR_TBSISTEMAPLCA AS T1 ON( A.RAIZ = T1.DOC_RAIZ )
+	WHERE
+	A.DecisaoOMIECedentes EQ 'Elegível' OR
+	A.DecisaoOMIESacados EQ 'Elegível' OR
+	A.DecisaoOMIECedentesRev EQ 'Elegível' OR
+	A.DecisaoSalesFinance EQ 'Elegível'
+;QUIT;
+
+data cadastro;
+set insight.BASE_CADASTRAL_SERASA_PJ_2025;
+
+/* =========================FIM TASK=========================== */
+/* TASK: MOTORES */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-EkBp3lv3u4si5reM/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+	CREATE TABLE EMPRESAS_NO_CADASTRO AS SELECT DISTINCT
+	A.OUTRAS_EMPRESAS_RAIZ,
+	C.NmPessoa,
+	C.CdPessoa,
+	C.NmGpEconomico,
+	C.CdGpEconomico,
+	A.DOCUMENTO_SOCIO,
+	A.CAPITAL_TOTAL,
+	C.DtInclusao,
+	C.DtAlteracao,
+	C.NmOfficer,
+	C.NmSegmentoContabil
+
+	FROM OUTRAS_EMPRESAS AS A
+	LEFT JOIN INSIGHT.TBPESSOA AS C ON(A.OUTRAS_EMPRESAS_RAIZ = C.NuCpfCnpjRaiz)
+	WHERE C.CdPessoa NOT IS NULL
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+	CREATE TABLE SOCIO_OUTRAS_EMPRESAS_NA_PLCA AS SELECT DISTINCT
+	'PLCA' AS JOIN,
+	A.OUTRAS_EMPRESAS_RAIZ,
+	C.NmPessoa,
+	C.CdPessoa,
+	C.NmGpEconomico,
+	C.CdGpEconomico,
+	A.DOCUMENTO_SOCIO,
+	A.CAPITAL_TOTAL,
+	B.*
+
+	FROM OUTRAS_EMPRESAS AS A
+	LEFT JOIN QUERY_FOR_TBSISTEMAPLCA AS B ON(A.OUTRAS_EMPRESAS_RAIZ = B.DOC_RAIZ )
+	LEFT JOIN QUERY_FOR_TBBRUTA AS C ON(A.OUTRAS_EMPRESAS_RAIZ = C.NuCpfCnpjRaiz)
+	WHERE B.LIMITE_OPERACIONAL_RAIZ_NO_PROGR > 0 AND B.STATUS_RAIZ EQ 'Ativo'
+;QUIT;
+
+PROC SQL;
+	CREATE TABLE SOCIO_OUTRAS_EMPRESAS_NA_BRUTA AS SELECT DISTINCT
+	'BRUTA' AS JOIN,
+	A.OUTRAS_EMPRESAS_RAIZ,
+	C.NmPessoa,
+	C.CdPessoa,
+	C.NmGpEconomico,
+	C.CdGpEconomico,
+	A.DOCUMENTO_SOCIO,
+	A.CAPITAL_TOTAL,
+	C.NmAnalistaCredito,
+	C.NmGerenteCredito,
+	C.DtVencLimiteGrupo,
+	C.VrTotalAprovadoGrupo
+
+	FROM OUTRAS_EMPRESAS AS A
+	LEFT JOIN QUERY_FOR_TBBRUTA AS C ON(A.OUTRAS_EMPRESAS_RAIZ = C.NuCpfCnpjRaiz)
+	WHERE C.FlAtivoP EQ 1
+;QUIT;
+
+PROC SQL;
+	CREATE TABLE SOCIO_OUTRAS_EMPS_NO_CADASTRO AS SELECT DISTINCT
+	'CADASTRO' AS JOIN,
+	A.OUTRAS_EMPRESAS_RAIZ,
+	C.NmPessoa,
+	C.CdPessoa,
+	C.NmGpEconomico,
+	C.CdGpEconomico,
+	A.DOCUMENTO_SOCIO,
+	A.CAPITAL_TOTAL,
+	C.DtInclusao,
+	C.DtAlteracao,
+	C.NmOfficer,
+	C.NmSegmentoContabil
+
+	FROM OUTRAS_EMPRESAS AS A
+	LEFT JOIN INSIGHT.TBPESSOA AS C ON(A.OUTRAS_EMPRESAS_RAIZ = C.NuCpfCnpjRaiz)
+	WHERE C.CdPessoa NOT IS NULL
+;QUIT;
+
+DATA EMPILHA_OUTRAS_EMPRESAS_SOCIOS;
+SET SOCIO_OUTRAS_EMPS_NO_CADASTRO SOCIO_OUTRAS_EMPRESAS_NA_BRUTA SOCIO_OUTRAS_EMPRESAS_NA_PLCA;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+	CREATE TABLE QUERY_FOR_BV_2 AS SELECT DISTINCT
+
+		A.*,
+		C.DtVencLimiteGrupo AS DET_VENC_GL,
+		C.VrTotalAprovadoGrupo AS VL_GL_GRUPO,
+		B.STATUS_PLCA,
+		CASE WHEN B.LIM_PLCA EQ . THEN 0 ELSE B.LIM_PLCA END AS LIM_PLCA,
+		CASE WHEN B.RISCO_PLCA EQ . THEN 0 ELSE B.RISCO_PLCA END AS RISCO_PLCA
+
+	FROM QUERY_FOR_BV AS A
+	LEFT JOIN QUERY_FOR_PLCA_EMPILHADO AS B ON (A.RAIZ = B.RAIZ )
+	LEFT JOIN QUERY_FOR_TBBRUTA AS C ON (A.RAIZ = C.NuCpfCnpjRaiz )
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table cadastro as select
+*,
+SUBSTR(PUT(CNPJ, Z14.),1,8) AS RAIZ
+FROM insight.BASE_CADASTRAL_SERASA_PJ_2025
+HAVING RAIZ EQ '13177774'
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE QUERY_FOR_BV AS SELECT DISTINCT
+		  t1.Tema,
+          t1.Fonte,
+          t1.DtInclusao,
+          t1.CdPessoa,
+          t1.NmPessoa,
+          t1.NuCpfCnpj AS CNPJ,
+          t1.NuCpfCnpjRaiz AS RAIZ,
+          t1.CdGpEconomico,
+          t1.NmGpEconomico,
+          t1.CdFilial,
+          t1.NmFilial,
+          t1.CdOfficer,
+          t1.NmOfficer
+      FROM WORK.EMPILHAR t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ANALISE_MOTORES);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ANALISE_MOTORES AS
+   SELECT DISTINCT t1.Raiz,
+          t1.DecisaoOMIECedentes,
+          t1.DecisaoOMIESacados,
+          t1.DecisaoOMIECedentesRev,
+          t1.DecisaoSalesFinance
+      FROM WORK.ANALISE_MOTORES t1
+      ORDER BY t1.Raiz;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,192 @@
+START_METADATA
+PROJECT: Rodas__TbRenegEscolhida
+FILE_SAS: 01 - TbRenegEscolhida.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (3x | +240), %INCLUDE (1x | +20), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 126
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: RENEGESC = /infogrc/TbRenegEscolhida/
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base, Base_M1, safraM1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BV-PDBD-PRD.TRUSTED_GOPRRENEGOCIACAOSIMULACAO.TBRENEGOCIACAOESCOLHIDA [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RENEGESC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_GOPRRENEGOCIACAOSIMULACAO.TBRENEGOCIACAOESCOLHIDA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], RENEGESC.TBRENEGESCOLHIDA [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): RENEGESC.TBRENEGESCOLHIDA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RENEGESC.TBRENEGESCOLHIDA
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RENEGESC.TBRENEGESCOLHIDA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_EXPORT, TBRENEGESCOLHIDA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%INCLUDE "/infogrc/utils/all-includes.sas";
+LIBNAME RENEGESC '/infogrc/TbRenegEscolhida/';
+
+DATA _NULL_;
+CALL SYMPUT ('Base',INPUT(PUT(INTNX('MONTHS',TODAY(),-13,'END'),YYMMN6.),6.));
+CALL SYMPUT ('Base_M1',INPUT(PUT(INTNX('MONTHS',TODAY(),-1,'END'),YYMMN6.),6.));
+;run;
+%put &Base &Base_M1;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage);
+   Create table TbRenegEscolhida as
+   select * from connection to perm
+     (
+		 SELECT * FROM `bv-pdbd-prd.trusted_goprrenegociacaosimulacao.tbrenegociacaoescolhida`
+
+        WHERE (EXTRACT(YEAR FROM DtInclusao) * 100 + EXTRACT(MONTH FROM   DtInclusao)) >= &Base.
+        AND DATE(DtInclusao) < CURRENT_DATE()
+
+		);
+   disconnect from perm;
+quit;
+
+PROC SQL;
+CREATE TABLE RENEGESC.TbRenegEscolhida AS
+SELECT
+	CdRenegociacaoEscolhida,
+    CdStatusRenegociacao,
+    NuCpfCnpj,
+    Input(NuContrato, 14.) as NuContrato format Best14.,
+    SqContratoFinanceiro,
+    VrPresente,
+    VrAtraso,
+    SqOfertaSimulacao,
+    DtPrimeiroVencimentoParcela,
+    QtParcelaAberto,
+    TxCET,
+    TxIOF,
+    TxJuroPactuada,
+    VrFinanciado,
+    VrDescontoMora,
+    VrDescontoMulta,
+    VrDescontoPrincipal,
+    QtDiaEfetivacao,
+    FlSeguroSPFAtivo,
+    QtParcelaNova,
+    VrParcelaNova,
+    NmCLienteInformado,
+    TpPessoa,
+    DsEmailInformado,
+    CdDDDInformado,
+    NuTelefoneInformado,
+    NrRgInformado,
+    NuCpfCnpjInformado,
+    DtNascimentoInformado,
+    DsEnderecoInformado,
+    NmCidadeInformado,
+    SgUFInformado,
+    NmBairroInformado,
+    NuCEPInformado,
+    TpEntrada,
+    NrProtocolo,
+    DtGeracao,
+	DATEPART(DtGeracao) AS DataGeracao FORMAT date9.,
+	PUT(TIMEPART(DtGeracao),TIME.) AS HoraGeracao,
+	DtExportacao,
+    DtFormalizacao,
+    DsOferta,
+    FlAtivo,
+    DtInclusao,
+    DtAlteracao,
+    DsLogin,
+    VrIOFComplementar,
+    FlMotorCalculo,
+    CdSimulacao,
+    VrDespesa,
+    VrHonorario,
+    VrIOF,
+    DtVencimentoEntrada,
+    QtDiaLimitePagamentoEntrada,
+    NmParceiro,
+    /*DsControleFraude,*/
+    QtParcelaEntrada,
+    VrParcelaEntrada,
+    DtProximaExecucaoRoboFormalizo,
+    (YEAR(datepart(DtInclusao)) * 100) + MONTH(datepart(DtInclusao)) AS NuAnoMes_DtInclusao
+/*    TsInclusaoTrusted*/
+FROM TbRenegEscolhida
+WHERE (YEAR(datepart(DtInclusao)) * 100) + MONTH(datepart(DtInclusao)) >= &Base. AND datepart(DtInclusao) < today()
+/*AND datepart(TsInclusaoTrusted) = today()*/
+
+;RUN;
+
+/**************/
+/*CORTA A BASE*/
+/**************/
+
+DATA BASE_EXPORT;
+SET RENEGESC.TbRenegEscolhida;
+WHERE NuAnoMes_DtInclusao >= &safraM1.;
+;RUN;
+
+/*****************/
+/* EXPORTA EXCEL */
+/*****************/
+
+%ExportaCSV(TbRenegEscolhida,BASE_EXPORT);
+
+/******************/
+/* Envio de Email */
+/******************/
+data _null_;
+rc = sleep(900, 1);
+run;
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("guilherme.mendes@bv.com.br")
+	CC=("inf-gerenciais@bv.com.br")
+
+SUBJECT="Aviso: TbRenegEscolhida atualizada! ";
+
+DATA _NULL_;
+	FILE MAIL;
+		PUT "Prezados,";
+		PUT ;
+		PUT "TbRenegEscolhida atualizada!";
+		PUT ;
+		PUT "Disponível no diretório \\BvNet\Pta\APPS\DATAHUB\BA\processos\output";
+		PUT ;
+		PUT "Favor não responder este e-mail.";
+		PUT ;
+		PUT "Atenciosamente,";
+		PUT ;
+		PUT "Equipe de informações Gerenciais";
+		PUT "Banco BV";
+		PUT ;
+RUN;

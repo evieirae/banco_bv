@@ -1,0 +1,772 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__1401-BaseFundos
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:19 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 673
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASES = /riscosbv/juridico/bases_full; DBEP = /riscosbv/juridico/yribeiro/DB_ExyonProjuris/; DBRPTTBL = /riscosbv/juridico/yribeiro/DB_ReportTable; MIS_JUR = /riscosbv/juridico/MIS_JUR
+DETECTED_MACROS_DEFINED: dir
+DETECTED_MACROS_USED: dir
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBV/JURIDICO/YRIBEIRO/RISCO_BCO_DBBVF_LOG.SAS [SAS/Local], DBEP.TBLPROCESSOOBJETOPROGNOSTICO [SAS/Local], DBEP.VWTBLCAUSACONS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DBEP
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBLBASE, WORK.TBLBASEOBJETOPOSSIVEL, WORK.TBLBASEOBJETOPROVAVEL, WORK.TBLBASEOBJETOREMOTO, WORK.TBLBASEOBJETOS
+TABLE_READ_PROVENANCE (Flow): DBEP.TBLPROCESSOOBJETOPROGNOSTICO [PROC SQL - FROM], DBEP.VWTBLCAUSACONS [PROC SQL - FROM], WORK.TBLBASE [PROC EXPORT - DATA=], WORK.TBLBASEOBJETOPOSSIVEL [PROC SQL - FROM], WORK.TBLBASEOBJETOPROVAVEL [PROC SQL - FROM], WORK.TBLBASEOBJETOREMOTO [PROC SQL - FROM], WORK.TBLBASEOBJETOS [PROC EXPORT - DATA=; PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir./TBL1401BaseFundos.CSV, &dir./TBL1401BaseFundosObjetos.CSV
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.TBLBASE, WORK.TBLBASEOBJETOEMP, WORK.TBLBASEOBJETOPOSSIVEL, WORK.TBLBASEOBJETOPROVAVEL, WORK.TBLBASEOBJETOREMOTO, WORK.TBLBASEOBJETOS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET dir=%sysfunc(getoption(work));
+
+[[ FILE_REFS_MACRO ]]
+OUT|&dir./TBL1401BaseFundos.CSV|%SYSFUNC(GETOPTION(WORK))|TBL1401BASEFUNDOS.CSV|DIR|ok
+OUT|&dir./TBL1401BaseFundosObjetos.CSV|%SYSFUNC(GETOPTION(WORK))|TBL1401BASEFUNDOSOBJETOS.CSV|DIR|ok
+IN|/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas|/RISCOSBV/JURIDICO/YRIBEIRO|RISCO_BCO_DBBVF_LOG.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: ParametrosIniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: ParametrosIniciais */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-7TwJwkBrBJCxjxn1/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname BASES        '/riscosbv/juridico/bases_full';
+Libname MIS_JUR V9   '/riscosbv/juridico/MIS_JUR' ;
+LIBNAME dbep         '/riscosbv/juridico/yribeiro/DB_ExyonProjuris/';
+LIBNAME dbrpttbl     '/riscosbv/juridico/yribeiro/DB_ReportTable';
+
+DATA _NULL_;
+    CALL SYMPUT("PASSTHRU",  "DATASRC=DBPJ USER=lgettSas PASSWORD='{SAS002}8356801C56C739574D3FFA39375B4AF41D2A147B4CE15FAD236666D2'");
+RUN;
+
+
+%include '/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas';
+
+/* =========================FIM TASK=========================== */
+/* TASK: ParametrosIniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: GeraBases */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: GeraBases */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-PlrZC55Afi1Kdk1J/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.TBLBASE AS
+SELECT
+B.*
+
+    ,intnx('day' , b.DtCadastramento , 21916 )                 as DtCadastramento2C
+    ,intnx('day' , b.DtEncerramento , 21916 )                  as DtEncerramento2C
+    ,intnx('day' , b.DtFatoGerador , 21916 )                   as DtFatoGerador2C
+    ,intnx('day' , b.DtParecer_V3 , 21916 )                    as DtParecer_V32C
+    ,intnx('day' , b.DtSentenca , 21916 )                      as DtSentenca2C
+    ,intnx('day' , b.DtBaixaContabil , 21916 )                 as DtBaixaContabil2C
+    ,intnx('day' , b.DtFaseProcessoPadrao , 21916 )            as DtFaseProcessoPadrao2C
+    ,intnx('day' , b.DtRevelia , 21916 )                       as DtRevelia2C
+    ,intnx('day' , b.DtAudiencia , 21916 )                     as DtAudiencia2C
+    ,intnx('day' , b.DtContestacaoAssessoriaPrimeira , 21916 ) as DtContestacaoAssessoriaPrim2C
+    ,intnx('day' , b.DtGlosaEncerramentoFalha , 21916 )        as DtGlosaEncerramentoFalha2C
+    ,intnx('day' , b.DtGarantiaBloqueio , 21916 )              as DtGarantiaBloqueio2C
+    ,intnx('day' , b.DtProvisaoLiquidaVigente , 21916 )        as DtProvisaoLiquidaVigente2C
+    ,intnx('day' , b.DtProvisaoBrutaVigente , 21916 )          as DtProvisaoBrutaVigente2C
+    ,intnx('day' , b.DtBaseProvisaoBrutaVigente , 21916 )      as DtGBseProvisaoBrutaVigente2C
+    ,intnx('day' , b.DtProvisaoBrutaInicial , 21916 )          as DtProvisaoBrutaInicial2C
+    ,intnx('day' , b.DtBaseProvisaoBrutaInicial , 21916 )      as DtBaseProvisaoBrutaInicial2
+    ,intnx('day' , b.DtCadastramentoFirstDayMonth , 21916 )    as DtCadastramentoFirstDayMonth2C
+
+FROM dbep.VWTBLCAUSACONS B
+WHERE 1=1
+AND B.cdSistema = 'p'
+AND B.CdUnidadeExyon = 'CTO'
+AND B.FlLegadoJudicialAdmnistrativo = 'J'
+AND B.NmCarteira = 'FUNDOS'
+;RUN;
+
+PROC SQL;
+CREATE TABLE WORK.TBLBASEOBJETOPROVAVEL AS
+SELECT
+
+ Cd_Causa                     AS CdCausa
+,SERIAL_IMPORT                AS SerialImport
+,Pasta
+,IdNatureza
+,NmNatureza
+,IdNaturezaUnidadeCustom
+,NmNaturezaUnidadeCustom
+,CdCausaUnidade
+,CdSistema
+,CdUnidadeExyon
+,ID_CARTEIRA_CUSTOM           AS IdCarteiraCustom
+,DtCadastroObjeto
+,IdObjeto
+,NmObjeto
+,VlProvisaoProvavel           AS VlPrognostico
+,VlProvisaoProvavelAtualizado AS VlPrognosticoAtualizado
+,'PROVAVEL'	AS Prognostico
+
+FROM dbep.TBLPROCESSOOBJETOPROGNOSTICO
+WHERE 1=1
+AND ID_CARTEIRA_CUSTOM = 12
+AND IdNatureza = 21
+AND IdNaturezaUnidadeCustom = 3
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE WORK.TBLBASEOBJETOREMOTO AS
+SELECT
+
+ Cd_Causa                   AS CdCausa
+,SERIAL_IMPORT              AS SerialImport
+,Pasta
+,IdNatureza
+,NmNatureza
+,IdNaturezaUnidadeCustom
+,NmNaturezaUnidadeCustom
+,CdCausaUnidade
+,CdSistema
+,CdUnidadeExyon
+,ID_CARTEIRA_CUSTOM         AS IdCarteiraCustom
+,DtCadastroObjeto
+,IdObjeto
+,NmObjeto
+,VlProvisaoRemoto           AS VlPrognostico
+,VlProvisaoRemotoAtualizado AS VlPrognosticoAtualizado
+,'REMOTO'	   AS Prognóstico
+
+FROM dbep.TBLPROCESSOOBJETOPROGNOSTICO
+WHERE 1=1
+AND ID_CARTEIRA_CUSTOM = 12
+AND IdNatureza = 21
+AND IdNaturezaUnidadeCustom = 3
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE WORK.TBLBASEOBJETOPOSSIVEL AS
+SELECT
+
+ Cd_Causa                     AS CdCausa
+,SERIAL_IMPORT                AS SerialImport
+,Pasta
+,IdNatureza
+,NmNatureza
+,IdNaturezaUnidadeCustom
+,NmNaturezaUnidadeCustom
+,CdCausaUnidade
+,CdSistema
+,CdUnidadeExyon
+,ID_CARTEIRA_CUSTOM           AS IdCarteiraCustom
+,DtCadastroObjeto
+,IdObjeto
+,NmObjeto
+,VlProvisaoPossivel           AS VlPrognostico
+,VlProvisaoPossivelAtualizado AS VlPrognosticoAtualizado
+,'POSSIVEL'	                  AS Prognostico
+
+FROM dbep.TBLPROCESSOOBJETOPROGNOSTICO
+WHERE 1=1
+AND ID_CARTEIRA_CUSTOM = 12
+AND IdNatureza = 21
+AND IdNaturezaUnidadeCustom = 3
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE WORK.TBLBASEOBJETOEMP AS
+
+SELECT * FROM (
+SELECT * FROM WORK.TBLBASEOBJETOPROVAVEL
+UNION
+SELECT * FROM WORK.TBLBASEOBJETOREMOTO
+UNION
+SELECT * FROM WORK.TBLBASEOBJETOPOSSIVEL
+)
+;RUN;
+
+PROC SQL;
+CREATE TABLE WORK.TBLBASEOBJETOS AS
+
+SELECT
+ a.CdCausaUnidade
+,a.cdSistema
+,a.CdCausa
+,a.CdPasta
+,a.CdSerialImport
+,a.CdUnidadeExyon
+,a.IdNatureza
+,a.IdNaturezaUnidadeCustom
+,a.FlAcaoAtiva
+,a.CdTipoProcesso
+,a.FlLegadoJudicialAdmnistrativo
+,a.DtCadastramento
+,a.DtEncerramento
+,a.CdProcesso
+,a.NuContrato1DeN
+,a.NmNatureza
+,a.NmNaturezaUnidadeCustom
+,a.NomeParte
+,a.CPFCNPJ
+,a.VlCausa
+,a.CdProcessoPadronizado
+,a.NmMotivoRRO
+,a.NmMotivo
+,a.CdMotivo
+,a.NmMotivoEncerramento
+,a.NmSubMotivo
+,a.CdSubMotivo
+,a.NmEncerramentoBoletim
+,a.NmAssessoria
+,a.NmCarteira
+,a.NmMunicipio
+,a.CdUF
+,a.NmRecurso
+,a.TipoAdvogadoPrincipalDoCliente
+,a.NmSafraEncerramento
+,a.CdAcaoJudicialCategoria
+,a.TipoAcaoGrupo
+,a.NmTipoEncerramento
+,a.NmAcaoJudicial
+,a.NmOrgaoJudicial
+,a.DtFatoGerador
+,a.Prioridade
+,a.AssuntoJudicial
+,a.OrgaoTribunal
+,a.Empresa
+,a.NuCausaIdadeMes
+,a.NuCausaIdadeAno
+,a.NuCausaIdadeTrimestre
+,a.DtCadastramento_LAST12MONTHS
+,a.DtEncerramento_LAST12MONTHS
+,a.VrIndenizacao
+,a.DtIndenizacaoPri
+,a.DtIndenizacaoUlt
+,a.NmTipoPgtoIndenizacao
+,a.NmTipoPgtoIndenizacaoGrupo
+,a.NmTipoPgtoIndenizacaoGrupo2
+,a.VrDepositoGuia
+,a.CdMotivoRRO
+,a.CdMotivoRROGrupo
+,a.CdEncerramentoBoletim
+,a.CdParecer_V1
+,a.FlFavoravel_V1
+,a.DtParecer_V1
+,a.CdParecer_V2
+,a.FlFavoravel_V2
+,a.DtParecer_V2
+,a.CdParecer_V3
+,a.FlFavoravel_V3
+,a.DtParecer_V3
+,a.CdSentenca
+,a.DtSentenca
+,a.FlSentenca
+,a.VrGarantiaFechada
+,a.VrGarantiaAtualizadoFechada
+,a.VrGarantiaGeral
+,a.VrGarantiaAtualizadoGeral
+,a.QtGarantiaAtiva
+,a.VrGarantiaAtiva
+,a.VrGarantiaAtualizadaoAtiva
+,a.FlGarantiaAtivaPossui
+,a.CdFaseProcesso
+,a.FlAdvogadoAgressor
+,a.CdOrgaoJudicialGrupo
+,a.CdOrgaoJudicialGrupo2
+,a.FlParecerFavoravelPossui
+,a.FlAssessoriaCobranca
+,a.FlAtuacaoVigente
+,a.DtBaixaContabil
+,a.FlBaixaContabil
+,a.CdMotivoParecerAnaliseTipo
+,a.FlAndamentoFavorabilidade
+,a.FlAndamentoEncerramento
+,a.VrEmolumentos
+,a.VrHonorarios
+,a.FlCampanhaPreContestacao
+,a.CdProcurador
+,a.CdProcuradorAlias
+,a.DtFaseProcessoPadrao
+,a.CdFaseProcessoPadrao
+,a.CdFaseProcessoGrupoPadrao
+,a.FlFaseProcessoPadraoPossui
+,a.FlFaseProcessoPadraoAtualizado
+,a.NuFaseProcPadraoDiasSemAtualiza
+,a.NuFaseProcPadraoMesSemAtualiza
+,a.FlAndamentoAcordoFirmado
+,a.FlAndamentoInviabilizaAcordo
+,a.FlCampanhaEncerramento
+,a.FlCampanhaMigracao
+,a.NmProduto
+,a.NmProdutoGrupo
+,a.CdProduto
+,a.CdProdutoGrupo
+,a.CdProdutoGrupo2
+,a.NmProdutoGrupo2
+,a.NuProdutoHierarquia
+,a.CdProdutoAbaOrigem
+,a.FlProdutoExiste
+,a.QtProdutos
+,a.FlOBFPendente
+,a.FlOBF
+,a.CdPagamentoTipoDesfecho
+,a.NmPagamentoTipoDesfecho
+,a.FlPgtoDesfecho
+,a.CdPagamentoTipoDesfecho2
+,a.NmPagamentoTipoDesfecho2
+,a.FlPgtoDesfecho2
+,a.DtReaberturaUltima
+,a.FlReabertura
+,a.NmReveliaTipo
+,a.DtRevelia
+,a.FlRevelia
+,a.FlReveliaAssessoria
+,a.DtAudiencia
+,a.FlAreaDefesaAnalisado
+,a.FlAreaDefesaValidado
+,a.FlAreaDefesaValidadoRessalva
+,a.FlAreaDefesaLibSemAvaliacao
+,a.DtContestacaoAssessoriaPrimeira
+,a.FlContestacaoAssessoria
+,a.NmAssessoriaPrimeiraContestacao
+,a.FlTransferenciaJudicialBloqueio
+,a.FlGlosaEncerramentoFalha
+,a.NmGlosaEncerramentoFalha
+,a.DtGlosaEncerramentoFalha
+,a.FlMotivoPrincipalHonorario
+,a.CdRegiaoGrupoAssessoria
+,a.NmGarantiaBloqueio
+,a.DtGarantiaBloqueio
+,a.FlGarantiaBloqueio
+,a.DtAssessoriaPedidoEncPrimeira
+,a.FlAssessoriaPedidoEncPrimeira
+,a.NmAssessoriaPedidoEncPrimeira
+,a.NmAssessoriaAuxiliarQueFezAcord
+,a.FlAssessoriaAuxiliarFezAcordo
+,a.VlAlcadaAcordoMax
+,a.FlAlcadaAcordoExiste
+,a.DtProvisaoLiquidaVigente
+,a.VrProvisaoLiquidaVigente
+,a.DtBaseProvisaoLiquidaVigente
+,a.NuProbPerdaZeroProvLiqVigente
+,a.NuProbAcordoProvisaoLiqVigente
+,a.NuProbCondenacaoProvLiqVigente
+,a.VlProbAcordoProvisaoLiquVigente
+,a.VlProbCondenacaoProvLiqVigente
+,a.DtProvisaoBrutaVigente
+,a.VrProvisaoBrutaVigente
+,a.DtBaseProvisaoBrutaVigente
+,a.NuProbPerdaZeroProvBrutaVigente
+,a.NuProbAcordoProvBrutaVigente
+,a.NuProbCondenacaoProvBrutaVigente
+,a.VlProbAcordoProvBrutaVigente
+,a.VlProbCondenacaoProvBrutaVigente
+,a.DtProvisaoBrutaPrimeira
+,a.VrProvisaoBrutaPrimeira
+,a.DtBaseProvisaoBrutaPrimeira
+,a.NuProbPerdaZeroProvBrutaPrimeira
+,a.NuProbAcordoProvBrutaPrim
+,a.NuProbCondenacaoProvBrutaPrim
+,a.VlProbAcordoProvBrutaPrim
+,a.VlProbCondenacaoProvBrutaPrim
+,a.DtProvisaoBrutaInicial
+,a.VrProvisaoBrutaInicial
+,a.DtBaseProvisaoBrutaInicial
+,a.NuProbPerdaZeroProvBrutaInicial
+,a.NuProbAcordoProvBrutaInicial
+,a.NuProbCondenacaoProvBrutaInicial
+,a.VlProbAcordoProvBrutaInicial
+,a.VlProbCondenacaoProvBrutaInicial
+,a.FlPgtoPrincipal
+,a.DtCadastramentoAno
+,a.FlGarantiaOuPrincipalPossui
+,a.FlAssessVigenteCadastPriContest
+,a.FlAssesVigenteFezOPriPedEnc
+,a.CdFaseProcessoGrupoPadraoAjustad
+,a.DsAcaoAtiva
+,a.NmMotivoRROGrupo
+,a.NmParecer_V1
+,a.NmParecerGrupo_V1
+,a.NmParecer_V2
+,a.NmParecerGrupo_V2
+,a.NmParecer_V3
+,a.NmParecerGrupo_V3
+,a.NmSentenca
+,a.NmFaseProcesso
+,a.NmMotivoParecerAnaliseTipo
+,a.NmOrgaoJudicialGrupo
+,a.NmOrgaoJudicialGrupo2
+,a.DtEncerramentoAno
+,a.DtEncerramentoMes
+,a.DtEncerramentoFirstDayMonth
+,a.DtEncerramentoYM
+,a.DtCadastramentoFirstDayMonth
+,a.DtCadastramentoMes
+,a.DtCadastramentoYM
+,a.NmProcurador
+,a.NmProcuradorAlias
+,a.NmProcuradorAliasMerge
+,a.NmFaseProcessoPadrao
+,a.NmFaseProcessoGrupoPadrao
+,a.NmFaseProcessoGrupoPadraoAjustad
+,a.NmRegiaoGrupoAssessoria
+
+
+,b.DtCadastroObjeto
+
+,SUM(b.VlPrognostico) AS VlPrognostico
+,SUM(b.VlPrognosticoAtualizado) AS VlPrognosticoAtualizado
+,b.Prognostico
+,today() AS DtProcessamento
+
+FROM TBLBASE a
+LEFT JOIN TBLBASEOBJETOEMP b ON b.Pasta = a.CdPasta
+
+
+
+
+GROUP BY
+
+ a.CdCausaUnidade
+,a.cdSistema
+,a.CdCausa
+,a.CdPasta
+,a.CdSerialImport
+,a.CdUnidadeExyon
+,a.IdNatureza
+,a.IdNaturezaUnidadeCustom
+,a.FlAcaoAtiva
+,a.CdTipoProcesso
+,a.FlLegadoJudicialAdmnistrativo
+,a.DtCadastramento
+,a.DtEncerramento
+,a.CdProcesso
+,a.NuContrato1DeN
+,a.NmNatureza
+,a.NmNaturezaUnidadeCustom
+,a.NomeParte
+,a.CPFCNPJ
+,a.VlCausa
+,a.CdProcessoPadronizado
+,a.NmMotivoRRO
+,a.NmMotivo
+,a.CdMotivo
+,a.NmMotivoEncerramento
+,a.NmSubMotivo
+,a.CdSubMotivo
+,a.NmEncerramentoBoletim
+,a.NmAssessoria
+,a.NmCarteira
+,a.NmMunicipio
+,a.CdUF
+,a.NmRecurso
+,a.TipoAdvogadoPrincipalDoCliente
+,a.NmSafraEncerramento
+,a.CdAcaoJudicialCategoria
+,a.TipoAcaoGrupo
+,a.NmTipoEncerramento
+,a.NmAcaoJudicial
+,a.NmOrgaoJudicial
+,a.DtFatoGerador
+,a.Prioridade
+,a.AssuntoJudicial
+,a.OrgaoTribunal
+,a.Empresa
+,a.NuCausaIdadeMes
+,a.NuCausaIdadeAno
+,a.NuCausaIdadeTrimestre
+,a.DtCadastramento_LAST12MONTHS
+,a.DtEncerramento_LAST12MONTHS
+,a.VrIndenizacao
+,a.DtIndenizacaoPri
+,a.DtIndenizacaoUlt
+,a.NmTipoPgtoIndenizacao
+,a.NmTipoPgtoIndenizacaoGrupo
+,a.NmTipoPgtoIndenizacaoGrupo2
+,a.VrDepositoGuia
+,a.CdMotivoRRO
+,a.CdMotivoRROGrupo
+,a.CdEncerramentoBoletim
+,a.CdParecer_V1
+,a.FlFavoravel_V1
+,a.DtParecer_V1
+,a.CdParecer_V2
+,a.FlFavoravel_V2
+,a.DtParecer_V2
+,a.CdParecer_V3
+,a.FlFavoravel_V3
+,a.DtParecer_V3
+,a.CdSentenca
+,a.DtSentenca
+,a.FlSentenca
+,a.VrGarantiaFechada
+,a.VrGarantiaAtualizadoFechada
+,a.VrGarantiaGeral
+,a.VrGarantiaAtualizadoGeral
+,a.QtGarantiaAtiva
+,a.VrGarantiaAtiva
+,a.VrGarantiaAtualizadaoAtiva
+,a.FlGarantiaAtivaPossui
+,a.CdFaseProcesso
+,a.FlAdvogadoAgressor
+,a.CdOrgaoJudicialGrupo
+,a.CdOrgaoJudicialGrupo2
+,a.FlParecerFavoravelPossui
+,a.FlAssessoriaCobranca
+,a.FlAtuacaoVigente
+,a.DtBaixaContabil
+,a.FlBaixaContabil
+,a.CdMotivoParecerAnaliseTipo
+,a.FlAndamentoFavorabilidade
+,a.FlAndamentoEncerramento
+,a.VrEmolumentos
+,a.VrHonorarios
+,a.FlCampanhaPreContestacao
+,a.CdProcurador
+,a.CdProcuradorAlias
+,a.DtFaseProcessoPadrao
+,a.CdFaseProcessoPadrao
+,a.CdFaseProcessoGrupoPadrao
+,a.FlFaseProcessoPadraoPossui
+,a.FlFaseProcessoPadraoAtualizado
+,a.NuFaseProcPadraoDiasSemAtualiza
+,a.NuFaseProcPadraoMesSemAtualiza
+,a.FlAndamentoAcordoFirmado
+,a.FlAndamentoInviabilizaAcordo
+,a.FlCampanhaEncerramento
+,a.FlCampanhaMigracao
+,a.NmProduto
+,a.NmProdutoGrupo
+,a.CdProduto
+,a.CdProdutoGrupo
+,a.CdProdutoGrupo2
+,a.NmProdutoGrupo2
+,a.NuProdutoHierarquia
+,a.CdProdutoAbaOrigem
+,a.FlProdutoExiste
+,a.QtProdutos
+,a.FlOBFPendente
+,a.FlOBF
+,a.CdPagamentoTipoDesfecho
+,a.NmPagamentoTipoDesfecho
+,a.FlPgtoDesfecho
+,a.CdPagamentoTipoDesfecho2
+,a.NmPagamentoTipoDesfecho2
+,a.FlPgtoDesfecho2
+,a.DtReaberturaUltima
+,a.FlReabertura
+,a.NmReveliaTipo
+,a.DtRevelia
+,a.FlRevelia
+,a.FlReveliaAssessoria
+,a.DtAudiencia
+,a.FlAreaDefesaAnalisado
+,a.FlAreaDefesaValidado
+,a.FlAreaDefesaValidadoRessalva
+,a.FlAreaDefesaLibSemAvaliacao
+,a.DtContestacaoAssessoriaPrimeira
+,a.FlContestacaoAssessoria
+,a.NmAssessoriaPrimeiraContestacao
+,a.FlTransferenciaJudicialBloqueio
+,a.FlGlosaEncerramentoFalha
+,a.NmGlosaEncerramentoFalha
+,a.DtGlosaEncerramentoFalha
+,a.FlMotivoPrincipalHonorario
+,a.CdRegiaoGrupoAssessoria
+,a.NmGarantiaBloqueio
+,a.DtGarantiaBloqueio
+,a.FlGarantiaBloqueio
+,a.DtAssessoriaPedidoEncPrimeira
+,a.FlAssessoriaPedidoEncPrimeira
+,a.NmAssessoriaPedidoEncPrimeira
+,a.NmAssessoriaAuxiliarQueFezAcord
+,a.FlAssessoriaAuxiliarFezAcordo
+,a.VlAlcadaAcordoMax
+,a.FlAlcadaAcordoExiste
+,a.DtProvisaoLiquidaVigente
+,a.VrProvisaoLiquidaVigente
+,a.DtBaseProvisaoLiquidaVigente
+,a.NuProbPerdaZeroProvLiqVigente
+,a.NuProbAcordoProvisaoLiqVigente
+,a.NuProbCondenacaoProvLiqVigente
+,a.VlProbAcordoProvisaoLiquVigente
+,a.VlProbCondenacaoProvLiqVigente
+,a.DtProvisaoBrutaVigente
+,a.VrProvisaoBrutaVigente
+,a.DtBaseProvisaoBrutaVigente
+,a.NuProbPerdaZeroProvBrutaVigente
+,a.NuProbAcordoProvBrutaVigente
+,a.NuProbCondenacaoProvBrutaVigente
+,a.VlProbAcordoProvBrutaVigente
+,a.VlProbCondenacaoProvBrutaVigente
+,a.DtProvisaoBrutaPrimeira
+,a.VrProvisaoBrutaPrimeira
+,a.DtBaseProvisaoBrutaPrimeira
+,a.NuProbPerdaZeroProvBrutaPrimeira
+,a.NuProbAcordoProvBrutaPrim
+,a.NuProbCondenacaoProvBrutaPrim
+,a.VlProbAcordoProvBrutaPrim
+,a.VlProbCondenacaoProvBrutaPrim
+,a.DtProvisaoBrutaInicial
+,a.VrProvisaoBrutaInicial
+,a.DtBaseProvisaoBrutaInicial
+,a.NuProbPerdaZeroProvBrutaInicial
+,a.NuProbAcordoProvBrutaInicial
+,a.NuProbCondenacaoProvBrutaInicial
+,a.VlProbAcordoProvBrutaInicial
+,a.VlProbCondenacaoProvBrutaInicial
+,a.FlPgtoPrincipal
+,a.DtCadastramentoAno
+,a.FlGarantiaOuPrincipalPossui
+,a.FlAssessVigenteCadastPriContest
+,a.FlAssesVigenteFezOPriPedEnc
+,a.CdFaseProcessoGrupoPadraoAjustad
+,a.DsAcaoAtiva
+,a.NmMotivoRROGrupo
+,a.NmParecer_V1
+,a.NmParecerGrupo_V1
+,a.NmParecer_V2
+,a.NmParecerGrupo_V2
+,a.NmParecer_V3
+,a.NmParecerGrupo_V3
+,a.NmSentenca
+,a.NmFaseProcesso
+,a.NmMotivoParecerAnaliseTipo
+,a.NmOrgaoJudicialGrupo
+,a.NmOrgaoJudicialGrupo2
+,a.DtEncerramentoAno
+,a.DtEncerramentoMes
+,a.DtEncerramentoFirstDayMonth
+,a.DtEncerramentoYM
+,a.DtCadastramentoFirstDayMonth
+,a.DtCadastramentoMes
+,a.DtCadastramentoYM
+,a.NmProcurador
+,a.NmProcuradorAlias
+,a.NmProcuradorAliasMerge
+,a.NmFaseProcessoPadrao
+,a.NmFaseProcessoGrupoPadrao
+,a.NmFaseProcessoGrupoPadraoAjustad
+,a.NmRegiaoGrupoAssessoria
+,b.DtCadastroObjeto
+,b.Prognostico
+
+;RUN;
+
+proc sql;
+CREATE TABLE WORK.TBLBASEOBJETOS AS
+
+Select
+
+a.*
+,intnx('day' , a.DtCadastramento , 21916 )                 as DtCadastramento2C
+,intnx('day' , a.DtEncerramento , 21916 )                  as DtEncerramento2C
+,intnx('day' , a.DtFatoGerador , 21916 )                   as DtFatoGerador2C
+,intnx('day' , a.DtParecer_V3 , 21916 )                    as DtParecer_V32C
+,intnx('day' , a.DtSentenca , 21916 )                      as DtSentenca2C
+,intnx('day' , a.DtBaixaContabil , 21916 )                 as DtBaixaContabil2C
+,intnx('day' , a.DtFaseProcessoPadrao , 21916 )            as DtFaseProcessoPadrao2C
+,intnx('day' , a.DtRevelia , 21916 )                       as DtRevelia2C
+,intnx('day' , a.DtAudiencia , 21916 )                     as DtAudiencia2C
+,intnx('day' , a.DtContestacaoAssessoriaPrimeira , 21916 ) as DtContestacaoAssessoriaPrim2C
+,intnx('day' , a.DtGlosaEncerramentoFalha , 21916 )        as DtGlosaEncerramentoFalha2C
+,intnx('day' , a.DtGarantiaBloqueio , 21916 )              as DtGarantiaBloqueio2C
+,intnx('day' , a.DtProvisaoLiquidaVigente , 21916 )        as DtProvisaoLiquidaVigente2C
+,intnx('day' , a.DtProvisaoBrutaVigente , 21916 )          as DtProvisaoBrutaVigente2C
+,intnx('day' , a.DtBaseProvisaoBrutaVigente , 21916 )      as DtGBseProvisaoBrutaVigente2C
+,intnx('day' , a.DtProvisaoBrutaInicial , 21916 )          as DtProvisaoBrutaInicial2C
+,intnx('day' , a.DtBaseProvisaoBrutaInicial , 21916 )      as DtBaseProvisaoBrutaInicial2C
+,intnx('day' , a.DtCadastramentoFirstDayMonth , 21916 )    as DtCadastramentoFirstDayMonth2C
+,intnx('day' , a.DtProcessamento , 21916 )                 as DtProcessamento2C
+,intnx('day' , a.DtCadastroObjeto , 21916 )                as DtFormalizacao2C
+
+from WORK.TBLBASEOBJETOS AS a
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: GeraBases */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: FixarBases */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: FixarBases */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-xZ2v9Bot1aqw1bcf/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let dir = %sysfunc(getoption(work));
+
+proc export
+DATA            = WORK.TBLBASE
+OUTFILE            = "&dir./TBL1401BaseFundos.CSV"
+DBMS            = dlm replace ;
+delimiter="¦";
+;run;
+
+proc export
+DATA            = WORK.TBLBASEOBJETOS
+OUTFILE            = "&dir./TBL1401BaseFundosObjetos.CSV"
+DBMS            = dlm replace ;
+delimiter="¦";
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: FixarBases */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1000 - Fixar Log */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-e5a5gVWuS6gHmzWh/code.sas */
+/* =========================INÍCIO TASK========================= */
+%log_errors;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

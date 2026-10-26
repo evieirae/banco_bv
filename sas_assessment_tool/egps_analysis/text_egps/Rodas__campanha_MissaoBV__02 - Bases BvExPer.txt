@@ -1,0 +1,124 @@
+START_METADATA
+PROJECT: Rodas__campanha_MissaoBV
+FILE_SAS: 02 - Bases BvExPer.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 68
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CMBV = /infogrc/Campanha_MissaoBV; CMBV_BKP = /infogrc/Campanha_MissaoBV/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], EXP_BU.BVEXPER_BASEUNICA_RESUMO_TOTAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BVEXPER_FILIAL, WORK.BVEXPER_GR, WORK.BVEXPER_REGIONAL
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CMBV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BVEXPER_FILIAL, WORK.BVEXPER_GR, WORK.BVEXPER_REGIONAL
+TABLE_READ_PROVENANCE (Flow): EXP_BU.BVEXPER_BASEUNICA_RESUMO_TOTAL [PROC SQL - FROM], WORK.BVEXPER_FILIAL [DATA Step - SET], WORK.BVEXPER_GR [DATA Step - SET], WORK.BVEXPER_REGIONAL [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CMBV.TBBASEEXPER_MISSAOBV
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BVEXPER_FILIAL, BVEXPER_GR, BVEXPER_REGIONAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CMBV '/infogrc/Campanha_MissaoBV';
+LIBNAME CMBV_BKP '/infogrc/Campanha_MissaoBV/Bases_BKP';
+
+/*****REGIONAL*****/
+proc sql;
+create table BvExper_Regional as
+select distinct
+TpNivel,
+NuAnoMes,
+NmSubEstruturaComercialA as Nome,
+DsLoginN3A as dslogin,
+NmElegAcelerador as Apto,
+FAIXA_PONTOS_TURBO as Cluster,
+PONTOS_TURBO as Pontos
+from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+where 1=1
+and TpBase = 'Pontos'
+/*and NmSubEstruturaComercialA like '%Canal Rodas%'*/
+and TpNivel = 'Re'
+and NuAnoMes between 202510 and 202512
+and NmSubEstruturaComercialA not in ('', 'Canal Solar e Privado')
+/*and NmCanalEstruturaComercial = 'Canal Veiculos';*/
+;run;
+
+/*****Filial*****/
+proc sql;
+create table BvExper_Filial as
+select distinct
+TpNivel,
+NuAnoMes,
+NmAreaEstruturaComercial as Nome,
+DsLoginN2A as dslogin,
+NmElegAcelerador as Apto,
+FAIXA_PONTOS_TURBO as Cluster,
+PONTOS_TURBO as Pontos
+from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+where 1=1
+and TpBase = 'Pontos'
+/*and NmSubEstruturaComercialA like '%Canal Rodas%'*/
+and TpNivel = 'Fi'
+and NuAnoMes between 202510 and 202512
+and NmSubEstruturaComercialA not in ('', 'Canal Solar e Privado')
+/*and NmCanalEstruturaComercial = 'Canal Veiculos';*/
+;run;
+
+/*****GR*****/
+proc sql;
+create table BvExper_GR as
+select distinct
+TpNivel,
+NuAnoMes,
+NmColaborador as Nome,
+DsLoginN1 as dslogin,
+NmElegAcelerador as Apto,
+FAIXA_PONTOS_TURBO as Cluster,
+PONTOS_TURBO as Pontos
+from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+where 1=1
+and TpBase = 'Pontos'
+/*and NmSubEstruturaComercialA like '%Canal Rodas%'*/
+and TpNivel = 'GR'
+and NuAnoMes between 202510 and 202512
+and NmSubEstruturaComercialA not in ('', 'Canal Solar e Privado')
+/*and NmCanalEstruturaComercial = 'Canal Veiculos';*/
+;run;
+
+DATA CMBV.TbBaseExPer_MissaoBV;
+SET WORK.BVEXPER_REGIONAL
+	WORK.BVEXPER_FILIAL
+	WORK.BVEXPER_GR;
+;RUN;

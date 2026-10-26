@@ -1,0 +1,205 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_leves
+FILE_SAS: 08-Base Producao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 140
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): PPR.PPR_ANALITICO [SAS/Local], PROJETOS.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): PPR.PPR_ANALITICO [PROC SQL - FROM], PROJETOS.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PROD
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE PROD AS
+SELECT
+'PROD' as TpDados,
+
+CASE WHEN A.DtContrato between '01Jan2025'd and '31Mar2025'd then '1T25'
+	 WHEN A.DtContrato between '01Apr2025'd and '30Jun2025'd then '2T25'
+	 WHEN A.DtContrato between '01Jul2025'd and '30Sep2025'd then '3T25'
+	 WHEN A.DtContrato between '01Oct2025'd and '31Oct2025'd then '202510'
+	 WHEN A.DtContrato between '01Nov2025'd and '30Nov2025'd then '202511'
+	 WHEN A.DtContrato between '01Dec2025'd and '31Dec2025'd then '202512'
+	 WHEN A.DtContrato between '01Jan2026'd and '31Jan2026'd then '202601'
+	 WHEN A.DtContrato between '01Feb2026'd and '28Feb2026'd then '202602'
+     end as Safra,
+	 CASE
+	 WHEN A.DtContrato between '01Jan2025'd and '31Mar2025'd then '1T25'
+	 WHEN A.DtContrato between '01Apr2025'd and '30Jun2025'd then '2T25'
+	 WHEN A.DtContrato between '01Jul2025'd and '30Sep2025'd then '3T25'
+	 WHEN A.DtContrato between '01Oct2025'd and '31Oct2025'd then '202510'
+	 WHEN A.DtContrato between '01Nov2025'd and '30Nov2025'd then '202511'
+	 WHEN A.DtContrato between '01Dec2025'd and '31Dec2025'd then '202512'
+	 WHEN A.DtContrato between '01Jan2026'd and '31Jan2026'd then '202601'
+	 ELSE E.NuSemana END AS FG_SEMANA,
+
+/*	 CASE */
+/*     WHEN A.DtContrato between '01Jan2024'd and '31Mar2024'd then '1T24'*/
+/*	 WHEN A.DtContrato between '01Apr2024'd and '30Jun2024'd then '2T24'*/
+/*	 WHEN A.DtContrato between '01Jul2024'd and '30Sep2024'd then '3T24'*/
+/*	 WHEN A.DtContrato between '01Oct2024'd and '31Dec2024'd then '4T24'*/
+/*	 WHEN A.DtContrato between '01Jan2025'd and '31Mar2025'd then '1T25'*/
+/*	 WHEN A.DtContrato between '01Apr2025'd and '30Jun2025'd then '2T25'*/
+/*	 WHEN A.DtContrato between '01Jul2025'd and '30Sep2025'd then '3T25'*/
+/*	 WHEN A.DtContrato between '01Oct2025'd and '31Oct2025'd then '202510'*/
+/*     ELSE A.DtContrato END AS FG_DIA,*/
+
+CASE WHEN A.Regional = 'Canal Rodas e EGV - Regional I' 	THEN 'R1'
+     WHEN A.Regional = 'Canal Rodas e EGV - Regional II' 	THEN 'R2'
+     WHEN A.Regional = 'Canal Rodas e EGV - Regional III' THEN 'R3'
+     WHEN A.Regional = 'Canal Rodas e EGV - Regional IV' THEN 'R4'
+     WHEN A.Regional = 'Canal Rodas e EGV - Regional V' 	THEN 'R5'
+     WHEN A.Regional = 'Canal Rodas e EGV - Regional VI' THEN 'R6'
+	 ELSE 'DEMAIS' END AS Regional,
+
+CASE WHEN A.FaixaEntrada in ('0 - 10%')   THEN 'MÍNIMA ATÉ 10%'
+     WHEN A.FaixaEntrada in ('11 - 20%') THEN 'MÍNIMA ATÉ 20%'
+	 WHEN A.FaixaEntrada in ('21 - 30%') THEN 'MÍNIMA ATÉ 30%'
+     WHEN A.FaixaEntrada in ('31 - 40%') THEN 'MÍNIMA ATÉ 40%'
+	 WHEN A.FaixaEntrada in ('41 - 50%') THEN 'MÍNIMA ATÉ 50%'
+	 WHEN A.FaixaEntrada in ('Maior que 50%') THEN 'MÍNIMA > 50%'
+	 ELSE 'Desconhecido' END AS FAIXA_ENTRADA_MINIMA,
+
+A.DsFilial AS Filial,
+/*A.FLpap,*/
+/*COALESCE(F.FlPorteA,'Desconhecido') as PortePDV,*/
+
+/*CASE WHEN A.CdConvenio=B.CdParceiroComercial THEN B.Onda ELSE 'DEMAIS' END AS FG_AVANCOC6,
+CASE WHEN A.CdConvenio=C.CdParceiroComercial THEN C.Onda ELSE 'DEMAIS' END AS FG_Acoes_Preco_C6,*/
+/*CASE WHEN A.CdConvenio=E.CdParceiro_Comercial THEN 'PDV_FEIRAO' ELSE 'DEMAIS' END AS FG_PDVFEIRAO_NOV25,*/
+CASE WHEN A.CdConvenio=J.PDV THEN J.MARCACAO ELSE 'DEMAIS' END AS FL_AVANCO_STD,
+CASE WHEN A.CdConvenio=K.PDV THEN K.MARCACAO ELSE 'DEMAIS' END AS FL_AVANCO_C6,
+CASE WHEN A.CdConvenio=L.CdLoja THEN L.ACAO_APOSTA ELSE 'DEMAIS' END AS FL_APOSTAS_REGIONALIZADAS,
+
+/*	CASE
+    WHEN A.DtEntradaProposta >= '02OCT2025'd THEN
+        CASE
+            WHEN SUBSTR(A.NUCPFCNPJ, 6, 2) BETWEEN '00' AND '99' THEN 'Nova Política'
+            ELSE 'Demais'
+        END
+    WHEN A.DtEntradaProposta >= '26SEP2025'd THEN
+        CASE
+            WHEN SUBSTR(A.NUCPFCNPJ, 6, 2) BETWEEN '00' AND '19' THEN 'Nova Política'
+            ELSE 'Demais'
+        END
+    WHEN A.DtEntradaProposta >= '18SEP2025'd THEN
+        CASE
+            WHEN SUBSTR(A.NUCPFCNPJ, 6, 2) BETWEEN '00' AND '01' THEN 'Nova Política'
+            ELSE 'Demais'
+        END
+    ELSE 'Demais'
+		END AS FL_Politica,*/
+
+/*CASE WHEN A.PcProbabilidadeAprovacao*10 <= 0.5 THEN 'ZERO'
+     WHEN A.PcProbabilidadeAprovacao*10 <= 6.0 THEN 'ATÉ 6,0'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 7.3 THEN '6,25-7,25'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 7.9 THEN '7,5-7,75'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 8.5 THEN '8,25-8,5'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 9.8 THEN '8,75-9,75'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 10 THEN '10'
+	  ELSE 'ZERO' END AS AGRUPAMENTO_RTG_SIMPLES,*/
+
+CASE WHEN A.PcProbabilidadeAprovacao*10 <= 0.5 THEN 'ZERO'
+     WHEN A.PcProbabilidadeAprovacao*10 <= 4.5 THEN 'ATÉ 4,5'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 5.5 THEN '4,75-5,5'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 7.5 THEN '5,75-7,5'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 8.5 THEN '7,75-8,5'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 9.8 THEN '9,25-9,75'
+	  WHEN A.PcProbabilidadeAprovacao*10 <= 10 THEN '10'
+	  ELSE 'ZERO' END AS AGRUPAMENTO_RTG_SIMPLES_V2,
+
+A.FxIdade,
+
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VpSpread) as VpSpread,
+SUM(A.VrMargem) as VrMargem,
+SUM(CASE WHEN A.FlTxAlterada = 1 then VarTaxaAlterada/100*A.VrProducao else 0 end) as TamanhoPA_PND,
+SUM(A.FlTxAlterada) as PA_TT,
+SUM(A.VrFinanciamento)as VrFinanciamento,
+SUM (A.Rupe * A.VrFinanciamento) as PE_PND,
+SUM(A.FlPropostaEfetivada) as QtdContratos,
+SUM(A.PcProbabilidadeAprovacao*A.VrProducao) as Rating_Medio_Prod,
+SUM(t1.VrComissaoTotal) as VrComissao,
+
+/*MARCAÇÃO SEGUROS */
+SUM(t1.QtSeguros) as QtSeguros,
+SUM(t1.FlBVMais) as FlBVMais,
+SUM(t1.FlCap) as FlCap,
+SUM(t1.FlDemais) as FlDemais,
+SUM(t1.FlCompleto) as FlCompleto,
+SUM(t1.FlGarantiaMecanica) as FlGarantiaMecanica,
+SUM(t1.FlRCF) as FlRCF,
+SUM(t1.FlCasco) as FlCasco,
+SUM(t1.FlGap) as FlGap,
+SUM(t1.FlDFI) as FlDFI,
+SUM(t1.VrSeguros) as VrSeguros,
+SUM(t1.VrBVMais) as VrBVMais,
+SUM(t1.VrCap) as VrCap,
+SUM(t1.VrDemais) as VrDemais,
+SUM(t1.VrCompleto) as VrCompleto,
+SUM(t1.VrGarantiaMecanica) as VrGarantiaMecanica,
+SUM(t1.VrRCF) as VrRCF,
+SUM(t1.VrCasco) as VrCasco,
+SUM(t1.VrGap) as VrGap,
+SUM(t1.VrDFI) as VrDFI,
+SUM(t1.FlBVMaisEleg) as FlBVMaisEleg,
+SUM(t1.FlCapEleg) as FlCapEleg,
+SUM(t1.FlDemaisEleg) as FlDemaisEleg
+
+From PPR.PPR_ANALITICO AS A
+LEFT JOIN PROJETOS.TBPRODUCAO AS t1 on A.NuProposta=t1.NuProposta
+LEFT JOIN TBSEMANAS as E ON A.DtContrato=E.DtTempo
+/*LEFT JOIN Avanco_C6 as B ON A.CdConvenio=B.CdParceiroComercial
+LEFT JOIN Acoes_Preco_C6 as C ON A.CdConvenio=C.CdParceiroComercial*/
+/*LEFT JOIN FEIRAO_NOV25 as E ON A.CdConvenio=E.CdParceiro_Comercial*/
+/*LEFT JOIN BASEGRC.TBPORTEPDV AS F ON A.CdConvenio = F.CdParceiroComercial*/
+LEFT JOIN Avanco_STD as J ON A.CdConvenio=J.PDV
+LEFT JOIN Avanco_C6_Jan as K ON A.CdConvenio=K.PDV
+LEFT JOIN REGIONALIZADA_APOSTAS as L ON A.CdConvenio=L.CdLoja
+WHERE A.DtContrato >='01Jan2025'd
+and A.VrProducao <> .
+AND Produto = 'Leves'
+/* and A.DtContrato <= '25jul2025'D */
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11;
+
+QUIT;

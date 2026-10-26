@@ -1,0 +1,254 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 100 - Campanha_Comissao_Abandono.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -9
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 173
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASESRC = /riscosbvf/mis_varejo/integracao; RITOSOL = /infogrc/rito_comercial_solar
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m0, Base_m5, dt_ref, start_year_m1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBCOMISSAO [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBORIGINACAO [SAS/Local], BASESRC.BASE_CAMPANHAS_SOLAR [SAS/Local], BASESRC.BASE_CARRINHOABANDONADO_SOLAR [SAS/Local], TMP.TBBVCOMPENSA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASESRC
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBCOMISSAO [PROC SQL - FROM], BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], BASES.TBORIGINACAO [PROC SQL - JOIN], BASESRC.BASE_CAMPANHAS_SOLAR [PROC SQL - FROM], BASESRC.BASE_CARRINHOABANDONADO_SOLAR [PROC SQL - FROM], RITOSOL.BASE_CAMPANHAS_COMISSAO [PROC EXPORT - DATA=], TMP.TBBVCOMPENSA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/output/cartapdv_campanhassolar.csv
+INTERNAL READS (Temp/Local): RITOSOL.BASE_CAMPANHAS_COMISSAO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): BASESRC.BASE_CAMPANHAS_SOLAR, BASESRC.BASE_CARRINHOABANDONADO_SOLAR, RITOSOL.BASE_CAMPANHAS_COMISSAO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_CAMPANHAS_COMISSAO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/cartapdv_campanhassolar.csv
+TEMP/DISCARDED OUTPUTS: BASE_BVCOMPENSA, BASE_CAMPANHAS_SOLAR, BASE_CARRINHO_ABANDONADO, BASE_CARRINHO_LIMPA, BASE_CARRINHO_LIMPA_2, BASE_COMISSAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/output/cartapdv_campanhassolar.csv
+
+END_METADATA
+================================================================================
+Libname BASESRC '/riscosbvf/mis_varejo/integracao'; /*Caminho compartilhado com demais áreas para salvar arquivos para MIS Varejo utilizar*/
+/**Libname OneSolar '/infogrc/one_one_solar';**/
+Libname ritosol '/infogrc/rito_comercial_solar';
+
+Proc Sql;
+Create table Base_BVCompensa as
+Select Distinct
+'Campanhas' as Base
+,InPut(Campanhas.AnoMes, 8.) as NuAnoMes
+,'Cobans' as Visao
+,Parc.DsLoginN1C
+,Parc.DsLoginN2C
+,Parc.DsLoginN3C
+
+,Campanhas.CdParceiroCampanha
+,Campanhas.NmParceiroCampanha as NmParceiroComercial
+,Put(Campanhas.CdParceiroCampanha,8.) || '-' || Campanhas.NmParceiroCampanha as Dimensao3
+,"Mês Fechado" as Semana
+
+,Campanhas.NmCampanha as NmCampanha
+,'BV Compensa' as NmTipoEvento
+,Porte.Porte
+,Porte.TipoParceiro
+
+,Case When Campanhas.NmCampanha = '' Then 190001 Else InPut(Campanhas.AnoMes, 8.) End as Class_Campanha
+
+/*,Min(Coalesce(Campanhas.VrMetaValorProducao,0)) as VrMetaValorProducao*/
+/*,Min(Coalesce(Campanhas.VrMetaQtContratos,0)) as VrMetaQtContratos*/
+
+,Min(Coalesce(Campanhas.VrMetaValorProducao,0)) + Min(Coalesce(Campanhas.VrMetaQtContratos,0)) as Meta Format COMMAX12.2
+,Sum(Coalesce(Campanhas.AReceber,0)) as PontosGanhos Format COMMAX10.0
+
+From TMP.TBBVCOMPENSA as Campanhas
+	INNER Join Base_Cobans_Solar_Saida as Parc On Campanhas.CdParceiroCampanha = Parc.CdParceiroComercial
+	Left join Base_Porte_Cobans as Porte On Campanhas.CdParceiroCampanha = Porte.CdParceiroComercial and Input(Campanhas.AnoMes, 8.) = Porte.NuANomes
+	Left Join (Select Distinct DsloginN1, NmColaborador From Bases.TbEstruturaComercial Where DsLoginN1 NE '') as Estrutura ON Parc.DsLoginN1C = Estrutura.DsloginN1
+	Where InPut(Campanhas.AnoMes, 8.) >= &Base_m5. and
+		Parc.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+;Quit;
+
+Proc Sql;
+Create table Base_Campanhas_Solar as
+Select Distinct
+'Campanhas' as Base
+,Campanhas.NuAnoMes
+,'Cobans' as Visao
+,Parc.DsLoginN1C
+,Parc.DsLoginN2C
+,Parc.DsLoginN3C
+
+,Campanhas.CdParceiroComercial
+,Campanhas.NmParceiroComercial
+,Put(Campanhas.CdParceiroComercial,8.) || '-' || Campanhas.NmParceiroComercial as Dimensao3
+,"Mês Fechado" as Semana
+
+,Campanhas.NmCampanha
+,Campanhas.NmTipoEvento
+,Porte.Porte
+,Porte.TipoParceiro
+
+,Case When Campanhas.NmCampanha = "" Then 190001 Else Campanhas.NuAnoMes End as Class_Campanha
+
+,Sum(Coalesce(Campanhas.Meta,0)) as Meta Format COMMAX12.2
+,Sum(Coalesce(Campanhas.PontosGanhos,0)) as PontosGanhos Format COMMAX10.0
+
+From BASESRC.BASE_CAMPANHAS_SOLAR as Campanhas
+	INNER Join Base_Cobans_Solar_Saida as Parc On Campanhas.CdParceiroComercial = Parc.CdParceiroComercial
+	Left join Base_Porte_Cobans as Porte On Campanhas.CdParceiroComercial = Porte.CdParceiroComercial and Campanhas.NuAnoMes = Porte.NuANomes
+	Left Join (Select Distinct DsloginN1, NmColaborador From Bases.TbEstruturaComercial Where DsLoginN1 NE '') as Estrutura ON Parc.DsLoginN1C = Estrutura.DsloginN1
+	Where Campanhas.NuAnomes >= &Base_m5. and
+		Parc.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+;Quit;
+
+Proc Sql;
+Create table Base_Comissao as
+Select
+'Comissao' as Base
+,(YEAR(Comissao.DtLiquidacao) * 100) + MONTH(Comissao.DtLiquidacao) as NuAnomes
+,'Cobans' as Visao
+,Comissao.CdParceiroComercial
+,Comissao.NmParceiroComercial
+,Put(Comissao.CdParceiroComercial,8.) || '-' || Comissao.NmParceiroComercial as Dimensao3
+
+,Comissao.DsLoginN1C
+,Comissao.DsLoginN2C
+,Comissao.DsLoginN3C
+,Comissao.NmAreaEstruturaComercialC
+,Comissao.NmColaboradorC
+,DsSituacaoPagamento
+
+,Count(Comissao.NuContrato) as QtContratos Format Commax12.
+,Sum(Comissao.VrLiquido) as VrLiquido Format Commax12.2
+
+From Bases.TbComissao as Comissao
+Left Join Base_Cobans_Solar_Saida as Parc On Comissao.NuCpfCnpjContrato = Parc.NuCnpjLoja
+Where Comissao.DtContrato >= &start_year_m1. and Comissao.NmGrupoProdutoMeta = 'Solar' and Comissao.NmCanalEstruturaComercialC = 'Canal Solar' and
+		Comissao.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Proc Sql;
+Create Table Base_Carrinho_Limpa (Where=(FlPropostaOriginada NE 1)) as
+Select (YEAR(Carrinho.DtSimulacao) * 100) + MONTH(Carrinho.DtSimulacao) as NuAnomes, Carrinho.DtSimulacao, Carrinho.CdParceiroComercial, Carrinho.NmParceiroComercial, Carrinho.CPF, Upcase(Trim(Carrinho.'Parecer Comercial'n)) as Status, Orig.FlPropostaOriginada
+
+From BASESRC.BASE_CARRINHOABANDONADO_SOLAR as Carrinho
+Left Join Bases.TbOriginacao as Orig
+		On Carrinho.CdParceiroComercial = Orig.CdParceiroComercial and
+		   Carrinho.DtSimulacao Between Orig.DtEntradaProposta and Orig.DtEntradaProposta + 45
+/*Where (YEAR(DtSimulacao) * 100) + MONTH(DtSimulacao) >= &Base_m5.*/
+Where DtSimulacao >= (&dt_ref. - 45)
+Order by DtSimulacao Desc, CdParceiroComercial, CPF
+;Quit;
+
+Proc Sort Nodupkey Data=Base_Carrinho_Limpa Out=Base_Carrinho_Limpa_2; by Descending DtSimulacao CPF CdParceiroComercial; Quit;
+
+Proc Sql;
+Create table Base_Carrinho_Abandonado as
+Select Distinct
+'Abandono' as Base
+,Porte.NuAnomes
+,'Cobans' as Visao
+,Parc.DsLoginN1C
+,Parc.DsLoginN2C
+,Parc.DsLoginN3C
+
+,Porte.CdParceiroComercial
+,Parc.NmParceiroComercial
+,Put(Porte.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial as Dimensao3
+,"Mês Fechado" as Semana
+
+,Porte.Porte
+,Porte.TipoParceiro
+
+,Sum(Coalesce(Atendimento.Aguardando_Atendimento,0)) as Aguardando_Atendimento Format Commax12.
+,Sum(Coalesce(SemContato.Sem_contato_c_cliente,0)) as Sem_contato_c_cliente Format Commax12.
+,Sum(Coalesce(Pagamento.Condicao_de_pagamento,0)) as Condicao_de_pagamento Format Commax12.
+,Sum(Coalesce(Cotacao.Cotação_sem_Fechamento,0)) as Cotação_sem_Fechamento Format Commax12.
+,Sum(Coalesce(Vendedor.Identificacao_do_Vendedor,0)) as Identificacao_do_Vendedor Format Commax12.
+
+From Base_Porte_Cobans as Porte
+	LEFT JOIN (Select CdParceiroComercial, Count(Distinct CPF) as Aguardando_Atendimento    From Base_Carrinho_Limpa_2 Where Status in ('EM ATENDIMENTO', 'SEM ATUAÇÃO DO GR') 						         Group by 1) as Atendimento On Porte.CdParceiroComercial = Atendimento.CdParceiroComercial
+	LEFT JOIN (Select CdParceiroComercial, Count(Distinct CPF) as Sem_contato_c_cliente     From Base_Carrinho_Limpa_2 Where Status in ('SEM CONTATO C/CLIENTE')               							     Group by 1) as SemContato  On Porte.CdParceiroComercial = SemContato.CdParceiroComercial
+	LEFT JOIN (Select CdParceiroComercial, Count(Distinct CPF) as Condicao_de_pagamento     From Base_Carrinho_Limpa_2 Where Status in ('CONTR EM OUTRA INSTITUIÇÃO-TAXA', 'CARTÃO DE CRÉDITO', 'A VISTA')   Group by 1) as pagamento   On Porte.CdParceiroComercial = pagamento.CdParceiroComercial
+	LEFT JOIN (Select CdParceiroComercial, Count(Distinct CPF) as Cotação_sem_Fechamento    From Base_Carrinho_Limpa_2 Where Status in ('SÓ COTAÇÃO', 'DESISTÊNCIA PREÇO DO PROJETO')                        Group by 1) as Cotacao     On Porte.CdParceiroComercial = Cotacao.CdParceiroComercial
+	LEFT JOIN (Select CdParceiroComercial, Count(Distinct CPF) as Identificacao_do_Vendedor From Base_Carrinho_Limpa_2 Where Status in ('CPF DO VENDEDOR') 												     Group by 1) as Vendedor    On Porte.CdParceiroComercial = Vendedor.CdParceiroComercial
+
+	LEFT Join Base_Cobans_Solar_Saida as Parc On Porte.CdParceiroComercial = Parc.CdParceiroComercial
+	Left Join (Select Distinct DsloginN1, NmColaborador From Bases.TbEstruturaComercial Where DsLoginN1 NE '') as Estrutura ON Parc.DsLoginN1C = Estrutura.DsloginN1
+Where Porte.NuAnomes >= &Base_m0. and
+		Parc.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+
+Group By 1,2,3,4,5,6,7,8,9,10,11,12
+;Quit;
+
+Data ritosol.Base_Campanhas_Comissao;
+Set Base_Campanhas_Solar
+	Base_BVCompensa
+	Base_Comissao
+	Base_Carrinho_Abandonado
+;Run;
+
+proc export
+data = ritosol.Base_Campanhas_Comissao
+file = '/riscosbvf/BA/processos/output/cartapdv_campanhassolar.csv' replace
+dbms = dlm;
+delimiter = ';';
+run;
+
+X "mv  /riscosbvf/BA/processos/output/cartapdv_campanhassolar.csv  /riscosbvf/BA/processos/output/ ";

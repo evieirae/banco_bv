@@ -1,0 +1,209 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_Funil_Leves
+FILE_SAS: 1 - Gera apurador de edicao de propostas.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 126
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], STGORA_APRO_SIMU.TBSIMULACAODADOFNNCO [DBCON], STGORA_APRO_SIMU.TBSIMULACAOPRAZOFNNCO [DBCON], STGORA_APRO_SIMU.TBSIMULACAOPROPOSTA [DBCON], STGORA_APRO_SIMU.TBSIMULACAOPROPOSTAGARANTIA [DBCON], STGORA_APRO_SIMU.TBSIMULACAOPRZOFNNCOPRPSA [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.SIMULACOES_01
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.SIMULACOES_01
+TABLE_READ_PROVENANCE (Flow): STGORA_APRO_SIMU.TBSIMULACAODADOFNNCO [Pass-Through Native (DBCON) - JOIN], STGORA_APRO_SIMU.TBSIMULACAOPRAZOFNNCO [Pass-Through Native (DBCON) - FROM], STGORA_APRO_SIMU.TBSIMULACAOPROPOSTA [Pass-Through Native (DBCON) - FROM], STGORA_APRO_SIMU.TBSIMULACAOPROPOSTAGARANTIA [Pass-Through Native (DBCON) - JOIN], STGORA_APRO_SIMU.TBSIMULACAOPRZOFNNCOPRPSA [Pass-Through Native (DBCON) - JOIN], WORK.SIMULACOES_01 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PROPOSTACOMEDICAO, PROPOSTACOMEDICAOFULL, PROPOSTACOMEDICAOFULLPRIPERNA, PROPOSTACOMEDICAOFULLULTPERNA, PROPOSTACOMEDICAOFULLUNION, PROPOSTASEMEDICAO, SIMULACOES_00, SIMULACOES_01, TBPROPOSTAEDITADASUM, WORK.SIMULACOES_02
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Gera apurador de edicao de propostas.sas														| */
+/* | Descricao: Programa para apurar kpi de edição de propsotas em Motos.					| */
+/* | Objetivo: 	Apuração do Dash FUNIL Motos					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera apurador de edicao de propostas=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+	%CONECTADB(server=BI);
+
+	CREATE TABLE simulacoes_00 AS
+		SELECT *
+		FROM CONNECTION TO DBCON
+		(
+			SELECT A.cdsimulacaoProposta				AS Cod_Simulacao
+					, A.SgSistemaOrigem						AS Sistema_Origem
+					, A.DtSimulacaoproposta					AS Dt_Simulacao
+					, A.CdgrupoCategoriaVeiculo				AS Cod_Grupo_Categoria_Veiculo
+					, A.nucpfcnpj							AS CPF_CNPJ
+					, H.FlIsentoTarifaAberturaCrdo
+					, H.PcEntradaAjustada
+					, H.VrEntrada
+					, H.VrProposta
+					, D.Nuproposta 							as NuProposta
+					, B.VrVeiculoSimulacao
+					, B.AaModelo
+					, B.FlZeroKM
+					, B.CdMolicar
+			  		, C.qtparcela
+			  		, C.VrPrestacao
+			  		, C.VrTotalSeguro
+			  		, C.VrTotalCustoOperacao
+					, C.PcVariacaoTabelaFnnco
+					, C.TxOriginalFinanciamento
+				, c.CdSimulacaoPrazofnnco
+				, c.TxInicioFinanciamento
+				, a.CdParceiroComercial
+
+				FROM STGORA_APRO_simu.TbSimulacaoProposta 				AS A
+				LEFT JOIN STGORA_APRO_simu.TbSimulacaoPropostaGarantia	AS B
+					ON A.CdSimulacaoProposta = B.CdSimulacaoProposta
+				LEFT JOIN
+						(
+							SELECT * FROM STGORA_APRO_simu.TbSimulacaoPrazoFnnco
+								WHERE CdSimulacaoPrazoFnnco IN
+									(SELECT MAX(CdSimulacaoPrazoFnnco)
+										FROM STGORA_APRO_simu.TbSimulacaoPrazoFnnco
+										GROUP BY CdSimulacaoDadofnnco)
+						)
+		AS C
+					ON B.CdSimulacaoDadofnnco	= C.CdSimulacaoDadofnnco
+				LEFT JOIN STGORA_APRO_SIMU.TbSimulacaoDadoFnnco AS H
+					ON B.CdSimulacaoDadoFnnco = H.CdSimulacaoDadoFnnco
+				LEFT JOIN STGORA_APRO_simu.TbSimulacaoPrzoFnncoPrpsa	AS D
+					ON C.CdSimulacaoPrazofnnco	= D.CdSimulacaoPrazofnnco
+
+/*		WHERE A.DtSimulacaoproposta >= &dt_simu_bi. and (A.SgSistemaOrigem in ('SMICSTVE', 'MOBIAUTO', 'SIMUMLVL', 'SIMUMCVL', 'SIMUVEIC') */
+/*		or (A.SgSistemaOrigem = 'CRSMINTLV' and a.CdParceiroComercial in (400732, 400733, 400734, 434334, 434335)))*/
+		WHERE A.DtSimulacaoproposta >= '20240101' and
+/*			  A.SgSistemaOrigem in ('SMICSTVE', 'MOBIAUTO', 'SIMUMLVL', 'SIMUMCVL', 'SIMUVEIC','CRSMINTLV','SIMUSCVL','SIMUSCMT','SIMUKVVL','SIMUKVMT','SIMUDVVL','SIMUAPPBV','SIMUBVIVL','SIMUBVIMT','SIMUBVIPD','APPBV') and*/
+/*								      ICARROS    MOBIAUTO      MELI	       MCN       SITE_BV    USADOSBR   SÓ_CARRÃO   SÓ_CARRÃO  KARVI Lev  KARVI Motos  DRYVE     APBV         NAPISTA                             APPBV*/
+			  A.CdgrupoCategoriaVeiculo in (1) and
+D.Nuproposta is not null
+
+		)
+
+;QUIT;
+
+PROC SORT DATA=simulacoes_00
+	OUT=simulacoes_01;
+	BY DESCENDING NuProposta Dt_Simulacao ;
+RUN;
+
+data work.simulacoes_02;
+	set work.simulacoes_01;
+	BY DESCENDING NuProposta Dt_Simulacao ;
+
+	if first.NuProposta then
+		n=1;
+	else n+1;
+run;
+
+PROC SQL;
+
+CREATE TABLE PropostaComEdicao as
+
+Select *
+from simulacoes_02
+where n > 1;quit;
+
+PROC SQL;
+
+CREATE TABLE PropostaSemEdicao as
+
+Select *
+from simulacoes_02
+where NuProposta not in (select distinct NuProposta from PropostaComEdicao);quit;
+
+PROC SQL;
+
+CREATE TABLE PropostaComEdicaoFull as
+
+Select *
+from simulacoes_02
+where NuProposta not in (select distinct NuProposta from PropostaSemEdicao);quit;
+PROC SQL;
+
+CREATE TABLE PropostaComEdicaoFullPriPerna as
+
+Select *
+from PropostaComEdicaoFull
+where n = 1;
+
+PROC SQL;
+
+CREATE TABLE PropostaComEdicaoFullUltPerna as
+Select A.NuProposta,A.FlZeroKM, A.N AS MAXN
+from PropostaComEdicaoFull A
+JOIN
+(Select NuProposta, max(n) as MaxNB
+from PropostaComEdicaoFull
+group by NuProposta) B
+ON A.NuProposta = B.NuProposta
+AND A.N = B.MaxNB ;
+
+PROC SQL;
+
+CREATE TABLE PropostaComEdicaoFullUnion as
+
+Select a.*,b.NuProposta as NuProposta_b, b.FlZeroKM as FlZeroKM_b, MaxN as MaxN_b
+from PropostaComEdicaoFullPriPerna a
+join PropostaComEdicaoFullUltPerna b
+on a.NuProposta = b.NuProposta;quit;
+
+proc sql;
+Create table TbPropostaEditadaSum as
+
+select
+NuProposta,
+count(NuProposta) as TtlPropEdit,
+sum(MaxN_b) as TtlEdicoes
+from PropostaComEdicaoFullUnion
+group by NuProposta;quit;

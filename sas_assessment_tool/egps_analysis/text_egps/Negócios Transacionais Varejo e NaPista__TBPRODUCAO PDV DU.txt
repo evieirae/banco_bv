@@ -1,0 +1,148 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Negócios Transacionais Varejo e NaPista__TBPRODUCAO PDV DU
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:05 UTC
+BUSINESS_AREA: Negócios Transacionais Varejo e NaPista
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 83
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.QUERY_FOR_TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Code For Query Builder */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Code For Query Builder */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-lhA9Jidpj62lu5rA/code.sas */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPRODUCAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBPRODUCAO AS
+   SELECT t1.NuAnoMes,
+          t1.CdColaborador,
+          t1.NmColaborador,
+          t1.DsFilial,
+          t1.NmCanalEstruturaComercial,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmSubEstruturaComercialC,
+          t1.NmGrupoProdutoMeta,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.FxIdade,
+
+case when t1.NmAreaEstruturaComercialC in ('Canal Pesados', 'Canal Motos') then '1' else '0' end as GrDedicado,
+
+case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+
+t2.PredominanciaProduto,
+
+		   
+            (SUM(t1.VrProducao)) FORMAT=21.2 AS SUM_of_VrProducao,
+		   
+            (SUM(t1.VrProducaoProjetado)) FORMAT=21.2 AS SUM_of_VrProducaoProjetado,
+          
+            (COUNT(t1.NuProposta)) AS COUNT_of_NuProposta
+
+      FROM BASES.TBPRODUCAO t1
+
+	  LEFT JOIN BASES.TBPARCEIROCOMERCIAL t2 on t2.CDPARCEIROCOMERCIAL =  t1.CdParceiroComercial
+
+      WHERE t1.NuAnoMes >= 202401 and t1.NmGrupoProdutoMeta in ('Motos','Pesados')
+
+      GROUP BY
+	  1,2,3,4,5,6,7,8,9,10,11,12,13,14;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Code For Query Builder */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPRODUCAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBPRODUCAO AS
+   SELECT t1.NuAnoMes,
+          t1.CdColaborador,
+          t1.NmColaborador,
+          t1.DsFilial,
+          t1.NmCanalEstruturaComercial,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmSubEstruturaComercialC,
+          t1.NmGrupoProdutoMeta,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.FxIdade,
+          
+            (SUM(t1.VrProducao)) FORMAT=21.2 AS SUM_of_VrProducao,
+          
+            (COUNT(t1.NuProposta)) AS COUNT_of_NuProposta
+      FROM BASES.TBPRODUCAO t1
+      WHERE t1.NuAnoMes >= 202401 AND t1.NmGrupoProdutoMeta = 'Pesados'
+      GROUP BY t1.NuAnoMes,
+               t1.CdColaborador,
+               t1.NmColaborador,
+               t1.DsFilial,
+               t1.NmCanalEstruturaComercial,
+               t1.NmAreaEstruturaComercialC,
+               t1.NmSubEstruturaComercialC,
+               t1.NmGrupoProdutoMeta,
+               t1.CdParceiroComercial,
+               t1.NmParceiroComercial,
+               t1.FxIdade;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

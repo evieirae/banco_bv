@@ -1,0 +1,612 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Crédito__Base Monitor de Alertas
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:23 UTC
+BUSINESS_AREA: Crédito
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC TRANSPOSE (2x | +20)
+----------------------------------------
+LINES_OF_CODE: 437
+CODE_TASKS_COUNT: 9
+DETECTED_PROCS: EXPORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (15x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: _INSIGHT = /riscosbvf/insight
+DETECTED_MACROS_DEFINED: nome_tabela_hoje
+DETECTED_MACROS_USED: lista_insight, nome_tabela_hoje
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DICTIONARY.TABLES [SAS/Local], SHAREATA.TBCARTEIRAGRUPO [SAS/Local], _INSIGHT.BASE_ALERTAS_PME [SAS/Local], _INSIGHT.TBBRUTA [SAS/Local], _INSIGHT.TBVNP [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_ALERTAS_PME, WORK.CARTEIRA_PME2
+IMPORTED_LIBNAMES: _INSIGHT
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ALERTAS_PME, WORK.CARTEIRA_PME2, WORK.QUERY_FOR_CARTEIRA_PME2, WORK.QUERY_FOR_TBBRUTA
+TABLE_READ_PROVENANCE (Flow): DICTIONARY.TABLES [PROC SQL - FROM], SHAREATA.TBCARTEIRAGRUPO [PROC SQL - FROM], WORK.BASE_ALERTAS_PME [PROC SQL - FROM], WORK.CARTEIRA_PME2 [PROC SQL - FROM], WORK.QUERY_FOR_CARTEIRA_PME2 [DATA Step - SET], WORK.QUERY_FOR_TBBRUTA [PROC SQL - JOIN], _INSIGHT.BASE_ALERTAS_PME [DATA Step - SET], _INSIGHT.TBBRUTA [DATA Step - SET; PROC SQL - FROM], _INSIGHT.TBVNP [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): \\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\ALERTAS_UNICOS_FINAL.xlsx, \\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\BASE_ALERTAS_UM.xlsx, \\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\CARTEIRA_FINAL.xlsx, \\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\HISTORICO_PCMR.xlsx
+TEMP/DISCARDED OUTPUTS: ALERTAS_UNICOS, ALERTAS_UNICOS_AUX, ALERTAS_UNICOS_FINAL, ANALISE, ANALISE2, ANALISE3, ANALISE4, ANALISE5, BASE_ALERTAS_PME, BASE_ALERTAS_PME1, BASE_ALERTAS_PME2, BASE_ALERTAS_PME_SAFRA_ATUAL, BASE_VNP, CARTEIRA_ALERTAS_AUX, CARTEIRA_ALERTAS_FINAL, CARTEIRA_FINAL, CARTEIRA_PME, CARTEIRA_PME2, HISTORICO_PCMR, NE, OUT, QTDPORSAFRA, QTD_CARTEIRA, TABELAS, TABELAS1, TABELAS2, TABELAS3, TABELAS4, TABELAS_AUX, TABELA_FINAL, WORK.&NOME_TABELA_HOJE, WORK.QUERY_FOR_BASE_ALERTAS_PME, WORK.QUERY_FOR_CARTEIRA_PME2, WORK.QUERY_FOR_TBBRUTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET nome_tabela_hoje=TBBRUTA_%sysfunc(today(), yymmddn8.);
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Alertas */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 38 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Alertas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-IhLjf2u82h25TPFh/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME _INSIGHT 	'/riscosbvf/insight'                              ACCESS = READONLY;
+
+Data Base_Alertas_PME;
+SET _INSIGHT.BASE_ALERTAS_PME;
+WHERE TpAlerta NE 'GP Divergente Global' AND TpAlerta NE 'Bloqueio' AND TpAlerta NE 'Prinad' AND TpAlerta NE 'Vencimento Limite 90D' AND TpAlerta NE 'Vencimento Limite 60D'
+AND DtInclusao >= '01JAN24'D;
+
+Safra = year(Dtinclusao)*100+ month(Dtinclusao);
+
+IF TpAlerta = 'Ações Judiciais' then NmAlerta= 'Restritivos  '; else
+IF TpAlerta = 'CCF' then NmAlerta= 'Restritivos  '; else
+IF TpAlerta = 'Liminar Serasa' then NmAlerta= 'Restritivos  '; else
+IF TpAlerta = 'Sócio PF' then NmAlerta= 'Restritivos  '; else
+IF TpAlerta = 'Falência Decretada' then NmAlerta= 'RJ/Falência  '; else
+IF TpAlerta = 'Recuperação Judicial' then NmAlerta= 'RJ/Falência  '; else
+IF TpAlerta = 'Balanco' then NmAlerta= 'Balanço  '; else
+IF TpAlerta = 'Refin' then NmAlerta= 'Refin  '; else
+IF TpAlerta = 'Restritivos' then NmAlerta= 'Restritivos  '; else
+IF TpAlerta = 'VENCIDOS SCR ' then NmAlerta= 'Vencidos SCR '; else
+IF TpAlerta = 'Garantias' then NmAlerta= 'Garantias  '; else
+IF TpAlerta = 'ILM' then NmAlerta= 'Garantias  '; else
+IF TpAlerta = 'VNP' then NmAlerta= 'VNP  ';
+
+IF NTpAlerta = 2  AND QdAtual <= 7 then DsGrauSeveridade  = '1. Baixo'; else
+IF NTpAlerta = 2  AND QdAtual <= 30 then DsGrauSeveridade = '2. Médio'; else
+IF NTpAlerta = 2  AND QdAtual > 30 then DsGrauSeveridade  = '3. Alto '; else
+
+IF NTpAlerta = 11 AND VrAtual <= 0.2 then DsGrauSeveridade  = '1. Baixo'; else
+IF NTpAlerta = 11 AND VrAtual <= 0.5 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 11 AND VrAtual > 0.5 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 12 AND DsObservacao = 'Direitos creditórios abaixo do previsto' then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 12 AND DsObservacao = 'Direitos creditórios não identificados no período' then DsGrauSeveridade  = '3. Alto '; else
+
+IF NTpAlerta = 3 AND VrAtual >= 0.7 then DsGrauSeveridade  = '1. Baixo'; else
+IF NTpAlerta = 3 AND VrAtual >= 0.6 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 3 AND VrAtual < 0.6 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 7 AND (VrAtual/VrFaturamento) <= 0.01 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 7 AND (VrAtual/VrFaturamento) > 0.01 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 10 AND (VrAtual/VrFaturamento) <= 0.05 then DsGrauSeveridade  = '1. Baixo'; else
+IF NTpAlerta = 10 AND (VrAtual/VrFaturamento) <= 0.10 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 10 AND (VrAtual/VrFaturamento) > 0.10 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 10 AND QdAtual <= 5 then DsGrauSeveridade  = '1. Baixo'; else
+IF NTpAlerta = 10 AND QdAtual <= 20 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 10 AND QdAtual > 20 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 8 AND (VrAtual/VrFaturamento) <= 0.10 then DsGrauSeveridade  = '1. Baixo'; else
+IF NTpAlerta = 8 AND (VrAtual/VrFaturamento) <= 0.20 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 8 AND (VrAtual/VrFaturamento) > 0.20 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 9 AND QdAtual <= 5 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 9 AND QdAtual > 5 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 4 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 6 then DsGrauSeveridade  ='3. Alto '; else
+
+IF NTpAlerta = 17 then DsGrauSeveridade  ='3. Alto ';else
+
+IF NTpAlerta = 16 then DsGrauSeveridade  ='1. Baixo';else
+
+IF NTpAlerta = 13 then DsGrauSeveridade  ='2. Médio';else
+
+IF NTpAlerta = 25 AND (VrAtual/VrFaturamento) <= 0.02 then DsGrauSeveridade  = '2. Médio'; else
+IF NTpAlerta = 25 AND (VrAtual/VrFaturamento) > 0.02 then DsGrauSeveridade  ='3. Alto ';
+
+Run;
+
+PROC SQL;
+   CREATE TABLE ALERTAS_UNICOS AS
+   SELECT YEAR (t1.DtInclusao)*100 + MONTH (t1.DtInclusao) AS SAFRA,
+          t1.NuCnpjRaiz,
+          
+            (COUNT(t1.TpAlerta)) AS COUNT_of_TpAlerta
+      FROM WORK.BASE_ALERTAS_PME t1
+      GROUP BY 1,2;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE ALERTAS_UNICOS_AUX AS
+   SELECT SAFRA
+		  ,COUNT (t1.NuCnpjRaiz) AS QTD
+      FROM ALERTAS_UNICOS t1
+      GROUP BY 1;
+
+QUIT;
+
+DATA ALERTAS_UNICOS_FINAL;
+SET ALERTAS_UNICOS_AUX;
+    ano_mes = INPUT(PUT(SAFRA, 6.), YYMMN6.);
+
+data_final_mes = INTNX('MONTH', ano_mes, 0, 'E');
+
+FORMAT data_final_mes DDMMYY10.;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Alertas */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Carteira */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 38 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Carteira */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-L5IfQtwJKMXgWqXh/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA BASE_ALERTAS_PME_SAFRA_ATUAL;
+
+SET BASE_ALERTAS_PME;
+WHERE Safra=YEAR(TODAY()-10)*100 + MONTH(TODAY()-10);
+QTD = 1;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_ALERTAS_PME1 AS SELECT
+CdGpEconomico,
+DsGrauSeveridade,
+SUM(QTD) AS QTD
+FROM BASE_ALERTAS_PME_SAFRA_ATUAL
+GROUP BY 1,2;
+RUN;
+
+PROC TRANSPOSE DATA= BASE_ALERTAS_PME1  OUT= BASE_ALERTAS_PME2;
+    BY NOTSORTED  CdGpEconomico ;
+    ID DsGrauSeveridade;
+    VAR QTD;
+RUN;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBBRUTA AS
+   SELECT t1.CdGpEconomico,
+          
+            (MAX(t1.DsClassificacaoSME)) AS MAX_of_DsClassificacaoSME,
+          
+            (MAX(t1.VrTotalAprovadoGLGrupo)) FORMAT=17.2 AS MAX_of_VrTotalAprovadoGLGrupo,
+          
+            (MAX(t1.VrTotalRiscoGLGrupo)) FORMAT=17.2 AS MAX_of_VrTotalRiscoGLGrupo,
+			MAX(t1.DsClassificacaoANTSME) AS DsClassificacaoANTSME
+      FROM _INSIGHT.TBBRUTA t1
+      GROUP BY t1.CdGpEconomico;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CARTEIRA_PME AS
+SELECT
+A.*,
+B.MAX_of_DsClassificacaoSME,
+B.MAX_of_VrTotalAprovadoGLGrupo,
+B.MAX_of_VrTotalRiscoGLGrupo,
+B.DsClassificacaoANTSME
+FROM SHAREATA.TBCARTEIRAGRUPO AS A
+LEFT JOIN WORK.QUERY_FOR_TBBRUTA AS B ON A.CdGrupoEconomico = B.CdGpEconomico;
+RUN;
+
+DATA CARTEIRA_PME2;
+SET CARTEIRA_PME;
+WHERE NmGerenteCredito = 'RODRIGO.ACASTRO';
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_VNP AS SELECT
+NmGrupoEconomico,
+MAX(QtDiasAtraso) AS QtDiasAtraso
+FROM _INSIGHT.TBVNP
+(WHERE = (FlAtual = 1))
+GROUP BY 1;
+RUN;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTEIRA_PME2 AS
+   SELECT t1.CdGrupoEconomico,
+          t1.NmGrupoEconomico,
+          t1.SegmentoAtuacao,
+          t1.NmAnalistaCredito,
+          t1.DsPorte,
+          t1.Carteira,
+          t1.MAX_of_DsClassificacaoSME AS PCMR,
+		  t1.DsClassificacaoANTSME AS PCMR_Ant,
+          t1.MAX_of_VrTotalAprovadoGLGrupo AS VrLimite,
+          t1.MAX_of_VrTotalRiscoGLGrupo AS VrRisco,
+		  t2.'1. Baixo'N AS Baixo,
+		  t2.'2. Médio'N AS Medio,
+		  t2.'3. Alto 'N AS Alto,
+		  t3.QtDiasAtraso
+      FROM WORK.CARTEIRA_PME2 t1
+ 		LEFT JOIN BASE_ALERTAS_PME2 t2
+ON t1.CdGrupoEconomico = t2.CdGpEconomico
+LEFT JOIN BASE_VNP t3
+ON t1.NmGrupoEconomico = t3.NmGrupoEconomico;
+QUIT;
+
+DATA CARTEIRA_FINAL;
+SET WORK.QUERY_FOR_CARTEIRA_PME2;
+IF Baixo=. Then Baixo=0; ELSE Baixo=Baixo;
+IF Medio=. Then Medio=0; ELSE Medio=Medio;
+IF Alto=. Then Alto=0; ELSE Alto=Alto;
+
+Alertas = Baixo+Medio+Alto;
+
+IF PCMR = 'PCMR1' AND PCMR_Ant = 'PCMR2' THEN Status_PCMR = 'Melhorou'; ELSE
+IF PCMR = 'PCMR2' AND PCMR_Ant = 'PCMR3' THEN Status_PCMR = 'Melhorou'; ELSE
+
+IF PCMR = 'PCMR1' AND PCMR_Ant = 'PCMR1' THEN Status_PCMR = 'Manteve'; ELSE
+IF PCMR = 'PCMR2' AND PCMR_Ant = 'PCMR2' THEN Status_PCMR = 'Manteve'; ELSE
+IF PCMR = 'PCMR3' AND PCMR_Ant = 'PCMR3' THEN Status_PCMR = 'Manteve'; ELSE
+IF PCMR = 'PCMR4' AND PCMR_Ant = 'PCMR4' THEN Status_PCMR = 'Manteve'; ELSE
+
+IF PCMR = 'PCMR4' AND PCMR_Ant = 'PCMR1' THEN Status_PCMR = 'Piorou '; ELSE
+IF PCMR = 'PCMR3' AND PCMR_Ant = 'PCMR1' THEN Status_PCMR = 'Piorou '; ELSE
+IF PCMR = 'PCMR2' AND PCMR_Ant = 'PCMR1' THEN Status_PCMR = 'Piorou '; ELSE
+
+IF PCMR = 'PCMR3' AND PCMR_Ant = 'PCMR2' THEN Status_PCMR = 'Piorou '; ELSE
+IF PCMR = 'PCMR4' AND PCMR_Ant = 'PCMR2' THEN Status_PCMR = 'Piorou '; ELSE
+
+IF PCMR = 'PCMR4' AND PCMR_Ant = 'PCMR3' THEN Status_PCMR = 'Piorou ';ELSE
+
+IF PCMR NE '' AND PCMR_Ant = '' THEN Status_PCMR = 'Novo ';ELSE
+IF PCMR = '' AND PCMR_Ant = '' THEN Status_PCMR = 'Sem PCMR ';
+
+If QtDiasAtraso >= 5 THEN EmAtraso = 1; ELSE EmAtraso=0;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Carteira */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: PCMR */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 38 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: PCMR */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-EEfNoywboyAmNwBV/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+    create table tabelas as
+    select memname as tabela,
+           input(substr(memname, 9, 8), yymmdd8.) as data format=date9.,
+           cats('_INSIGHT.', memname) as origem 
+    from dictionary.tables
+    where libname = '_INSIGHT'
+          and memname like 'TBBRUTA%'
+    order by data desc;
+quit;
+
+proc sql;
+
+create table tabelas_aux as select
+
+case when tabela = 'TBBRUTA' then cats('TBBRUTA_', put(today(), yymmddn8.)) else tabela end as tabela,
+case when tabela = 'TBBRUTA' then today() else data end as data format ddmmyy10.,
+origem
+from tabelas;
+quit;
+
+data tabelas1;
+set tabelas_aux;
+where data ne .;
+safra=year(data)*100+month(data);
+run;
+
+proc sql;
+    create table tabelas2 as
+    select safra,
+	max(data) as max_data format=date9.
+    from tabelas1
+	group by 1;
+quit;
+
+proc sql;
+	create table tabelas3 as
+	select a.*,
+	case when a.data=b.max_data then 1 else 0 end as flag
+	from tabelas1 as a
+	left join tabelas2 as b
+	on a.safra=b.safra;
+quit;
+
+data tabelas4;
+set tabelas3;
+where flag = 1 and safra >= (year(intnx('month',today(),-24))*100+month(intnx('month',today(),-24)));
+run;
+
+%let nome_tabela_hoje = TBBRUTA_%sysfunc(today(), yymmddn8.);
+
+proc sql;
+    select cats('_INSIGHT.', tabela) into :lista_insight separated by ' '
+    from tabelas4
+    where tabela ne "&nome_tabela_hoje";
+quit;
+data work.&nome_tabela_hoje;
+set _insight.TBBRUTA;
+RUN;
+
+data tabela_final;
+    length origem $32.;
+    set &lista_insight WORK.&nome_tabela_hoje indsname=nome_tabela;
+    origem = scan(nome_tabela, -1, '.');
+run;
+
+
+
+
+
+
+
+
+
+
+
+
+DATA ANALISE;
+SET tabela_final;
+format Safra date9.;
+Safra=input(substr(origem, 9, 8), yymmdd8.);
+
+KEEP
+DtProcessamento
+TpLancamento
+NmGpEconomico
+DsClassificacaoSME
+NmGerenteCredito
+FLAtivoGP
+Safra;
+
+RUN;
+
+DATA ANALISE2;
+
+SET ANALISE;
+
+WHERE TpLancamento = "Pessoa" AND NmGerenteCredito = "RODRIGO.ACASTRO" and FlAtivogp = 1;
+
+RUN;
+
+PROC SQL;
+
+CREATE TABLE ANALISE3 AS SELECT
+Safra,
+NmGpEconomico,
+MAX(DsClassificacaoSME) AS PCMR
+FROM ANALISE2
+GROUP BY 1,2;
+
+RUN;
+
+PROC SQL;
+
+CREATE TABLE QtdPorSafra AS SELECT
+Safra,
+PCMR,
+COUNT(*) AS Qtd
+FROM ANALISE3
+GROUP BY 1,2;
+
+RUN;
+
+DATA ANALISE4;
+
+SET ANALISE3;
+
+IF PCMR = 'PCMR1' THEN MONITORAMENTO = 1; ELSE
+IF PCMR = 'PCMR2' THEN MONITORAMENTO = 2; ELSE
+IF PCMR = 'PCMR3' THEN MONITORAMENTO = 3; ELSE
+IF PCMR = 'PCMR4' THEN MONITORAMENTO = 4; ELSE MONITORAMENTO = 1;
+
+RUN;
+
+PROC TRANSPOSE
+
+DATA = ANALISE4
+OUT = ANALISE5 (DROP = _NAME_);
+BY NmGpEconomico NOTSORTED;
+ID SAFRA;
+VAR MONITORAMENTO;
+
+RUN;
+
+DATA HISTORICO_PCMR;
+
+SET QtdPorSafra;
+
+WHERE PCMR NE '';
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: PCMR */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Percentual Carteira */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 38 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Percentual Carteira */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-SKNS46TDDvynKFiN/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+CREATE TABLE QTD_CARTEIRA AS SELECT
+
+SAFRA,
+COUNT (DISTINCT(NmGpEconomico)) AS QTD_CARTEIRA
+FROM ANALISE2
+
+GROUP BY 1;
+RUN;
+
+PROC SQL;
+
+CREATE TABLE CARTEIRA_ALERTAS_AUX AS SELECT
+
+A.*,
+B.QTD AS QTD_ALERTAS
+FROM QTD_CARTEIRA AS A
+
+LEFT JOIN ALERTAS_UNICOS_FINAL AS B ON
+year(a.safra)*100+month(a.safra) = year(b.data_final_mes)*100+month(b.data_final_mes);
+
+RUN;
+
+DATA CARTEIRA_ALERTAS_FINAL;
+
+SET CARTEIRA_ALERTAS_AUX;
+
+WHERE QTD_ALERTAS NE .;
+
+PC_CARTEIRA = 100*(QTD_ALERTAS / QTD_CARTEIRA);
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Percentual Carteira */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ALERTAS_PME);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ALERTAS_PME AS
+   SELECT t1.DtInclusao,
+          t1.NuCnpjRaiz,
+          
+            (COUNT(t1.TpAlerta)) AS COUNT_of_TpAlerta
+      FROM WORK.BASE_ALERTAS_PME t1
+      GROUP BY t1.DtInclusao,
+               t1.NuCnpjRaiz;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CARTEIRA_FINAL
+    OUTFILE='\\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\CARTEIRA_FINAL.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.BASE_ALERTAS_PME
+    OUTFILE='\\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\BASE_ALERTAS_UM.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.HISTORICO_PCMR
+    OUTFILE='\\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\HISTORICO_PCMR.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.ALERTAS_UNICOS_FINAL
+    OUTFILE='\\bvnet\global\DCCR\Monitoramento e Planejamento\Planejamento\Indicadores\02 - Atacado\07.PowerBI\31. Monitor Alertas\ALERTAS_UNICOS_FINAL.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,200 @@
+START_METADATA
+PROJECT: Rodas__TbCobansSolar
+FILE_SAS: TbCobansSolar.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 122
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], DBCOR.DBO.TBPARCEIROSUBPRODUTO [DBCON], DBCOR.DBO.TBSUBPRODUTO [DBCON], DBCOR.TBATIVIDADEFINANCIAMENTO [DBCON], DBCOR.TBATIVIDFINANCPARCCOMERCIAL [DBCON], DBCOR.TBCOLABORADOR [DBCON], DBCOR.TBFAVORECIDOAUTORIZADO [DBCON], DBCOR.TBFAVORECIDOCONTACORRENTE [DBCON], DBCOR.TBFILIAL [DBCON], DBCOR.TBPARCEIROCOMERCIAL [DBCON], DBCOR.TBPESSOA [DBCON], DBCOR.TBREGIAO [DBCON], DBCOR.TBREPRESENTANTELEGAL [DBCON], DBCOR.TBSOCIO [DBCON], DBCOR.TBTIPOPARCEIROCOMERCIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): DBCOR.DBO.TBPARCEIROSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCOR.DBO.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBATIVIDADEFINANCIAMENTO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBATIVIDFINANCPARCCOMERCIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFAVORECIDOAUTORIZADO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFAVORECIDOCONTACORRENTE [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFILIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - FROM], DBCOR.TBPESSOA [Pass-Through Native (DBCON) - JOIN], DBCOR.TBREGIAO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBREPRESENTANTELEGAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBSOCIO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTIPOPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/output/TbCobansSolar.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbCobansSolar.csv
+TEMP/DISCARDED OUTPUTS: TBCOBANSSOLAR, TBCOBANSSOLAR_AUX
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/output/TbCobansSolar.csv
+
+END_METADATA
+================================================================================
+/*################################################################################################*/
+/* Programa: TbCobansSolar.sas                                                                    */
+/* Autor:    Bárbara Campioni - MIS Varejo  		                                              */
+/* Versão:   21.09.2023 - Gerar base de Cobans e Cobans Favorecidos Ativos Solar para o Dash PLD  */                        															  */
+/*################################################################################################*/
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */;
+
+%INCLUDE '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%INCLUDE '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+
+%criavardb;
+proc sql;
+%CONECTADB (server=CTR);
+CREATE TABLE TbCobansSolar_Aux AS
+SELECT * FROM connection to dbcon
+(
+SELECT
+         ParceiroComercial.dtcadastro                    AS DtCadastroCoban
+        ,ParceiroComercial.NmFantasia                    AS RazaoSocialParceiro
+		,Pessoa.NuCpfCnpj                                AS CNPJParceiro
+        ,ParceiroComercial.CdParceiroComercial           AS Login
+		,ParceiroComercial.FlAtivo                       AS StatusLogin
+        ,TipoParceiroComercial.NmTipoParceiroComercial   AS TipoParceiro
+		,AtividadeFinanciamento.DsAtividadeFinanciamento AS NmAtividade
+        ,ParceiroSubProduto.CdSubProduto                 AS CdProduto
+        ,SubProduto.DsSubProduto                         AS NmProduto
+        ,FavorecidoAutorizado.dtcadastro                 AS DtCadastroFavorecido
+        ,FavorecidoAutorizado.NmTitular                  AS RazaoSocialFavorecido
+		,FavorecidoAutorizado.NuCpfCnpj                  AS CNPJFavorecido
+        ,FavorecidoContaCorrente.NuBanco                 AS NroBancoFavorecido
+		,FavorecidoContaCorrente.CdAgencia               AS NroAgenciaFavorecido
+        ,FavorecidoContaCorrente.NuContaCorrente         AS NroContaFavorecido
+		,FavorecidoAutorizado.FlAtivo                    AS StatusFavorecido
+        ,FavorecidoContaCorrente.FlPrincipal             AS Principal
+		,FavorecidoContaCorrente.FlContaServico          AS Servico
+		,FavorecidoContaCorrente.FlComissao              AS Comissao
+        ,FavorecidoContaCorrente.FlContrato              AS Contrato
+		,FavorecidoContaCorrente.FlAtivoComissao         AS AtivoComissao
+		,FavorecidoContaCorrente.FlAtivoContrato         AS AtivoContrato
+        ,ColaboradorN1.NmColaborador                     AS GerenteComercial
+        ,ColaboradorN2.NmColaborador                     AS GerenteRegional
+        ,RepresentanteLegal.NmRepresentanteLegal         AS NmSocio
+        ,RepresentanteLegal.NuCpf                        AS CPFSocio
+
+FROM DBCOR..TbParceiroComercial ParceiroComercial
+
+	LEFT  JOIN DBCOR..TbRegiao Regiao
+    	ON Regiao.CdRegiao = ParceiroComercial.CdRegiao
+
+	LEFT  JOIN DBCOR..TbFilial Filial
+    	ON Regiao.CdFilial = Filial.CdFilial
+
+	LEFT  JOIN DBCOR..TbColaborador ColaboradorN1
+		ON ColaboradorN1.CdColaborador = Filial.CdGerenteComercial
+
+    LEFT  JOIN DBCOR..TbColaborador ColaboradorN2
+    	ON ColaboradorN2.CdColaborador = Filial.CdGerenteRegional
+
+    LEFT  JOIN DBCOR..TbRepresentanteLegal RepresentanteLegal
+		ON RepresentanteLegal.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+    LEFT  JOIN DBCOR..TbSocio Socio
+    	ON Socio.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+			AND Socio .SqRepresentanteLegal = RepresentanteLegal.SqRepresentanteLegal
+
+    LEFT  JOIN DBCOR..TbPessoa Pessoa
+    	ON ParceiroComercial.CdPessoa = Pessoa.CdPessoa
+
+    LEFT  JOIN DBCOR..TbTipoParceiroComercial TipoParceiroComercial
+    	ON TipoParceiroComercial.CdTipoParceiroComercial = ParceiroComercial.CdTipoParceiroComercial
+
+    LEFT JOIN DBCOR..TbAtividFinancParcComercial AtividFinancParcComercial
+    	ON AtividFinancParcComercial.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+    LEFT JOIN DBCOR..TbAtividadeFinanciamento AtividadeFinanciamento
+    	ON AtividFinancParcComercial.CdAtividadeFinanciamento = AtividadeFinanciamento.CdAtividadeFinanciamento
+
+    LEFT JOIN DBCOR..TbFavorecidoAutorizado FavorecidoAutorizado
+    	ON FavorecidoAutorizado.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+    LEFT JOIN DBCOR..TbFavorecidoContaCorrente FavorecidoContaCorrente
+    	ON FavorecidoContaCorrente.CdParceiroComercial = FavorecidoAutorizado.CdParceiroComercial
+
+    LEFT JOIN DBCOR.dbo.TbParceiroSubProduto ParceiroSubProduto
+    ON ParceiroSubProduto.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+    LEFT JOIN DBCOR.dbo.TbSubProduto SubProduto
+    	ON SubProduto.CdSubProduto = ParceiroSubProduto.CdSubProduto
+
+WHERE  ParceiroComercial.FlAtivo = 'S'
+
+	AND ParceiroComercial.flconsignadoconvenio = 'N'
+	AND ParceiroComercial.CdTipoParceiroComercial in (5)
+	AND ParceiroComercial.FlParceiroVirtual = 'N'
+	AND AtividadeFinanciamento.cdatividadefinanciamento in (7)
+	AND FavorecidoContaCorrente.SqFavorecido = FavorecidoAutorizado.SqFavorecido
+	AND ParceiroSubProduto.FlAtivo = 's'
+	AND ParceiroSubProduto.CdSubProduto = 70
+
+ORDER BY ParceiroComercial.dtcadastro
+)
+
+;run;
+
+proc sql;
+CREATE TABLE TbCobansSolar as
+SELECT
+		 DATEPART (DtCadastroCoban) as DtCadastroCoban format date9.
+        ,RazaoSocialParceiro
+		,CNPJParceiro
+        ,Login
+		,StatusLogin
+        ,TipoParceiro
+		,NmAtividade
+        ,CdProduto
+        ,NmProduto
+        ,DATEPART (DtCadastroFavorecido) as DtCadastroFavorecido format date9.
+        ,RazaoSocialFavorecido
+		,CNPJFavorecido
+        ,NroBancoFavorecido
+		,NroAgenciaFavorecido
+        ,NroContaFavorecido
+		,StatusFavorecido
+        ,Principal
+		,Servico
+		,Comissao
+        ,Contrato
+		,AtivoComissao
+		,AtivoContrato
+        ,GerenteComercial
+        ,GerenteRegional
+        ,NmSocio
+        ,CPFSocio
+FROM TbCobansSolar_Aux
+;run;
+
+proc export
+data= TbCobansSolar
+file='/riscosbvf/BA/processos/output/TbCobansSolar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/output/TbCobansSolar.csv /riscosbvf/BA/processos/output/TbCobansSolar.csv';

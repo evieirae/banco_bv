@@ -1,0 +1,568 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Rodas__Campanha_SuperaBV-Solar__v2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -15
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 449
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: EXPORT, RANK, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CAMPSOL = /infogrc/Campanha_SuperaBV_Solar
+DETECTED_MACROS_DEFINED: Anomes
+DETECTED_MACROS_USED: Anomes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBESTRUTURACOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CAMPSOL
+IMPORTED FILES (Requires Ingestion): C:\Users\marcio.shiroma\OneDrive - Banco Votorantim S.A\Área de Trabalho\Envio de Arquivos\Supera BV - CS.xlsx[SHEET='Parceiros']
+TEMP/DISCARDED_FILE_INPUT: WORK.Supera BV _ CS <- C:\Users\marcio.shiroma\OneDrive - Banco Votorantim S.A\Área de Trabalho\Envio de Arquivos\Supera BV - CS.xlsx[SHEET='Parceiros']
+TABLE_READ_PROVENANCE (Flow): BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], CAMPSOL.BASE_SUPERABV_SOLAR [PROC EXPORT - DATA=], CAMPSOL.PART_CAMP_SUPERABV_SOLAR [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): CAMPSOL.BASE_SUPERABV_SOLAR, CAMPSOL.PART_CAMP_SUPERABV_SOLAR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CAMPSOL.BASE_SUPERABV_SOLAR, CAMPSOL.PART_CAMP_SUPERABV_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbSuperaBV_Solar.csv
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ACOMPANHAMENTO_CAMPANHA_G1E2, AGRUPA_BASE_SUPERABV_SOLAR, BASE_CAMPANHA_G1E2_FINAL, BASE_CAMPANHA_G1E2_REGRAS, BASE_CAMPANHA_G1E2_RKG, BASE_CAMPANHA_G1E2_RKG2, BASE_CAMPANHA_G3E4_FINAL, BASE_CAMPANHA_G3E4_REGRAS, BASE_CAMPANHA_G3E4_REGRAS_RKG, BASE_CAMPANHA_G3E4_REGRAS_RKG2, BASE_META_CAMPANHA_SOLAR, BASE_PDV_PARTICIPANTES, BASE_PRODUCAO_PDVS_G3E4, BASE_PRODUCAO_PDVS_NI, BASE_REAL_CAMPANHA_SOLAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET Anomes=202501;
+
+[[ FILE_REFS_MACRO ]]
+OUT|/riscosbvf/BA/processos/output/TbSuperaBV_Solar.csv|/RISCOSBVF/BA/PROCESSOS/OUTPUT|TBSUPERABV_SOLAR.CSV||ok
+IN|C:\Users\marcio.shiroma\OneDrive - Banco Votorantim S.A\Área de Trabalho\Envio de Arquivos\Supera BV - CS.xlsx[SHEET='Parceiros']|C:/USERS/MARCIO.SHIROMA/ONEDRIVE - BANCO VOTORANTIM S.A/ÁREA DE TRABALHO/ENVIO DE ARQUIVOS|SUPERA BV - CS.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Participantes Campanha */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Participantes Campanha */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-TsDzG1DIs6GKBj1s/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname CampSol '/infogrc/Campanha_SuperaBV_Solar';
+
+Proc Sql;
+Create Table CampSol.Part_Camp_SuperaBV_Solar as
+Select
+((YEAR(DataBase) * 100) + MONTH(DataBase)) as NuAnomes
+,INPUT(PUT(INTNX('MONTHS',DataBase,-3,'END'),YYMMN6.),6.) as Anomes_Ini_Prod
+,INPUT(PUT(INTNX('MONTHS',DataBase,-1,'END'),YYMMN6.),6.) as Anomes_Fim_Prod
+,Canal
+,Gerente
+,DsLoginN1
+,CdParceiroComercial
+,NmParceiroComercial
+,CNPJ
+,Ativo
+,DtCadastro
+,DataBase
+,Faixa_Efetivacao
+,Flag_Sub
+,Grupo
+,Campanha_Parceiro
+From WORK.'Supera BV _ CS'n
+;Quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Participantes Campanha */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Participantes e Metas e Real Grupo 1 e 2 */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Participantes e Metas e Real Grupo 1 e 2 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-sQLicyocpaTGhjQx/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname CampSol '/infogrc/Campanha_SuperaBV_Solar';
+%Let Anomes = 202501;
+
+
+Proc Sql;
+Create table Base_PDV_Participantes as
+Select Distinct
+NuAnomes
+,Anomes_Ini_Prod
+,Anomes_Fim_Prod
+,Canal
+,Gerente
+,DsLoginN1
+,CNPJ
+,DataBase
+,Faixa_Efetivacao
+,Grupo
+From CampSol.Part_Camp_SuperaBV_Solar;
+;quit;
+
+
+Proc Sql;
+Create table Base_Producao_PDVs_NI as
+Select Distinct
+Producao.NuAnoMes
+,Producao.NuCnpjLojaFavorecido
+,Producao.NmParceiroComercialFavorecido
+,Sum(Producao.VrProducao) as VrProducao
+,Sum(Producao.VrBvMais) as Premio_SPF
+,Sum(Producao.VrCAP) as Premio_CAP
+,Sum(Producao.VrPlacaSolar) as Premio_PlacaSolar
+,(Calculated Premio_SPF + Calculated Premio_CAP + Calculated Premio_PlacaSolar) as VrPremio_Seguros
+,Participantes.NuAnomes as NuAnomes_Campanha
+,Participantes.DsLoginN1
+,Participantes.Grupo
+,Case
+	When Producao.NuAnoMes Between Participantes.Anomes_Ini_Prod and Participantes.Anomes_Fim_Prod Then 1
+	Else 0
+ End as Producao_Trim
+
+,Case
+	When Producao.NuAnoMes = Participantes.NuAnomes Then Participantes.NuAnomes
+	Else 0
+ End as Real_Mes_Camp
+From tmp.TBPRODUCAO as Producao
+Inner join
+		(Select Distinct CNPJ, NuAnomes, Grupo, DsLoginn1, Anomes_Ini_Prod, Anomes_Fim_Prod From Base_PDV_Participantes) as Participantes
+ 	   	On Producao.NuCnpjLojaFavorecido = Participantes.CNPJ
+Where Producao.NuAnomes >= &Anomes. and Producao.NmGrupoProdutoMeta = 'Solar' and Producao.NmAreaEstruturaComercialC NE ''
+Group By 1,2,3,4,5
+;Quit;
+
+
+Proc Sql;
+Create Table Base_Meta_Campanha_Solar as
+Select
+NuAnomes_Campanha
+,Grupo
+,DsLoginN1
+,Sum(VrProducao) as VrProducao_Trim Format Commax12.2
+,Sum(VrProducao)/3 as Media_Producao_Trim Format Commax12.2
+,Case
+	When Calculated Media_Producao_Trim < 400000 Then 400000 Else Calculated Media_Producao_Trim
+End as Meta_Producao_Final Format Commax12.2
+,Sum(VrPremio_Seguros) as VrPremio_Seguros_Trim
+,Sum(VrPremio_Seguros) / Sum(VrProducao) as PenFin_Seguros Format Percent10.2
+,Case
+	When Sum(VrPremio_Seguros) / Sum(VrProducao) < 0.03 Then 0.03 Else Sum(VrPremio_Seguros) / Sum(VrProducao)
+End as PenFin_Seguros_Final Format Percent10.2
+
+From Base_Producao_PDVs_NI
+Where Producao_Trim = 1 and Grupo in ('Grupo 1', 'Grupo 2')
+Group by 1,2,3
+;Quit;
+
+
+Proc Sql;
+Create Table Base_Real_Campanha_Solar as
+Select
+NuAnomes_Campanha as NuAnomes
+,Grupo
+,DsLoginN1
+,Sum(VrProducao) as Real_Producao Format Commax12.2
+,Sum(VrPremio_Seguros) as Real_Premio Format Commax12.2
+,Sum(VrPremio_Seguros) / Sum(VrProducao) as PenFin_Seguros Format Percent10.2
+From Base_Producao_PDVs_NI
+Where NuAnomes_Campanha = Real_Mes_Camp and Grupo in ('Grupo 1', 'Grupo 2')
+Group by 1,2,3
+;Quit;
+
+
+Proc Sql;
+Create Table Acompanhamento_Campanha_G1e2 as
+Select Distinct
+Participantes.NuAnomes
+,Participantes.Canal
+,Participantes.Gerente
+,Participantes.DsLoginN1
+,Participantes.Grupo
+,Metas.Meta_Producao_Final
+,Metas.PenFin_Seguros_Final as PenFin_Meta
+,Real.Real_Producao
+,Real.PenFin_Seguros as PenFin_Real
+
+,Real.Real_Producao / Metas.Meta_Producao_Final as Perc_Ating_Producao Format Percent10.2
+,Real.PenFin_Seguros / Metas.PenFin_Seguros_Final as Perc_Ating_Seguros Format Percent10.2
+From CampSol.Part_Camp_SuperaBV_Solar as Participantes
+ Left Join Base_Meta_Campanha_Solar as Metas
+ 		On Participantes.NuAnomes = Metas.NuAnomes_Campanha and Participantes.DsLoginN1 = Metas.DsLoginN1
+
+	Left join Base_Real_Campanha_Solar as Real
+			On Participantes.NuAnomes = Real.NuANomes and Participantes.DsLoginN1 = Real.DsLoginN1
+
+Where Participantes.Grupo in ('Grupo 1', 'Grupo 2')
+;Quit;
+
+
+Proc Sql;
+Create Table Base_Campanha_G1e2_Regras as
+Select Distinct
+Participantes.NuAnomes
+,Participantes.Canal
+,Participantes.Gerente
+,Participantes.DsLoginN1
+,Participantes.Grupo
+,Metas.Meta_Producao_Final
+,Real.Real_Producao
+,Real.Real_Producao / Metas.Meta_Producao_Final as Perc_Ating_Producao Format Percent10.2
+,Case When (Calculated Perc_Ating_Producao - 1) > 0 Then Floor((Calculated Perc_Ating_Producao - 1)*100)/100 Else 0 End as Incremento_Prod Format Percent10.2
+,Case When Calculated Incremento_Prod >= 0.1 Then 'Sim' Else 'Não' End as Eleg_Comissao_Prod
+,Case When Calculated Incremento_Prod >= 0.15 Then 'Sim' Else 'Não' End as Eleg_Acelerador_Prod
+
+,Metas.PenFin_Seguros_Final as PenFin_Meta
+,Real.PenFin_Seguros as PenFin_Real
+,Real.PenFin_Seguros / Metas.PenFin_Seguros_Final as Perc_Ating_Seguros Format Percent10.2
+,Case When (Calculated Perc_Ating_Seguros - 1) > 0 Then Floor((Calculated Perc_Ating_Seguros - 1)*100)/100 Else 0 End as Incremento_Seg Format Percent10.2
+,Case When Calculated Incremento_Seg >= 0.1 Then 'Sim' Else 'Não' End as Eleg_Comissao_Seg
+
+
+
+,Case
+	When Calculated Eleg_Comissao_Prod = 'Sim' and Calculated Eleg_Acelerador_Prod = 'Não' Then (Calculated Incremento_Prod * 100) * 100
+	When Calculated Eleg_Comissao_Prod = 'Sim' and Calculated Eleg_Acelerador_Prod = 'Sim' Then (Calculated Incremento_Prod * 100) * 200
+	Else 0
+ End As Premio_Prod_Incremental
+
+
+
+,Case
+	When Calculated Eleg_Comissao_Seg = 'Sim' Then (Calculated Incremento_Seg * 50) * 100
+	Else 0
+ End As Premio_Seguro_Incremental
+
+,Calculated Incremento_Prod *100 as Total_Pontos format Commax10.
+
+From CampSol.Part_Camp_SuperaBV_Solar as Participantes
+ Left Join Base_Meta_Campanha_Solar as Metas
+ 		On Participantes.NuAnomes = Metas.NuAnomes_Campanha and Participantes.DsLoginN1 = Metas.DsLoginN1
+
+	Left join Base_Real_Campanha_Solar as Real
+			On Participantes.NuAnomes = Real.NuANomes and Participantes.DsLoginN1 = Real.DsLoginN1
+
+Where Participantes.Grupo in ('Grupo 1', 'Grupo 2')
+;Quit;
+
+
+PROC SORT DATA=Base_Campanha_G1e2_Regras OUT=Base_Campanha_G1e2_RKG;
+BY NuAnoMes Grupo DESCENDING Perc_Ating_Producao;
+;RUN;
+
+proc rank data=Base_Campanha_G1e2_RKG descending out=Base_Campanha_G1e2_RKG2 ties=dense;
+    var Perc_Ating_Producao;
+    ranks RKG_Pontos;
+    by NuAnoMes Grupo;
+run;
+
+
+Proc Sql;
+Create Table Base_Campanha_G1e2_Final as
+Select
+NuAnomes
+,Canal
+,Gerente
+,DsLoginN1
+,Grupo
+,Meta_Producao_Final
+,Real_Producao
+,Perc_Ating_Producao
+,Incremento_Prod
+,Eleg_Comissao_Prod
+,Eleg_Acelerador_Prod
+,PenFin_Meta
+,PenFin_Real
+,Perc_Ating_Seguros
+,Incremento_Seg
+,Eleg_Comissao_Seg
+
+,Premio_Prod_Incremental
+
+,Premio_Seguro_Incremental
+,Total_Pontos
+,RKG_Pontos
+,Case
+	When RKG_Pontos = 1 then 15
+	When RKG_Pontos = 2 then 13
+	When RKG_Pontos = 3 then 11
+	When RKG_Pontos = 4 then 9
+	When RKG_Pontos = 5 then 7
+	When RKG_Pontos = 6 then 5
+	When RKG_Pontos = 7 then 3
+	When RKG_Pontos >= 8 then 1
+	Else 0
+End as Milhas
+From Base_Campanha_G1e2_RKG2
+;Quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Participantes e Metas e Real Grupo 1 e 2 */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Participantes e Metas e Real Grupo 3 e 4 */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Participantes e Metas e Real Grupo 3 e 4 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-E8hfnaQORSgI2vkb/code.sas */
+/* =========================INÍCIO TASK========================= */
+Proc Sql;
+Create table Base_Producao_PDVs_G3e4 as
+Select Distinct
+Participantes.NuAnomes as NuAnomes_Campanha
+,Participantes.Canal
+,Participantes.DsLoginN1
+,Participantes.Gerente
+,Participantes.Grupo
+,Participantes.Faixa_Efetivacao
+,Producao.NuAnoMes
+,Producao.NuCnpjLojaFavorecido
+,Producao.NmParceiroComercialFavorecido
+,Sum(Producao.VrProducao) as VrProducao
+,Count(NuContrato) as Qt_Contratos
+,Sum(Producao.FlBvMais) as Qt_SPF
+,Sum(Producao.FlCAP) as Qt_AP
+,Sum(Producao.FlPlacaSolar) as Qt_PlacaSolar
+,Calculated Qt_SPF + Calculated Qt_AP + Calculated Qt_PlacaSolar as Qt_Seguros
+,Case
+	When Participantes.Faixa_Efetivacao = '1 a 2 meses sem efetivar' and  Calculated Qt_Contratos < 3 Then Calculated Qt_Contratos * 100
+	When Participantes.Faixa_Efetivacao = '1 a 2 meses sem efetivar' and Calculated Qt_Contratos >= 3 Then Calculated Qt_Contratos * 150
+
+	When Participantes.Faixa_Efetivacao = '3 a 4 meses sem efetivar' and  Calculated Qt_Contratos < 3 Then Calculated Qt_Contratos * 250
+	When Participantes.Faixa_Efetivacao = '3 a 4 meses sem efetivar' and Calculated Qt_Contratos >= 3 Then Calculated Qt_Contratos * 350
+
+	When Participantes.Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' and Calculated Qt_Contratos < 3 Then Calculated Qt_Contratos * 250
+	When Participantes.Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' and Calculated Qt_Contratos >= 3 Then Calculated Qt_Contratos * 350
+	Else 0
+End as Premio_Contratos
+
+,Case
+	When Participantes.Faixa_Efetivacao = '1 a 2 meses sem efetivar' and Calculated Qt_Seguros > 0 Then Calculated Qt_Seguros * 25
+	When Participantes.Faixa_Efetivacao = '3 a 4 meses sem efetivar' and Calculated Qt_Seguros > 0 Then Calculated Qt_Seguros * 50
+	When Participantes.Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' and Calculated Qt_Seguros > 0 Then Calculated Qt_Seguros * 50
+	Else 0
+End as Premio_Seguros
+
+From Base_PDV_Participantes as Participantes
+Inner join tmp.TBPRODUCAO as Producao
+ 	   	On Producao.NuCnpjLojaFavorecido = Participantes.CNPJ and Participantes.NuAnomes = Producao.NuAnomes
+Where Producao.NmGrupoProdutoMeta = 'Solar' and Participantes.Grupo in ('Grupo 3', 'Grupo 4')
+Group By 1,2,3,4,5,6,7,8,9
+;Quit;
+
+
+Proc Sql;
+Create Table Base_Campanha_G3e4_Regras as
+Select Distinct
+NuAnomes
+,Canal
+,Gerente
+,DsLoginN1
+,Grupo
+,Sum(Qt_Contratos) as Qt_Contratos
+,Sum(Qt_Seguros) as Qt_Seguros
+,Sum(Premio_Contratos) as Premio_Contratos
+,Sum(Premio_Seguros) as Premio_Seguros
+
+,Sum(
+		Case
+		 When Faixa_Efetivacao = '1 a 2 meses sem efetivar' Then Qt_Contratos * 1
+		 When Faixa_Efetivacao = '3 a 4 meses sem efetivar' Then Qt_Contratos * 3
+		 When Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' Then Qt_Contratos * 3
+		 Else 0
+
+End) as Total_Pontos
+From Base_Producao_PDVs_G3e4
+Group by 1,2,3,4
+;Quit;
+
+
+PROC SORT DATA=Base_Campanha_G3e4_Regras OUT=Base_Campanha_G3e4_Regras_RKG;
+BY NuAnoMes Grupo DESCENDING Total_Pontos;
+;RUN;
+
+proc rank data=Base_Campanha_G3e4_Regras_RKG descending out=Base_Campanha_G3e4_Regras_RKG2 ties=dense;
+    var Total_Pontos;
+    ranks RKG_Pontos;
+    by NuAnoMes Grupo;
+run;
+
+
+Proc Sql;
+Create Table Base_Campanha_G3e4_Final as
+Select
+NuAnomes
+,Canal
+,Gerente
+,DsLoginN1
+,Grupo
+,Qt_Contratos
+,Qt_Seguros
+,Premio_Contratos
+,Premio_Seguros
+,Total_Pontos
+,RKG_Pontos
+,Case
+	When RKG_Pontos = 1 then 15
+	When RKG_Pontos = 2 then 13
+	When RKG_Pontos = 3 then 11
+	When RKG_Pontos = 4 then 9
+	When RKG_Pontos = 5 then 7
+	When RKG_Pontos = 6 then 5
+	When RKG_Pontos = 7 then 3
+	When RKG_Pontos >= 8 then 1
+	Else 0
+End as Milhas
+
+From Base_Campanha_G3e4_Regras_RKG2
+;Quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Participantes e Metas e Real Grupo 3 e 4 */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Base_Campanha_Final */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 20 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Base_Campanha_Final */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1Q8lyMQkXTtSor2B/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname CampSol '/infogrc/Campanha_SuperaBV_Solar';
+
+Data Agrupa_Base_SuperaBV_Solar;
+Set Base_Campanha_G1e2_Final
+	Base_Campanha_G3e4_Final
+;Run;
+
+Proc Sql;
+Create table CampSol.Base_SuperaBV_Solar as
+Select
+Supera.NuAnomes
+,Estrutura.NmCanalEstruturaComercial
+,Supera.Canal as NmAreaEstruturaComercial
+,Supera.Gerente as NmColaborador
+,Supera.DsLoginN1
+,Estrutura.DsLoginN2A
+,Supera.Grupo
+,Coalesce(Supera.Meta_Producao_Final,0) as Meta_Producao_Final Format COMMAX12.2
+,Coalesce(Supera.Real_Producao,0) as Real_Producao Format COMMAX12.2
+,Coalesce(Supera.Perc_Ating_Producao,0) as Perc_Ating_Producao Format COMMAX12.5
+,Coalesce(Supera.Incremento_Prod,0) as Incremento_Prod Format COMMAX12.5
+,Supera.Eleg_Comissao_Prod
+,Supera.Eleg_Acelerador_Prod
+,Coalesce(Supera.PenFin_Meta,0) as PenFin_Meta Format COMMAX12.5
+,Coalesce(Supera.PenFin_Real,0) as PenFin_Real Format COMMAX12.5
+,Coalesce(Supera.Perc_Ating_Seguros,0) as Perc_Ating_Seguros Format COMMAX12.5
+,Coalesce(Supera.Incremento_Seg,0) as Incremento_Seg Format COMMAX12.5
+,Supera.Eleg_Comissao_Seg
+,Coalesce(Supera.Premio_Prod_Incremental,0) as Premio_Prod_Incremental Format COMMAX12.2
+,Coalesce(Supera.Premio_Seguro_Incremental,0) as Premio_Seguro_Incremental Format COMMAX12.2
+,Coalesce(Supera.Total_Pontos,0) as Total_Pontos Format COMMAX12.2
+,Coalesce(Supera.RKG_Pontos,0) as RKG_Pontos Format COMMAX12.2
+,Coalesce(Supera.Milhas,0) as Milhas Format COMMAX12.2
+,Coalesce(Supera.Qt_Contratos,0) as Qt_Contratos Format COMMAX12.2
+,Coalesce(Supera.Qt_Seguros,0) as Qt_Seguros Format COMMAX12.2
+,Coalesce(Supera.Premio_Contratos,0) as Premio_Contratos Format COMMAX12.2
+,Coalesce(Supera.Premio_Seguros,0) as Premio_Seguros Format COMMAX12.2
+
+From Agrupa_Base_SuperaBV_Solar as Supera
+	Left join Bases.TbEstruturaComercial as Estrutura
+		On Supera.DsLoginN1 = Estrutura.DsLoginN1 and Supera.NuAnomes = Estrutura.NuAnomes
+;quit;
+
+proc export
+data=CampSol.Base_SuperaBV_Solar
+file='/riscosbvf/BA/processos/output/TbSuperaBV_Solar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Base_Campanha_Final */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+Proc Sql;
+Create table CampSol.Base_SuperaBV_Solar as
+Select
+Supera.NuAnomes
+,Estrutura.NmCanalEstruturaComercial
+,Supera.Canal as NmAreaEstruturaComercial
+,Supera.Gerente as NmColaborador
+,Supera.DsLoginN1
+,Estrutura.DsLoginN2A
+,Supera.Grupo
+,Coalesce(Supera.Meta_Producao_Final,0) as Meta_Producao_Final Format COMMAX12.2
+,Coalesce(Supera.Real_Producao,0) as Real_Producao Format COMMAX12.2
+,Coalesce(Supera.Perc_Ating_Producao,0) as Perc_Ating_Producao Format COMMAX12.5
+,Coalesce(Supera.Incremento_Prod,0) as Incremento_Prod Format COMMAX12.5
+,Supera.Eleg_Comissao_Prod
+,Supera.Eleg_Acelerador_Prod
+,Coalesce(Supera.PenFin_Meta,0) as PenFin_Meta Format COMMAX12.5
+,Coalesce(Supera.PenFin_Real,0) as PenFin_Real Format COMMAX12.5
+,Coalesce(Supera.Perc_Ating_Seguros,0) as Perc_Ating_Seguros Format COMMAX12.5
+,Coalesce(Supera.Incremento_Seg,0) as Incremento_Seg Format COMMAX12.5
+,Supera.Eleg_Comissao_Seg
+,Coalesce(Supera.Premio_Prod_Incremental,0) as Premio_Prod_Incremental Format COMMAX12.2
+,Coalesce(Supera.Premio_Seguro_Incremental,0) as Premio_Seguro_Incremental Format COMMAX12.2
+,Coalesce(Supera.Total_Pontos,0) as Total_Pontos Format COMMAX12.2
+,Coalesce(Supera.RKG_Pontos,0) as RKG_Pontos Format COMMAX12.2
+,Coalesce(Supera.Milhas,0) as Milhas Format COMMAX12.2
+,Coalesce(Supera.Qt_Contratos,0) as Qt_Contratos Format COMMAX12.2
+,Coalesce(Supera.Qt_Seguros,0) as Qt_Seguros Format COMMAX12.2
+,Coalesce(Supera.Premio_Contratos,0) as Premio_Contratos Format COMMAX12.2
+,Coalesce(Supera.Premio_Seguros,0) as Premio_Seguros Format COMMAX12.2
+
+From Agrupa_Base_SuperaBV_Solar as Supera
+	Left join Bases.TbEstruturaComercial as Estrutura
+		On Supera.DsLoginN1 = Estrutura.DsLoginN1 and Supera.NuAnomes = Estrutura.NuAnomes
+;quit;
+
+proc export
+data=CampSol.Base_SuperaBV_Solar
+file='/riscosbvf/BA/processos/output/TbSuperaBV_Solar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

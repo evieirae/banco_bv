@@ -1,0 +1,108 @@
+START_METADATA
+PROJECT: Rodas__Incentivo_Comercial_Bateu_Levou_Solar
+FILE_SAS: 02 - Comissao MC Direta.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 45
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ICOMS = /infogrc/Incentivo_Comercial/Solar; ICOMSBKP = /infogrc/Incentivo_Comercial/Solar/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: AnoMes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBGRINCENTIVO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: ICOMS, ICOMSBKP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRINCENTIVO [PROC SQL - JOIN], ICOMS.TBGRCOMISSAODIRETA_SOLAR [DATA Step - SET], TMP.TBPRODUCAO [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): ICOMS.TBGRCOMISSAODIRETA_SOLAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): ICOMS.TBGRCOMISSAODIRETA_SOLAR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ICOMS.TBGRCOMISSAODIRETA_SOLAR, ICOMSBKP.TBGRCOMISSAODIRETA_BKP_&ANOMES
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PRODUCAO, BASE_PRODUCAO_01
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME ICOMS '/infogrc/Incentivo_Comercial/Solar';
+LIBNAME ICOMSBKP '/infogrc/Incentivo_Comercial/Solar/Bases_BKP';
+
+DATA BASE_PRODUCAO;
+SET TMP.TBPRODUCAO;
+WHERE
+NUANOMES >= 202503
+and NmGrupoCargoColaborador IN ('Gerente Relacionamento Solar')
+AND NmGrupoProdutoMeta = "Solar"
+;run;
+
+PROC SQL;
+CREATE TABLE BASE_PRODUCAO_01 AS
+SELECT
+
+A.NuAnoMes,
+B.NmCanalEstruturaComercial,
+B.NmEstruturaComercialA,
+B.NmSubEstruturaComercialA,
+B.NmAreaEstruturaComercial,
+B.LstSubstituicao,
+B.LstColaboradorFocal,
+B.DsLoginN3A,
+CASE WHEN B.DsLoginN2A = '' THEN 'cadeira.vazia' ELSE B.DsLoginN2A END AS DsLoginN2A,
+
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+
+SUM(CASE WHEN A.nmgrupoprodutometa IN ('Solar') THEN a.VrMargemContribuicao ELSE 0 END) as VrMargemContribuicao format commax20.2,
+
+(0.03) AS PcComissaoDiretaMC format percent9.0,
+calculated VrMargemContribuicao * calculated PcComissaoDiretaMC as VrComissaoDiretaGR format commax20.2
+
+FROM BASE_PRODUCAO A
+
+LEFT JOIN BASEGRC.TBGRINCENTIVO B ON B.DsLoginN1 = A.DsLoginN1 AND B.NUANOMES = A.NUANOMES
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12
+order by 1,5,12
+
+;run;
+
+/*******************************/
+/*FAZ BKP DA ÚLTIMA BASE VALIDA*/
+/*******************************/
+DATA ICOMSBKP.TBGRCOMISSAODIRETA_BKP_&AnoMes.;
+SET ICOMS.TBGRCOMISSAODIRETA_SOLAR
+;RUN;
+/******************/
+/*SALVA BASE FINAL*/
+/******************/
+
+DATA ICOMS.TBGRCOMISSAODIRETA_SOLAR;
+	SET BASE_PRODUCAO_01
+;RUN;

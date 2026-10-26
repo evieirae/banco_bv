@@ -1,0 +1,170 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_Pilto_AgenteVirtual
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:00 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 103
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ATIVA = /riscosbv/cobranca/erocha/ATIVA/TABLEAU
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): ATIVA.BASE_ATIVA_202510 [SAS/Local], BV-PDBD-PRD.DVRY_CORP_COBRANCA.CARTEIRAGOE_COBRANCA_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_PILOTO_ATIVA_AV
+IMPORTED_LIBNAMES: ATIVA
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ATIVA_AV, WORK.BASE_PILOTO_ATIVA_AV
+TABLE_READ_PROVENANCE (Flow): ATIVA.BASE_ATIVA_202510 [PROC SQL - FROM], BV-PDBD-PRD.DVRY_CORP_COBRANCA.CARTEIRAGOE_COBRANCA_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], WORK.BASE_ATIVA_AV [PROC SQL - FROM], WORK.BASE_PILOTO_ATIVA_AV [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PILOTO_ATIVA_AV, CART_FX_ATIVA_RN, WORK.QUERY_FOR_BASE_ATIVA_AV, WORK.QUERY_FOR_BASE_PILOTO_ATIVA_AV
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: BASE_PILOTO_AV_RN */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BASE_PILOTO_AV_RN */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-u4QoLGGayktL77Ed/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME ATIVA '/riscosbv/cobranca/erocha/ATIVA/TABLEAU';
+
+
+
+
+
+PROC SQL;
+CREATE TABLE BASE_PILOTO_ATIVA_AV AS
+SELECT NUCONTRATO
+    , PUT(NR_CPFCNPJ,Z14.) AS CPF
+	, NR_CPFCNPJ AS CPF_2
+	, RISCO_ENVIO
+	, CD_ASSESSORIA
+	, ASSESSORIA
+	, DSGRUPO_2
+	, CASE
+          WHEN RISCO_ENVIO <=5000 THEN 'A.ATE 5K'
+		  WHEN RISCO_ENVIO <=10000 THEN 'B.ATE 10K'
+		  WHEN RISCO_ENVIO <=15000 THEN 'C.ATE 15K'
+		  WHEN RISCO_ENVIO <=20000 THEN 'D.ATE 20K'
+		  WHEN RISCO_ENVIO <=25000 THEN 'E.ATE 25K'
+		  WHEN RISCO_ENVIO <=30000 THEN 'F.ATE 30K'
+		  WHEN RISCO_ENVIO <=35000 THEN 'G.ATE 35K'
+		  ELSE 'H.MAIOR35K'
+		  END AS FX_RISCO
+FROM ATIVA.BASE_ATIVA_202510
+WHERE CD_ASSESSORIA = 2065
+AND DSGRUPO_2 = 'PREDITIVO'
+;QUIT;
+
+
+
+proc sql;
+    connect to bigquery as perm (
+        project='bv-sadi-dtm'
+        credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+        schema='bv-pdbd-prd'
+        READ_MODE=storage
+    );
+
+    create table CART_FX_ATIVA_RN as
+    select * from connection to perm (
+        SELECT
+            CD_CONTRATO AS NUCONTRATOGESTAO,
+			cd_cpf_cnpj,
+            CD_ASSESSORIA AS COD_ASSES,
+            DT_CRIACAO_BASE AS DTPROCESSAMENTO,
+            QT_DIAS_ATRASO AS ATRASO,
+			vr_risco_contrato AS RISCO
+
+        FROM bv-pdbd-prd.dvry_corp_cobranca.carteiragoe_cobranca_fato
+        WHERE SUBSTR(CD_CONTRATO,1,2) IN ('12','14')
+        AND DT_CRIACAO_BASE IN ( DATE '2025-10-01')
+		AND CD_ASSESSORIA = '2065'
+    );
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BASE_PILOTO_AV_RN */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ATIVA_AV);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ATIVA_AV AS
+   SELECT t1.DSGRUPO_2,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO
+      FROM WORK.BASE_ATIVA_AV t1
+      GROUP BY t1.DSGRUPO_2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_PILOTO_ATIVA_AV);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_PILOTO_ATIVA_AV AS
+   SELECT t1.FX_RISCO,
+          
+            (COUNT(t1.NUCONTRATO)) AS QTD
+      FROM WORK.BASE_PILOTO_ATIVA_AV t1
+      GROUP BY t1.FX_RISCO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

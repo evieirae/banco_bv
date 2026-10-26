@@ -1,0 +1,97 @@
+START_METADATA
+PROJECT: Rodas__super_trunfo
+FILE_SAS: 01 - Dados Simulacao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 43
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/libname.sas
+TABLE_READ_PROVENANCE (Flow): CONVSIMU.TBSIMULACOES [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SIMULACAO, BASE_SIMULACAO_01, SCORE_ULTIMASIMU_01
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/libname.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/libname.sas';
+
+PROC SQL;
+CREATE TABLE BASE_SIMULACAO_01 AS
+  SELECT
+    *,
+	CASE WHEN LOWER(Produto) LIKE '%leves%' THEN 'Leves'
+	     WHEN LOWER(Produto) LIKE '%pesados%' THEN 'Pesados'
+		 WHEN Produto = 'Motos' THEN 'Motos'
+	END AS ProdutoAjuste,
+	CASE WHEN COALESCE(FxIdade) = 'Acima 10 anos' THEN 'Acima de 10 anos' ELSE COALESCE(FxIdade) END AS FaixaIdade,
+	CASE WHEN FlPropostaEfetivada = 1 THEN 1
+	     WHEN StatusSimulacao = 'Proposta APNP' THEN 2
+		 WHEN StatusSimulacao = 'Proposta negada' THEN 3
+		 WHEN StatusSimulacao = 'Card sem proposta originada' THEN 4
+		 WHEN StatusSimulacao = 'Simulação sem card' THEN 5
+    ELSE 6 END AS Prioridade
+  FROM CONVSIMU.tbsimulacoes
+  WHERE
+    calculated ProdutoAjuste IS NOT NULL
+    AND SistemaInicial IN ('PPAR', 'ACOM', 'APAR')
+	AND FlCard = 1
+  ORDER BY
+    NuAnoMes,
+    NuCpfCnpj,
+	CdParceiroComercial,
+    calculated Prioridade,
+	NuProposta DESC,
+	DtSimulacaoFinal DESC;
+RUN;
+
+PROC SORT DATA=BASE_SIMULACAO_01 OUT=SCORE_ULTIMASIMU_01 NODUPKEY;
+  BY NuAnoMes NuCpfCnpj CdParceiroComercial ProdutoAjuste;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_SIMULACAO AS
+  SELECT
+    NuAnoMes,
+	CdParceiroComercial,
+	ProdutoAjuste AS Produto,
+	FaixaIdade,
+	COUNT(DISTINCT NuCpfCnpj) AS QtdSimulacoes
+  FROM SCORE_ULTIMASIMU_01
+  GROUP BY 1,2,3,4;
+RUN;

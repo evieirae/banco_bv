@@ -1,0 +1,224 @@
+START_METADATA
+PROJECT: Rodas__campanha_MissaoBV
+FILE_SAS: 05 - TbEstruturaComercial.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -63
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 138
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CMBV = /infogrc/Campanha_MissaoBV; CMBV_BKP = /infogrc/Campanha_MissaoBV/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_FOCAL, WORK.ESTRUTURA_COMERCIAL, WORK.ESTRUTURA_COMERCIAL_01, WORK.TBBASECOLABORADOR
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CMBV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_FOCAL, WORK.ESTRUTURA_COMERCIAL, WORK.ESTRUTURA_COMERCIAL_01, WORK.ESTRUTURA_COMERCIAL_01_A, WORK.ESTRUTURA_COMERCIAL_02, WORK.ESTRUTURA_COMERCIAL_03, WORK.TBBASECOLABORADOR
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [DATA Step - SET], BASES.TBESTRUTURACOMERCIAL [DATA Step - SET], CMBV.TBBASECOLABORADOR [PROC SQL - JOIN], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [Pass-Through Native (DBCON) - FROM], WORK.BASE_FOCAL [PROC SQL - JOIN], WORK.ESTRUTURA_COMERCIAL [PROC SQL - FROM], WORK.ESTRUTURA_COMERCIAL_01 [DATA Step - SET], WORK.ESTRUTURA_COMERCIAL_01_A [DATA Step - SET; PROC SORT - DATA=; PROC SQL - FROM], WORK.ESTRUTURA_COMERCIAL_02 [PROC SORT - DATA=], WORK.ESTRUTURA_COMERCIAL_03 [DATA Step - SET; PROC SQL - FROM], WORK.TBBASECOLABORADOR [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): CMBV.TBBASECOLABORADOR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CMBV.TBBASECOLABORADOR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CMBV.BASE_ESTRUTURA_DASH, CMBV.ESTRUTURA_COMERCIAL, CMBV.TBBASECOLABORADOR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_FOCAL, ESTRUTURA_COMERCIAL, ESTRUTURA_COMERCIAL_01, TBBASECOLABORADOR, WORK.ESTRUTURA_COMERCIAL_01_A, WORK.ESTRUTURA_COMERCIAL_02, WORK.ESTRUTURA_COMERCIAL_03
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CMBV '/infogrc/Campanha_MissaoBV';
+LIBNAME CMBV_BKP '/infogrc/Campanha_MissaoBV/Bases_BKP';
+
+/*****************************************/
+/*TABELA COM DATA DE ADMISSAO COLABORADOR*/
+/*****************************************/
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+CREATE TABLE TbBaseColaborador AS
+SELECT
+	NmSubEstruturaComercial
+	,NmAreaEstruturaComercial
+	,CdColaborador
+	,NmColaborador
+	,DsLogin
+	/*,DsEmail*/
+	,NmCargoColaborador
+	,CdEstadoColaborador
+	,NmEstadoColaborador
+	,DtAdmissaoColaborador
+	,DtDesligamentoColaborador
+	,DATEPART(DtDesligamentoColaborador) as DtDesligamentoColaborador2 FORMAT DATE9.
+
+FROM connection to dbcon
+	(
+		SELECT * FROM DWBI_DIME.TbDimHierarquiaComercial HierarquiaComercial
+		WHERE today() BETWEEN HierarquiaComercial.DtInicioVigencia AND HierarquiaComercial.DtFimVigencia
+		AND YEAR(HierarquiaComercial.DtInicioVigencia) BETWEEN YEAR(today())-1 AND YEAR(today())
+/*		AND YEAR(DtDesligamentoColaborador) BETWEEN YEAR(today())-1 AND YEAR(today())*/
+/*		AND CdEstruturaComercial = 8 and HierarquiaComercial.CdEstadoColaborador = 5 EM ATIVIDADE NORMAL*/
+		and NmCargoColaborador in ('Gerente Relacionamento Veículos', 'Gerente Relacionamento Pesados',
+		'Gerente Relacionamento Motos', 'Gerente Relac Canal Negócios')
+
+		ORDER BY DtDesligamentoColaborador desc
+	)
+
+/*where dslogin = 'aarao.souza'*/
+
+;run;
+quit;
+
+DATA CMBV.TbBaseColaborador;
+SET WORK.TbBaseColaborador;
+;RUN;
+
+/***************************/
+/*MONTA ESTRUTURA COMERCIAL*/
+/***************************/
+
+DATA ESTRUTURA_COMERCIAL;
+SET BASES.TBESTRUTURACOMERCIAL;
+WHERE NUANOMES BETWEEN 202510 AND 202512 and NmCanalEstruturaComercial in ('Canal Veiculos', 'Canal Negocios') and dsloginn1 <> ''
+;RUN;
+
+DATA BASE_FOCAL;
+SET BASEGRC.TBCOLABORADORFOCAL;
+WHERE NmGrupoProdutoMeta = 'Leves';
+;run;
+
+PROC SQL;
+CREATE TABLE ESTRUTURA_COMERCIAL_01 AS
+SELECT
+
+A.NUANOMES,
+A.NMCANALESTRUTURACOMERCIAL,
+A.NmSubEstruturaComercialH,
+A.NmSubEstruturaComercialA,
+a.NmAreaEstruturaComercial,
+A.LstSubstituicao,
+b.LstColaboradorFocal,
+A.DsLoginN3H,
+A.DSLOGINN3A,
+A.DsLoginN2H,
+A.DSLOGINN2A,
+A.DSLOGINN1,
+A.NmColaborador,
+C.DtAdmissaoColaborador,
+C.NmEstadoColaborador,
+a.IdMatricula,
+a.CdColaboradorAtivo,
+a.NmGrupoCargo
+
+FROM WORK.ESTRUTURA_COMERCIAL A
+
+LEFT JOIN work.BASE_FOCAL as b
+		ON  a.CdFilial = b.CdFilial
+
+LEFT JOIN CMBV.TbBaseColaborador C ON C.DsLogin = A.DSLOGINN1
+
+ORDER BY A.NmAreaEstruturaComercial
+
+;RUN;
+
+DATA WORK.ESTRUTURA_COMERCIAL_01_A;
+SET WORK.ESTRUTURA_COMERCIAL_01;
+WHERE NmEstadoColaborador IN ('Em Atividade Normal', 'Gozando Férias');
+;RUN;
+
+/***************************************************************************/
+/*DELETA UM CASO DE UM COLABORADOR TERCEIRO QUE ESTA CONSTANDO NA ESTRUTURA*/
+/***************************************************************************/
+
+PROC SQL;
+DELETE FROM WORK.ESTRUTURA_COMERCIAL_01_A
+WHERE dsloginn1 = 'marcelo.kaminski';
+;RUN;
+
+/*************************************/
+/*15/12/2025 - AJUSTA O HC DE PESADOS*/
+/*************************************/
+
+PROC SQL;
+DELETE FROM WORK.ESTRUTURA_COMERCIAL_01_A
+WHERE NmAreaEstruturaComercial = 'Canal Pesados' and dsloginn1 in ('clarice.jasckovski', 'geraldo.morosino', 'mauro.andrade');
+;RUN;
+
+PROC SQL;
+DELETE FROM WORK.ESTRUTURA_COMERCIAL_01_A
+WHERE NmAreaEstruturaComercial = 'Canal Morumbi' and dsloginn1 in ('thiago.medeiros1');
+;RUN;
+
+PROC SQL;
+DELETE FROM WORK.ESTRUTURA_COMERCIAL_01_A
+WHERE NmAreaEstruturaComercial = 'Canal Fortaleza' and dsloginn1 in ('aleandra.branco') and nuanomes = 202510; /*COLABORADORA EM AUXILIO DOENÇA*/
+;RUN;
+
+PROC SQL;
+DELETE FROM WORK.ESTRUTURA_COMERCIAL_01_A
+WHERE NmAreaEstruturaComercial = 'Canal Sorocaba' and dsloginn1 in ('andrea.salgado');
+;RUN;
+
+/********************/
+/*SALVA A BASE TOTAL*/
+/********************/
+
+DATA CMBV.ESTRUTURA_COMERCIAL;
+SET WORK.ESTRUTURA_COMERCIAL_01_A;
+;RUN;
+
+/*****************************************************************************************************************/
+/*SALVA UMA BASE PARA UTILIZAR NO POWERBI, ONDE O COLABORADOR APARECE APENAS 1 VEZ DURANTE A VIGÊNCIA DA CAMPANHA*/
+/*UTILIZAMOS PARA SER O PONTO DE PARTIDA DO DASH + OS DADOS PARA APLICAR O RLS*/
+/*****************************************************************************************************************/
+
+PROC SORT DATA=WORK.ESTRUTURA_COMERCIAL_01_A OUT=WORK.ESTRUTURA_COMERCIAL_02;BY DsLoginN1 DESCENDING NuAnoMes ;RUN;
+PROC SORT DATA=WORK.ESTRUTURA_COMERCIAL_02 OUT=WORK.ESTRUTURA_COMERCIAL_03 NODUPKEY;BY DsLoginN1;RUN;
+
+/*****************************************************************************************************************************************************************/
+/*DELETA UM CASO DE UM COLABORADOR DE CN V -  GR EXCLUSIVO DO PRODUTO CRÉDITO TRABALHADOR E NAO DEVE CONSTAR NO HC DA GF GISELLE CHASTEL*/
+/*****************************************************************************************************************************************************************/
+
+PROC SQL;
+DELETE FROM WORK.ESTRUTURA_COMERCIAL_03
+WHERE dsloginn1 = 'jose.cavalcanti1';
+;RUN;
+
+/************************************************************************************************************************************************************************/
+/*01/12/2025 - GFM*/
+/*DELETA UM CASO DE UM COLABORADOR DE CANAL PESADOS QUE FOI CONTRATADO NO FINAL DE NOVEMBRO E NÃO DEVE CONSIDERAR NA BASE DE HIERARQUIA - ALINHADO ANDERSON E GF ROBERTO*/
+/************************************************************************************************************************************************************************/
+
+PROC SQL;
+DELETE FROM WORK.ESTRUTURA_COMERCIAL_03
+WHERE dsloginn1 = 'mauro.andrade' and NuAnoMes = 202511;
+;RUN;
+
+DATA CMBV.BASE_ESTRUTURA_DASH;
+SET WORK.ESTRUTURA_COMERCIAL_03;
+;RUN;

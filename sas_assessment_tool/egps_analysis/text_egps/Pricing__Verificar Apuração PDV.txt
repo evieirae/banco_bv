@@ -1,0 +1,165 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Pricing__Verificar Apuração PDV
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:15 UTC
+BUSINESS_AREA: Pricing
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 107
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: DESDOBRO = /infogrc/desdobro_rodas/bases/; PROJETOS = /projetos/MISV/data/bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DESDOBRO.CONTRATO_DESDOBRO [SAS/Local], PROJETOS.TBPARCEIROCOMERCIAL [SAS/Local], PROJETOS.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DESDOBRO, PROJETOS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): DESDOBRO.CONTRATO_DESDOBRO [PROC SQL - JOIN], PROJETOS.TBPARCEIROCOMERCIAL [PROC SQL - FROM], PROJETOS.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CDPARCEIROCNPJ, PARCEIRO, PRODUCAOPDV
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Analitico - Verificar Apuração BV Compensa */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Analitico - Verificar Apuração BV Compensa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-mQ6QIfJIjtihwqAS/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME DESDOBRO '/infogrc/desdobro_rodas/bases/';
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+
+PROC SQL;
+CREATE TABLE ProducaoPDV AS
+SELECT
+A.NuProposta,
+A.NuContrato,
+A.NmSubEstruturaComercialC,
+A.DtContrato,
+A.DtLiquidacaoEfetiva,
+A.DtCancelamento,
+A.CdParceiroComercial,
+A.DsTipoCanalProducao,
+A.NmGrupoProdutoMeta,
+A.FlBVMais,
+SUM (A.VrProducao) AS Vroducao,
+SUM (B.VrLiberado) AS Desdobro,
+SUM (A.VrComissaoTotal) AS Comissao
+
+FROM PROJETOS.TBPRODUCAO AS A
+LEFT JOIN DESDOBRO.CONTRATO_DESDOBRO AS B ON A.NuContrato = B.NuContrato
+WHERE A.DtContrato >= '01Feb2026'D AND A.DtContrato <= '28Feb2026'D AND A.CdParceiroComercial in (476825)
+GROUP BY 1,2,3,4,5,6,7,8,9,10;RUN;
+
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+PROC SQL;
+Create table CdParceiroCNPJ as
+select
+CdParceiroComercial,
+NuCnpjLoja
+from projetos.TBPARCEIROCOMERCIAL as a
+WHERE
+CdParceiroComercial in (396320)
+
+AND FlAtivo = "S"
+
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Analitico - Verificar Apuração BV Compensa */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-lLdTqvbwSJP2hJlu/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+PROC SQL;
+Create table PARCEIRO as
+select
+CdParceiroComercial,
+NmParceiroComercial,
+NmAreaEstruturaComercialC,
+NmSubEstruturaComercialC,
+DsLoginN1C,
+NuCnpjLoja
+from projetos.TBPARCEIROCOMERCIAL as a
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME DESDOBRO '/infogrc/desdobro_rodas/bases/';
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+
+PROC SQL;
+CREATE TABLE ProducaoPDV AS
+SELECT
+A.NuProposta,
+A.NuContrato,
+A.NmSubEstruturaComercialC,
+A.DtContrato,
+A.DtLiquidacaoEfetiva,
+A.DtCancelamento,
+A.CdParceiroComercial,
+A.DsTipoCanalProducao,
+A.NmGrupoProdutoMeta,
+A.FlBVMais,
+SUM (A.VrProducao) AS Vroducao,
+SUM (B.VrLiberado) AS Desdobro,
+SUM (A.VrComissaoTotal) AS Comissao
+
+FROM PROJETOS.TBPRODUCAO AS A
+LEFT JOIN DESDOBRO.CONTRATO_DESDOBRO AS B ON A.NuContrato = B.NuContrato
+WHERE A.DtContrato >= '01Feb2026'D AND A.DtContrato <= '28Feb2026'D AND A.CdParceiroComercial in (476825)
+GROUP BY 1,2,3,4,5,6,7,8,9,10;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

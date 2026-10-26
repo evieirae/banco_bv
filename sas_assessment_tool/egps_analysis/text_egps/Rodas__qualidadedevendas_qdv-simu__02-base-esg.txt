@@ -1,0 +1,121 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-simu
+FILE_SAS: 02-base-esg.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 0
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 65
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtIniPta, SafraESG
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.BASE_MODELOS_ESG_&SAFRAESG [SAS/Local], DBA.TBMOLICAR [DBCON], DBA.TBPROPGARANTIAMAQEQUIP [DBCON], DBA.TBPROPOSTA [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: AUXL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.BASE_MODELOS_ESG_&SAFRAESG [PROC SQL - FROM], AUXL.PROPOSTAS_ESG [PROC SQL - FROM], DBA.TBMOLICAR [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPGARANTIAMAQEQUIP [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): AUXL.PROPOSTAS_ESG
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUXL.PROPOSTAS_ESG
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEESG, PROPOSTASESG, TBMODELOMOLICAR
+DYNAMIC REFS (Ambiguous): AUXL.BASE_MODELOS_ESG_{SAFRAESG}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE PropostasESG AS
+  SELECT * FROM connection TO dbcon
+  (
+    SELECT
+      PRP.NuProposta,
+      PRP.DtEntradaProposta,
+      PRP.StProposta,
+      PRP.NuContrato,
+      GRE.CdModelo,
+      GRE.CdMolicar,
+      GRE.CdMarca,
+      GRE.AAModelo,
+      GRE.AAFabricacao,
+      GRE.DsCategoria,
+      MLC.CdModelo AS CdModelo_Molicar,
+      MLC.DsCombustivel
+    FROM
+      DBA.TbProposta PRP
+    INNER JOIN
+      DBA.TbPropGarantiaMaqEquip GRE
+      ON PRP.NuProposta = GRE.NuProposta
+    LEFT JOIN
+      DBA.TbMolicar MLC
+      ON GRE.CdMolicar = MLC.CdMolicar
+    WHERE
+      (
+        MLC.DsCombustivel LIKE '%(EE)%'
+        OR MLC.DsCombustivel LIKE '%(GE)%'
+        OR MLC.DsCombustivel LIKE '%(DE)%'
+	OR MLC.DsCombustivel LIKE '%Gas./Eta./E%'
+      )
+      AND PRP.DtEntradaProposta >= &DtIniPta.
+    ORDER BY PRP.DtEntradaProposta);
+RUN;
+
+PROC SORT DATA=PropostasESG DUPOUT=DUPLI OUT=AUXL.PROPOSTAS_ESG NODUPKEY;
+BY NUPROPOSTA
+   DTENTRADAPROPOSTA
+;
+RUN;
+
+PROC SQL;
+CREATE TABLE BaseESG AS
+  SELECT DISTINCT
+    UPCASE(CdMarca) AS CdMarca,
+    UPCASE(CdModelo) AS CdModelo,
+    UPCASE(combustivel) AS Combustivel
+  FROM AUXL.BASE_MODELOS_ESG_&SafraESG.;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbModeloMolicar AS
+  SELECT
+    PRP.*,
+    ESG.combustivel
+  FROM
+    AUXL.PROPOSTAS_ESG PRP
+  LEFT JOIN
+    BaseESG ESG
+    ON ESG.CdModelo = UPCASE(PRP.CdModelo_Molicar)
+  WHERE
+    PRP.StProposta NOT IN ('C','CE')
+  ORDER BY 2,1;
+RUN;
+
+PROC SORT DATA=TbModeloMolicar NODUPKEY; BY NuProposta; RUN;
+
+PROC SQL; CREATE INDEX NuProposta ON TbModeloMolicar; QUIT;

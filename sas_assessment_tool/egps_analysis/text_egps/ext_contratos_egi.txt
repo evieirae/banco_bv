@@ -1,0 +1,282 @@
+START_METADATA
+PROJECT: SAS_UC4__ext_contratos_egi
+FILE_SAS: ext_contratos_egi.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:51 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 188
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], DBA.TBCOLABORADOR [DBCON], DBA.TBFILIAL [DBCON], DBA.TBPARCEIROCOMERCIAL [DBCON], DBA.TBPESSOA [DBCON], DBA.TBPESSOAFISICASOBANALISE [DBCON], DBA.TBPESSOASOBANALISE [DBCON], DBA.TBSUBPRODUTO [DBCON], DBCOR.TBTIPOCOBRANCA [DBCON], DBCRED.TBENDERECOTBPESSOASOBANALISE [DBCON], DBCRED.TBPROPOSTAFINANCEIRO [DBCON], DBIMOBILIARIO.TBPROPOSTA [DBCON], EGI.TBCONTRATO [DBCON], EGI.TBCONTRATOCUSTO [DBCON], EGI.TBCONTRATOFINANCEIRO [DBCON], TBCONTRATOVALIDO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TMP
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): DBA.TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DBA.TBFILIAL [Pass-Through Native (DBCON) - JOIN], DBA.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOA [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOAFISICASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBA.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTIPOCOBRANCA [Pass-Through Native (DBCON) - JOIN], DBCRED.TBENDERECOTBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTAFINANCEIRO [Pass-Through Native (DBCON) - JOIN], DBIMOBILIARIO.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], EGI.TBCONTRATO [Pass-Through Native (DBCON) - JOIN], EGI.TBCONTRATOCUSTO [Pass-Through Native (DBCON) - FROM], EGI.TBCONTRATOFINANCEIRO [Pass-Through Native (DBCON) - FROM], TBCONTRATOVALIDO [Pass-Through Native (DBCON) - JOIN], TMP.EXTRACAO_PTAIQCONT_EGI [PROC SORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): TMP.EXTRACAO_PTAIQCONT_EGI
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TMP.EXTRACAO_PTAIQCONT_EGI
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_contratos_egi.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	ext_contratos_egi.sas												| */
+/* |	Descricao: 	Programa para extrair informacoes de EGI dos sistema IQ.			| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableua utilizados pela		| */
+/* |				area comercial.														| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de BA								| */
+/* |	Criador: 	Carlos Makoto - BA													| */
+/* |	Data:		01/04/2020															| */
+/* ====================================================================================== */
+/* |	Atualizacao:	08/04/2020														| */
+/* |	Responsavel: 	Paulo Oliveira - Squad MIS Comercial							| */
+/* |	Alt. Realizada:	- Inclusao de cabecalho											| */
+/* |					- Testes iniciais												| */
+/* ====================================================================================== */
+/* |	Atualizacao:	24/04/2020  													| */
+/* |	Responsavel: 	Christian Seki - Squad MIS Comercial							| */
+/* |	Alt. Realizada:	- Inclusao dos imports de conexao								| */
+/* |					- Alteracao no nome do programa para ext_contratos_egi.sas		| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* =================== Extracao PTA  ====================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+CREATE TABLE tmp.extracao_ptaiqcont_EGI AS
+SELECT * FROM connection to dbcon
+(
+WITH TbContratoValido AS
+(
+	SELECT
+		 ContratoFinanceiro.NuContrato
+		,max(ContratoFinanceiro.SqContratoFinanceiro) AS SqContratoFinanceiro
+	FROM EGI.TbContratoFinanceiro ContratoFinanceiro
+
+		LEFT JOIN EGI.TbContrato Contrato
+			ON  ContratoFinanceiro.NuContrato = Contrato.NuContrato
+
+		LEFT JOIN DBA.TbProposta Proposta
+			ON  Contrato.NuContrato = Proposta.NuContratoGestao
+
+	WHERE 1=1
+		AND Contrato.NuContrato > 0
+		AND DATEDIFF(month,Contrato.DtContrato,ContratoFinanceiro.DtContratoFinanceiro) = 0
+
+	GROUP BY ContratoFinanceiro.NuContrato
+
+)
+
+	SELECT
+		 year(DATE(Contrato.DtContrato))*100+month(DATE(Contrato.DtContrato)) NuAnoMes
+		,Contrato.DtContrato
+		,ContratoFinanceiro.DtContratoFinanceiro
+		,Contrato.DtLiquidacaoEfetiva
+		,Contrato.DtCancelamento
+		,ContratoFinanceiro.DtProcessamento
+		,ContratoFinanceiro.DtInicioVigencia
+		,ContratoFinanceiro.DtFimVigencia
+		,ContratoFinanceiro.DtPrimeiroVencimento
+		,ContratoFinanceiro.DtUltimoVencimento
+		,Proposta.NuProposta
+		,Proposta.DtEntradaProposta
+		,ContratoFinanceiro.NuContrato
+		,ContratoFinanceiro.SqContratoFinanceiro
+		,ContratoFinanceiro.FlAtivo
+		,ContratoFinanceiro.CdMotivoContratoFinanceiro
+		,ContratoFinanceiro.CdTipoCobranca
+		,TipoCobranca.NmTipoCobranca
+		,ContratoFinanceiro.NuContratoLegado
+
+		,Contrato.CdOperador CdColaborador
+		,CASE WHEN Contrato.CdOperador <> Contrato.CdPromotor then Contrato.CdPromotor end CdColaboradorPromotor
+
+		,Contrato.CdFilial
+		,Filial.DsFilial
+		,Contrato.CdParceiroComercial
+
+		,Contrato.CdPessoa
+		,Pessoa.NmPessoa
+		,Pessoa.TpPessoa
+		,Pessoa.NuCpfCnpj
+		,EnderecoTbPessoaSobAnalise.CdUf as CdUfPessoa
+		,EnderecoTbPessoaSobAnalise.NmCidade as NmCidadePessoa
+		,PessoaFisicaSobAnalise.QtAnosIdade as QtAnosIdadePessoa
+
+		,CASE
+			WHEN ContratoFinanceiro.QtParcelas >  60 THEN '60+'
+			WHEN ContratoFinanceiro.QtParcelas >  48 THEN '60'
+			WHEN ContratoFinanceiro.QtParcelas >  36 THEN '48'
+			WHEN ContratoFinanceiro.QtParcelas >  24 THEN '36'
+			WHEN ContratoFinanceiro.QtParcelas >  18 THEN '24'
+			WHEN ContratoFinanceiro.QtParcelas >  12 THEN '18'
+			WHEN ContratoFinanceiro.QtParcelas >   0 THEN '12'
+			END FxParcela
+
+		,case when PropostaFinanceiro.TpOrigemTaxa='A' then 1 else 0 end FlTxAlterada
+		,Contrato.CdProduto*1000000 + Contrato.CdModalidadeProduto*1000 + 0 CdGrupoSubProduto
+		,Proposta.CdSubProduto
+		,SubProduto.DsSubProduto
+		,CASE WHEN (
+							Contrato.CdOperador = 2826
+						OR  ContratoFinanceiro.SqContratoFinanceiro > 1
+						OR DATEDIFF(month,DtContrato,DtCancelamento) = 0
+					) THEN 'N' ELSE 'S' END StProducao
+		,Contrato.CdSituacaoContrato
+		,CASE WHEN TpPrePos = 'O' then 6 else 1 end CdTipoMercado
+		,ContratoFinanceiro.CdTabelaFinanciamento
+		,ContratoFinanceiro.VrIof
+		,ContratoFinanceiro.VrRetencao
+		,ContratoFinanceiro.VrTarifaFinanciadaTotal
+		,ContratoFinanceiro.VrPrestacao
+
+		,ContratoFinanceiro.VrContrato
+		,ContratoFinanceiro.VrEntrada
+		,(ContratoFinanceiro.VrContrato-ContratoFinanceiro.VrEntrada) * (ContratoFinanceiro.VrEntrada/nullif(ContratoFinanceiro.VrContrato,0)) AS VpEntrada
+		,ContratoFinanceiro.VrContrato-ContratoFinanceiro.VrEntrada VrProducaoLiquida
+		,ContratoFinanceiro.VrContrato-ContratoFinanceiro.VrEntrada VrProducao
+		,ContratoFinanceiro.VrComissaoParcelada
+		,ContratoFinanceiro.VrComissaoTotal
+
+		,ContratoFinanceiro.VrFinanciamento
+		,ContratoCusto.VrTarifaCadastro
+		,ContratoCusto.VrTarifaAvaliacaoBem
+
+		,ContratoFinanceiro.TxGerencial
+		,(ContratoFinanceiro.TxGerencial/100) * (ContratoFinanceiro.VrContrato-ContratoFinanceiro.VrEntrada) VpTxGerencial
+
+		,ContratoFinanceiro.TxJuros
+		,(ContratoFinanceiro.TxJuros/100) * (ContratoFinanceiro.VrContrato-ContratoFinanceiro.VrEntrada) VpTxJuros
+
+		,case when PessoaSobAnalise.NuScoreFim = 99 then 1 else PessoaSobAnalise.NuScoreFim end as NuScoreFim
+		,(case when PessoaSobAnalise.NuScoreFim = 99 then 1 else PessoaSobAnalise.NuScoreFim end) * (ContratoFinanceiro.VrContrato-ContratoFinanceiro.VrEntrada) as VpScore
+
+		,ContratoFinanceiro.QtParcelas
+		,ContratoFinanceiro.QtParcelas*(ContratoFinanceiro.VrContrato-ContratoFinanceiro.VrEntrada) VpPrazo
+
+	FROM EGI.TbContratoFinanceiro ContratoFinanceiro
+
+		INNER JOIN TbContratoValido ContratoValido
+			ON  ContratoFinanceiro.NuContrato = ContratoValido.NuContrato
+
+		LEFT JOIN TbContratoValido SqContratoValido
+			ON  ContratoFinanceiro.NuContrato = SqContratoValido.NuContrato
+			AND ContratoFinanceiro.SqContratoFinanceiro = SqContratoValido.SqContratoFinanceiro
+
+		LEFT JOIN
+		(
+			SELECT
+				 NuContrato
+				,SqContratoFinanceiro
+				,sum(CASE WHEN CdGrupoCusto =  5 THEN VrCusto END) VrTarifaCadastro
+				,sum(CASE WHEN CdGrupoCusto = 10 THEN VrCusto END) VrTarifaAvaliacaoBem
+			FROM EGI.TbContratoCusto
+			WHERE CdGrupoCusto IN (5,10)
+			GROUP BY
+				 NuContrato
+				,SqContratoFinanceiro
+		) ContratoCusto
+
+			ON  ContratoFinanceiro.NuContrato = ContratoCusto.NuContrato
+			AND	ContratoFinanceiro.SqContratoFinanceiro = ContratoCusto.SqContratoFinanceiro
+
+		LEFT JOIN EGI.TbContrato Contrato
+			ON  ContratoFinanceiro.NuContrato = Contrato.NuContrato
+
+				LEFT JOIN DBA.TbFilial Filial
+					ON  Contrato.CdFilial = Filial.CdFilial
+
+			LEFT JOIN DBA.TbPessoa Pessoa
+				ON  Contrato.CdPessoa = Pessoa.CdPessoa
+
+			LEFT JOIN DBA.TbColaborador Colaborador
+				ON  Contrato.CdOperador = Colaborador.CdColaborador
+				AND Colaborador.CdColaborador NOT IN (503,9777,11046,11210,18512,57936)
+				AND Colaborador.CdOperador <> 0
+
+			LEFT JOIN DBA.TbParceiroComercial ParceiroComercial
+				ON  Contrato.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+		INNER JOIN DbImobiliario.TbProposta Proposta
+			ON  Contrato.NuContrato = Proposta.NuContratoGestao
+
+			LEFT JOIN DBA.TbPessoaSobAnalise PessoaSobAnalise
+				ON  Proposta.NuProposta = PessoaSobAnalise.NuProposta
+				AND PessoaSobAnalise.CdPapel = 1
+
+				LEFT JOIN DBA.TbPessoaFisicaSobAnalise PessoaFisicaSobAnalise
+					ON  PessoaSobAnalise.CdPessoaSobAnalise = PessoaFisicaSobAnalise.CdPessoaSobAnalise
+
+			LEFT JOIN DBCRED.TbEnderecoTbPessoaSobAnalise EnderecoTbPessoaSobAnalise
+				ON  PessoaSobAnalise.CdPessoaSobAnalise = EnderecoTbPessoaSobAnalise.CdPessoaSobAnalise
+				AND EnderecoTbPessoaSobAnalise.CdTipoEndereco = 1
+
+			LEFT JOIN DBA.TbSubProduto SubProduto
+				ON  Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+				LEFT JOIN DBCRED.TbPropostaFinanceiro PropostaFinanceiro
+					on Proposta.NuProposta = PropostaFinanceiro.NuProposta
+
+			LEFT JOIN DBCOR.TbTipoCobranca TipoCobranca
+				ON  PropostaFinanceiro.CdTipoCobranca = TipoCobranca.CdTipoCobranca
+
+	ORDER BY
+		 ContratoFinanceiro.NuContrato
+		,ContratoFinanceiro.SqContratoFinanceiro
+)
+;RUN;
+
+proc sort data=tmp.extracao_ptaiqcont_EGI ;by DtEntradaProposta;run;
+proc sort data=tmp.extracao_ptaiqcont_EGI  nodupkey;by NuContrato SqContratoFinanceiro;run;
+
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* ====================================================================================== */
+%PUT #!# FIM ext_contratos_egi.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%PUT #!# TEMPO PROCESSAMENTO:   %SYSFUNC(intck(SECOND, &W_ini, %SYSFUNC(datetime())), tod8.);

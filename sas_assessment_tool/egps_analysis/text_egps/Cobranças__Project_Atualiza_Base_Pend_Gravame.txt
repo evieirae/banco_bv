@@ -1,0 +1,93 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_Atualiza_Base_Pend_Gravame
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:50 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 36
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: CONTATOS = /riscosbv/cobranca/rribeiro/contatos
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CONTATOS
+IMPORTED FILES (Requires Ingestion): \\bvnet\pta\APPS\CRM_HUB\CarteiraPend\tbdnecarteirapend\processado\TbDNECarteiraPend.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.TbDNECarteiraPend <- \\bvnet\pta\APPS\CRM_HUB\CarteiraPend\tbdnecarteirapend\processado\TbDNECarteiraPend.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBDNECARTEIRAPEND
+TABLE_READ_PROVENANCE (Flow): WORK.TBDNECARTEIRAPEND [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CONTATOS.AUX_GRAVAME_PEND
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.TBDNECARTEIRAPEND;
+
+[[ FILE_REFS_MACRO ]]
+IN|\\bvnet\pta\APPS\CRM_HUB\CarteiraPend\tbdnecarteirapend\processado\TbDNECarteiraPend.csv|//BVNET/PTA/APPS/CRM_HUB/CARTEIRAPEND/TBDNECARTEIRAPEND/PROCESSADO|TBDNECARTEIRAPEND.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00_Map_LIB */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-pBUkq1xjCakg9UBi/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CONTATOS '/riscosbv/cobranca/rribeiro/contatos';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01_DB_Gravame */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01_DB_Gravame */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-rsYgQiosnGbEqTWt/code.sas */
+/* =========================INÍCIO TASK========================= */
+Options Reuse=yes Compress=binary;
+PROC SQL;
+CREATE TABLE CONTATOS.AUX_GRAVAME_PEND AS
+SELECT DISTINCT
+  TODAY() Format = yymmdd10. AS DT_REF
+, (YEAR(DtFoto)*100+Month(DtFoto)) Format = best6. AS SAFRA_ATUALIZ
+, *
+FROM WORK.TBDNECARTEIRAPEND
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01_DB_Gravame */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

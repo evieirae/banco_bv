@@ -1,0 +1,979 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__MIS-AcordoV3-202609_bq_new
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-09-29 21:33:33 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -399
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), RETAIN (2x | +20), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 793
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: DELETE, SORT, SQL
+HAS_DATA_STEP: Yes (16x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: B_GERAL = /riscosbv/cobranca/malmeida; JAVERT = /riscosbv/cobranca/jmoghrabi; PERF_CL = /riscosbv/cobranca/erocha/CARTAO/CL/MIS
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: AnoMes, AnoMesCarga, DtCompetencia, DtMxProces
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_RCVRY.AGENCY [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.TB_PAGTO_BOLETO [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3 [BIGQUERY], B_GERAL.DIAS_UTEIS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: B_GERAL
+EXPORTED_LIBNAMES: JAVERT, PERF_CL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_RCVRY.AGENCY [Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.AGPMTDET [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.AGRHDR [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.TB_PAGTO_BOLETO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.UDA3 [Pass-Through Native (BIGQUERY) - JOIN], B_GERAL.DIAS_UTEIS [PROC SQL - FROM; PROC SQL - JOIN], JAVERT.TBMISCOLCHAO [DATA Step - SET; PROC SORT - DATA=], PERF_CL.ACORDO_&ANOMESCARGA [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): JAVERT.TBMISCOLCHAO, PERF_CL.ACORDO_&ANOMESCARGA
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): JAVERT.TBMISACORDO, JAVERT.TBMISCOLCHAO, PERF_CL.ACORDO_&ANOMESCARGA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BA_ACORDO, TBACORDO, TBACORDO1, TBAGENTE, TBCARTEIRA, TBCONTA, TBDATA, TBDTACORDO, TBDTAGENTE, TBESTOQUE1, TBE_DEMAIS, TBE_INICIO, TBFLUXO, TBMISACORDO, TBQUEBRA, TBQUITACAO, TBRESUMO, TBR_ACORDO, TBR_CONTA, TBTTACORDO
+DYNAMIC REFS (Ambiguous): PERF_CL.ACORDO_{ANOMESCARGA}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.BA_ACORDO;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-azymhfRAdlEBXLmV/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (
+project   = 'bv-sadi-dtm'
+credfile  = '/projetos/acessos/bq/di/sadi-dtm.json'
+schema    = 'bv_pdbd_prd'
+Read_Mode = Storage
+SCANSTRINGCOLUMNS=YES);
+CREATE TABLE BA_ACORDO AS
+SELECT *
+FROM CONNECTION TO PERM (WITH QUERY_1 AS (
+SELECT
+    ac.ahcollid AS CdAgente,
+    CAST(ac.ahacct AS STRING) AS Chave,
+    ac.ahdscqb AS DsMtvoQuebra,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(pb.pbdtciclo)) AS DtCicloPgto,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtClicloCriacao)) AS DtClicloCriacao,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtCriacao)) AS DtCriacao,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtFim)) AS DtFim,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtInicio)) AS DtInicio,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(pb.pbdttransac)) AS DtPgto,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(u3.u3dtpriatr)) AS DtPrimeiroAtraso,
+    (
+        SELECT MIN(FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(a.ahdt))) AS MIN_AHDT
+        FROM bv-pdbd-prd.trusted_rcvry.agrhdr AS A
+        WHERE ac.ahacct = a.ahacct
+        AND a.ahdt >= P2.DtQuebra
+    ) AS DtPromessa,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtQuebra)) AS DtQuebra,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtQuebraAcordo)) AS DtQuebraAcordo,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtQuitacao)) AS DtQuitacao,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(pc.apduedt)) AS DtVencimento,
+    FORMAT_DATETIME('%d/%m/%Y %H:%M:%S',DATETIME(P2.DtVencQuebra)) AS DtVencQuebra,
+    ag.agfirm AS NmAgente,
+    ac.ahssnum AS NuCpfCnpj,
+    CASE
+        WHEN DATE(P2.DtClicloCriacao) >= P2.DtInicio THEN 'FLUXO'
+        WHEN P2.DtClicloCriacao IS NULL AND DATE(P2.DtCriacao) >= P2.DtInicio THEN 'FLUXO1'
+        ELSE 'COLCHAO'
+    END AS Perfil,
+    pc.apflag AS StParcela,
+    P2.Tipo AS Tipo,
+    P2.TpEntrada AS TpEntrada,
+    CASE
+        WHEN UPPER(ac.ahdscqb) LIKE '%WEBSERVICE%' THEN 1
+        ELSE 0
+    END AS FlQuebraManual,
+    P2.NuAcordo AS NuAcordo,
+    CAST(pc.apdetid AS INT64) + 1 AS NuParcela,
+    P2.Plano AS Plano,
+    P2.PMTQuebra + 1 AS PMTQuebra,
+    ac.ahtotpmt AS VrAcordo,
+    pc.apamt AS VrParcela
+FROM
+(
+    SELECT
+        P1.DtInicio AS DtInicio,
+        P1.DtFim AS DtFim,
+        P1.Tipo AS Tipo,
+        P1.NuAcordo AS NuAcordo,
+        P1.DtCriacao AS DtCriacao,
+        P1.Plano AS Plano,
+        P1.DtQuebraAcordo AS DtQuebraAcordo,
+        P1.QdPMTPgto AS QdPMTPgto,
+        P1.MAXVencPgto AS MAXVencPgto,
+        P1.DtCriacaoCliclo AS DtCriacaoCliclo,
+        P1.MAXDtCicloPgto AS MAXDtCicloPgto,
+        P1.DtVencQuebra AS DtVencQuebra,
+        P1.PMTQuebra AS PMTQuebra,
+        COALESCE(P1.DtCriacaoCliclo, P1.DtCriacao) AS DtClicloCriacao,
+        COALESCE(P1.DtQuebraAcordo, P1.DtVencQuebra) AS DtQuebra,
+        CASE
+            WHEN P1.Plano = P1.QdPMTPgto THEN COALESCE(P1.MAXDtCicloPgto, P1.MAXVencPgto)
+        END AS DtQuitacao,
+        CASE
+            WHEN P1.Tipo <> 'MIGRA' THEN 'CYBER'
+            ELSE P1.Tipo
+        END AS TpEntrada
+    FROM
+    (
+        SELECT
+            DATE('2026-09-01') AS DtInicio,
+            DATE_SUB(DATE_ADD(DATE('2026-09-01'), INTERVAL 1 MONTH), INTERVAL 1 DAY) AS DtFim,
+            a.ahtype AS Tipo,
+            a.ahid AS NuAcordo,
+            a.ahdt AS DtCriacao,
+            CAST(a.ahprd AS INT64) + 1 AS Plano,
+            a.ahdtqb AS DtQuebraAcordo,
+            SUM(CASE WHEN b.apflag = 'C' THEN 1 ELSE 0 END) AS QdPMTPgto,
+            MAX(CASE WHEN b.apflag = 'C' THEN b.apduedt END) AS MAXVencPgto,
+            MIN(CASE WHEN b.apflag = 'C' AND CAST(b.apdetid AS INT64) = 0 THEN c.pbdtciclo END) AS DtCriacaoCliclo,
+            MAX(CASE WHEN b.apflag = 'C' THEN c.pbdtciclo END) AS MAXDtCicloPgto,
+            MIN(CASE WHEN b.apflag = 'R' THEN b.apduedt END) AS DtVencQuebra,
+            MIN(CASE WHEN b.apflag = 'R' THEN CAST(b.apdetid AS INT64) END) AS PMTQuebra
+        FROM
+            bv-pdbd-prd.trusted_rcvry.agrhdr AS A
+        INNER JOIN
+            bv-pdbd-prd.trusted_rcvry.agpmtdet AS B ON a.ahid = b.apahid
+        LEFT JOIN
+            bv-pdbd-prd.trusted_rcvry.tb_pagto_boleto AS C
+              ON CAST(b.apahid AS INT64) = CAST(c.pbnumacordo AS INT64)
+             AND CAST(b.apdetid AS INT64) = CAST(c.pbnumparc AS INT64)
+        WHERE
+            CAST(a.ahprd AS INT64) > 0
+            AND DATE(a.ahdt) <= LAST_DAY(DATE('2026-09-01'))
+        GROUP BY
+            a.ahid,
+            a.ahdt,
+            a.ahprd,
+            a.ahtype,
+            a.ahdtqb
+    ) AS P1
+) AS P2
+JOIN
+    bv-pdbd-prd.trusted_rcvry.agrhdr AS AC ON ac.ahid = P2.NuAcordo
+JOIN
+    bv-pdbd-prd.trusted_rcvry.agency AS AG ON ac.ahcollid = ag.agagency
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.agpmtdet AS PC
+      ON pc.apahid = P2.NuAcordo
+     AND DATE(pc.apduedt) BETWEEN P2.DtInicio AND P2.DtFim
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.uda3 AS U3
+      ON ac.ahacct = u3.u3acct
+LEFT JOIN
+    bv-pdbd-prd.trusted_rcvry.tb_pagto_boleto AS PB
+      ON CAST(pc.apahid AS INT64) = CAST(pb.pbnumacordo AS INT64)
+     AND CAST(pc.apdetid AS INT64) = CAST(pb.pbnumparc AS INT64)
+WHERE
+    P2.QdPMTPgto > 0
+    AND DATE(P2.DtClicloCriacao) <= P2.DtFim
+    AND (DATE(P2.DtQuebra) >= DATE('2026-09-01') OR P2.DtQuebra IS NULL)
+    AND (DATE(P2.DtQuitacao) >= DATE('2026-09-01') OR P2.DtQuitacao IS NULL)
+ORDER BY
+    NuAcordo,
+    CdAgente,
+    NuParcela
+)
+
+SELECT * FROM QUERY_1
+) ;
+
+DISCONNECT FROM PERM;
+QUIT;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_Carga */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_Carga */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-kcFkolBI6H8fsQIG/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbAcordo1	AS
+SELECT
+ INPUT(PUT(DTINICIO			,$10.),DDMMYY10.)	AS DTINICIO				FORMAT DDMMYY10.
+,INPUT(PUT(DTFIM			,$10.),DDMMYY10.)	AS DTFIM				FORMAT DDMMYY10.
+,NUACORDO
+,INPUT(PUT(DTCRIACAO		,$10.),DDMMYY10.) 	AS DTCRIACAO			FORMAT DDMMYY10.
+,INPUT(PUT(DTCLICLOCRIACAO	,$10.),DDMMYY10.) 	AS DTCLICLOCRIACAO		FORMAT DDMMYY10.
+,INPUT(PUT(DTQUEBRAACORDO	,$10.),DDMMYY10.) 	AS DTQUEBRAACORDO		FORMAT DDMMYY10.
+,INPUT(PUT(DTVENCQUEBRA		,$10.),DDMMYY10.) 	AS DTVENCQUEBRA 		FORMAT DDMMYY10.
+,INPUT(PUT(DTQUEBRA			,$10.),DDMMYY10.) 	AS DTQUEBRA				FORMAT DDMMYY10.
+,INPUT(PUT(DTQUITACAO		,$10.),DDMMYY10.) 	AS DTQUITACAO			FORMAT DDMMYY10.
+,PLANO
+,TIPO
+,TPENTRADA
+,INPUT(CHAVE,13.)									AS CHAVE			FORMAT BEST13.
+,INPUT(SUBSTR(CHAVE,4,25),22.)					 	AS NUCONTA
+,INPUT(SUBSTR(CHAVE,1, 3),3.)						AS PRODUTO
+,NUCPFCNPJ
+,VRACORDO
+,INPUT(PUT(DTPRIMEIROATRASO	,$10.),DDMMYY10.) 	AS DTPRIMEIROATRASO		FORMAT DDMMYY10.
+,CDAGENTE
+,TRANWRD(NMAGENTE,"_CL","")						AS NMAGENTE
+,NUPARCELA
+,INPUT(PUT(DTVENCIMENTO		,$10.),DDMMYY10.) 	AS DTVENCIMENTO			FORMAT DDMMYY10.
+,VRPARCELA
+,STPARCELA
+,INPUT(PUT(DTPGTO			,$10.),DDMMYY10.) 	AS DTPGTO				FORMAT DDMMYY10.
+,INPUT(PUT(DTCICLOPGTO		,$10.),DDMMYY10.) 	AS DTCICLOPGTO			FORMAT DDMMYY10.
+,PERFIL
+,FLQUEBRAMANUAL
+,DSMTVOQUEBRA
+,PMTQUEBRA
+,INPUT(PUT(DTPROMESSA	,$10.),DDMMYY10.) 		AS DTPROMESSA		FORMAT DDMMYY10.
+FROM BA_ACORDO;
+
+DATA TbAcordo;
+SET TbAcordo1;
+
+
+
+
+
+
+IF NMAGENTE IN ('REALE','TOLEDO 2','AVAL_CL', 'AVAL') THEN NMAGENTE = 'TOLEDO';
+IF NMAGENTE IN ('PASCHOALOTTO_', 'RN_ADV_CL') THEN NMAGENTE = 'RN_ADV';
+IF NMAGENTE IN ('FLEX_CL', 'FLEX', 'VILELA_CL') THEN NMAGENTE = 'VILELA';
+IF NMAGENTE IN ('BELLINATI 2_C', 'BELLINATI_CL') THEN NMAGENTE = 'BELLINATI';
+IF NMAGENTE IN ('NOVA QUEST_CL', 'NOVA QUEST', 'LM ANGELIS_CL') THEN NMAGENTE = 'LM ANGELIS';
+
+
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_Carga */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: LIBNAME */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gDeQcStkIIygl3lr/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PERF_CL BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+LIBNAME JAVERT BASE '/riscosbv/cobranca/jmoghrabi';
+LIBNAME B_GERAL 	BASE '/riscosbv/cobranca/malmeida';
+
+PROC SQL NOPRINT;
+SELECT DISTINCT
+ DtInicio * 1
+,max(DTCLICLOCRIACAO)
+INTO :DtCompetencia
+    ,:DtMxProces
+FROM TBACORDO;
+QUIT;RUN;
+
+DATA _NULL_;
+CALL SYMPUT('AnoMesCarga' 	,PUT(&DtCompetencia.,YYMMN6.));
+CALL SYMPUT('AnoMes'		,PUT(&DtCompetencia.,YYMMd8.));
+RUN;
+
+%PUT &AnoMesCarga;
+%PUT &AnoMes;
+
+/* =========================FIM TASK=========================== */
+/* TASK: LIBNAME */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R_MIS */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R_MIS */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-yrgNmgE4r2gin4Yh/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA TbMISAcordo (DROP=TIPO);
+ SET TbAcordo;
+FORMAT DtLimite	 DDMMYY10.
+	   DtREF	 DDMMYY10.;
+
+DTCLICLOCRIACAO = COALESCE(DTCLICLOCRIACAO,DTCRIACAO);
+
+DtLimite = INTNX('DAY',DTFIM,4);
+
+IF DTFIM <= TODAY()	THEN DtREF = DTFIM;
+					ELSE DtREF = TODAY();
+
+A_Acordo				= INTCK('DAY',DTPRIMEIROATRASO,DTCRIACAO);
+A_Quebra 				= INTCK('DAY',DTCRIACAO ,DTQUEBRA);
+
+IF A_Acordo < 360	THEN DsFase = 'CL1';ELSE
+						 DsFase = 'CL2';
+
+;RUN;
+
+
+PROC SQL ;
+CREATE TABLE TbMISAcordo AS
+SELECT
+ *
+,CASE
+ WHEN STPARCELA = 'C'
+  AND DTPGTO < DTINICIO AND DTCICLOPGTO < DTINICIO	THEN 0 
+ WHEN NUPARCELA = 1									THEN 0 
+ WHEN DTVENCIMENTO = .	 							THEN 0 
+ ELSE 1	END 					AS R_CxMes
+
+FROM TbMISAcordo;
+
+;QUIT;
+
+
+PROC SQL ;
+CREATE TABLE TbMISAcordo AS
+SELECT
+ *
+,CASE
+ WHEN PERFIL = 'COLCHAO'					THEN 1 ELSE 0 END 	AS FlEInicio
+
+,CASE
+ WHEN R_CxMes = 1
+  AND DTCICLOPGTO IS NOT NULL
+  AND DTCICLOPGTO <= DtLimite				THEN 1 ELSE 0 END 	AS FlPago
+
+,CASE
+ WHEN CALCULATED FlPago = 1 AND PLANO = NUPARCELA	THEN 1
+ WHEN DTQUITACAO BETWEEN DTINICIO AND DTFIM			THEN 1
+ ELSE 0 END 													AS FlQuitacao
+
+,CASE
+ WHEN DTQUEBRA BETWEEN DTINICIO AND DTFIM	THEN 1 ELSE 0 END 	AS FlQuebra
+
+,CASE
+ WHEN CALCULATED FlQuebra = 1
+  AND DTPROMESSA IS NOT NULL
+  AND DTPROMESSA  = DTQUEBRA 				THEN 1 ELSE 0 END 	AS FlPromessa
+
+FROM TbMISAcordo
+
+ORDER BY DTCRIACAO , NUACORDO, NUPARCELA
+;QUIT;RUN;
+
+
+PROC SQL;
+CREATE TABLE TbResumo	AS
+SELECT
+ DtInicio
+,NUACORDO
+,CDAGENTE
+,MAX(R_CxMes)			AS R_CxMes
+,MIN(DTVENCIMENTO)		AS DTVENCIMENTO		FORMAT DDMMYY10.
+,SUM(R_CxMes)			AS QdPMTMes
+,MAX(FlQuitacao)		AS QdQuitacao
+,MAX(FlQuebra)			AS QdQuebra
+
+FROM TbMISAcordo
+GROUP BY 1,2,3
+
+;QUIT;RUN;
+
+
+PROC SQL ;
+CREATE TABLE TbMISAcordo AS
+SELECT
+ A.*
+,B.QdPMTMes
+,CASE
+ WHEN A.DTVENCIMENTO = B.DTVENCIMENTO 	THEN 1 ELSE 0 END 	AS QdAcordo
+,CALCULATED QdAcordo * A.FlEInicio							AS QdEstoque
+,CASE
+ WHEN A.FlEInicio = 0 THEN CALCULATED QdAcordo ELSE 0 END	AS QdFluxo
+,CALCULATED QdAcordo * B.QdQuitacao							AS QdQuitacao
+,CALCULATED QdAcordo * B.QdQuebra							AS QdQuebra
+,CALCULATED QdAcordo * A.VrAcordo							AS VrCarteira
+,A.R_CxMes * A.VRPARCELA 									AS VrCaixa
+,CASE
+ WHEN A.R_CxMes = 1 THEN DAY(A.DTVENCIMENTO) END 			AS DiaEntradaCx
+
+FROM TbMISAcordo   	AS A
+LEFT JOIN TbResumo	AS B
+  ON A.DtInicio 	= B.DtInicio
+ AND A.NUACORDO		= B.NUACORDO
+ AND A.CDAGENTE		= B.CDAGENTE
+;QUIT;RUN;
+
+
+PROC SQL;
+CREATE TABLE TbMISAcordo AS
+SELECT
+*
+,CASE WHEN R_CxMes = 1 THEN
+  CASE
+  WHEN DTPGTO  = .
+   AND DTQUEBRA IS NOT NULL	AND DTQUEBRA 	 <= DTREF 			THEN 'QUEBRA'
+  WHEN DTPGTO  = . 			AND DTVENCIMENTO >= DTREF 			THEN 'A VENCER'
+  WHEN DTPGTO  = . 			AND DTVENCIMENTO  < DTREF    	  	THEN 'VENCIDA'
+  WHEN DTPGTO IS NOT NULL  	AND DTCICLOPGTO   > DTLIMITE		THEN 'VENCIDA'
+  WHEN FlPago  = 1 												THEN 'PAGO'
+  END
+ END 			AS StPmtMis
+FROM TbMISAcordo
+;QUIT;RUN;
+
+DATA PERF_CL.Acordo_&AnoMesCarga.;
+ SET TbMISAcordo;
+RUN;
+
+DATA JAVERT.TbMISAcordo;
+ SET TbMISAcordo;
+RUN;
+
+PROC DELETE
+DATA= TbResumo
+      TbMISAcordo;
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R_MIS */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: V_Acordo */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: V_Acordo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-TnwJrN97sn1j99h2/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbDtAcordo AS
+SELECT DISTINCT
+ &AnoMesCarga.    AS SAFRA
+,A.DTCLICLOCRIACAO
+,DU.Du
+
+from PERF_CL.Acordo_&AnoMesCarga.	AS A
+    ,B_GERAL.DIAS_UTEIS 			AS DU
+WHERE DU.Data  = A.DTCLICLOCRIACAO
+  AND DU.Safra = &AnoMesCarga.
+;QUIT;RUN;
+
+
+PROC SQL;
+CREATE TABLE TbData AS
+SELECT
+ DU.Safra
+,DU.Data
+,DU.Du
+,MAX(COALESCE(A.DTCLICLOCRIACAO,DU1.Data))	AS DataDU			FORMAT DDMMYY10.
+
+FROM B_GERAL.DIAS_UTEIS 		AS DU
+LEFT JOIN TbDtAcordo			AS A
+  on DU.Du    = A.Du
+ AND DU.Safra = A.Safra
+
+LEFT JOIN B_GERAL.DIAS_UTEIS	AS DU1
+  ON DU.Du    = DU1.Du
+ AND DU.Safra = DU1.Safra
+
+where DU.Safra = &AnoMesCarga.
+GROUP BY DU.Safra,DU.Data ,DU.Du
+
+having calculated DataDU <= &DtMxProces.
+;QUIT;RUN;
+
+
+PROC SQL;
+CREATE TABLE TbE_INICIO AS
+SELECT
+ DT.Data
+,DT.DataDU
+,DT.Du
+,"ESTOQUE INICIAL" AS TpLancamento	LENGTH = 20
+,RF.*
+FROM PERF_CL.Acordo_&AnoMesCarga. AS RF
+    ,TbData AS DT
+WHERE RF.DTINICIO  = DT.Data
+  AND RF.QdEstoque = 1
+;QUIT; RUN ;
+
+
+DATA TbEstoque1;
+ SET TbE_INICIO;
+TpLancamento = "ESTOQUE" ;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE TbFluxo AS
+SELECT
+ DT.Data
+,DT.DataDU
+,DT.Du
+,"FLUXO" AS TpLancamento LENGTH = 20
+,RF.*
+FROM PERF_CL.Acordo_&AnoMesCarga. AS RF
+    ,TbData AS DT
+WHERE RF.DTCLICLOCRIACAO  = DT.Data
+  AND RF.QdFluxo = 1
+ORDER BY RF.DTCLICLOCRIACAO
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE TbQuebra AS
+SELECT
+ DT.Data
+,DT.DataDU
+,DT.Du
+,"QUEBRA" AS TpLancamento LENGTH = 20
+, RF.*
+FROM PERF_CL.Acordo_&AnoMesCarga. AS RF
+    ,TbData AS DT
+WHERE RF.DTQUEBRA = DT.Data
+  AND RF.QdQuebra = 1
+ORDER BY RF.DTQUEBRA
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE TbQuitacao AS
+SELECT
+ DT.Data
+,DT.DataDU
+,DT.Du
+,"QUITACAO"	 AS TpLancamento LENGTH = 20
+, RF.*
+FROM PERF_CL.Acordo_&AnoMesCarga. AS RF
+    ,TbData AS DT
+WHERE RF.DTQuitacao = DT.Data
+  AND RF.QdQuitacao = 1
+ORDER BY RF.DTQuitacao
+;QUIT;
+
+
+DATA TbTTAcordo;
+SET TbE_INICIO
+	TbEstoque1
+	TbFluxo
+	TbQuebra
+	TbQuitacao;
+
+IF FIND (TpLancamento ,"ESTOQUE", "I") > 0  THEN DO;
+	QdAcordo = QdEstoque;
+	Fator    = 1;				END;
+ELSE IF TpLancamento = "FLUXO"				THEN DO;
+	QdAcordo = QdFluxo;
+	Fator    = 1;				END;
+ELSE IF TpLancamento = "QUEBRA"				THEN DO;
+	QdAcordo   = QdQuebra;
+	Fator      = -1;
+	QdManual   = FlQuebraManual;
+	QdPromessa = FlPromessa;	END;
+
+ELSE IF TpLancamento = "QUITACAO"			THEN DO;
+	QdAcordo = QdQuitacao;
+	Fator    = -1;				END;
+ELSE DO;
+	QdAcordo = 0;
+	Fator    = 0;				END;
+RUN;
+
+
+DATA TbTTAcordo;
+SET TbTTAcordo;
+FORMAT FxPlano $15.;
+IF      PLANO  = 2 	THEN FxPlano = "Até 02 parc";
+ELSE IF PLANO  = 3 	THEN FxPlano = "Até 03 parc";
+ELSE IF PLANO <= 6 	THEN FxPlano = "Até 06 parc";
+ELSE IF PLANO <= 12	THEN FxPlano = "Até 12 parc";
+ELSE IF PLANO <= 24	THEN FxPlano = "Até 24 parc";
+					ELSE FxPlano = "Acima 24 parc";
+RUN;
+
+PROC SQL;
+CREATE TABLE TbR_Acordo AS
+SELECT
+ DataDU
+,Du
+,NMAGENTE
+,TpLancamento
+,DsFase
+,FxPlano
+,AVG(Fator)								AS Fator
+,SUM(QdAcordo)							AS QdAcordo
+,SUM(VrAcordo * QdAcordo )				AS VrAcordo
+,COALESCE(SUM(input(QdManual,best12.))	 ,0) 			AS QdManual
+,COALESCE(SUM(QdPromessa),0) 			AS QdPromessa
+
+FROM TbTTAcordo
+GROUP BY DataDU,Du,NMAGENTE,DsFase,TpLancamento,FxPlano
+ORDER BY DataDU,Du,TpLancamento,DsFase
+;QUIT;RUN;
+
+
+PROC  SQL;
+CREATE TABLE TbDtAgente AS
+SELECT
+ DT.*
+,AG.*
+,PL.*
+FROM (SELECT DISTINCT DataDU,Du 			FROM TbData)	 AS DT
+	,(SELECT DISTINCT NMAGENTE 				FROM TbR_Acordo) AS AG
+    ,(SELECT DISTINCT DsFase,FxPlano	 	FROM TbR_Acordo) AS PL
+
+WHERE DT.Du > 1
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE TbE_Demais AS
+SELECT
+ RF.DataDU
+,RF.Du
+,RF.NMAGENTE
+,"ESTOQUE"	AS TpLancamento	LENGTH = 20
+,RF.DsFase
+,RF.FxPlano
+,1			AS Fator
+,SUM(A.QdAcordo * A.Fator) AS QdAcordo
+,SUM(A.VrAcordo * A.Fator) AS VrAcordo
+
+FROM TbDtAgente	AS RF
+LEFT JOIN TbR_Acordo AS A
+  ON A.NMAGENTE = RF.NMAGENTE
+ AND A.DsFase   = RF.DsFase
+ AND A.FxPlano  = RF.FxPlano
+ AND A.Du       < RF.Du
+ AND A.TpLancamento NOT IN ("ESTOQUE INICIAL")
+GROUP BY  RF.DataDU,RF.Du,RF.NMAGENTE,RF.DsFase,RF.FxPlano
+ORDER BY RF.NMAGENTE, RF.Du
+;QUIT;RUN;
+
+
+DATA TbR_Acordo;
+RETAIN DtCompetencia Ano Safra;
+ SET TbR_Acordo TbE_Demais;
+FORMAT DtCompetencia DDMMYY8.;
+
+DtCompetencia = INTNX ('MONTH',DataDU, 0 ,'B');
+Ano   = YEAR(DataDU);
+Safra = PUT(DataDU,YYMMd8.);
+QdMIS = QdAcordo * Fator;
+VrMIS = VrAcordo * Fator;
+;RUN;
+
+%MACRO Incluir();
+
+%IF %SYSFUNC(EXIST(JAVERT.TbMISColchao)) = 1 	%THEN	%DO;
+
+	DATA JAVERT.TbMISColchao;
+ 	 SET JAVERT.TbMISColchao;
+	 WHERE DtCompetencia <> &DtCompetencia. ;RUN;
+
+	DATA JAVERT.TbMISColchao;
+     SET JAVERT.TbMISColchao
+	     TbR_Acordo ;RUN ;
+%END
+
+;%ELSE %DO;
+	DATA JAVERT.TbMISColchao;
+     SET TbR_Acordo ;RUN ;
+%END;
+
+%MEND Incluir;
+
+%Incluir
+
+PROC SORT DATA = JAVERT.TbMISColchao;
+BY DataDU TpLancamento DsFase NMAGENTE  ;RUN ;
+
+PROC DELETE DATA =
+TbData
+TbE_INICIO
+TbEstoque1
+TbFluxo
+TbQuebra
+TbQuitacao
+TbTTAcordo
+TbDtAgente
+TbE_Demais ;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: V_Acordo */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program - Copy */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program - Copy */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ciKwswtP6J8FjLQj/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME PERF_CL BASE '/riscosbv/cobranca/erocha/CARTAO/CL/MIS';
+
+PROC SQL;
+CREATE TABLE TbAgente AS
+SELECT DISTINCT
+ CDAGENTE
+,NMAGENTE
+,CASE
+ WHEN CDAGENTE = 4021	THEN "RN ADV"
+ WHEN CDAGENTE = 4022	THEN "VILELA IBANEZ"
+ ELSE NMAGENTE END AS NmDePara
+FROM TBACORDO;
+
+QUIT;RUN;
+
+PROC SQL;
+CREATE TABLE TbCarteira AS
+SELECT
+A.*
+
+FROM PERF_CL.ACORDO_&AnoMesCarga. AS A
+LEFT JOIN TbAgente AS AG
+ON AG.CDAGENT
+
+;quit;run;
+
+PROC SQL;
+CREATE TABLE TbConta AS
+SELECT
+ A.DATA_BASE			AS Safra
+,A.CHAVE
+,A.TIPO
+,A.DTENVIO
+,A.FX_ATRASO
+,A.CL_STATUS
+,A.NmAgente
+,MAX(F.QdFluxo)			AS FlFluxo
+,SUM(F.QdFluxo)			AS QdFluxo
+,MAX(F.DTCLICLOCRIACAO)	AS DtFluxo		FORMAT DDMMYY8.
+
+,MAX(Q.QdQuebra)		AS FlQuebra
+,SUM(Q.QdQuebra)		AS QdQuebra
+,MAX(Q.DTQuebra)		AS DtQuebra		FORMAT DDMMYY8.
+
+FROM TbCART AS a
+
+LEFT JOIN PERF_CL.ACORDO_&AnoMesCarga.		AS F
+ ON F.CHAVE	   = A.CHAVE
+AND F.NmAgente = A.NmAgente
+AND F.QdFluxo  = 1
+
+LEFT JOIN PERF_CL.ACORDO_&AnoMesCarga.		AS Q
+ ON Q.CHAVE	   = A.CHAVE
+AND Q.NmAgente = A.NmAgente
+AND Q.QdQuebra  = 1
+
+WHERE A.TIPO <> "COLCHAO"
+
+GROUP BY  A.DATA_BASE,A.CHAVE,A.TIPO,A.DTENVIO,A.FX_ATRASO,A.CL_STATUS,A.NmAgente
+;QUIT;RUN;
+
+DATA TbConta;
+ SET TbConta;
+
+ FORMAT DtREF DDMMYY8.;
+
+ DtREF = MAX(DtFluxo,DtQuebra);
+
+ IF DtQuebra <> . and DtREF = DtQuebra	THEN FlQuebraFinal = 1;
+ 										ELSE FlQuebraFinal = 0;
+run;
+
+PROC SQL;
+CREATE TABLE TbR_Conta AS
+SELECT
+ Safra
+,FX_ATRASO
+,CL_STATUS
+,NmAgente
+,COUNT(*)			AS QdConta
+,SUM(QdFluxo)		AS QdFluxo
+,SUM(QdQuebra)		AS QdQuebra
+,SUM(FlFluxo)		AS FlFluxo
+,SUM(FlQuebraFinal)	as FlQuebra
+
+FROM TbConta
+
+GROUP BY Safra ,FX_ATRASO,CL_STATUS,NmAgente;
+QUIT;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program - Copy */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbAcordo1	AS
+SELECT
+ INPUT(PUT(DTINICIO			,$10.),DDMMYY10.)	AS DTINICIO				FORMAT DDMMYY10.
+,INPUT(PUT(DTFIM			,$10.),DDMMYY10.)	AS DTFIM				FORMAT DDMMYY10.
+,NUACORDO
+,INPUT(PUT(DTCRIACAO		,$10.),DDMMYY10.) 	AS DTCRIACAO			FORMAT DDMMYY10.
+,INPUT(PUT(DTCLICLOCRIACAO	,$10.),DDMMYY10.) 	AS DTCLICLOCRIACAO		FORMAT DDMMYY10.
+,INPUT(PUT(DTQUEBRAACORDO	,$10.),DDMMYY10.) 	AS DTQUEBRAACORDO		FORMAT DDMMYY10.
+,INPUT(PUT(DTVENCQUEBRA		,$10.),DDMMYY10.) 	AS DTVENCQUEBRA 		FORMAT DDMMYY10.
+,INPUT(PUT(DTQUEBRA			,$10.),DDMMYY10.) 	AS DTQUEBRA				FORMAT DDMMYY10.
+,INPUT(PUT(DTQUITACAO		,$10.),DDMMYY10.) 	AS DTQUITACAO			FORMAT DDMMYY10.
+,PLANO
+,TIPO
+,TPENTRADA
+,INPUT(CHAVE,13.)									AS CHAVE			FORMAT BEST13.
+,INPUT(SUBSTR(CHAVE,4,25),22.)					 	AS NUCONTA
+,INPUT(SUBSTR(CHAVE,1, 3),3.)						AS PRODUTO
+,NUCPFCNPJ
+,VRACORDO
+,INPUT(PUT(DTPRIMEIROATRASO	,$10.),DDMMYY10.) 	AS DTPRIMEIROATRASO		FORMAT DDMMYY10.
+,CDAGENTE
+,TRANWRD(NMAGENTE,"_CL","")						AS NMAGENTE
+,NUPARCELA
+,INPUT(PUT(DTVENCIMENTO		,$10.),DDMMYY10.) 	AS DTVENCIMENTO			FORMAT DDMMYY10.
+,VRPARCELA
+,STPARCELA
+,INPUT(PUT(DTPGTO			,$10.),DDMMYY10.) 	AS DTPGTO				FORMAT DDMMYY10.
+,INPUT(PUT(DTCICLOPGTO		,$10.),DDMMYY10.) 	AS DTCICLOPGTO			FORMAT DDMMYY10.
+,PERFIL
+,FLQUEBRAMANUAL
+,DSMTVOQUEBRA
+,PMTQUEBRA
+,INPUT(PUT(DTPROMESSA	,$10.),DDMMYY10.) 		AS DTPROMESSA		FORMAT DDMMYY10.
+FROM BA_ACORDO;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC  SQL;
+CREATE TABLE TbDtAgente AS
+SELECT
+ DT.*
+,AG.*
+,PL.*
+FROM (SELECT DISTINCT DataDU,Du 			FROM TbData)	 AS DT
+	,(SELECT DISTINCT NMAGENTE 				FROM TbR_Acordo) AS AG
+    ,(SELECT DISTINCT DsFase,FxPlano	 	FROM TbR_Acordo) AS PL
+
+WHERE DT.Du > 1
+;QUIT;
+
+
+PROC SQL;
+CREATE TABLE TbE_Demais AS
+SELECT
+ RF.DataDU
+,RF.Du
+,RF.NMAGENTE
+,"ESTOQUE"	AS TpLancamento	LENGTH = 20
+,RF.DsFase
+,RF.FxPlano
+,1			AS Fator
+,SUM(A.QdAcordo * A.Fator) AS QdAcordo
+,SUM(A.VrAcordo * A.Fator) AS VrAcordo
+
+FROM TbDtAgente	AS RF
+LEFT JOIN TbR_Acordo AS A
+  ON A.NMAGENTE = RF.NMAGENTE
+ AND A.DsFase   = RF.DsFase
+ AND A.FxPlano  = RF.FxPlano
+ AND A.Du       < RF.Du
+ AND A.TpLancamento NOT IN ("ESTOQUE INICIAL")
+GROUP BY  RF.DataDU,RF.Du,RF.NMAGENTE,RF.DsFase,RF.FxPlano
+ORDER BY RF.NMAGENTE, RF.Du
+;QUIT;RUN;
+
+
+DATA TbR_Acordo;
+RETAIN DtCompetencia Ano Safra;
+ SET TbR_Acordo TbE_Demais;
+FORMAT DtCompetencia DDMMYY8.;
+
+DtCompetencia = INTNX ('MONTH',DataDU, 0 ,'B');
+Ano   = YEAR(DataDU);
+Safra = PUT(DataDU,YYMMd8.);
+QdMIS = QdAcordo * Fator;
+VrMIS = VrAcordo * Fator;
+;RUN;
+
+%MACRO Incluir();
+
+%IF %SYSFUNC(EXIST(JAVERT.TbMISColchao)) = 1 	%THEN	%DO;
+
+	DATA JAVERT.TbMISColchao;
+ 	 SET JAVERT.TbMISColchao;
+	 WHERE DtCompetencia <> &DtCompetencia. ;RUN;
+
+	DATA JAVERT.TbMISColchao;
+     SET JAVERT.TbMISColchao
+	     TbR_Acordo ;RUN ;
+%END
+
+;%ELSE %DO;
+	DATA JAVERT.TbMISColchao;
+     SET TbR_Acordo ;RUN ;
+%END;
+
+%MEND Incluir;
+
+%Incluir
+
+PROC SORT DATA = JAVERT.TbMISColchao;
+BY DataDU TpLancamento DsFase NMAGENTE  ;RUN ;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,123 @@
+START_METADATA
+PROJECT: Rodas__PainelRFM
+FILE_SAS: Inicio.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: html
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (2x | +24), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 57
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, ODSTEXT, REPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_dur, W_fim, W_ini
+DETECTED_MACROS_USED: W_dur, W_fim, W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/PainelRFM/vm/code/run.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/PAINELRFM/VM/CODE/RUN.SAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: IGELOG
+IMPORTED FILES (Requires Ingestion): /infogrc/PainelRFM/vm/code/run.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/PainelRFM/vm/code/run.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): IGELOG.LOGEXECUCAOPROCESSOS
+APPEND_ONLY_OUTPUTS: IGELOG.LOGEXECUCAOPROCESSOS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): IGELOG.LOGEXECUCAOPROCESSOS
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LOGEXE, STATUSSIM
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/PainelRFM/vm/code/run.sas
+
+END_METADATA
+================================================================================
+/* Marcar horário de início da atualização */
+%LET W_ini = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br" "actct.gcosta@bv.com.br")
+SUBJECT="Painel RFM | Início da atualização";
+
+DATA _NULL_;
+	FILE MAIL_INI;
+		PUT "Processamento da base do painel RFM.";
+RUN;
+
+/* Executar código de geração da base */
+%include '/infogrc/PainelRFM/vm/code/run.sas';
+
+/* Calcular tempo de processamento total */
+%LET W_fim = %SYSFUNC(datetime());
+%LET W_dur = %SYSFUNC(intck(SECOND, &W_ini, &W_fim), tod8.);
+
+/* Enviar e-mail de finalização da atualização */
+PROC SQL;
+CREATE TABLE STATUSSIM AS
+SELECT
+  MAX(DtAtualizacao) FORMAT=ddmmyy10. AS DtAtualizacao
+FROM BASES.TBPRODUCAO;
+RUN;
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br" "actct.gcosta@bv.com.br")
+    TYPE="text/html"
+    SUBJECT="Painel RFM | Fim da atualização";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+PROC REPORT DATA=STATUSSIM nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 9pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 9pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 9pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS DtAtualizacao;
+RUN;
+
+PROC ODSTEXT;
+   p "Prezados,";
+   p "";
+   p "A base do Painel RFM foi atualizada.";
+   p "A geração da base demorou &W_dur. para ser concluída.";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+
+DATA LOGEXE;
+  IdProcesso = 'CONVSIMD';
+  LENGTH Processo $40.;
+  Processo = 'Funil de simulações Diário 3M';
+  FORMAT Inicio Final DATETIME18.;
+  Inicio = &W_ini.;
+  Final = &W_fim.;
+  Duracao = "&W_dur.";
+RUN;
+
+PROC APPEND DATA=LOGEXE BASE=IGELOG.LogExecucaoProcessos; RUN;

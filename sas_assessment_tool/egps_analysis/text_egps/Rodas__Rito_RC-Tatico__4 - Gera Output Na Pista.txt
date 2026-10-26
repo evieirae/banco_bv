@@ -1,0 +1,194 @@
+START_METADATA
+PROJECT: Rodas__Rito_RC-Tatico
+FILE_SAS: 4 - Gera Output Na Pista.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -1
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 129
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv, trim1, trim2, trim3, trim4, trim_anterior, trim_atual
+DETECTED_MACROS_USED: dir_csv, mindata, trim1, trim2, trim3, trimestres
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], TMP.TBNAPISTARITOCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_NAPISTARITO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_NAPISTARITO
+TABLE_READ_PROVENANCE (Flow): TMP.TBNAPISTARITOCOMERCIAL [DATA Step - SET], WORK.BASE_NAPISTARITO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./BASE_FINAL_RC_TATICO_NAPISTARITO.csv
+TEMP/DISCARDED OUTPUTS: BASE_FINAL_RC_TATICO_NAPISTARITO, BASE_NAPISTARITO, DATE9, RESUMO_MES_NAPISTARITO, RESUMO_TRIMESTRE_NAPISTARITO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Gera Output Na Pista.sas														| */
+/* | Descricao: Programa gerar o output Na Pista para Rito RC Tatico.					| */
+/* | Objetivo: 	Apuração do Rito RC Tatico					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ================================================================= */
+/* ============ NaPista Rito Comercial Leves ======================= */
+/* ================================================================= */
+
+data base_NaPistaRito;
+    set tmp.TbNaPistaRitoComercial (where=(nuanomes <= &mindata.));
+
+   	data = input(put((nuAnoMes*100)+1, 8.), yymmdd8.);
+    format data date9.;
+    ano = year(data);
+    trimestre = qtr(data);
+    mes = month(data);
+run;
+
+proc sql print;
+    select distinct cats(ano, trimestre)
+    into :trimestres SEPARATED BY ' '
+    from base_NaPistaRito
+    order by ano desc, trimestre desc;
+quit;
+
+%let trim1 = %scan(&trimestres, 1);
+%let trim2 = %scan(&trimestres, 2);
+%let trim3 = %scan(&trimestres, 3);
+%let trim4= %scan(&trimestres, 4);
+%let trim_atual = %scan(&trimestres, 1);
+%let trim_anterior = %scan(&trimestres, 2);
+
+proc sql;
+    create table resumo_trimestre_NaPistaRito as
+    select
+		"BASE_TRI" AS TP_BASE,
+        ano,
+		. AS NuAnomes,
+		ano*100+trimestre as NuAnoTri,
+          t1.NmColaboradorC,
+		  t1.DsLoginN1C as DsLoginN1,
+          t1.DsLoginN2C as DsLoginN2,
+          t1.DsLoginN3C as DsLoginN3,
+          t1.LstSubstituicaoC as LstSubstituicao,
+          t1.NmCanalEstruturaComercialC,
+          t1.NmSubEstruturaComercialC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmParceiroComercial,
+		  	max(DtAtualizacao) as DtAtualizacao Format ddmmyy10.,
+            (SUM(t1.estoque_zero))AS estoque_zero,
+            (SUM(t1.lojas_ativas))AS lojas_ativas,
+			(SUM(t1.lojas_ativas))AS Qtlojas_ativas,
+            (SUM(t1.QtLojas_Estoque_0_Digital))AS QtLojas_Estoque_0_Digital,
+            (SUM(t1.QtLojas_Ativas_Digital))AS QtLojas_Ativas_Digital,
+            (SUM(t1.QtLojas_Class_Digital))AS QtLojas_Class_Digital,
+			(SUM(t1.qtd_classificados))AS Qtd_classificados
+
+      FROM WORK.base_NaPistaRito t1
+	   where cats(t1.ano, t1.trimestre) in ("&trim1", "&trim2", "&trim3")
+	  group by t1.ano,
+				t1.ano*100+t1.trimestre,
+				/*		put(ano*100+trimestre,best.)||"t",*/
+				t1.trimestre,
+				t1.NmColaboradorC,
+			    t1.DsLoginN1C,
+				t1.DsLoginN2C,
+				t1.DsLoginN3C,
+				t1.LstSubstituicaoC,
+				t1.NmCanalEstruturaComercialC,
+				t1.NmSubEstruturaComercialC,
+				t1.NmAreaEstruturaComercialC,
+				t1.NmParceiroComercial;
+QUIT;
+
+proc sql;
+    create table resumo_mes_NaPistaRito as
+	select
+		"BASE_MES" AS TP_BASE,
+        t1.ano,
+		t1.NuAnomes,
+		t1.ano*100+t1.trimestre as NuAnoTri,
+	    t1.trimestre,
+		t1.NmColaboradorC,
+		 t1.DsLoginN1C as DsLoginN1,
+          t1.DsLoginN2C as DsLoginN2,
+          t1.DsLoginN3C as DsLoginN3,
+          t1.LstSubstituicaoC as LstSubstituicao,
+          t1.NmCanalEstruturaComercialC,
+          t1.NmSubEstruturaComercialC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmParceiroComercial,
+		  max(DtAtualizacao) as DtAtualizacao Format ddmmyy10.,
+            (SUM(t1.estoque_zero))AS estoque_zero,
+            (SUM(t1.lojas_ativas))AS lojas_ativas,
+			(SUM(t1.lojas_ativas))AS Qtlojas_ativas,
+            (SUM(t1.QtLojas_Estoque_0_Digital))AS QtLojas_Estoque_0_Digital,
+            (SUM(t1.QtLojas_Ativas_Digital))AS QtLojas_Ativas_Digital,
+            (SUM(t1.QtLojas_Class_Digital))AS QtLojas_Class_Digital,
+			(SUM(t1.qtd_classificados))AS Qtd_classificados
+      FROM WORK.base_NaPistaRito t1
+	  	 where cats(ano, trimestre) in ("&trim1", "&trim2", "&trim3")
+	  group by
+			t1.ano,
+			t1.NuAnomes,
+			t1.ano*100+t1.trimestre,
+			t1.trimestre,
+			t1.NmColaboradorC,
+			t1.DsLoginN1C,
+			t1.DsLoginN2C,
+			t1.DsLoginN3C,
+			t1.LstSubstituicaoC,
+			t1.NmCanalEstruturaComercialC,
+			t1.NmSubEstruturaComercialC,
+			t1.NmAreaEstruturaComercialC,
+			t1.NmParceiroComercial;
+QUIT;
+
+data base_final_RC_Tatico_NaPistaRito;
+    set resumo_trimestre_NaPistaRito resumo_mes_NaPistaRito;
+run;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= base_final_RC_Tatico_NaPistaRito
+		outfile="&dir_csv./BASE_FINAL_RC_TATICO_NAPISTARITO.csv" REPLACE
+   		dbms=dlm
+    		replace;
+    		delimiter=';';
+    		putnames=yes;
+run;

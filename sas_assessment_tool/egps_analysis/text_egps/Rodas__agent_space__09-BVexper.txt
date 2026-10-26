@@ -1,0 +1,98 @@
+START_METADATA
+PROJECT: Rodas__agent_space
+FILE_SAS: 09-BVexper.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 36
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dia_mes, dia_semana
+DETECTED_MACROS_USED: SafraM0, SafraM1, dia_mes, dia_semana
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): EXP_BU.BVEXPER_BASEUNICA_RESUMO_TOTAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): EXP_BU.BVEXPER_BASEUNICA_RESUMO_TOTAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBBVEXERFILIAL, TBBVEXERGR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+%macro executar_includesBvExper();
+
+    %let dia_semana = %sysfunc(weekday(%sysfunc(today())));
+    %let dia_mes = %sysfunc(day(%sysfunc(today())));
+
+    %put dia_semana: &dia_semana;
+    %put dia_mes: &dia_mes;
+
+    %if &dia_semana = 2 %then %do; /* Segunda-feira */
+        %if &dia_mes < 10 %then %do;
+
+		proc sql;
+		create table TBBvexerGR as
+		select * from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+		where NuAnoMes =&SafraM1. and TpNivel='GR' and TpBase='Atingimento'
+		;run;
+
+		proc sql;
+		create table TBBvexerFilial as
+		select * from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+		where NuAnoMes =&SafraM1. and TpNivel='Fi' and TpBase='Atingimento'
+		;run;
+
+        %end;
+        %else %do;
+
+		proc sql;
+		create table TBBvexerGR as
+		select * from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+		where NuAnoMes =&SafraM0. and TpNivel='GR' and TpBase='Atingimento'
+		;run;
+
+		proc sql;
+		create table TBBvexerFilial as
+		select * from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+		where NuAnoMes =&SafraM0. and TpNivel='Fi' and TpBase='Atingimento'
+		;run;
+
+        %end;
+    %end;
+    %else %do;
+        %put Hoje não é segunda-feira. Nenhum include será executado.;
+    %end;
+
+%mend executar_includesBvExper;
+
+%executar_includesBvExper;

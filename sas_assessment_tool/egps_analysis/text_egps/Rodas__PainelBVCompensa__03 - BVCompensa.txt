@@ -1,0 +1,179 @@
+START_METADATA
+PROJECT: Rodas__PainelBVCompensa
+FILE_SAS: 03 - BVCompensa.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 112
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHA [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHAPARCEIRO [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHAPRODUTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHASUBPRODUTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBMETA [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBMETAPREMISSA [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBMETARECOMPENSA [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBPERIODOAPURACAO [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBTIPOPREMISSA [BIGQUERY], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBTIPORECOMPENSA [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHAPARCEIRO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHAPRODUTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBCAMPANHASUBPRODUTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBMETA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBMETAPREMISSA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBMETARECOMPENSA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBPERIODOAPURACAO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBTIPOPREMISSA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_GAPCGESTAOCAMPANHAACORDO.TBTIPORECOMPENSA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BVCOMPENSA, BVCOMPENSAGCP
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+options compress=binary;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table BVCompensaGCP as
+   select * from connection to perm
+     (
+SELECT DISTINCT
+    FORMAT_DATE('%d/%m/%Y', CURRENT_DATE()) AS DtAtualizacaoBVCompensa,
+    tc.CdCampanha,
+    tc.NmCampanha,
+/*    -- Adicionando a coluna NmGrupoProdutoMeta usando atribuição do Agrupamento SubProdutos*/
+    CASE
+        WHEN tcsp.CdSubProduto IN (1,4,9,16,29,58) THEN 'Leves'
+        WHEN tcsp.CdSubProduto IN (2,3,30,31,61) THEN 'Pesados'
+        WHEN tcsp.CdSubProduto IN (5,6,7,64,65,66) THEN 'Motos'
+        WHEN tcsp.CdSubProduto IN (8,19,59,60,102,103) THEN 'CVG Leves'
+        WHEN tcsp.CdSubProduto IN (13,20,62,63) THEN 'CVG Pesados'
+        WHEN tcsp.CdSubProduto IN (70) THEN 'Solar'
+        WHEN tcsp.CdSubProduto IN (74,104) THEN 'Saude'
+        WHEN tcsp.CdSubProduto IN (100) THEN 'FGTS'
+        ELSE 'N/A'
+    END AS NmGrupoProdutoMeta,
+    tc.CdTipoApuracaoCampanha,
+    FORMAT_DATE('%d/%m/%Y', CAST(tpa.DtInicioVigencia AS DATE)) AS DtInicioVigencia,
+    FORMAT_DATE('%d/%m/%Y', CAST(tpa.DtFimVigencia AS DATE)) AS DtFimVigencia,
+/*    -- Adicionando a coluna AnoMes usando FORMAT_DATE para formatar a DtInicioVigencia*/
+    FORMAT_DATE('%Y%m', CAST(tpa.DtInicioVigencia AS DATE)) AS AnoMes,
+    tcp.CdParceiroCampanha,
+    tm.CdParceiroComercial,
+    tcp.NmParceiroCampanha,
+    CAST(tmp.VrMeta as FLOAT64) as VrMeta,
+    CONCAT('Meta ',tm.NuOrdemPrioridade) as NuOrdemPrioridade,
+    ttp.DsTipoPremissa,
+    ttr.DsTipoRecompensa,
+    CAST(tmr.VrRecompensa as FLOAT64) AS VrRecompensa
+
+FROM bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbcampanha tc
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbmeta tm
+    ON tc.CdCampanha = tm.CdCampanha
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbcampanhaparceiro tcp
+    ON tc.CdCampanha = tcp.CdCampanha AND IFNULL(tcp.CdParceiroCampanha,0) = IFNULL(tm.CdParceiroComercial,tcp.CdParceiroCampanha)
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbmetapremissa tmp
+    ON tm.CdMeta = tmp.CdMeta
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbtipopremissa ttp
+    ON tmp.CdTipoPremissa = ttp.CdTipoPremissa
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbmetarecompensa tmr
+    ON tm.CdMeta = tmr.CdMeta
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbtiporecompensa ttr
+    ON tmr.CdTipoRecompensa = ttr.CdTipoRecompensa
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbperiodoapuracao tpa
+    ON tc.CdCampanha = tpa.CdCampanha
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbcampanhaproduto tcprd
+    ON tcprd.CdCampanha = tc.CdCampanha
+
+INNER JOIN bv-pdbd-prd.trusted_gapcgestaocampanhaacordo.tbcampanhasubproduto tcsp
+    ON tcsp.CdCampanhaProduto = tcprd.CdCampanhaProduto
+
+WHERE
+
+    tpa.DtInicioVigencia >= '2024-01-01'
+    AND tc.FlAtivo = 'S'
+    AND tcp.FlAtivo = 'S'
+    AND tm.FlAtivo = 'S'
+    AND tmp.FlAtivo = 'S'
+    AND tmr.FlAtivo = 'S'
+    AND tcprd.FlAtivo = 'S'
+    AND tcsp.FlAtivo = 'S'
+    AND tc.cdtipocampanha <> 2
+
+/*    -- AND tc.CdCampanha = 168*/
+/*    -- AND tcp.CdParceiroCampanha = 113651*/
+/*    -- AND ttp.DsTipoPremissa = 'Percentual Penetração Seguros'*/
+
+ORDER BY
+    tc.CdCampanha ASC
+	, tcp.CdParceiroCampanha ASC
+	, DtInicioVigencia ASC
+	, NuOrdemPrioridade DESC
+	, VrMeta DESC
+);
+   disconnect from perm;
+quit;
+
+PROC SQL;
+   CREATE TABLE BVCompensa AS
+   SELECT DISTINCT
+   		  DtAtualizacaoBVCompensa,
+		  CdCampanha,
+          NmCampanha,
+		  NmGrupoProdutoMeta,
+          CdTipoApuracaoCampanha,
+          DtInicioVigencia,
+          DtFimVigencia,
+          AnoMes,
+          CdParceiroCampanha,
+          CdParceiroComercial,
+          NmParceiroCampanha,
+          NuOrdemPrioridade,
+          MAX(CASE WHEN DsTipoPremissa = 'Valor Producao' THEN VrMeta ELSE 0 END) AS VrMetaValorProducao,
+          MAX(CASE WHEN DsTipoPremissa = 'Percentual Penetração Seguros' THEN VrMeta ELSE 0 END) AS VrMetaPenetracaoSeguros,
+          MAX(CASE WHEN DsTipoPremissa = 'Percentual Crescimento Mensal' THEN VrMeta ELSE 0 END) AS VrMetaCresMen,
+          MAX(CASE WHEN DsTipoPremissa = 'Percentual Crescimento Trimestral' THEN VrMeta ELSE 0 END) AS VrMetaCresTri,
+          MAX(CASE WHEN DsTipoPremissa = 'Quantidade Contratos' THEN VrMeta ELSE 0 END) AS VrMetaQtContratos,
+          VrRecompensa
+      FROM BVCompensaGCP
+      GROUP BY DtAtualizacaoBVCompensa,
+		  NmGrupoProdutoMeta,
+		  CdCampanha,
+          NmCampanha,
+          CdTipoApuracaoCampanha,
+          DtInicioVigencia,
+          DtFimVigencia,
+          AnoMes,
+          CdParceiroCampanha,
+          CdParceiroComercial,
+          NmParceiroCampanha,
+          NuOrdemPrioridade
+;QUIT;

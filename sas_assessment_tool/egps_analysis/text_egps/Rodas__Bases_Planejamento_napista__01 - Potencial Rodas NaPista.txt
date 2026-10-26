@@ -1,0 +1,327 @@
+START_METADATA
+PROJECT: Rodas__Bases_Planejamento_napista
+FILE_SAS: 01 - Potencial Rodas NaPista.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 75)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -8
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: ARRAY (5x | +75)
+----------------------------------------
+LINES_OF_CODE: 231
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SafraM0, SafraM2
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBNAPISTAPAGAMENTOSRESULTADO [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BPLAN.POTENCIAL_RODAS_LEVES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_NAPISTA
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BPLAN
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_NAPISTA, WORK.BASE_NAPISTA_2, WORK.BASE_PGTO_NAPISTA, WORK.PARCEIROSATIVOS
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBNAPISTAPAGAMENTOSRESULTADO [PROC SQL - FROM], BASES.TBCOLABORADOR [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], BPLAN.POTENCIAL_RODAS_LEVES [PROC SQL - FROM], BPLAN.POTENCIAL_RODAS_NAPISTA [PROC EXPORT - DATA=], WORK.BASE_NAPISTA [PROC SQL - FROM], WORK.BASE_NAPISTA_2 [DATA Step - SET; PROC SQL - FROM], WORK.BASE_PGTO_NAPISTA [PROC SQL - JOIN], WORK.PARCEIROSATIVOS [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): BPLAN.POTENCIAL_RODAS_NAPISTA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BPLAN.POTENCIAL_RODAS_NAPISTA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbBplan_Potencial_Rodas_NaPista.csv
+TEMP/DISCARDED OUTPUTS: BASE_NAPISTA, BASE_NAPISTA_2, WORK.BASE_NAPISTA_2, WORK.BASE_PGTO_NAPISTA, WORK.PARCEIROSATIVOS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**********************************/
+/*BASE DE LOJAS ATIVAS DE VEÍCULOS*/
+/**********************************/
+
+PROC SQL;
+CREATE TABLE WORK.PARCEIROSATIVOS AS
+SELECT
+
+A.CdParceiroComercial,
+A.NuCnpjLoja,
+A.DsAtividadeFinanciamento,
+A.NmFilialC,
+A.NmTipoParceiroComercial,
+A.NmAutoShopping,
+A.NmGrupoConcessionaria,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN A.NmGrupoConcessionaria
+	WHEN A.NmAutoShopping <> '' THEN A.NmAutoShopping
+	WHEN A.NmTipoParceiroComercial <> '' THEN A.NmTipoParceiroComercial
+	ELSE 'Outros'
+END) AS NmClassificacaoGrupoParceiro,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN 'GRANDES GRUPOS'
+	WHEN A.NmAutoShopping <> '' THEN 'AUTO SHOPPING'
+	WHEN A.NmTipoParceiroComercial <> '' THEN UPCASE(A.NmTipoParceiroComercial)
+	ELSE 'OUTROS'
+END) AS NmClassificacaoTipoGrupoParceiro,
+
+A.NmParceiroComercial,
+A.CdUf,
+A.CdColaboradorC,
+A.NmColaboradorC,
+A.DsLoginN1C,
+B.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.DtCadastro,
+A.FlAtivo
+FROM BASES.TBPARCEIROCOMERCIAL A
+
+LEFT JOIN BASES.TBCOLABORADOR B ON B.DSLOGIN = A.DsLoginN1C AND B.CDCOLABORADOR = A.CdColaboradorC
+
+WHERE
+A.FlAtivo = 'S'
+AND A.NmCanalEstruturaComercialC = 'Canal Veiculos'
+AND A.DsAtividadeFinanciamento = 'VEÍCULO'
+
+ORDER BY 1
+
+;RUN;
+
+/******/
+
+PROC SQL;
+CREATE TABLE WORK.BASE_PGTO_NAPISTA AS
+SELECT
+
+A.NuAnoMes,
+A.codigo_parceiro_bv,
+A.CdParceiroComercial,
+A.NmParceiroComercial,
+A.NmTipoParceiroComercial,
+A.NmAreaEstruturaComercial,
+A.NmFilial,
+A.NmCanalEstruturaComercial,
+A.valor_pago,
+A.tipo_pagamento,
+A.data_pagamento
+FROM BASEGRC.TBNAPISTAPAGAMENTOSRESULTADO A
+
+WHERE
+/*A.NuAnoMes BETWEEN 202502 AND 202504*/
+codigo_parceiro_bv <> 0
+AND A.nuanomes >= &SafraM2. and A.nuanomes <= &SafraM0.
+/*AND A.nuanomes >= &SafraM3. and A.nuanomes <= &SafraM1.*/
+
+ORDER BY 1,2
+
+;QUIT;
+
+/*****/
+
+PROC SQL;
+CREATE TABLE BASE_NAPISTA AS
+SELECT
+
+A.NuAnoMes,
+A.FlAtivo,
+A.NmGrupoProduto,
+A.CdParceiroComercial,
+
+B.NmTipoParceiroComercial,
+B.NmAutoShopping,
+B.NmGrupoConcessionaria,
+B.NmClassificacaoGrupoParceiro,
+B.NmClassificacaoTipoGrupoParceiro,
+
+A.ChaveUFCidade,
+A.NmCidade,
+A.CdUf,
+A.QtBancos,
+A.NuCnpjLoja,
+A.FlPorteA,
+A.CdColaboradorC,
+B.NmColaboradorC,
+B.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.NmTipoParceiroComercial,
+sum(A.qtdcontratos) as qtdcontratos,
+sum(A.VrProducao) as VrProducao,
+sum(A.VrMargemContribuicao) as VrMargemContribuicao,
+sum(A.qtgravamesplayers) as qtgravamesplayers,
+sum(A.Vrgravamesplayers) as Vrgravamesplayers,
+A.PorteCidade,
+A.Regiao,
+A.FaixaBancos
+
+FROM BPLAN.POTENCIAL_RODAS_LEVES A
+
+LEFT JOIN WORK.PARCEIROSATIVOS B ON B.CdParceiroComercial = A.CdParceiroComercial
+
+where b.NmGrupoCargoColaborador = 'Gerente Relacionamento Veiculos'
+
+group by
+A.NuAnoMes,
+A.FlAtivo,
+A.NmGrupoProduto,
+A.CdParceiroComercial,
+B.NmTipoParceiroComercial,
+B.NmAutoShopping,
+B.NmGrupoConcessionaria,
+B.NmClassificacaoGrupoParceiro,
+B.NmClassificacaoTipoGrupoParceiro,
+A.ChaveUFCidade,
+A.NmCidade,
+A.CdUf,
+A.QtBancos,
+A.NuCnpjLoja,
+A.FlPorteA,
+A.CdColaboradorC,
+B.NmColaboradorC,
+B.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.NmTipoParceiroComercial,
+A.PorteCidade,
+A.Regiao,
+A.FaixaBancos
+
+order by NuAnoMes
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_NAPISTA_2 AS
+SELECT
+
+A.NuAnoMes,
+A.FlAtivo,
+A.NmGrupoProduto,
+A.CdParceiroComercial,
+
+A.NmTipoParceiroComercial,
+A.NmAutoShopping,
+A.NmGrupoConcessionaria,
+A.NmClassificacaoGrupoParceiro,
+A.NmClassificacaoTipoGrupoParceiro,
+
+A.ChaveUFCidade,
+A.NmCidade,
+A.CdUf,
+A.QtBancos,
+A.NuCnpjLoja,
+A.FlPorteA,
+A.CdColaboradorC,
+A.NmColaboradorC,
+A.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.NmTipoParceiroComercial,
+A.PorteCidade,
+A.Regiao,
+A.FaixaBancos,
+sum(A.qtdcontratos) as qtdcontratos format commax20.0,
+sum(A.VrProducao) as VrProducao format commax20.2,
+sum(A.VrMargemContribuicao) as VrMargemContribuicao format commax20.2,
+sum(A.qtgravamesplayers) as qtgravamesplayers format commax20.0,
+sum(A.Vrgravamesplayers) as Vrgravamesplayers format commax20.2,
+SUM(C.valor_pago) AS VrProducao_NaPista format commax20.2
+
+FROM WORK.BASE_NAPISTA A
+
+LEFT JOIN WORK.BASE_PGTO_NAPISTA C ON C.codigo_parceiro_bv = A.CdParceiroComercial AND C.NUANOMES = A.NUANOMES
+
+group by
+A.NuAnoMes,
+A.FlAtivo,
+A.NmGrupoProduto,
+A.CdParceiroComercial,
+A.NmTipoParceiroComercial,
+A.NmAutoShopping,
+A.NmGrupoConcessionaria,
+A.NmClassificacaoGrupoParceiro,
+A.NmClassificacaoTipoGrupoParceiro,
+A.ChaveUFCidade,
+A.NmCidade,
+A.CdUf,
+A.QtBancos,
+A.NuCnpjLoja,
+A.FlPorteA,
+A.CdColaboradorC,
+A.NmColaboradorC,
+A.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.NmTipoParceiroComercial,
+A.PorteCidade,
+A.Regiao,
+A.FaixaBancos
+
+order by A.NuAnoMes
+
+;RUN;
+
+/*SUBSTITUI TUDO QUE FOI "MISSING OU '.' POR '0'*/
+/*ALGUNS CASOS ESTÃO "VAZIOS" AO FINALIZAR O SCRIPT*/
+
+data work.BASE_NAPISTA_2;
+	set work.BASE_NAPISTA_2;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+/******************************************************************************************/
+/*GFM - 09/01/2026 - DELETE DO PDV ABAIXO POIS É UMA LOCADORA - VITORIA QUE PEDIU O DELETE*/
+/******************************************************************************************/
+
+PROC SQL;
+DELETE FROM work.BASE_NAPISTA_2
+WHERE CdParceiroComercial = 474640;
+;RUN;
+
+/******************************************************************************************/
+/******************************************************************************************/
+
+DATA BPLAN.POTENCIAL_RODAS_NAPISTA;
+SET WORK.BASE_NAPISTA_2;
+;RUN;
+
+/***************/
+/*EXPORTA BASES*/
+/***************/
+
+proc export
+data= BPLAN.POTENCIAL_RODAS_NAPISTA
+file='/riscosbvf/BA/processos/output/TbBplan_Potencial_Rodas_NaPista.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

@@ -1,0 +1,414 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Carteira_Final_Semana_edit_joao
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:26 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 12)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 8
+ODS_OUTPUTS_DETECTED: html, lst, xlsx
+TRIGGERS: FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 284
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: EXPORT, PRINT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: PE = /riscosbvf/financas/PE_DATA_VIZ/
+DETECTED_MACROS_DEFINED: DU, DtReferencia, MEDIA_CDI
+DETECTED_MACROS_USED: DU, DtReferencia, MEDIA_CDI
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_POSICAOCONSOLIDADA.TBESTRUTURAGERENCIAL [BIGQUERY], BV-PDBD-PRD.TRUSTED_POSICAOCONSOLIDADA.TBESTRUTURAPRODUTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_POSICAOCONSOLIDADAVAREJO.TBPOSICAOCONTABIL [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: PE
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_POSICAOCONSOLIDADA.TBESTRUTURAGERENCIAL [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_POSICAOCONSOLIDADA.TBESTRUTURAPRODUTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_POSICAOCONSOLIDADAVAREJO.TBPOSICAOCONTABIL [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /riscosbvf/financas/PE_DATA_VIZ/CARTEIRA_FINAL_SEMANA.xlsx
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PE.CUSTOCAP_FIM_SEMANA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/financas/PE_DATA_VIZ/CARTEIRA_FINAL_SEMANA.xlsx
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: POSICAO_CONTABIL, TEMPLATE_CONCILIACAO, VALOR_CONTRATRO, VERIFICA_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET DtReferencia='2025-12-31';
+%LET MEDIA_CDI=1.00055131;
+%LET DU=22;
+
+[[ FILE_REFS_MACRO ]]
+OUT|/riscosbvf/financas/PE_DATA_VIZ/CARTEIRA_FINAL_SEMANA.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|CARTEIRA_FINAL_SEMANA.XLSX||ok
+IN|/riscosbvf/financas/PE_DATA_VIZ/CARTEIRA_FINAL_SEMANA.xlsx|/RISCOSBVF/FINANCAS/PE_DATA_VIZ|CARTEIRA_FINAL_SEMANA.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Processo */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Processo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-KwTqey2dwshDgC3l/code.sas */
+/* =========================INÍCIO TASK========================= */
+option compress = binary;
+
+
+
+
+
+
+
+%LET DtReferencia = '2025-12-31';
+
+
+
+
+
+
+%LET MEDIA_CDI = 1.00055131;
+%LET DU =  22;
+
+options compress=binary;
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+Create table POSICAO_CONTABIL as
+select * from connection to perm
+(
+
+  SELECT
+	Nuobjetonegociacao
+	,coalesce(cast(pr.CdModalidadeProduto as INT64),-1) as CdModalidadeCatalogoProduto
+	,ger.cdbook
+	,pc.DtReferencia
+	,sum(coalesce(cast(VrSaldoContabilSMTM as FLOAT64),0)) as VrSaldoContabilSMTM
+
+	from bv-pdbd-prd.trusted_posicaoconsolidadavarejo.tbposicaocontabil pc
+	left outer join  bv-pdbd-prd.trusted_posicaoconsolidada.tbestruturaproduto as pr
+    on ifnull(Pc.CdCnsldrEstruturaProduto,-1) = pr.CdCnsldrEstruturaProduto
+	left outer join bv-pdbd-prd.trusted_posicaoconsolidada.tbestruturagerencial as ger
+    on pc.CdCnsldrEstruturaGerencial = ger.CdCnsldrEstruturaGerencial
+	where pc.DtReferencia = &DtReferencia. and  pc.CdCarteira <> 13
+
+	group by
+	Nuobjetonegociacao
+	,pr.CdModalidadeProduto
+	,cdbook
+	,pc.DtReferencia
+
+);
+disconnect from perm
+;quit;
+
+proc sql;
+create table POSICAO_CONTABIL as select
+*
+,CASE WHEN CdModalidadeCatalogoProduto = -1 OR CdModalidadeCatalogoProduto = .
+		OR cdbook = -1 OR cdbook = .
+		THEN 'NAO ERA CONSIDERADO' ELSE 'JA ERA CONSIDERADO'
+		END AS FLAG_BASE
+
+from POSICAO_CONTABIL
+WHERE COALESCE(VRSALDOCONTABILSMTM,0) <> 0
+;quit;
+
+PROC SQL;
+CREATE TABLE VERIFICA_TOTAL AS SELECT
+DTREFERENCIA
+,SUM(COALESCE(VRSALDOCONTABILSMTM,0)) format= commax22.2 AS SALDO_CARTEIRA
+,SUM(COALESCE(VRSALDOCONTABILSMTM,0)) * ((&MEDIA_CDI. ** &DU.)-1) format= commax22.2 AS CUSTO_CAP
+FROM POSICAO_CONTABIL
+WHERE FLAG_BASE = 'NAO ERA CONSIDERADO'
+GROUP BY
+DTREFERENCIA
+;QUIT;
+
+PROC SQL;
+CREATE TABLE VALOR_CONTRATRO AS SELECT
+NUOBJETONEGOCIACAO
+,CDMODALIDADECATALOGOPRODUTO
+,CDBOOK
+,DTREFERENCIA
+,COALESCE(VRSALDOCONTABILSMTM,0) AS VRSALDOCONTABILSMTM
+,COALESCE(VRSALDOCONTABILSMTM,0) * ((&MEDIA_CDI. ** &DU.)-1) AS CUSTO_CAP
+FROM POSICAO_CONTABIL
+WHERE FLAG_BASE = 'NAO ERA CONSIDERADO'
+GROUP BY
+NUOBJETONEGOCIACAO
+,CDMODALIDADECATALOGOPRODUTO
+,CDBOOK
+,DTREFERENCIA
+;QUIT;
+LIBNAME PE '/riscosbvf/financas/PE_DATA_VIZ/';
+
+DATA PE.CUSTOCAP_FIM_SEMANA;
+SET VALOR_CONTRATRO;
+RUN;
+
+
+
+
+
+PROC SQL;
+CREATE TABLE TEMPLATE_CONCILIACAO AS SELECT
+1 AS CdTipoAjuste
+,2108 AS CDTIPOREALOCACAO
+,'Ajuste Internegocios' AS DsJustificativaRealocacao
+,151 AS CdModalidadeProduto
+,. AS CdComponente
+,8 AS CdSegmentoMercado
+,'A' AS TpContabil
+,'31/12/2025' AS DtReferencia
+,0 AS VrResultadoTesouraria
+,(CUSTO_CAP) * -1  AS VrResultadoComercial
+,(CUSTO_CAP) AS VrResultadoAcionista
+,0 AS VrResultadoComercialPrivate
+,0 AS VrCustoCaixa
+,0 AS ResultadoMora
+,0 AS ResultadoMulta
+,0 AS RiscoAlocado
+,'1||151||Carteira_Sem_Marcacao' AS CdChaveOperacao
+,. as CdCliente
+,. as CdOfficer
+,. as CdDivisaoComercial
+,. as CdGrupoComercial
+,. as CdGrupoEconomico
+,. as CdRegional
+,1 as CdVeiculo
+,. as NuContaContabil
+,225 as cdbook
+,5 as cdGrupoConciliacao
+,'NÃO' as Segmentar
+
+FROM VERIFICA_TOTAL
+;QUIT;
+
+PROC EXPORT
+  DATA=TEMPLATE_CONCILIACAO
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/CARTEIRA_FINAL_SEMANA.xlsx"
+  REPLACE;
+  SHEET= CART_FINAL_SEMANA;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Processo */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Email */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Email */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-COJHnQwrtRcQSkcX/code.sas */
+/* =========================INÍCIO TASK========================= */
+FILENAME MYMAIL EMAIL FROM="joao.victor@bv.com.br"
+
+TO=(
+"joao.victor@bv.com.br"
+
+"gms.gcosta@bv.com.br"
+"felipe.nogueira@bv.com.br"
+"katia.manzi@bv.com.br"
+"ricardo.milagres@bv.com.br"
+"keli.pereira@bv.com.br"
+
+"eduardo.palma@bv.com.br"
+
+"NARA.VIANNA@BV.COM.BR"
+
+)
+SUBJECT="Carteira Final de Semana - Dezembro 2025" CONTENT_TYPE="text/html"
+	ATTACH=("/riscosbvf/financas/PE_DATA_VIZ/CARTEIRA_FINAL_SEMANA.xlsx" content_type="application/xlsx")
+
+;
+
+ODS LISTING CLOSE;
+ODS HTML BODY=MYMAIL;
+
+proc print
+data= VERIFICA_TOTAL noobs style={bordercolor=black borderwidth=1px borderstyle=solid};
+
+TITLE COLOR=blue 'MIS Finanças';
+TITLE2  COLOR=black HEIGHT=9pt 'Prezados, segue o valor entre Comercial e Acionista da carteira que foi gerada no final de semana referente ao mês de Dezembro 2025';
+TITLE3  COLOR=black HEIGHT=9pt 'Em anexo segue o template para conciliação';
+TITLE4  COLOR=black HEIGHT=9pt '';
+TITLE5  COLOR=black HEIGHT=9pt 'Valor do Custo de Captação da Carteira de Final de Semana:';
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Email */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+option compress = binary;
+
+
+
+
+
+
+
+%LET DtReferencia = '2025-12-31';
+
+
+
+
+
+
+%LET MEDIA_CDI = 1.00055131;
+%LET DU =  22;
+
+options compress=binary;
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+Create table POSICAO_CONTABIL as
+select * from connection to perm
+(
+
+  SELECT
+	Nuobjetonegociacao
+	,coalesce(cast(pr.CdModalidadeProduto as INT64),-1) as CdModalidadeCatalogoProduto
+	,ger.cdbook
+	,pc.DtReferencia
+	,sum(coalesce(cast(VrSaldoContabilSMTM as FLOAT64),0)) as VrSaldoContabilSMTM
+
+	from bv-pdbd-prd.trusted_posicaoconsolidadavarejo.tbposicaocontabil pc
+	left outer join  bv-pdbd-prd.trusted_posicaoconsolidada.tbestruturaproduto as pr
+    on ifnull(Pc.CdCnsldrEstruturaProduto,-1) = pr.CdCnsldrEstruturaProduto
+	left outer join bv-pdbd-prd.trusted_posicaoconsolidada.tbestruturagerencial as ger
+    on pc.CdCnsldrEstruturaGerencial = ger.CdCnsldrEstruturaGerencial
+	where pc.DtReferencia = &DtReferencia. and  pc.CdCarteira <> 13
+
+	group by
+	Nuobjetonegociacao
+	,pr.CdModalidadeProduto
+	,cdbook
+	,pc.DtReferencia
+
+);
+disconnect from perm
+;quit;
+
+proc sql;
+create table POSICAO_CONTABIL as select
+*
+,CASE WHEN CdModalidadeCatalogoProduto = -1 OR CdModalidadeCatalogoProduto = .
+		OR cdbook = -1 OR cdbook = .
+		THEN 'NAO ERA CONSIDERADO' ELSE 'JA ERA CONSIDERADO'
+		END AS FLAG_BASE
+
+from POSICAO_CONTABIL
+WHERE COALESCE(VRSALDOCONTABILSMTM,0) <> 0
+;quit;
+
+PROC SQL;
+CREATE TABLE VERIFICA_TOTAL AS SELECT
+DTREFERENCIA
+,SUM(COALESCE(VRSALDOCONTABILSMTM,0)) format= commax22.2 AS SALDO_CARTEIRA
+,SUM(COALESCE(VRSALDOCONTABILSMTM,0)) * ((&MEDIA_CDI. ** &DU.)-1) format= commax22.2 AS CUSTO_CAP
+FROM POSICAO_CONTABIL
+WHERE FLAG_BASE = 'NAO ERA CONSIDERADO'
+GROUP BY
+DTREFERENCIA
+;QUIT;
+
+PROC SQL;
+CREATE TABLE VALOR_CONTRATRO AS SELECT
+NUOBJETONEGOCIACAO
+,CDMODALIDADECATALOGOPRODUTO
+,CDBOOK
+,DTREFERENCIA
+,COALESCE(VRSALDOCONTABILSMTM,0) AS VRSALDOCONTABILSMTM
+,COALESCE(VRSALDOCONTABILSMTM,0) * ((&MEDIA_CDI. ** &DU.)-1) AS CUSTO_CAP
+FROM POSICAO_CONTABIL
+WHERE FLAG_BASE = 'NAO ERA CONSIDERADO'
+GROUP BY
+NUOBJETONEGOCIACAO
+,CDMODALIDADECATALOGOPRODUTO
+,CDBOOK
+,DTREFERENCIA
+;QUIT;
+LIBNAME PE '/riscosbvf/financas/PE_DATA_VIZ/';
+
+DATA PE.CUSTOCAP_FIM_SEMANA;
+SET VALOR_CONTRATRO;
+RUN;
+
+
+
+
+
+PROC SQL;
+CREATE TABLE TEMPLATE_CONCILIACAO AS SELECT
+1 AS CdTipoAjuste
+,2108 AS CDTIPOREALOCACAO
+,'Ajuste Internegocios' AS DsJustificativaRealocacao
+,151 AS CdModalidadeProduto
+,. AS CdComponente
+,8 AS CdSegmentoMercado
+,'A' AS TpContabil
+,'31/12/2025' AS DtReferencia
+,0 AS VrResultadoTesouraria
+,(CUSTO_CAP) * -1  AS VrResultadoComercial
+,(CUSTO_CAP) AS VrResultadoAcionista
+,0 AS VrResultadoComercialPrivate
+,0 AS VrCustoCaixa
+,0 AS ResultadoMora
+,0 AS ResultadoMulta
+,0 AS RiscoAlocado
+,'1||151||Carteira_Sem_Marcacao' AS CdChaveOperacao
+,. as CdCliente
+,. as CdOfficer
+,. as CdDivisaoComercial
+,. as CdGrupoComercial
+,. as CdGrupoEconomico
+,. as CdRegional
+,. as CdVeiculo
+,. as NuContaContabil
+,225 as cdbook
+,5 as cdGrupoConciliacao
+,'NÃO' as Segmentar
+
+FROM VERIFICA_TOTAL
+;QUIT;
+
+PROC EXPORT
+  DATA=TEMPLATE_CONCILIACAO
+  DBMS=XLSX
+  OUTFILE="/riscosbvf/financas/PE_DATA_VIZ/CARTEIRA_FINAL_SEMANA.xlsx"
+  REPLACE;
+  SHEET= CART_FINAL_SEMANA;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

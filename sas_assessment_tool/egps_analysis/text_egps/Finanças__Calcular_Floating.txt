@@ -1,0 +1,346 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Calcular_Floating
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:35 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 9
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 231
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: DataRef, base
+DETECTED_MACROS_USED: DataRef, base
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): PLANCTRL.BASE_SAIDA_SIC_AGO25 [SAS/Local], PLANCTRL.TB001_SEGMENTACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Floating\floating.xlsx[SHEET='Planilha1'], \\bvnet\global\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Floating\rural.xlsx[SHEET='Planilha1']
+TEMP/DISCARDED_FILE_INPUT: WORK.floating <- N:\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Floating\floating.xlsx[SHEET='Planilha1'], WORK.rural <- \\bvnet\global\DFRI\SPT. ALM. RI. P&amp;C. Contas a Pagar\P&amp;C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Floating\rural.xlsx[SHEET='Planilha1']
+TEMP/DISCARDED_TABLE_INPUT: WORK.AJUSTES, WORK.DADOS, WORK.FLOATING, WORK.FLOATING_ATUAL, WORK.FLOATING_CALC, WORK.FLOATING_SEGMENTADO, WORK.FLOATING_SOMA, WORK.FLOAT_PERC, WORK.FLOAT_SINT, WORK.RURAL, WORK.RURAL_SOMA, WORK.SEGMENTADO
+TABLE_READ_PROVENANCE (Flow): PLANCTRL.BASE_SAIDA_SIC_AGO25 [PROC SQL - FROM; Resolved qualified read (%LET)], PLANCTRL.TB001_SEGMENTACAO [PROC SORT - DATA=], WORK.AJUSTES [PROC SQL - FROM], WORK.DADOS [PROC SQL - FROM], WORK.FLOATING [PROC SQL - FROM], WORK.FLOATING_ATUAL [PROC SQL - FROM], WORK.FLOATING_CALC [PROC SQL - FROM], WORK.FLOATING_SEGMENTADO [PROC SQL - FROM], WORK.FLOATING_SOMA [PROC SQL - JOIN], WORK.FLOAT_PERC [PROC SQL - JOIN], WORK.FLOAT_SINT [PROC SQL - FROM], WORK.RURAL [PROC SQL - FROM; PROC SQL - JOIN], WORK.RURAL_SOMA [PROC SQL - JOIN], WORK.SEGMENTADO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SAIDA_SIC_SET25D_D3, WORK.AJUSTES, WORK.AJUSTES_RURAL, WORK.DADOS, WORK.FLOATING_ATUAL, WORK.FLOATING_CALC, WORK.FLOATING_SEGMENTADO, WORK.FLOATING_SOMA, WORK.FLOAT_PERC, WORK.FLOAT_SINT, WORK.RURAL_SOMA, WORK.SEGMENTADO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET DtBase=JUL22;
+%LET DataRef='29AUG2025'd;
+%LET base=BASE_SAIDA_SIC_MAI24D_D3;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DFRI\SPT. ALM. RI. P&C. Contas a Pagar\P&C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Floating\floating.xlsx[SHEET='Planilha1']||FLOATING.XLSX|C|ok
+IN|\\bvnet\global\DFRI\SPT. ALM. RI. P&C. Contas a Pagar\P&C Atacado e Consolidação\CONCILIACAO\SAS - Projetos\Floating\rural.xlsx[SHEET='Planilha1']||RURAL.XLSX|C|ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Segmentar_Floating */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Segmentar_Floating */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-yjF9GHyRmgGhr23p/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+
+Create table work.rural_soma as
+select sum(total_acionista) as total_acionista, 1 as agrup
+from work.rural;
+
+Create table work.float_sint as
+select dtapuracaosaldo, cdbanco, sum(vrsaldototal) as vrsaldototal, 21 as per_compulsorio, 25 as per_rural, max(CDI) as CDI
+from work.FLOATING
+group by dtapuracaosaldo, cdbanco
+order by dtapuracaosaldo, cdbanco;
+
+
+
+Create table work.float_perc as
+select *, case when vrsaldototal > 500000000 then (vrsaldototal - ((vrsaldototal - 500000000) * per_compulsorio/100) ) * ((1+CDI)**(1/252)-1)
+		  else vrsaldototal * ((1+CDI)**(1/252)-1)
+		  end as CalcFloatnovo,
+		  case when vrsaldototal > 500000000 then (vrsaldototal - ((vrsaldototal - 500000000) * per_compulsorio/100) ) / vrsaldototal
+		  else vrsaldototal / vrsaldototal
+		  end as perc_dia
+from work.float_sint;
+
+quit;
+
+proc sql;
+create table work.floating_calc as
+select f.DtApuracaoSaldo, f.cdbanco, f.cdpessoa, (perc_dia * f.VrSaldoTotal)*((1+f.CDI)**(1/252)-1) as CalcFloat, 1 as agrup, f.VrSaldoTotal
+from work.FLOATING f
+inner join work.float_perc p
+on p.dtapuracaosaldo = f.dtapuracaosaldo
+and p.cdbanco = f.cdbanco;
+
+create table work.floating_soma as
+select cdbanco, sum(CalcFloat) as tot_float, 1 as agrup
+from floating_calc
+group by cdbanco;
+
+create table work.floating_atual as
+select DtApuracaoSaldo, f.cdbanco, cdpessoa, CalcFloat, tot_float, CalcFloat/tot_float as percfloat, total_acionista, total_acionista*CalcFloat/tot_float as desconto_rural, CalcFloat - COALESCE((total_acionista*CalcFloat/tot_float),0) as calcfloat_atual, f.VrSaldoTotal
+from  work.floating_calc f
+inner join work.floating_soma s
+on s.agrup = f.agrup
+and s.cdbanco = f.cdbanco
+left join work.rural_soma r
+on r.agrup = s.agrup
+and f.cdbanco = 161;
+
+quit;
+
+PROC SORT nodupkey DATA=PLANCTRL.TB001_SEGMENTACAO out=Work.Segmentado;
+ BY cdcliente ;
+ Run;
+
+proc sql;
+Create table work.floating_segmentado as
+select distinct f.DtApuracaoSaldo, f.cdbanco, f.cdpessoa, f.calcfloat_atual as CalcFloat , f.VrSaldoTotal, CdSegmentoMercado, nmSegmentoMercado, CdGrupoComercial, nmGrupoComercial,
+CdDivisaoComercial, nmDivisaoComercial, cdpessoafuncionario as CdOfficer, nmfuncionario as nmOfficer,
+CdGrupoEconomico, nmGrupoEconomico
+from work.floating_atual as f
+left join Work.Segmentado as s
+on s.cdcliente = f.cdpessoa
+where f.cdpessoa NE .;
+
+update work.floating_segmentado
+set  CdSegmentoMercado = 15,
+     nmSegmentoMercado = 'DIGITAL'
+where cdpessoa in (-1, -2);
+
+update work.floating_segmentado
+set  CdSegmentoMercado = 6,
+     CdDivisaoComercial = 88,
+	 NmSegmentoMercado = 'INSTITUICAO FINANCEIRA'
+where CdSegmentoMercado = .;
+
+update work.floating_segmentado
+set  CdSegmentoMercado = 5,
+     nmSegmentoMercado = 'VAREJO'
+where CdSegmentoMercado = 15;
+
+update work.floating_segmentado
+set  CdSegmentoMercado = 6,
+     nmSegmentoMercado = 'INSTITUICAO FINANCEIRA'
+where cdbanco = 161
+and CdSegmentoMercado = 5;
+
+update work.floating_segmentado
+set  cdbanco = 1
+where cdbanco = 161;
+
+update work.floating_segmentado
+set  cdbanco = 1455
+where cdbanco = 436;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Segmentar_Floating */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Gerar_ajustes_DAV */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Gerar_ajustes_DAV */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-JI5PZNtM8cUT1eVp/code.sas */
+/* =========================INÍCIO TASK========================= */
+%Let DataRef = '30SEP2025'd;
+
+Proc sql;
+
+create table work.Ajustes as
+select 1 as CdTipoAjuste, 1042 as CdTipoRealocacao, 'Ajuste Floating DV' as DsJustificativaRealocacao, 582 as CdModalidadeProduto,
+21 as CdComponente, CdSegmentoMercado, 'A' as TipoContabil, &DataRef. format ddmmyy10. as DtReferencia ,
+0 as VrResultadoTesouraria, sum(calcfloat) as VrResultadoComercial, -sum(calcfloat) as VrResultadoAcionista,
+0 as VrResultadoComercialPrivate,  0 as VrMesaCaixa, 0 as ResultadoMora, 0 as ResultadoMulta, 0 as RiscoAlocado,
+cats(cdbanco, '||Floating_', put(&DataRef., yymmddn8.), '_' , cdpessoa)  as ChaveUnica, cdpessoa as CdCliente, CdOfficer, CdDivisaoComercial, CdGrupoComercial,
+CdGrupoEconomico, '' as CdRegional, cdbanco as CdVeiculo, '' as CdContaContabil, 594 as CdBook, 13 as cdGrupoConciliacao, 'Não' as Segmentar
+from work.floating_segmentado
+group by cdpessoa, CdSegmentoMercado, CdOfficer, CdDivisaoComercial, CdGrupoComercial, CdGrupoEconomico, cdbanco ;
+
+update work.Ajustes
+set ChaveUnica = TRANWRD(ChaveUnica, '-1', 'DIGITAL')
+where cdcliente = -1;
+
+update work.Ajustes
+set ChaveUnica = TRANWRD(ChaveUnica, '-2', 'MELIUZ')
+where cdcliente = -2;
+
+update work.Ajustes
+set cdcliente = .
+where cdcliente in (-1,-2);
+
+delete from work.Ajustes
+where abs(VrResultadoComercial) < 0.01;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Gerar_ajustes_DAV */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Ajustes_Rural */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Ajustes_Rural */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ikWg1XdwjfnZkboq/code.sas */
+/* =========================INÍCIO TASK========================= */
+%Let DataRef = '30SEP2025'd;
+
+%Let base = BASE_SAIDA_SIC_SET25D_D3;
+
+
+
+Proc sql;
+
+create table work.Dados as
+select cdobjetonegociacao, chave_unica, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cdsegmento_mercado_sas, cdveiculo, max(total_acionista) as acionista, max(cdbook) as cdbook
+from PLANCTRL.&base as b
+inner join Work.RURAL as r
+on r.operacao = b.cdobjetonegociacao
+where cdobjetonegociacao in (select operacao from Work.RURAL)
+and origem = 'SIC'
+group by cdobjetonegociacao, chave_unica, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cdsegmento_mercado_sas, cdveiculo;
+
+create table work.Ajustes_rural as
+select 2 as CdTipoAjuste, 2082 as CdTipoRealocacao, 'Acio vs CIB Rural Exigibilidade DAV' as DsJustificativaRealocacao, cdmodalidade_produto_sas as CdModalidadeProduto,
+'' as CdComponente, cdsegmento_mercado_sas as CdSegmentoMercado, tipo_contabil as TipoContabil, &DataRef. format ddmmyy10. as DtReferencia ,
+0 as VrResultadoTesouraria, acionista as VrResultadoComercial, -acionista as VrResultadoAcionista,
+0 as VrResultadoComercialPrivate,  0 as VrMesaCaixa, 0 as ResultadoMora, 0 as ResultadoMulta, 0 as RiscoAlocado,
+chave_unica as ChaveUnica, CdCliente, '' as CdOfficer, '' as CdDivisaoComercial, '' as CdGrupoComercial,
+'' as CdGrupoEconomico, '' as CdRegional, cdveiculo, '' as CdContaContabil, CdBook, 3 as cdGrupoConciliacao, 'Não' as Segmentar
+from work.Dados;
+
+drop table work.Dados;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Ajustes_Rural */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%Let DataRef = '29AUG2025'd;
+
+Proc sql;
+
+create table work.Ajustes as
+select 1 as CdTipoAjuste, 1042 as CdTipoRealocacao, 'Ajuste Floating DV' as DsJustificativaRealocacao, 582 as CdModalidadeProduto,
+21 as CdComponente, CdSegmentoMercado, 'A' as TipoContabil, &DataRef. format ddmmyy10. as DtReferencia ,
+0 as VrResultadoTesouraria, sum(calcfloat) as VrResultadoComercial, -sum(calcfloat) as VrResultadoAcionista,
+0 as VrResultadoComercialPrivate,  0 as VrMesaCaixa, 0 as ResultadoMora, 0 as ResultadoMulta, 0 as RiscoAlocado,
+cats(cdbanco, '||Floating_', put(&DataRef., yymmddn8.), '_' , cdpessoa)  as ChaveUnica, cdpessoa as CdCliente, CdOfficer, CdDivisaoComercial, CdGrupoComercial,
+CdGrupoEconomico, '' as CdRegional, cdbanco as CdVeiculo, '' as CdContaContabil, 594 as CdBook, 13 as cdGrupoConciliacao, 'Não' as Segmentar
+from work.floating_segmentado
+group by cdpessoa, CdSegmentoMercado, CdOfficer, CdDivisaoComercial, CdGrupoComercial, CdGrupoEconomico, cdbanco ;
+
+update work.Ajustes
+set ChaveUnica = TRANWRD(ChaveUnica, '-1', 'DIGITAL')
+where cdcliente = -1;
+
+update work.Ajustes
+set ChaveUnica = TRANWRD(ChaveUnica, '-2', 'MELIUZ')
+where cdcliente = -2;
+
+update work.Ajustes
+set cdcliente = .
+where cdcliente in (-1,-2);
+
+delete from work.Ajustes
+where abs(VrResultadoComercial) < 0.01;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%Let DataRef = '29AUG2025'd;
+
+%Let base = BASE_SAIDA_SIC_AGO25;
+
+
+
+Proc sql;
+
+create table work.Dados as
+select cdobjetonegociacao, chave_unica, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cdsegmento_mercado_sas, cdveiculo, max(total_acionista) as acionista, max(cdbook) as cdbook
+from PLANCTRL.&base as b
+inner join Work.RURAL as r
+on r.operacao = b.cdobjetonegociacao
+where cdobjetonegociacao in (select operacao from Work.RURAL)
+and origem = 'SIC'
+group by cdobjetonegociacao, chave_unica, cdmodalidade_produto_sas, tipo_contabil, cdcliente, cdsegmento_mercado_sas, cdveiculo;
+
+create table work.Ajustes_rural as
+select 2 as CdTipoAjuste, 2082 as CdTipoRealocacao, 'Acio vs CIB Rural Exigibilidade DAV' as DsJustificativaRealocacao, cdmodalidade_produto_sas as CdModalidadeProduto,
+'' as CdComponente, cdsegmento_mercado_sas as CdSegmentoMercado, tipo_contabil as TipoContabil, &DataRef. format ddmmyy10. as DtReferencia ,
+0 as VrResultadoTesouraria, acionista as VrResultadoComercial, -acionista as VrResultadoAcionista,
+0 as VrResultadoComercialPrivate,  0 as VrMesaCaixa, 0 as ResultadoMora, 0 as ResultadoMulta, 0 as RiscoAlocado,
+chave_unica as ChaveUnica, CdCliente, '' as CdOfficer, '' as CdDivisaoComercial, '' as CdGrupoComercial,
+'' as CdGrupoEconomico, '' as CdRegional, cdveiculo, '' as CdContaContabil, CdBook, 3 as cdGrupoConciliacao, 'Não' as Segmentar
+from work.Dados;
+
+drop table work.Dados;
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

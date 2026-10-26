@@ -1,0 +1,90 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: TI__Extração - Sim. NRT
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-06-18 17:52:30 UTC
+BUSINESS_AREA: TI
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 43
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CONVSIMU = /infogrc/convsimu
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtRef
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: DTREF
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CONVSIMU.TBSIMULACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CONVSIMU
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): CONVSIMU.TBSIMULACOES [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: WORK.NRT_&DTREF
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-zyVtIyevV8BNbSwq/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname convsimu "/infogrc/convsimu";
+
+%macro base_nrt(DtRef);
+
+PROC SQL;
+   CREATE TABLE WORK.nrt_&DtRef. AS
+   SELECT DISTINCT
+		  t1.NuAnoMes,
+          t1.NuCpfCnpj,
+          t1.CdSimulacaoFinal,
+          t1.NuProposta,
+          t1.NuContrato,
+          t1.Produto,
+          t1.FlPropostaOriginada,
+          t1.FlPropostaAprovada,
+          t1.FlPropostaEfetivada
+      FROM CONVSIMU.TBSIMULACOES t1
+      WHERE t1.NuAnoMes = &DtRef. AND t1.Canal = 'MULTIMARCAS' AND t1.SistemaFinal IN
+           (
+           'APAR',
+           'PPAR'
+           ) AND t1.Mensageria IN
+           (
+           '0. Aprovado 100%',
+           '1. Muita chance >85%',
+           '2. Grande chance >70%',
+           '3. Boa chance >50%',
+           '4. Tem chance >0%'
+           );
+QUIT;
+
+%mend();
+%base_nrt(202503);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

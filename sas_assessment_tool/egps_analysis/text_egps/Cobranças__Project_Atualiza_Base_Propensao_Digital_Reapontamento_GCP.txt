@@ -1,0 +1,183 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_Atualiza_Base_Propensao_Digital_Reapontamento_GCP
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:15 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 80)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80)
+----------------------------------------
+LINES_OF_CODE: 109
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: CONTATOS = /riscosbv/cobranca/rribeiro/contatos; ZBLOQ = /riscosbv/cobranca/brsouza/reguas/listas_restritas/; ZBRUNO = /riscosbv/cobranca/brsouza; ZPOLITIC = /riscosbv/cobranca/caroline/LTV_POLITICA
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM, SYNAPSE, SYNAPSE2
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_ANLY_CIENCIADADOCOBR.TBPROPENSAOPAGAMENTODIGITAL [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CONTATOS
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_01, WORK.MODELO_PROP_DIG
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_ANLY_CIENCIADADOCOBR.TBPROPENSAOPAGAMENTODIGITAL [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], WORK.BASE_01 [PROC SQL - FROM], WORK.MODELO_PROP_DIG [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CONTATOS.AUX_BASE_PROP_DIGITAL
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.BASE_01, WORK.MODELO_PROP_DIG
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00_Map_LIB */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-pBUkq1xjCakg9UBi/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CONTATOS '/riscosbv/cobranca/rribeiro/contatos';
+LIBNAME ZBLOQ	'/riscosbv/cobranca/brsouza/reguas/listas_restritas/';
+LIBNAME ZBRUNO '/riscosbv/cobranca/brsouza';
+LIBNAME ZPOLITIC '/riscosbv/cobranca/caroline/LTV_POLITICA';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01_Base_Prop */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01_Base_Prop */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-yneO8GGb4G8INoBR/code.sas */
+/* =========================INÍCIO TASK========================= */
+options reuse=yes compress=binary;
+
+
+
+
+
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (
+project   = 'bv-sadi-dtm'
+credfile  = '/projetos/acessos/bq/di/sadi-dtm.json'
+schema    = 'bv-pdbd-prd'
+Read_Mode = Storage
+Allow_Large_Results = must
+Max_Char_Len = 40
+);
+CREATE TABLE WORK.MODELO_PROP_DIG AS
+SELECT DISTINCT
+  A.*
+, CASE WHEN GH_dvry >7 THEN 1 ELSE 0 END AS FLAG_PROP_DIG
+, NUCONTRATO FORMAT= BEST14. INFORMAT=best14. AS NUCONTRATOGESTAO
+, GH_dvry AS GH
+FROM CONNECTION TO PERM (
+SELECT DISTINCT *
+from bv-pdbd-prd.dvry_anly_cienciadadocobr.tbPropensaoPagamentoDigital
+where particao in (select distinct max(particao) as ult_at from bv-pdbd-prd.dvry_anly_cienciadadocobr.tbPropensaoPagamentoDigital)
+) AS A
+;DISCONNECT FROM PERM
+;QUIT;
+
+PROC SQL;
+CREATE INDEX NuContratoGestao ON WORK.MODELO_PROP_DIG(NuContratoGestao);
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01_Base_Prop */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02_Tratamento_Bases */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02_Tratamento_Bases */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-48PcnvYENQFnaKCb/code.sas */
+/* =========================INÍCIO TASK========================= */
+options reuse=yes compress=binary;
+
+
+
+
+DATA _NULL_ ;
+CALL SYMPUT('DT_ARQ', PUT(TODAY(),YYMMDDN8.));
+RUN;
+
+
+
+
+Options Reuse=yes Compress=binary;
+PROC SQL;
+CREATE TABLE WORK.BASE_01 AS
+SELECT DISTINCT
+  Input(Compress(Put(Particao,best.)),best6.) Format = Best6. Informat = Best6. AS Safra
+, DatePart(TsInclusao) Format = yymmdd10. Informat = yymmdd10. AS TsInclusao
+, Case When Length(Compress(PUT(NUCPFCNPJ,14.))) <=11 Then PUT(NUCPFCNPJ,z11.) Else PUT(NUCPFCNPJ,z14.) End As NuCPFCNPJ
+, NUCONTRATOGESTAO
+, Flag_Prop_Dig Format = Best1. Informat = Best1. AS Flag_Prop_Dig
+, GH Format = Best2. Informat = Best2. AS  GH_Prop_Dig
+FROM WORK.MODELO_PROP_DIG
+Order By GH Desc
+;QUIT;
+
+PROC SQL;
+CREATE INDEX NUCONTRATOGESTAO ON WORK.BASE_01(NUCONTRATOGESTAO);
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02_Tratamento_Bases */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03_Salva_Bases_LIB */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03_Salva_Bases_LIB */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gYQhH1AE1mRjZMNg/code.sas */
+/* =========================INÍCIO TASK========================= */
+options reuse=yes compress=binary;
+
+
+
+
+PROC SQL;
+CREATE TABLE CONTATOS.AUX_BASE_PROP_DIGITAL AS
+SELECT DISTINCT
+  TODAY() FORMAT yymmdd10. AS DT_REF
+, DATETIME() Format datetime. AS Ult_Atualizacao
+, *
+FROM WORK.BASE_01
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03_Salva_Bases_LIB */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

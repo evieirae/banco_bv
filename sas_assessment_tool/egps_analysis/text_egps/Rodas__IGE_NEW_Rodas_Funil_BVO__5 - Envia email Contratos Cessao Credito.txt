@@ -1,0 +1,132 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_Funil_BVO
+FILE_SAS: 5 - Envia email Contratos Cessao Credito.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40), FILENAME  (1x | +12), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 66
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv, hoje
+DETECTED_MACROS_USED: dir_csv, hoje
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], SOLITMP.CUBOSIMULACAORODASBVO_ANALISE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): SOLITMP.CUBOSIMULACAORODASBVO_ANALISE [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /BVO_PLAN.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./BVO_PLAN.csv
+TEMP/DISCARDED OUTPUTS: BVO_PLAN
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /BVO_PLAN.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	4 - Envia email Contratos Cessao de Credito.sas														| */
+/* | Descricao: Programa gerar csv dos contratos para cessao de credito Fases 1 e 2 do BVO.					| */
+/* | Objetivo: 	Enviar arquivo por email aos cuidados de rodof.oliveira@bv.com.br					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera csv contratos cessao de credito bvo=========================*/
+/* ======================================================================================*/
+
+/* Verifica se o dia atual é 21 */
+%let hoje = %sysfunc(day(%sysfunc(today())));
+
+/* Define macro para toda a lógica */
+%macro envia_email();
+
+    %if &hoje = 21 %then %do;
+
+        /* Cria a tabela */
+        proc sql;
+            create table BVO_PLAN AS
+                SELECT
+                    NuAnoMes,
+                    Produto,
+                    TpPessoa,
+                    NuProposta,
+                    NuContrato,
+                    case
+                        when FlEsteiraBB = 1 then "Fase 2"
+                        else "Fase 1"
+                    end as FASE,
+                    FlEsteiraBB,
+                    FlPropostaPaga,
+                    FlPropostaEfetivada
+                from SOLITMP.CUBOSIMULACAORODASBVO_ANALISE
+                where NuContrato is not null
+                order by NuAnoMes desc;
+        quit;
+
+        /* Exporta o CSV */
+        %let dir_csv = /riscosbvf/BA/processos/output;
+        proc export
+            data=BVO_PLAN
+            file="&dir_csv./BVO_PLAN.csv"
+            replace
+            dbms=dlm;
+            delimiter=';';
+        run;
+/* ======================================================================================*/
+/* =====================Envia email=========================*/
+/* ======================================================================================*/
+
+        /* Dispara o e-mail */
+        filename mymail email
+            to=('flavio.luis@bv.com.br','rodof.oliveira@bv.com.br')
+            subject="Contratos Cessão Crédito BVO"
+            attach="&dir_csv./BVO_PLAN.csv";
+
+        data _null_;
+            file mymail;
+            put "Segue em anexo os contratos BVO Fases 1 e 2.";
+        run;
+
+    %end;
+
+%mend;
+
+/* Executa a macro */
+%envia_email();

@@ -1,0 +1,218 @@
+START_METADATA
+PROJECT: Rodas__BvExper
+FILE_SAS: 02 - BvExper - Resumo GR.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 147
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): EXP_BU.TBBASEUNICA_BVEXPER_GR [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBBVEXPER_RESUMO_ATINGIMENTO_GR, WORK.TBBVEXPER_RESUMO_GR, WORK.TBBVEXPER_RESUMO_PONTOS_GR
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBBVEXPER_RESUMO_ATINGIMENTO_GR, WORK.TBBVEXPER_RESUMO_GR, WORK.TBBVEXPER_RESUMO_PONTOS_GR
+TABLE_READ_PROVENANCE (Flow): EXP_BU.TBBASEUNICA_BVEXPER_GR [PROC SQL - FROM], WORK.TBBVEXPER_RESUMO_ATINGIMENTO_GR [DATA Step - SET], WORK.TBBVEXPER_RESUMO_GR [PROC SORT - DATA=], WORK.TBBVEXPER_RESUMO_PONTOS_GR [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBBVEXPER_RESUMO_ATINGIMENTO_GR, TBBVEXPER_RESUMO_GR, TBBVEXPER_RESUMO_PONTOS_GR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE TbBvExper_Resumo_Pontos_GR AS
+SELECT
+
+'GR' as TpNivel,
+'Pontos' as TpBase,
+A.NuAnoMes,
+A.NmCanalEstruturaComercial,
+A.DsLoginN3A,
+A.NmSubEstruturaComercialA,
+A.DsLoginN2A,
+A.NmAreaEstruturaComercial,
+A.CdColaborador,
+A.IdMatricula,
+A.DsLoginN1,
+A.NmColaborador,
+A.NmGrupoCargo,
+A.QtDiasAtividadeNormal,
+A.QtDiasFerias,
+A.QtDiasOutros,
+A.NmElegAcelerador,
+
+sum(A.Pontos_VrProducao) AS Producao FORMAT COMMAX20.6,
+sum(A.Pontos_MktShareCart) AS MktShareCart FORMAT COMMAX20.6,
+sum(0) AS Spread FORMAT COMMAX20.6,
+sum(A.Pontos_VrMC_Rodas) AS MC_Rodas FORMAT COMMAX20.6,
+sum(A.Pontos_VrMC_EGV) AS MC_EGV FORMAT COMMAX20.6,
+sum(A.Pontos_VrMCN) AS MCN FORMAT COMMAX20.6,
+sum(A.Pontos_PenPDV) AS PenPDV FORMAT COMMAX20.6,
+
+sum(A.Pontos_VrSPF) AS SPF FORMAT COMMAX20.6,
+sum(A.Pontos_VrAP) AS AP FORMAT COMMAX20.6,
+sum(A.Pontos_VrSegurosAuto) AS SegurosAuto FORMAT COMMAX20.6,
+sum(A.Pontos_VrSPF_VrAP) AS SPF_AP FORMAT COMMAX20.6,
+sum(A.Pontos_VrAP_VrPlacaSolar) as AP_PlacaSolar FORMAT COMMAX20.6,
+sum(A.Pontos_VrMetaInad15) AS MetaInad15 FORMAT COMMAX20.6,
+sum(A.Pontos_VrMetaInad30) AS MetaInad30 FORMAT COMMAX20.6,
+sum(A.Pontos_SegurosCancelados) AS SegurosCancelados FORMAT COMMAX20.6,
+sum(A.Pontos_Efetivacao) AS Efetivacao FORMAT COMMAX20.6,
+sum(A.Pontos_ContaDigital) AS ContaDigital FORMAT COMMAX20.6,
+sum(a.Pontos_ParceiroProduzindo) as ParceiroProduzindo FORMAT COMMAX20.6,
+
+AVG(A.Pontos_Total) AS Pontos_Total FORMAT COMMAX20.6,
+A.Faixa_Pontos AS Faixa_Pontos,
+AVG(FlAting_PtsTurbo) AS FlAting_PtsTurbo FORMAT COMMAX20.6,
+AVG(A.PONTOS_TURBO) AS PONTOS_TURBO FORMAT COMMAX20.6,
+A.FAIXA_PONTOS_TURBO AS FAIXA_PONTOS_TURBO
+
+FROM EXP_BU.TbBaseUnica_BvExper_GR A
+
+GROUP BY
+Calculated TpNivel,
+calculated TpBase,
+A.NuAnoMes,
+A.NmCanalEstruturaComercial,
+A.DsLoginN3A,
+A.NmSubEstruturaComercialA,
+A.DsLoginN2A,
+A.NmAreaEstruturaComercial,
+A.CdColaborador,
+A.IdMatricula,
+A.DsLoginN1,
+A.NmColaborador,
+A.NmGrupoCargo,
+A.QtDiasAtividadeNormal,
+A.QtDiasFerias,
+A.QtDiasOutros,
+A.NmElegAcelerador,
+A.Faixa_Pontos,
+A.FAIXA_PONTOS_TURBO
+
+ORDER BY
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NuAnoMes,
+A.DsLoginN1
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbBvExper_Resumo_Atingimento_GR AS
+SELECT
+
+'GR' as TpNivel,
+'Atingimento' as TpBase,
+A.NuAnoMes,
+A.NmCanalEstruturaComercial,
+A.DsLoginN3A,
+A.NmSubEstruturaComercialA,
+A.DsLoginN2A,
+A.NmAreaEstruturaComercial,
+A.CdColaborador,
+A.IdMatricula,
+A.DsLoginN1,
+A.NmColaborador,
+A.NmGrupoCargo,
+A.QtDiasAtividadeNormal,
+A.QtDiasFerias,
+A.QtDiasOutros,
+A.NmElegAcelerador,
+
+sum(A.Pc_AtingMeta_VrProducao)*100 AS Producao FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_MktShareCart)*100 AS MktShareCart FORMAT COMMAX20.6,
+sum(0)*100 AS Spread FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrMC_Rodas)*100 AS MC_Rodas FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrMC_EGV)*100 AS MC_EGV FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrMcn)*100 AS MCN FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_PenPdv)*100 AS PenPDV FORMAT COMMAX20.6,
+
+sum(A.Pc_AtingMeta_VrSPF)*100 AS SPF FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrAP)*100 AS AP FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrSegurosAuto)*100 AS SegurosAuto FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrSPF_VrAP)*100 AS SPF_AP FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrAP_VrPlacaSolar)*100 AS AP_PlacaSolar FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrMetaInad15)*100 AS MetaInad15 FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_VrMetaInad30)*100 AS MetaInad30 FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_SegurosCancelados)*100 AS SegurosCancelados FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_Efetivacao)*100 AS Efetivacao FORMAT COMMAX20.6,
+sum(A.Pc_AtingMeta_ContaDigital)*100 AS ContaDigital FORMAT COMMAX20.6,
+sum(a.Pc_AtingMeta_ParceiroProduzindo)*100 as ParceiroProduzindo FORMAT COMMAX20.6,
+
+AVG(0) AS Pontos_Total FORMAT COMMAX20.6,
+A.Faixa_Pontos AS Faixa_Pontos,
+
+AVG(QTD_METAS_ATING) AS QTD_METAS_ATING FORMAT COMMAX20.6,
+AVG(QTD_ELEG_KPI_TOTAL) AS QTD_ELEG_KPI_TOTAL FORMAT COMMAX20.6,
+
+AVG(FlAting_PtsTurbo) AS FlAting_PtsTurbo FORMAT COMMAX20.6,
+AVG(0) AS PONTOS_TURBO FORMAT COMMAX20.6,
+A.FAIXA_PONTOS_TURBO AS FAIXA_PONTOS_TURBO
+
+FROM EXP_BU.TbBaseUnica_BvExper_GR A
+
+GROUP BY
+Calculated TpNivel,
+calculated TpBase,
+A.NuAnoMes,
+A.NmCanalEstruturaComercial,
+A.DsLoginN3A,
+A.NmSubEstruturaComercialA,
+A.DsLoginN2A,
+A.NmAreaEstruturaComercial,
+A.CdColaborador,
+A.IdMatricula,
+A.DsLoginN1,
+A.NmColaborador,
+A.NmGrupoCargo,
+A.QtDiasAtividadeNormal,
+A.QtDiasFerias,
+A.QtDiasOutros,
+A.NmElegAcelerador,
+A.Faixa_Pontos,
+A.FAIXA_PONTOS_TURBO
+
+ORDER BY
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NuAnoMes,
+A.DsLoginN1
+;RUN;
+
+DATA TbBvExper_Resumo_GR;
+SET WORK.TbBvExper_Resumo_Atingimento_GR
+	WORK.TbBvExper_Resumo_Pontos_GR;
+;run;
+
+PROC SORT DATA=WORK.TBBVEXPER_RESUMO_GR;BY NmCanalEstruturaComercial NmSubEstruturaComercialA NuAnoMes DsLoginN1 TpBase;RUN;

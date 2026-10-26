@@ -1,0 +1,1478 @@
+START_METADATA
+PROJECT: Rodas__assinatura_app
+FILE_SAS: assinatura_app.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -47
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 1190
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (17x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: APPBV = /infogrc/assinatura_appbv/bases; FUNIL2 = /riscosbvf/CRM/comp_total; MIS = /projetos/MISV/data/bases
+DETECTED_MACROS_DEFINED: _timer_start, dir_csv
+DETECTED_MACROS_USED: dir_csv, dt_ModeloProp, dt_atual, maxModelo_AppBv, maxTag_AppBv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DVRYBD, DVRYCRM, DVRYVE
+INCLUDED SCRIPTS (Dependencies): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB_v.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/COACHING/TRIBO_VEICULOS/SAS/CONECTADB_V.SAS [SAS/Local], DVRYBD.TBTIPOMODELO_PROPOSTA [SQLSVR], DVRYCRM.TBCLIENTEBV [SQLSVR], DVRYCRM.TBPESSOA [SQLSVR], DVRYVE.TBBDAPPFINANCIAMENTO [SQLSVR], FUNIL2.SIMU_PROP_AQUISICAO [SAS/Local], MIS.TBORIGINACAO [SAS/Local], MIS.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DVRYBD, DVRYCRM, DVRYVE, FUNIL2, MIS
+EXPORTED_LIBNAMES: APPBV
+IMPORTED FILES (Requires Ingestion): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB_v.sas
+TABLE_READ_PROVENANCE (Flow): APPBV.APPBV_FUNIL [DATA Step - SET; PROC SQL - FROM; PROC SQL - JOIN], APPBV.APPBV_TAG [DATA Step - SET; PROC SQL - FROM], APPBV.MODELO_PROPOSTA [DATA Step - SET; PROC SQL - FROM], DVRYBD.TBTIPOMODELO_PROPOSTA [PROC SQL - FROM], DVRYCRM.TBCLIENTEBV [PROC SQL - JOIN], DVRYCRM.TBPESSOA [PROC SQL - JOIN], DVRYVE.TBBDAPPFINANCIAMENTO [PROC SQL - FROM], FUNIL2.SIMU_PROP_AQUISICAO [PROC SQL - JOIN], MIS.TBORIGINACAO [PROC SQL - FROM; PROC SQL - JOIN], MIS.TBPRODUCAO [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB_v.sas
+INTERNAL READS (Temp/Local): APPBV.APPBV_FUNIL, APPBV.APPBV_TAG, APPBV.MODELO_PROPOSTA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): APPBV.APPBV_FUNIL, APPBV.APPBV_TAG, APPBV.MODELO_PROPOSTA, FUNIL2.SIMU_PROP_AQUISICAO, MIS.TBORIGINACAO, MIS.TBPRODUCAO
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): ONBOARD.APPBV_FUNIL_TEMP, ONBOARD.APPBV_TAG_TEMP, ONBOARD.APPBV_USER_TEMP
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): APPBV.APPBV_FUNIL, APPBV.APPBV_FUNIL_BKP, APPBV.APPBV_TAG, APPBV.MODELO_PROPOSTA, APPBV.MODELO_PROPOSTA_BKP
+APPEND_ONLY_OUTPUTS: APPBV.APPBV_FUNIL, APPBV.APPBV_TAG, APPBV.MODELO_PROPOSTA
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): APPBV.APPBV_FUNIL, APPBV.APPBV_TAG, APPBV.MODELO_PROPOSTA
+EXPORTED FILES (Artifacts): &dir_csv./assinatura_app.csv
+TEMP/DISCARDED OUTPUTS: APPBV_TAG_NEW, APPBV_USER_3, APPBV_USER_31, APPBV_USER_31_SUM, APPBV_USER_3_SUM, APPBV_USER_4, APPBV_USER_41, APPBV_USER_41_SUM, APPBV_USER_4_SUM, APPBV_USER_5, APPBV_USER_7, APPBV_USER_8, APP_TAG, APP_TAG_1, APP_TAG_2, APP_TAG_3, APP_TAG_4, APP_TAG_4A, APP_TAG_5, APP_TAG_PROP, APP_TAG_PROP_EV, APP_TAG_TS, APP_TAG_TS_EV, ASSINATURA_APP, ASSINATURA_APP_2, DUPLICIDADE_11A, DUPLICIDADE_1A, DUPLICIDADE_21A, DUPLICIDADE_2A, DUPLICIDADE_3A, DUPLICIDADE_3B, MODELO_1, MODELO_2, MODELO_21, MODELO_3, MODELO_4, MODELO_PROPOSTA, MODELO_PROPOSTA_1, MODELO_PROPOSTA_2, MODELO_PROPOSTA_3, MODELO_PROPOSTA_FLASSINOU
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB_v.sas
+
+END_METADATA
+================================================================================
+/***********************************************************************************************|
+|					DECLARAÇÃO DE LIBNAMES, PARÂMETROS E %INCLUDE								|
+|***********************************************************************************************/
+
+/* Start timer */
+%LET _timer_start = %SYSFUNC(datetime());
+
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 VALIDVARNAME=ANY;
+/*OPTIONS ERRORABEND;*/
+OPTIONS COMPRESS=BINARY REUSE=YES;
+
+/* Roda a macro para utilizar o usuário de acesso ao BI*/
+%INCLUDE 		'/riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB_v.sas';
+
+LIBNAME APPBV	'/infogrc/assinatura_appbv/bases';
+LIBNAME MIS 	'/projetos/MISV/data/bases';
+LIBNAME FUNIL2	'/riscosbvf/CRM/comp_total';
+
+LIBNAME DVRYBD 	SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_banco_digital
+				USER=_SAS_BANCODIGITAL PASSWORD="{SAS002}206C492D1E4DCDEF4B5E8F4C2BB0C0262A25A84047F1388D";
+LIBNAME DVRYVE	SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_veiculos
+				USER= _SAS_VEICULOS	PASSWORD="{SAS002}6F63681B5258C9D15BB1A44A31C3DA5C524E367D11CE356E4478F47E";
+LIBNAME DVRYCRM	SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_crm
+				USER=_SAS_CRM	PASSWORD="{sas002}DF101A2C5B303A50386416621272918E204F119D4D5679B9";
+
+/* Diretórios de exportação dos arquivos CSV e XLSX */
+%LET dir_csv = /riscosbvf/BA/processos/output;
+
+/*VERIFICAR OS DADOS MAIS RECENTES*/
+
+/*MODELO PROPOSTA */
+PROC SQL; SELECT MAX(dtescolhaassinaturainicial) format DATE9. INTO: maxModelo_AppBv FROM APPBV.modelo_proposta; QUIT;
+PROC SQL; SELECT MAX(DATEPART(dtinclusao)) format DATE9. INTO: maxModelo_Dvry FROM DVRYBD.tbtipomodelo_proposta; QUIT;
+
+/*TAGUEAMENTO*/
+PROC SQL; SELECT MAX(dia) format DATE9. INTO: maxTag_AppBv FROM APPBV.appbv_tag; QUIT;
+PROC SQL; SELECT MAX(DATEPART(DtDia)) format DATE9. INTO:maxTag_Dvry FROM DVRYVE.tbBdAppFinanciamento; QUIT;
+
+/*ORIGINAÇÃO E PRODUÇÃO*/
+PROC SQL; SELECT MAX(dtEntradaProposta) format DATE9. INTO: maxOriginacao_Mis FROM MIS.tbOriginacao; QUIT;
+PROC SQL; SELECT MAX(dtEntradaProposta) format DATE9. INTO: maxProducao_Mis FROM MIS.tbProducao; QUIT;
+
+/*CRM*/
+
+DATA _NULL_;
+	dt_atual 		= today()-1;
+	dt_ModeloProp 	= intnx('day',"&maxModelo_AppBv."d,-60);
+
+	CALL symputx('dt_atual', put(dt_atual,date9.));
+	CALL symputx('dt_ModeloProp', put(dt_ModeloProp,date9.));
+RUN;
+
+/*%let dt_ModeloProp = 01SEP2021;*/
+
+%put &dt_atual;
+%put &dt_ModeloProp;
+
+/***************************************************************\
+|	CRIA BASE:	APPBV.MODELO_PROPOSTA							|
+|	ORIGEM:		DRVY_BANCO_DIGITAL.TBMODELO_PROPOSTA			|
+|	REF:		MODELO											|
+\***************************************************************/
+
+/*
+nuproposta, 9.
+nuanomes, 6.
+dtescolhaassinatura, date9.
+tsescolhaassinatura, datetime19.
+cdmodeloescolha, 2.
+dsmodeloescolha, $25.
+
+dtassinatura date
+tsassinatura datetime19.
+cdmodeloassinatura 2.
+flassinou 1.
+
+qtmodeloApp, 2.
+qtmodeloSms, 2.
+qtmodeloFis, 2.
+flalteroumodelo 1.
+
+tsprimeiroApp datetime19.
+
+*/
+
+proc sql;
+create table modelo_1 as
+	select
+	      nuproposta
+		, dtescolhaassinatura
+		, dtfinalizacaoassinatura
+		, cdmotivocancelamentoassinatura
+		, cdtipomodelo
+		, dstipomodeloexterno_dict
+	from DVRYBD.tbtipomodelo_proposta
+	where dtinclusao >= "&dt_ModeloProp."d
+	and cdtipomodelo in (1,10)
+;quit;
+
+proc sort data=modelo_1; by nuproposta dtescolhaassinatura;run;
+
+/*marca a primeira escolha do modelo de assinatura*/
+data modelo_2; set modelo_1;
+	by nuproposta dtescolhaassinatura;
+
+    if First.nuproposta then flprimeiromodelo = 1; else flprimeiromodelo = 0;
+run;
+
+proc sort data=modelo_2;
+	by nuproposta descending cdtipomodelo dtescolhaassinatura;
+run;
+
+data modelo_21; set modelo_2;
+	by nuproposta descending cdtipomodelo dtescolhaassinatura;
+
+	if First.nuproposta and cdtipomodelo = 10 then flprimeiroapp = 1; else flprimeiroapp = 0;
+run;
+
+/*ordena por numero de propostas e pela data de finalização descendente, deixando os registros mais recentes primeiros*/
+proc sort data=modelo_21;
+	by nuproposta descending dtfinalizacaoassinatura;
+run;
+
+/*marca se o ultimo registro foi assinado*/
+data modelo_3; set modelo_21;
+	by nuproposta descending dtfinalizacaoassinatura;
+
+	if First.nuproposta and dtfinalizacaoassinatura ne . and cdmotivocancelamentoassinatura = . then flassinou = 1; else flassinou = 0;
+run;
+
+proc sql;
+create table modelo_4 as
+
+	select
+		  a.nuproposta
+		, input(put(year(datepart(a.dtescolhaassinatura)),4.)||put(month(datepart(a.dtescolhaassinatura)),z2.), 6.) as anomes
+		, datepart(a.dtescolhaassinatura) format date9. as dtescolhaassinaturainicial
+		, a.dtescolhaassinatura format  datetime19. as tsescolhaassinaturainicial
+		, a.cdtipomodelo as cdmodeloescolha
+		, a.dstipomodeloexterno_dict as dsmodeloescolha
+		, datepart(f.dtescolhaassinatura) format date9. as dtescolhaprimeiroApp
+		, f.dtescolhaassinatura format  datetime19. as tsescolhaprimeiroApp
+		, datepart(b.dtescolhaassinatura) format date9. as dtescolhaassinaturafinal
+		, b.dtescolhaassinatura format  datetime19. as tsescolhaassinaturafinal
+		, datepart(b.dtfinalizacaoassinatura) format date9. as dtfinalizacaoassinatura
+		, b.dtfinalizacaoassinatura format  datetime19. as tsfinalizacaoassinatura
+		, b.cdtipomodelo as cdmodeloassinatura
+		, b.dstipomodeloexterno_dict as dsmodeloassinatura
+		, b.flassinou
+		, c.qtregistros	as qtmodeloSms
+		, d.qtregistros	as qtmodeloApp
+		, e.qtregistros	as qtmodeloFisico
+	from(
+		select
+			  nuproposta
+			, dtescolhaassinatura
+			, cdtipomodelo
+			, dstipomodeloexterno_dict
+		from
+			modelo_3
+		where
+			flprimeiromodelo = 1) a /*primeiro_modelo*/
+	left join(
+		select
+			  nuproposta
+			, dtescolhaassinatura
+		 	, dtfinalizacaoassinatura
+			, cdtipomodelo
+			, dstipomodeloexterno_dict
+			, flassinou
+		from
+			modelo_3
+		where
+			flassinou = 1) b /*proposta_assinada*/
+		 on a.nuproposta = b.nuproposta
+	left join(
+		select
+			  nuproposta
+			, dtescolhaassinatura
+		from
+			modelo_3
+		where
+			flprimeiroapp = 1) f /*primeiro registro app*/
+		 on a.nuproposta = f.nuproposta
+	left join (
+		select
+		   	  nuproposta
+			, count(nuproposta) as qtregistros
+		from
+			modelo_3
+		where cdtipomodelo = 1
+		group by 1) c /*registros do modelo sms*/
+	on a.nuproposta = c.nuproposta
+	left join (
+		select
+		   	  nuproposta
+			, count(nuproposta) as qtregistros
+		from
+			modelo_3
+		where cdtipomodelo = 10
+		group by 1) d /*registros do modelo app*/
+	on a.nuproposta = d.nuproposta
+	left join (
+		select
+		   	  nuproposta
+			, count(nuproposta) as qtregistros
+		from
+			modelo_3
+		where cdtipomodelo = 14
+		group by 1) e /*registros do modelo fisico*/
+	on a.nuproposta = e.nuproposta
+;quit;
+
+/* ********************************************
+FINALIZA TRATAMENTO NA BASE DE REGISTROS DE ASSINATURA ELETRÔNICA
+
+base: modelo_4
+
+observações:
+Identifica o inicio e fim do registro de cada proposta, bem
+como quantas vezes ela esteve disponível para assinatura.
+
+escolha inicio: primeiro registro de modelo
+escolha app: primeiro registro do modelo app
+escolha final: inicio do ultimo registro de modelo
+este último, é o mesmo da assinatura concuída.
+
+ ******************************************* */
+
+/*
+	Traz os detalhes da proposta, como dados do veículo,
+dados do cliente, dados do financiamento e a flag de
+produção, que garante que a proposta foi paga.
+
+	O idbv da base de crm é um dos dados responsáveis
+pela união da base de tagueamento com as bases offline,
+além do numero da proposta que foi adicionado em junho/22.
+
+*/
+
+proc sql;
+create table modelo_proposta_1 as
+	select
+		  a.*
+		, b.dtentradaproposta
+		, b.stproposta
+		, b.nucontratogestao
+		, b.nmcanalestruturacomercial
+		, b.cdfilial
+		, b.dsfilial
+		, b.cdparceirocomercial
+		, b.nmparceirocomercial
+		, b.nmpessoa
+		, b.tppessoa
+		, b.nucpfcnpj
+		, b.cdufpessoa
+		, b.Qtanosidade
+		, b.qtparcelas
+		, b.pcentrada
+		, b.vrproposta
+		, b.vrentrada
+		, b.vrfinanciamento
+		, b.vrprestacao
+		, b.cdcolaborador
+		, b.nmcolaborador
+		, b.cdMarca
+		, b.cdModelo
+		, b.AaModelo
+		, b.AaFabricacao
+
+		, case when c.nuproposta ne . then 1 else . end as flproducao
+
+		, d.idbv
+		, d.DtNascimento
+		, d.vrrenda
+		, d.dsemail
+		, d.nuddd
+		, d.nutelefone
+
+		, datepart(e.DtInicioRelacionamento) format date9. as DtInicioRelacionamento
+		, datepart(e.DtFimRelacionamento) format date9. as DtFimRelacionamento
+
+		, f.sistema_origem as sistemaOrigem
+
+	from modelo_4 a
+	left join MIS.tboriginacao b on a.nuproposta = b.nuproposta
+	left join MIS.tbproducao c on a.nuproposta = c.nuproposta
+	left join DVRYCRM.tbpessoa d   on b.nucpfcnpj   = d.idpessoa
+	left join DVRYCRM.tbClienteBV e on b.NuCpfCnpj = e.NuCpfCnpj
+	left join FUNIL2.simu_prop_aquisicao f on a.nuproposta = f.num_proposta
+;quit;
+
+/*
+a base tbClienteBV é para identificar o cpf que já possuia relacionamento
+com o banco no momento da assinatura da proposta. Por isso é feita a verificação
+da data de inicio e fim do relacionamento. Deste modo é possível analisar o
+fluxo de assinatura segmentado por púbico baseado no parâmetro flclienteBV.
+*/
+
+data modelo_proposta_2; set modelo_proposta_1;
+
+		if DtInicioRelacionamento ne .	and DtFimRelacionamento = .
+										and dtescolhaassinaturainicial > DtInicioRelacionamento then flClienteBv = 1;
+
+   		if DtInicioRelacionamento ne .	and DtFimRelacionamento ne .
+										and dtescolhaassinaturainicial > DtInicioRelacionamento
+										and dtescolhaassinaturainicial <= DtFimRelacionamento	 then flClienteBv = 1;
+
+   		drop DtInicioRelacionamento DtFimRelacionamento;
+
+run;
+
+/* remove as duplicidades ocasionadas pelo join com a mis.tbpessoa */
+proc sort data=modelo_proposta_2 nodupkey dupout=dup_mp2 out=modelo_proposta_3; by nuproposta;run;
+
+/*
+algumas propostas não foram identificadas na tabela log de assinatura, porém estão marcadas
+com status AP (aprovada e paga) e constam na tabela de produção, ou seja, foram efetivadas.
+Deste modo, a fim de não distorcer o indice de conversão, serão marcados diferente na flassinatura.
+
+flassinou
+1 = assinados = 1
+2 = assinatura não identificada e paga
+. = assinatura não identificada e não paga
+
+o tipo de assinatura ficara . (missing)
+*/
+
+data modelo_proposta; set modelo_proposta_3;
+if flassinou = . and stproposta = 'AP' and flproducao = 1 then flassinou = 2;
+run;
+
+/*Cria base na lib appbv */
+/*data appbv.modelo_proposta; set modelo_proposta_2; run;*/
+
+/*Gera bkp da base*/
+data appbv.modelo_proposta_bkp; set appbv.modelo_proposta; run;
+
+/* Exclui dados da base para evitar duplicidade */
+proc sql; 	delete from appbv.modelo_proposta	where datepart(tsescolhaassinaturainicial) >= "&dt_ModeloProp."d; quit;
+
+/* Insere os novos registros na base da lib */
+proc sql; insert into appbv.modelo_proposta	select * from modelo_proposta ;quit;
+
+/***************************************************************\
+|	CRIA BASE:	APPBV.APPBV_TAG									|
+|	ORIGEM:		DRVY_VEICULOS.TBBDAPPFINANCIAMENTO				|
+|	REF:		APPBV_SYNAPSE											|
+\***************************************************************/
+
+/*
+NAME					FORMAT
+NmUserId				$20.
+DtDia					DATETIME22.3
+DtDiaHora				DATETIME22.3
+NuSessionId				11.
+NmScreen				$255.
+NmEventType				$20.
+QtProdutosAtivos		11.
+TpOrigemCodigo			$20.
+TpTipoVeiculo			$20.
+DsPesquisaSatisfacao	$20.
+DSTextComments			$255.
+NmMarca					$30.
+NmOs					$20.
+NmDevice
+NmOsVersao				$20.
+NmCidade
+NmRegiao
+cdAppVersao				$20.
+StButtonText			$255.
+StModalName				$255.
+StModalRetention		$255.
+StModalType 			$255.
+
+*/
+
+proc sql;
+create table app_tag_1 as
+	select	  NmUserId						as userId
+			, datepart(DtDia) format date9.	as dia
+			, DtDiaHora						as diaHora
+			, NuSessionId					as sessionId
+			, case
+			    when NmScreen =   'bd|financiamentoVeiculo|bd|financiamentoVeiculo|contratacao|finalizandoDetalhesFinanciamento'
+			        then        'bd|financiamentoVeiculo|contratacao|finalizandoDetalhesFinanciamento'
+			    when NmScreen =   'bd|financiamentoVeiculo|bd|financiamentoVeiculo|contratacao|algoDeuErrado'
+			        then        'bd|financiamentoVeiculo|contratacao|algoDeuErrado'
+			    when NmScreen =   'bd|financiamentoVeiculo|contratacao|validarCodigo'
+				  or NmScreen = 'bd|financiamentoVeiculo|onboarding|validarToken'
+			        then        'bd|financiamentoVeiculo|onboarding|validarCodigo'
+			    else NmScreen end 			as fullScreen
+			, scan(NmScreen,-1,'|') 		as screen
+			, NmEventType					as eventType
+			, QtProdutosAtivos				as produtosAtivos
+			, TpOrigemCodigo				as origemCodigo
+			, TpTipoVeiculo					as tipoVeiculo
+			, DsPesquisaSatisfacao			as pesquisaSatisfacao
+			, DSTextComments				as textComments
+			, NmStep						as step
+			, NmMarca						as marca
+			, NmDevice						as device
+			, NmOs							as os
+			, NmOsVersao					as osVersao
+			, CdAppVersao					as appVersao
+			, NmCidade						as cidade
+			, NmRegiao						as regiao
+			, NuProposta					as proposta
+			, NmSeguro						as nomeSeguro
+			, StButtonText					as buttonText
+			, StModalName					as modalName
+			, StModalRetention				as modalRetention
+			, StModaType 					as modalType
+			, cats(NmUserId,DtDiaHora,NuSessionId,NmEventType,NmScreen) as chave
+	from DVRYVE.TBBDAPPFINANCIAMENTO
+	where DtDia > "&maxTag_AppBv."d
+
+;quit;
+
+/*proc sql; create table assinatura_1a as select *, cats(userId,diaHora,sessionId,eventType,screen) as chave from assinatura_0a; quit;*/
+
+proc sort data=app_tag_1; by chave;run;
+
+/***** flAtivo ************************************************************\
+|  1: eventos que serão considerados no funil; e            			   |
+|  0: ajustes na base em função de tagueamento duplicado ou não esperado.  |
+\**************************************************************************/
+
+data app_tag_2; set app_tag_1; by chave;
+
+/*identifica eventos duplicados e marca somente o primeiro como ativo*/
+if First.chave then flAtivo = 1; else flAtivo = 0;
+
+/*ajuste da flativo na tela validarcodigo pois origemCodigo deve estar preenchida*/
+if eventType = 'Screen' and screen = 'validarCodigo' and origemCodigo =  '' then flAtivo = 0;
+if eventType = 'Screen' and screen = 'validarCodigo' and origemCodigo ne '' then flAtivo = 1;
+
+drop chave;
+
+run;
+
+/** Dup1 ********************************************************************************************\
+| cria base para identificar duplicidade da tela enviarCodigo quando dispara junto com validarCodigo |
+\****************************************************************************************************/
+proc sql;
+create table duplicidade_1a as
+	select	  userId
+			, sessionId
+			, diaHora
+			, screen
+			, eventType
+			, cats(userId, sessionId, eventType, diaHora) as chave
+	from  app_tag_2
+	where (screen like '%validarCodigo%' or
+		   screen like '%enviarCodigo%' )
+	and eventType = 'Screen'
+;quit;
+
+proc sort data=duplicidade_1a; by chave descending screen; run;
+
+data duplicidade_11a; set duplicidade_1a; by chave descending screen;
+
+/*remove os eventos corretos e marca a duplicidade como 0*/
+if First.chave then delete; else flAtivo1 = 0;
+
+run;
+
+/*adiciona a coluna marcando os eventos que deverão ser removidos*/
+proc sql;
+create table app_tag_3 as
+	select	  t1.*
+			, t2.flAtivo1
+	from app_tag_2			  t1
+	left join duplicidade_11a t2 on cats(t1.userId, t1.sessionId, t1.eventType, t1.diaHora, t1.screen)
+								 = cats(t2.userId, t2.sessionId, t2.eventType, t2.diaHora, t2.screen)
+order by 1,3
+;quit;
+
+/*até este ponto temos a base do tagueamento de assinatura com as marcações flAtivo indicando com 0 as duplicidades ou eventos não esperados;*/
+
+/*próximo passo, identificar duplicidade que ocorre ao fechar o app*/
+
+/** Dup2 ********************************************************************************************\
+| identifica sessoes nas quais usuarios chegaram nas telas de erro e houve disparo não esperado      |
+| nas telas de introdução ou enviarCodigo -  estes eventos afetam a visão de funil por visitantes    |
+\****************************************************************************************************/
+
+proc sql;
+create table duplicidade_2a as
+	select	  t1.sessionId
+			, sum(t1.fxIncorreto) 		as fxIncorreto
+			, sum(t1.fxIntroducao) 		as fxIntroducao
+			, sum(t1.fxenviarCodigo) 	as fxEnviarCodigo
+			, sum(t1.fxOutras) 			as fxOutras
+	from (
+			select	  sessionId
+					, case when screen = 'fluxoIncorreto' or
+								screen = 'algoDeuErrado' or
+								screen = 'finalizandoDetalhesFinanciamento'
+						   then 1 else 0 end as fxIncorreto
+					, case when screen = 'introducao'
+						   then 1 else 0 end as fxIntroducao
+					, case when screen = 'enviarCodigo'
+						   then 1 else 0 end as fxEnviarCodigo
+					, case when screen ne 'fluxoIncorreto' and
+								screen ne 'algoDeuErrado' and
+								screen ne 'finalizandoDetalhesFinanciamento' and
+								screen ne 'introducao' and
+								screen ne 'enviarCodigo'
+						   then 1 else 0 end as fxOutras
+			from app_tag_3
+/*			where eventType = 'Screen'*/
+	) t1
+	group by 1
+;quit;
+
+/*identificar as sessões cujos disparos das telas introducao e enviarCodigo ocorreram mas não eram esperadas*/
+data duplicidade_21a; set duplicidade_2a;
+	if 	 fxIncorreto  > 0 and							/*esteve no fluxo incorreto*/
+		(fxIntroducao > 0 or fxEnviarCodigo > 0) and	/*esteve na telaInicial, conforme flag cliente ativo*/
+		 fxOutras     = 0 								/*não esteve em outras telas além do fluxo incorreto e tela inicial*/
+		 				  then flAtivo2 = 0;			/*as condições indicam que a tela introdução e enviarCodigo não eram esperadas*/
+						  else delete;
+
+	drop fxEnviarCodigo fxIncorreto fxIntroducao fxOutras;
+run;
+
+proc sql;
+create table app_tag_4 as
+	select	  t1.*
+			, t2.flAtivo2
+	from app_tag_3			  t1
+	left join duplicidade_21a t2 on  t1.sessionId = t2.sessionId
+								 and t1.screen in ('introducao', 'enviarCodigo')
+/*								 and t1.eventType = 'Screen'*/
+order by 1,3
+;quit;
+
+/*atualiza a marcação da flAtivo e remove a flAtivo1*/
+data app_tag_4a; set app_tag_4;
+if flAtivo1 ne . or flAtivo2 ne . then flAtivo = 0;
+drop flAtivo1 flAtivo2;
+
+/*remarca a string null para vazio na proposta*/
+
+if proposta = 'null' then proposta = '';
+
+nuproposta = input(proposta, 10.);
+
+drop proposta;
+
+run;
+/*NOTE: The data set WORK.APP_TAG has 1.933.742 observations and 25 variables.*/
+
+/** Dup3 ********************************************************************************************\
+| identifica as telas de enviarCodigo 'não esperadas' que disparam antes da tela assinarContrato	 |
+\****************************************************************************************************/
+
+proc sql;
+create table duplicidade_3a as
+	select	  userId
+			, sessionId
+			, diaHora
+			, screen
+			, eventType
+			, nuproposta
+	from  app_tag_4a
+	where (screen like '%assinarContrato%' or
+		   screen like '%enviarCodigo%' )
+	and eventType = 'Screen'
+	and flativo = 1
+	order by 1,2,3,4
+;quit;
+
+proc sql;
+create table duplicidade_3b as
+	select *, 0 as flativo2
+	from duplicidade_3a
+	where sessionid in (
+		select distinct sessionid
+		from duplicidade_3a
+		where screen='assinarContrato')
+	and screen = 'enviarCodigo'
+	and nuproposta = .
+;quit;
+
+proc sql;
+create table app_tag_5 as
+	select a.*, b.flativo2
+	from app_tag_4a a
+	left join duplicidade_3b b
+	on a.sessionid = b.sessionid
+	and a.diaHora = b.diaHora
+	and a.screen = b.screen
+;quit;
+
+data app_tag; set app_tag_5;
+if flAtivo2 ne . then flAtivo = 0;
+drop  flAtivo2;
+run;
+
+/***************************************/
+/*finaliza tratamento da dup3*/
+/***************************************/
+
+proc sql;
+insert into APPBV.APPBV_TAG
+	select * from app_tag
+;quit;
+
+/*data appbv_tag_new; set onboard.appbv_tag_temp; run;*/
+/*data appbv_tag_new; set onboard.appbv_tag_temp (where=(flativo=1)); run;*/
+data appbv_tag_new; set  APPBV.APPBV_TAG (where=(dia>="&dt_ModeloProp."d and flativo=1)); run;
+
+/*data onboard.appbv_tag_temp; set app_tag; run;*/
+
+/* ********************************************
+
+FINALIZA TRATAMENTO NA BASE DE TAGUEAMENTO
+
+base: app_tag
+condição: flativo = 1 -> registros tratados
+				  = 0 -> regisros com bug
+observações:
+os bugs se referem a disparos duplicados no
+tagueamento. Os bugs identificados foram passados
+para a squad a fim de efetuar as correções.
+
+este tratamento garante que a base histórica
+estará próximo da visão esperada, até que
+as correções sejam aplicadas.
+
+registros com bug não foram removidos
+para fim de homologação de volume de registros
+com a base original do gcp.
+ ******************************************* */
+
+/*separa a base de tagueamento em duas para facilitar o join*/
+
+/*base event screen*/
+data app_tag_prop app_tag_ts; set appbv_tag_new (where=(eventType='Screen'));
+
+	 if nuproposta ne .	then output app_tag_prop;
+else if userId ne '' 		then output app_tag_ts;
+run;
+
+/*base event event/modal*/
+data app_tag_prop_ev app_tag_ts_ev; set appbv_tag_new (where=(eventType='Event'));
+
+	 if nuproposta ne .	then output app_tag_prop_ev;
+else if userId ne ''		then output app_tag_ts_ev;
+run;
+
+/*cria base de proposta somente com propostas que assinaram;*/
+/*data modelo_proposta_flassinou; set modelo_proposta (where=(flassinou ne .)); run;*/
+data modelo_proposta_flassinou; set APPBV.MODELO_PROPOSTA(where=(flassinou ne . and dtescolhaassinaturainicial >= "&dt_ModeloProp."d )); run;
+
+/*
+Cria base do tagueamento de telas fora do fluxo de assinatura via app
+o objetivo é identificar se o cliente passou pelas telas antes do flxo de assinatura,
+principalmente os clientes que já possuem conta ativa com o bv.
+*/
+
+/* **************************************************************************************************************************************
+
+proc sql; select max(datepart(diahora)) format date9. into: maxAppUser 	from onboard.appbv_user_temp; quit;
+
+proc sql;
+create table appbv_user_0 as
+	select
+		  cduser as userid
+		, tsacesso as diahora
+		, dsscreen as fullScreen
+	from
+		sybdigi.bdappscreenbyuser
+	where
+		dtacesso > "&maxAppUser."d
+	and (	dsscreen like '%|home' 		or
+			dsscreen like '%|landing' 	or
+			dsscreen like '%app|perfil' or
+			dsscreen like '%Andamento'
+		 )
+	and cduser in (
+		select distinct idbv from modelo_proposta_flassinou where idbv ne ''
+	)
+;quit;
+
+proc sql;
+insert into onboard.appbv_user_temp
+	select * from appbv_user_0
+;quit;
+
+data appbv_user_new; set onboard.appbv_user_temp (where=(datepart(diaHora)>="&dtModeloProp."d)); run;
+
+/*
+une a base de tagueamento do fluxo de assinatura com a base
+dos acessos fora* do fluxo de assinatura
+
+* observando somente as páginsa cidas na query, que supostamente
+são telas acessadas antes do fluxo de assinatura.
+
+*/
+
+/*
+proc sql;
+create table appbv_user_1 as
+	select userid, diahora, fullscreen, nuproposta from app_tag
+		where flativo = 1 and eventType = 'Screen' and (userid ne '' or nuproposta ne .)
+	union all
+	select userid, diahora, fullscreen, . as nuproposta from appbv_user_0
+		where userid ne ''
+;quit;
+*/
+
+/* Páginas no fluxo de assinatura
+
+0	assinarContrato
+1	enviarCodigo
+2	enviarNovoCodigo
+3	validarCodigo
+4	erroCodigo
+5	ajustarEmail
+6	ajustarNumeroCelular
+7	introducao
+
+8	condicoesDeServico
+9	politicaDePrivacidade
+10	termosDeUso
+
+11	confirmarDadosPessoais
+12	dadosPessoaisIncorretos
+13	resumoFinanciamento
+14	resumoTaxasTarifas
+
+15	resumoSeguro
+16	seguroOferece
+17	resumoSeguroDetalhes
+18	duvidaSeguros
+19	ccbTermoSeguro
+
+20	assinatura-eletronica
+21	assinatura
+22	tutorialSelfie
+23	selfie
+24	confirmarSelfie
+25	capturarSelfie
+26	sucesso
+
+27	agradecimentoResposta
+28	pesquisaSatisfacao
+
+29	finalizandoDetalhesFinanciamento
+30	semAcessoLocalizacao
+
+31	algoDeuErrado
+32	fluxoIncorreto
+
+total 33 páginas
+	*/
+
+/* ********************************************
+
+TRANSPOSIÇÃO DA BASE DE TAGUEAMENTO DE LINHAS EM COLUNAS
+
+O objetivo desta transposição é identificar se o cliente navegou pelas
+telas do fluxo, a fim de criar um funil de conversão. Neste caso, desprezando
+a quantidade de vezes que foi acessado, analisando somente se teve o acesso.
+
+A base de tagueamento tem um registro para cada página acessada, deste modo,
+após a transposição, cada proposta será agrupada para ter um único registro
+com cada página acessada indicada por uma flag. 1 = acessou a página.
+
+*/
+
+/* *************************************************************************************************************************************
+
+proc sql;
+create table appbv_user_2 as
+	select
+		  a.nuproposta
+		, a.tsescolhaassinaturainicial
+		, case when b.fullscreen like '%|landing' 							then 1 else . end as landing
+		, case when b.fullscreen like '%|landing' 							then b.diahora else . end as tslanding format datetime22.
+		, case when b.fullscreen like '%|home' 								then 1 else . end as home
+		, case when b.fullscreen like '%|home' 								then b.diahora else . end as tshome format datetime22.3
+		, case when b.fullscreen like '%app|perfil' 						then 1 else . end as perfil
+		, case when b.fullscreen like '%app|perfil' 						then b.diahora else . end as tsperfil format datetime22.3
+		, case when b.fullscreen like '%Andamento' 							then 1 else . end as andamento
+		, case when b.fullscreen like '%Andamento' 							then b.diahora else . end as tsandamento format datetime22.3
+	from
+		modelo_proposta_flassinou a
+		inner join
+			appbv_user_new b
+		on  a.idbv = b.userid
+			and b.diahora between a.tsescolhaassinaturainicial and a.tsfinalizacaoassinatura
+;quit;
+
+proc sql;
+create table appbv_user_2_sum as
+	select
+		  nuproposta
+		, tsescolhaassinaturainicial
+
+		, max(landing) 								as fn_landing
+		, max(tslanding) format datetime19.			as ts_landing
+		, max(home) 								as fn_home
+		, max(tshome) format datetime19.			as ts_home
+		, max(perfil) 								as fn_perfil
+		, max(tsperfil) format datetime19.			as ts_perfil
+		, max(andamento) 							as fn_andamento
+		, max(tsandamento) format datetime19.		as ts_andamento
+	from
+		appbv_user_2
+	group by
+		1,2
+;quit;
+
+/* ************************************************************************************************************************************* */
+
+proc sql;
+create table appbv_user_3 as
+	select
+		  a.nuproposta
+		, a.idbv
+		, a.tsescolhaassinaturainicial
+		, a.tsfinalizacaoassinatura
+
+		, b.marca
+		, b.device
+		, b.os
+		, b.appVersao
+		, b.cidade
+		, b.regiao
+		, case when b.produtosAtivos ne .									then 1 else . end as produtosAtivos
+
+		, case when b.fullscreen like '%assinarContrato'					then 1 else . end as assinarContrato
+		, case when b.fullscreen like '%assinarContrato'					then b.diahora else . end as tsassinarContrato format datetime22.3
+		, case when b.fullscreen like '%enviarCodigo' 						then 1 else . end as enviarCodigo
+		, case when b.fullscreen like '%enviarCodigo' 						then b.diahora else . end as tsenviarCodigo format datetime22.3
+		, case when b.fullscreen like '%enviarNovoCodigo'					then 1 else . end as enviarNovoCodigo
+		, case when b.fullscreen like '%validarCodigo'						then 1 else . end as validarCodigo
+		, case when b.fullscreen like '%erroCodigo' 						then 1 else . end as erroCodigo
+		, case when b.fullscreen like '%ajustarEmail' 						then 1 else . end as ajustarEmail
+		, case when b.fullscreen like '%ajustarNumeroCelular' 				then 1 else . end as ajustarNumeroCelular
+		, case when b.fullscreen like '%introducao' 						then 1 else . end as introducao
+		, case when b.fullscreen like '%introducao' 						then b.diahora else . end as tsintroducao format datetime22.3
+		, case when b.fullscreen like '%semAcessoLocalizacao' 			  	then 1 else . end as semAcessoLocalizacao
+
+		, case when b.fullscreen like '%condicoesDeServico' 				then 1 else . end as condicoesDeServico
+		, case when b.fullscreen like '%politicaDePrivacidade' 				then 1 else . end as politicaDePrivacidade
+		, case when b.fullscreen like '%termosDeUso' 						then 1 else . end as termosDeUso
+
+		, case when b.fullscreen like '%confirmarDadosPessoais' 			then 1 else . end as confirmarDadosPessoais
+		, case when b.fullscreen like '%dadosPessoaisIncorretos' 			then 1 else . end as dadosPessoaisIncorretos
+		, case when b.fullscreen like '%resumoFinanciamento' 				then 1 else . end as resumoFinanciamento
+		, case when b.fullscreen like '%resumoTaxasTarifas' 				then 1 else . end as resumoTaxasTarifas
+
+		, case when b.fullscreen like '%resumoSeguro' 						then 1 else . end as resumoSeguro
+		, case when b.fullscreen like '%seguroOferece' 						then 1 else . end as seguroOferece
+		, case when b.fullscreen like '%resumoSeguroDetalhes' 				then 1 else . end as resumoSeguroDetalhes
+		, case when b.fullscreen like '%duvidaSeguros' 						then 1 else . end as duvidaSeguros
+		, case when b.fullscreen like '%ccbTermoSeguro' 					then 1 else . end as ccbTermoSeguro
+
+		, case when b.fullscreen like '%assinatura-eletronica' 				then 1 else . end as assinaturaEletronica
+		, case when b.fullscreen like '%assinatura-eletronica' 				then b.diahora else . end as tsassinaturaeletronica format datetime22.3
+		, case when b.fullscreen like '%assinatura' 						then 1 else . end as assinatura
+		, case when b.fullscreen like '%tutorialSelfie' 					then 1 else . end as tutorialSelfie
+		, case when b.fullscreen like '%selfie' 							then 1 else . end as selfie
+		, case when b.fullscreen like '%confirmarSelfie' 					then 1 else . end as confirmarSelfie
+		, case when b.fullscreen like '%capturarSelfie' 					then 1 else . end as capturarSelfie
+		, case when b.fullscreen like '%sucesso' 							then 1 else . end as sucesso
+		, case when b.fullscreen like '%sucesso' 							then b.diahora else . end as tssucesso format datetime22.3
+
+		, case when b.fullscreen like '%pesquisaSatisfacao' 				then 1 else . end as pesquisaSatisfacao
+		, case when b.fullscreen like '%agradecimentoResposta' 				then 1 else . end as agradecimentoResposta
+
+		, case when b.fullscreen like '%finalizandoDetalhesFinanciamento' 	then 1 else . end as finalizandoFinanciamento
+		, case when b.fullscreen like '%finalizandoDetalhesFinanciamento' 	then b.diahora else . end as tsfinalizandoFinanciamento format datetime22.3
+		, case when b.fullscreen like '%algoDeuErrado' 						then 1 else . end as algoDeuErrado
+		, case when b.fullscreen like '%algoDeuErrado' 						then b.diahora else . end as tsalgoDeuErrado format datetime22.3
+		, case when b.fullscreen like '%fluxoIncorreto' 					then 1 else . end as fluxoIncorreto
+		, case when b.fullscreen like '%fluxoIncorreto' 					then b.diahora else . end as tsfluxoIncorreto format datetime22.3
+	from
+		modelo_proposta_flassinou a
+	inner join
+		app_tag_prop b
+	on  a.nuproposta = b.nuproposta
+;quit;
+/*NOTE: Table WORK.APPBV_USER_3 created, with 98.555 rows and 41 columns.*/
+
+proc sql;
+create table appbv_user_3_sum as
+		select
+		  nuproposta
+		, tsescolhaassinaturainicial
+		, marca
+		, device
+		, os
+		, appVersao
+		, cidade
+		, regiao
+		, produtosAtivos
+
+		, max(assinarContrato) 						as fn_assinarContrato
+		, max(tsassinarContrato) format datetime19.	as ts_assinarContrato
+
+		, max(enviarCodigo) 						as fn_enviarCodigo
+		, max(tsenviarCodigo) format datetime19.	as ts_enviarCodigo
+		, max(enviarNovoCodigo) 					as fn_enviarNovoCodigo
+		, max(validarCodigo) 						as fn_validarCodigo
+		, max(erroCodigo) 							as fn_erroCodigo
+		, max(ajustarEmail) 						as fn_ajustarEmail
+		, max(ajustarNumeroCelular) 				as fn_ajustarNumeroCelular
+		, max(introducao) 							as fn_introducao
+		, max(tsintroducao) format datetime19.		as ts_introducao
+		, max(semAcessoLocalizacao) 				as fn_semAcessoLocalizacao
+
+		, max(condicoesDeServico)					as fn_condicoesDeServico
+		, max(politicaDePrivacidade)				as fn_politicaDePrivacidade
+		, max(termosDeUso) 							as fn_termosDeUso
+
+		, max(confirmarDadosPessoais) 				as fn_confirmarDadosPessoais
+		, max(dadosPessoaisIncorretos) 				as fn_dadosPessoaisIncorretos
+		, max(resumoFinanciamento) 					as fn_resumoFinanciamento
+		, max(resumoTaxasTarifas) 					as fn_resumoTaxasTarifas
+
+		, max(resumoSeguro)							as fn_resumoSeguro
+		, max(seguroOferece) 						as fn_seguroOferece
+		, max(resumoSeguroDetalhes) 				as fn_resumoSeguroDetalhes
+		, max(duvidaSeguros) 						as fn_duvidaSeguros
+		, max(ccbTermoSeguro) 						as fn_ccbTermoSeguro
+
+		, max(assinaturaEletronica) 				as fn_assinaturaEletronica
+		, max(tsassinaturaeletronica) format datetime19. as ts_assinaturaeletronica
+
+		, max(assinatura) 							as fn_assinatura
+		, max(tutorialSelfie) 						as fn_tutorialSelfie
+		, max(selfie) 								as fn_selfie
+		, max(confirmarSelfie) 						as fn_confirmarSelfie
+		, max(capturarSelfie) 						as fn_capturarSelfie
+		, max(sucesso) 								as fn_sucesso
+		, max(tssucesso) format datetime19.			as ts_sucesso
+
+		, max(pesquisaSatisfacao) 					as fn_pesquisaSatisfacao
+		, max(agradecimentoResposta) 				as fn_agradecimentoResposta
+
+		, max(finalizandoFinanciamento)				as fn_finalizandoFinanciamento
+		, max(tsfinalizandoFinanciamento) format datetime19. as ts_finalizandoFinanciamento
+		, max(algoDeuErrado) 						as fn_algoDeuErrado
+		, max(tsalgodeuerrado) format datetime19.	as ts_algoDeuErrado
+		, max(fluxoIncorreto) 						as fn_fluxoIncorreto
+		, max(tsfluxoincorreto) format datetime19.	as ts_fluxoIncorreto
+	from
+		appbv_user_3
+	group by 1,2,3,4,5,6,7,8,9
+;quit;
+/*NOTE: Table WORK.APPBV_USER_3_SUM created, with 679 rows and 41 columns.*/
+
+proc sql;
+create table appbv_user_31 as
+	select
+		  a.*
+		, case when b.fullscreen like '%assinarContrato' then b.diahora else . 			end as tsbtassinarContrato 			format datetime22.3
+		, case when b.fullscreen like '%assinatura-eletronica' then b.diahora else . 	end as tsbtassinaturaeletronica 	format datetime22.3
+
+	from
+		appbv_user_3_sum a
+	left join
+		app_tag_prop_ev b
+	on  a.nuproposta = b.nuproposta
+	and b.screen in ('assinarContrato', 'assinatura-eletronica')
+;quit;
+
+proc sql;
+create table appbv_user_31_sum as
+		select
+		  nuproposta
+		, tsescolhaassinaturainicial
+		, marca
+		, device
+		, os
+		, appVersao
+		, cidade
+		, regiao
+		, produtosAtivos
+
+		, max(fn_assinarContrato) 						as fn_assinarContrato
+		, max(ts_assinarContrato) 	 format datetime19. as ts_assinarContrato
+		, max(tsbtassinarContrato) 	 format datetime19. as ts_btassinarContrato
+
+		, max(fn_enviarCodigo) 							as fn_enviarCodigo
+		, max(ts_enviarCodigo) 	 	format datetime19.  as ts_enviarCodigo
+		, max(fn_enviarNovoCodigo) 						as fn_enviarNovoCodigo
+		, max(fn_validarCodigo) 						as fn_validarCodigo
+		, max(fn_erroCodigo) 							as fn_erroCodigo
+		, max(fn_ajustarEmail) 							as fn_ajustarEmail
+		, max(fn_ajustarNumeroCelular) 					as fn_ajustarNumeroCelular
+		, max(fn_introducao) 							as fn_introducao
+		, max(ts_introducao)		 format datetime19. as ts_introducao
+		, max(fn_semAcessoLocalizacao) 					as fn_semAcessoLocalizacao
+
+		, max(fn_condicoesDeServico)					as fn_condicoesDeServico
+		, max(fn_politicaDePrivacidade)					as fn_politicaDePrivacidade
+		, max(fn_termosDeUso) 							as fn_termosDeUso
+
+		, max(fn_confirmarDadosPessoais) 				as fn_confirmarDadosPessoais
+		, max(fn_dadosPessoaisIncorretos) 				as fn_dadosPessoaisIncorretos
+		, max(fn_resumoFinanciamento) 					as fn_resumoFinanciamento
+		, max(fn_resumoTaxasTarifas) 					as fn_resumoTaxasTarifas
+
+		, max(fn_resumoSeguro)							as fn_resumoSeguro
+		, max(fn_seguroOferece) 						as fn_seguroOferece
+		, max(fn_resumoSeguroDetalhes) 					as fn_resumoSeguroDetalhes
+		, max(fn_duvidaSeguros) 						as fn_duvidaSeguros
+		, max(fn_ccbTermoSeguro) 						as fn_ccbTermoSeguro
+
+		, max(fn_assinaturaEletronica) 						as fn_assinaturaEletronica
+		, max(ts_assinaturaeletronica) 	format datetime19.	as ts_assinaturaeletronica
+		, max(tsbtassinaturaeletronica) format datetime19. 	as ts_btassinaturaeletronica
+
+		, max(fn_assinatura) 							as fn_assinatura
+		, max(fn_tutorialSelfie) 						as fn_tutorialSelfie
+		, max(fn_selfie) 								as fn_selfie
+		, max(fn_confirmarSelfie) 						as fn_confirmarSelfie
+		, max(fn_capturarSelfie) 						as fn_capturarSelfie
+		, max(fn_sucesso) 								as fn_sucesso
+		, max(ts_sucesso)			 format datetime19. as ts_sucesso
+
+		, max(fn_pesquisaSatisfacao) 					as fn_pesquisaSatisfacao
+		, max(fn_agradecimentoResposta) 				as fn_agradecimentoResposta
+
+		, max(fn_finalizandoFinanciamento)				as fn_finalizandoFinanciamento
+		, max(ts_finalizandoFinanciamento) format datetime19. as ts_finalizandoFinanciamento
+		, max(fn_algoDeuErrado) 						as fn_algoDeuErrado
+		, max(ts_algodeuerrado) 	 format datetime19. as ts_algoDeuErrado
+		, max(fn_fluxoIncorreto) 						as fn_fluxoIncorreto
+		, max(ts_fluxoincorreto) 	 format datetime19. as ts_fluxoIncorreto
+	from
+		appbv_user_31
+	group by 1,2,3,4,5,6,7,8,9
+;quit;
+/*NOTE: Table WORK.APPBV_USER_31_SUM created, with 679 rows and 42 columns.*/
+
+/**/
+/*proc sql;*/
+/*create table appbv_user_32 as */
+/*	select*/
+/*		  a.**/
+/*		, b.buttonText as btassinarContrato*/
+/*	from*/
+/*		appbv_user_31 a*/
+/*	left join */
+/*		app_tag_prop_ev b*/
+/*	on  a.nuproposta = b.nuproposta*/
+/*	and a.tsbtassinarContrato = b.diahora*/
+/*;quit;*/
+
+proc sql;
+create table appbv_user_4 as
+	select
+		  a.nuproposta
+		, a.idbv
+		, a.tsescolhaassinaturainicial
+		, a.tsfinalizacaoassinatura
+
+		, b.marca
+		, b.device
+		, b.os
+		, b.appVersao
+		, b.cidade
+		, b.regiao
+		, case when b.produtosAtivos ne .									then 1 else . end as produtosAtivos
+
+		, case when b.fullscreen like '%assinarContrato'					then 1 else . end as assinarContrato
+		, case when b.fullscreen like '%assinarContrato'					then b.diahora else . end as tsassinarContrato format datetime22.3
+		, case when b.fullscreen like '%enviarCodigo' 						then 1 else . end as enviarCodigo
+		, case when b.fullscreen like '%enviarCodigo' 						then b.diahora else . end as tsenviarCodigo format datetime22.3
+		, case when b.fullscreen like '%enviarNovoCodigo'					then 1 else . end as enviarNovoCodigo
+		, case when b.fullscreen like '%validarCodigo'						then 1 else . end as validarCodigo
+		, case when b.fullscreen like '%erroCodigo' 						then 1 else . end as erroCodigo
+		, case when b.fullscreen like '%ajustarEmail' 						then 1 else . end as ajustarEmail
+		, case when b.fullscreen like '%ajustarNumeroCelular' 				then 1 else . end as ajustarNumeroCelular
+		, case when b.fullscreen like '%introducao' 						then 1 else . end as introducao
+		, case when b.fullscreen like '%introducao' 						then b.diahora else . end as tsintroducao format datetime22.3
+		, case when b.fullscreen like '%semAcessoLocalizacao' 			  	then 1 else . end as semAcessoLocalizacao
+
+		, case when b.fullscreen like '%condicoesDeServico' 				then 1 else . end as condicoesDeServico
+		, case when b.fullscreen like '%politicaDePrivacidade' 				then 1 else . end as politicaDePrivacidade
+		, case when b.fullscreen like '%termosDeUso' 						then 1 else . end as termosDeUso
+
+		, case when b.fullscreen like '%confirmarDadosPessoais' 			then 1 else . end as confirmarDadosPessoais
+		, case when b.fullscreen like '%dadosPessoaisIncorretos' 			then 1 else . end as dadosPessoaisIncorretos
+		, case when b.fullscreen like '%resumoFinanciamento' 				then 1 else . end as resumoFinanciamento
+		, case when b.fullscreen like '%resumoTaxasTarifas' 				then 1 else . end as resumoTaxasTarifas
+
+		, case when b.fullscreen like '%resumoSeguro' 						then 1 else . end as resumoSeguro
+		, case when b.fullscreen like '%seguroOferece' 						then 1 else . end as seguroOferece
+		, case when b.fullscreen like '%resumoSeguroDetalhes' 				then 1 else . end as resumoSeguroDetalhes
+		, case when b.fullscreen like '%duvidaSeguros' 						then 1 else . end as duvidaSeguros
+		, case when b.fullscreen like '%ccbTermoSeguro' 					then 1 else . end as ccbTermoSeguro
+
+		, case when b.fullscreen like '%assinatura-eletronica' 				then 1 else . end as assinaturaEletronica
+		, case when b.fullscreen like '%assinatura-eletronica' 				then b.diahora else . end as tsassinaturaeletronica format datetime22.3
+		, case when b.fullscreen like '%assinatura' 						then 1 else . end as assinatura
+		, case when b.fullscreen like '%tutorialSelfie' 					then 1 else . end as tutorialSelfie
+		, case when b.fullscreen like '%selfie' 							then 1 else . end as selfie
+		, case when b.fullscreen like '%confirmarSelfie' 					then 1 else . end as confirmarSelfie
+		, case when b.fullscreen like '%capturarSelfie' 					then 1 else . end as capturarSelfie
+		, case when b.fullscreen like '%sucesso' 							then 1 else . end as sucesso
+		, case when b.fullscreen like '%sucesso' 							then b.diahora else . end as tssucesso format datetime22.3
+
+		, case when b.fullscreen like '%pesquisaSatisfacao' 				then 1 else . end as pesquisaSatisfacao
+		, case when b.fullscreen like '%agradecimentoResposta' 				then 1 else . end as agradecimentoResposta
+
+		, case when b.fullscreen like '%finalizandoDetalhesFinanciamento' 	then 1 else . end as finalizandoFinanciamento
+		, case when b.fullscreen like '%finalizandoDetalhesFinanciamento' 	then b.diahora else . end as tsfinalizandoFinanciamento format datetime22.3
+		, case when b.fullscreen like '%algoDeuErrado' 						then 1 else . end as algoDeuErrado
+		, case when b.fullscreen like '%algoDeuErrado' 						then b.diahora else . end as tsalgoDeuErrado format datetime22.3
+		, case when b.fullscreen like '%fluxoIncorreto' 					then 1 else . end as fluxoIncorreto
+		, case when b.fullscreen like '%fluxoIncorreto' 					then b.diahora else . end as tsfluxoIncorreto format datetime22.3
+	from
+		modelo_proposta_flassinou a
+	inner join
+		app_tag_ts b
+	on	a.idbv = b.userid
+		and b.diahora between a.tsescolhaassinaturainicial and a.tsfinalizacaoassinatura
+;quit;
+
+proc sql;
+create table appbv_user_4_sum as
+		select
+		  nuproposta
+		, idbv
+		, tsescolhaassinaturainicial
+		, tsfinalizacaoassinatura
+		, marca
+		, device
+		, os
+		, appVersao
+		, cidade
+		, regiao
+		, produtosAtivos
+
+		, max(assinarContrato) 						as fn_assinarContrato
+		, max(tsassinarContrato) format datetime19.	format datetime19. as ts_assinarContrato
+
+		, max(enviarCodigo) 						as fn_enviarCodigo
+		, max(tsenviarCodigo) format datetime19.	format datetime19. as ts_enviarCodigo
+		, max(enviarNovoCodigo) 					as fn_enviarNovoCodigo
+		, max(validarCodigo) 						as fn_validarCodigo
+		, max(erroCodigo) 							as fn_erroCodigo
+		, max(ajustarEmail) 						as fn_ajustarEmail
+		, max(ajustarNumeroCelular) 				as fn_ajustarNumeroCelular
+		, max(introducao) 							as fn_introducao
+		, max(tsintroducao) format datetime19.		format datetime19. as ts_introducao
+		, max(semAcessoLocalizacao) 				as fn_semAcessoLocalizacao
+
+		, max(condicoesDeServico)					as fn_condicoesDeServico
+		, max(politicaDePrivacidade)				as fn_politicaDePrivacidade
+		, max(termosDeUso) 							as fn_termosDeUso
+
+		, max(confirmarDadosPessoais) 				as fn_confirmarDadosPessoais
+		, max(dadosPessoaisIncorretos) 				as fn_dadosPessoaisIncorretos
+		, max(resumoFinanciamento) 					as fn_resumoFinanciamento
+		, max(resumoTaxasTarifas) 					as fn_resumoTaxasTarifas
+
+		, max(resumoSeguro)							as fn_resumoSeguro
+		, max(seguroOferece) 						as fn_seguroOferece
+		, max(resumoSeguroDetalhes) 				as fn_resumoSeguroDetalhes
+		, max(duvidaSeguros) 						as fn_duvidaSeguros
+		, max(ccbTermoSeguro) 						as fn_ccbTermoSeguro
+
+		, max(assinaturaEletronica) 				as fn_assinaturaEletronica
+		, max(tsassinaturaeletronica) format datetime19.	 as ts_assinaturaeletronica
+
+		, max(assinatura) 							as fn_assinatura
+		, max(tutorialSelfie) 						as fn_tutorialSelfie
+		, max(selfie) 								as fn_selfie
+		, max(confirmarSelfie) 						as fn_confirmarSelfie
+		, max(capturarSelfie) 						as fn_capturarSelfie
+		, max(sucesso) 								as fn_sucesso
+		, max(tssucesso) format datetime19.			format datetime19. as ts_sucesso
+
+		, max(pesquisaSatisfacao) 					as fn_pesquisaSatisfacao
+		, max(agradecimentoResposta) 				as fn_agradecimentoResposta
+
+		, max(finalizandoFinanciamento)				as fn_finalizandoFinanciamento
+		, max(tsfinalizandoFinanciamento) format datetime19. format datetime19. as ts_finalizandoFinanciamento
+		, max(algoDeuErrado) 						as fn_algoDeuErrado
+		, max(tsalgodeuerrado) format datetime19.	format datetime19. as ts_algoDeuErrado
+		, max(fluxoIncorreto) 						as fn_fluxoIncorreto
+		, max(tsfluxoincorreto) format datetime19.	format datetime19. as ts_fluxoIncorreto
+	from
+		appbv_user_4
+	group by 1,2,3,4,5,6,7,8,9,10,11
+;quit;
+/*NOTE: Table WORK.APPBV_USER_4_SUM created, with 0 rows and 44 columns.*/
+
+proc sql;
+create table appbv_user_41 as
+	select
+		  a.*
+		, case when b.fullscreen like '%assinarContrato' then b.diahora else . end as tsbtassinarContrato format datetime22.3
+		, case when b.fullscreen like '%assinatura-eletronica' then b.diahora else . end as tsbtassinaturaeletronica format datetime22.3
+
+	from
+		appbv_user_4_sum a
+	left join
+		app_tag_ts_ev b
+		on	a.idbv = b.userid
+		and b.diahora between a.tsescolhaassinaturainicial and a.tsfinalizacaoassinatura
+;quit;
+
+proc sql;
+create table appbv_user_41_sum as
+		select
+		  nuproposta
+		, tsescolhaassinaturainicial
+		, marca
+		, device
+		, os
+		, appVersao
+		, cidade
+		, regiao
+		, produtosAtivos
+
+		, max(fn_assinarContrato) 						as fn_assinarContrato
+		, max(ts_assinarContrato) 	 format datetime19. as ts_assinarContrato
+		, max(tsbtassinarContrato) 	 format datetime19. as ts_btassinarContrato
+
+		, max(fn_enviarCodigo) 							as fn_enviarCodigo
+		, max(ts_enviarCodigo) 	 	format datetime19.  as ts_enviarCodigo
+		, max(fn_enviarNovoCodigo) 						as fn_enviarNovoCodigo
+		, max(fn_validarCodigo) 						as fn_validarCodigo
+		, max(fn_erroCodigo) 							as fn_erroCodigo
+		, max(fn_ajustarEmail) 							as fn_ajustarEmail
+		, max(fn_ajustarNumeroCelular) 					as fn_ajustarNumeroCelular
+		, max(fn_introducao) 							as fn_introducao
+		, max(ts_introducao)		 format datetime19. as ts_introducao
+		, max(fn_semAcessoLocalizacao) 					as fn_semAcessoLocalizacao
+
+		, max(fn_condicoesDeServico)					as fn_condicoesDeServico
+		, max(fn_politicaDePrivacidade)					as fn_politicaDePrivacidade
+		, max(fn_termosDeUso) 							as fn_termosDeUso
+
+		, max(fn_confirmarDadosPessoais) 				as fn_confirmarDadosPessoais
+		, max(fn_dadosPessoaisIncorretos) 				as fn_dadosPessoaisIncorretos
+		, max(fn_resumoFinanciamento) 					as fn_resumoFinanciamento
+		, max(fn_resumoTaxasTarifas) 					as fn_resumoTaxasTarifas
+
+		, max(fn_resumoSeguro)							as fn_resumoSeguro
+		, max(fn_seguroOferece) 						as fn_seguroOferece
+		, max(fn_resumoSeguroDetalhes) 					as fn_resumoSeguroDetalhes
+		, max(fn_duvidaSeguros) 						as fn_duvidaSeguros
+		, max(fn_ccbTermoSeguro) 						as fn_ccbTermoSeguro
+
+		, max(fn_assinaturaEletronica) 					as fn_assinaturaEletronica
+		, max(ts_assinaturaeletronica)	format datetime19. as ts_assinaturaeletronica
+		, max(tsbtassinaturaeletronica) format datetime19. as ts_btassinaturaeletronica
+
+		, max(fn_assinatura) 							as fn_assinatura
+		, max(fn_tutorialSelfie) 						as fn_tutorialSelfie
+		, max(fn_selfie) 								as fn_selfie
+		, max(fn_confirmarSelfie) 						as fn_confirmarSelfie
+		, max(fn_capturarSelfie) 						as fn_capturarSelfie
+		, max(fn_sucesso) 								as fn_sucesso
+		, max(ts_sucesso)			 format datetime19. as ts_sucesso
+
+		, max(fn_pesquisaSatisfacao) 					as fn_pesquisaSatisfacao
+		, max(fn_agradecimentoResposta) 				as fn_agradecimentoResposta
+
+		, max(fn_finalizandoFinanciamento)				as fn_finalizandoFinanciamento
+		, max(ts_finalizandoFinanciamento) format datetime19. as ts_finalizandoFinanciamento
+		, max(fn_algoDeuErrado) 						as fn_algoDeuErrado
+		, max(ts_algodeuerrado) 	 format datetime19. as ts_algoDeuErrado
+		, max(fn_fluxoIncorreto) 						as fn_fluxoIncorreto
+		, max(ts_fluxoincorreto) 	 format datetime19. as ts_fluxoIncorretoreto
+	from
+		appbv_user_41
+	group by 1,2,3,4,5,6,7,8,9
+;quit;
+
+data appbv_user_5; set appbv_user_31_sum; run;
+
+proc sql;
+insert into appbv_user_5
+	select * from appbv_user_41_sum
+;quit;
+
+/* *************************************************************************************************************************************
+proc sql;
+create table appbv_user_6 as
+	select
+		  COALESCE(a.nuproposta,b.nuproposta) as nuproposta
+		, COALESCE(a.tsescolhaassinaturainicial,b.tsescolhaassinaturainicial) as tsescolhaassinaturainicial format datetime19.
+		, a.*
+		, b.*
+
+	from
+		appbv_user_2_sum a
+	full join
+		appbv_user_5 b
+		on a.nuproposta = b.nuproposta
+;quit;
+
+/* ************************************************************************************************************************************* */
+
+proc sql;
+create table appbv_user_7 as
+	select
+		  a.*
+		, b.buttonText as bt_assinarContrato
+	from
+		appbv_user_5 a
+	left join
+		app_tag_prop_ev b
+		on  a.nuproposta = b.nuproposta
+		and a.ts_btassinarContrato = b.diaHora
+		and b.screen like '%assinarContrato'
+		and b.buttonText not in ('fechar', 'voltar', 'Quero sair')
+
+;quit;
+
+proc sql;
+create table appbv_user_8 as
+	select
+		  a.*
+		, b.buttonText as bt_assinaturaeletronica
+	from
+		appbv_user_7 a
+	left join
+		app_tag_prop_ev b
+		on  a.nuproposta = b.nuproposta
+		and a.ts_btassinaturaeletronica = b.diaHora
+		and b.screen like '%assinatura-eletronica'
+		and b.buttonText not in ('fechar', 'voltar', 'Quero sair')
+;quit;
+
+/*identifica o primeiro acesso entre as telas selecionadas*/
+
+/*
+estudo para identificar o gap do primeiro acesso dos novos clientes.
+
+foi identificado, junto ao po em 22/07/22, que o tagueamento das telas
+fora do fluxo de assinatura não estão claros e que, possivelmente,
+necessitará de desenvolvimento.
+
+deste modo, vamos nos ater somente ao nosso.
+
+para os clientes ativos (que já possuem relacionamento com o banco)
+a tela inicial será a 'assinarContrato'. adicionada na terceira
+semana de junho.
+
+*/
+
+/**/
+/*proc sql;*/
+/*create table appbv_user_0 as */
+/*	select */
+/*		  cduser as userid*/
+/*		, tsacesso as diahora	 		*/
+/*		, dsscreen as fullScreen*/
+/*	from 	*/
+/*		sybdigi.bdappscreenbyuser*/
+/*	where 	*/
+/*		dtacesso = '02sep2021'd*/
+/*	and cduser = '6e5c3df8-f194-456a-9d06-ba574a028bbb'*/
+/*				 */
+/*	order by 1,2*/
+/*;quit;*/
+
+data APPBV.APPBV_FUNIL_BKP; set APPBV.APPBV_FUNIL; run;
+
+/* Exclui o período indicado da base histórica */
+proc sql; delete from  APPBV.APPBV_FUNIL	where datepart(tsescolhaassinaturainicial) >= "&dt_ModeloProp."d; quit;
+
+/* Insere os novos registros na base referência */
+/*proc sql;*/
+/*insert into onboard.appbv_funil_temp*/
+/*	select * from appbv_user*/
+/*;quit;*/
+
+PROC APPEND DATA=appbv_user_8 BASE=APPBV.APPBV_FUNIL FORCE;
+
+/***************************************************************\
+|	CRIA BASE:	APPBV.ASSINATURA_APP							|
+|	ORIGEM:														|
+|	REF:		DATABASE											|
+\***************************************************************/
+
+proc sql;
+create table assinatura_app as
+	select
+		  a.*
+		, b.*
+		, b.nuproposta as nuproposta_funil
+	from
+		APPBV.modelo_proposta a
+	left join
+		APPBV.appbv_funil b
+		on a.nuproposta = b.nuproposta
+	where
+		a.stproposta = 'AP'
+	and
+		a.flproducao = 1
+
+;quit;
+
+data assinatura_app_2; set assinatura_app;
+
+	flClienteBv_ajustado = flClienteBv;
+
+	if (fn_enviarcodigo = 1 or fn_validarCodigo = 1) and fn_assinarContrato = . then flClienteBv_ajustado = .;
+
+	if fn_enviarCodigo = . and fn_validarCodigo = . and fn_introducao = 1 then flclienteBv_ajustado = 1;
+
+	if fn_assinarContrato = 1 then flClienteBv_ajustado = 1;
+
+run;
+
+PROC EXPORT
+DATA= assinatura_app_2
+FILE="&dir_csv./assinatura_app.csv" REPLACE
+DBMS=DLM;
+DELIMITER=';';
+RUN;

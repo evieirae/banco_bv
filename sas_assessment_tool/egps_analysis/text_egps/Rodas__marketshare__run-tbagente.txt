@@ -1,0 +1,136 @@
+START_METADATA
+PROJECT: Rodas__marketshare
+FILE_SAS: run-tbagente.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 32)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 24
+ODS_OUTPUTS_DETECTED: html
+TRIGGERS: %INCLUDE (1x | +20), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 70
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: ODSTEXT, REPORT, SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtCetip, QtdNovo
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DWBI_DTWH.TBAGENTEMIS [DBCON], DWBI_DTWH.TBGRAVAMEPANORAMA [DBCON], RELEXC.TBMARKETSHAREDIARIAABERTA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): DWBI_DTWH.TBAGENTEMIS [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBGRAVAMEPANORAMA [Pass-Through Native (DBCON) - FROM], RELEXC.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBAGENTE, TBAGENTESHARE, TBDISPAROEMAIL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/*|----------------------------------------------------------------------------------------------*/
+/*| Alterações: alterado tabela de gravames*/
+/*| Data e descrição:	Gustavo D. 02/08/2024*/
+/*|----------------------------------------------------------------------------------------------*/
+
+%include '/infogrc/utils/all-includes.sas';
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbAgenteShare AS SELECT * FROM connection to dbcon (
+  SELECT DISTINCT
+    CAST(Gravame.NuCNPJAgenteFinanceiro AS NUMERIC(14)) as NuCnpjAgente,
+    Gravame.NmAgenteFinanceiro as NmAgente
+  FROM
+    DWBI_DTWH.TbGravamePanorama Gravame
+  WHERE 1=1
+			AND Gravame.CdStatusGravame <> 'B'
+            AND Gravame.TpVeiculo IN ('AUTOMOVEL','CAMIONETA','CAMINHONETE','UTILITARIO','CICLOMOTOR','MOTONETA','MOTOCICLETA','TRICICLO','QUADRICICLO','MICROONIBUS','ONIBUS','REBOQUE','SEMI-REBOQUE','CAMINHAO TRATOR','CHASSI/PLATAFORMA','TRATOR DE RODAS','CAMINHAO')
+
+);
+RUN;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbAgente AS SELECT * FROM connection to dbcon (
+  SELECT * FROM DWBI_DTWH.TbAgenteMIS
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE TbDisparoEmail AS
+  SELECT
+    MKT.NuCnpjAgente,
+    MKT.NmAgente
+  FROM
+    TbAgenteShare MKT
+  LEFT JOIN
+    TbAgente TBI
+    ON MKT.NuCnpjAgente = TBI.NuCnpjAgente
+  WHERE
+    TBI.NuCnpjAgente IS NULL;
+RUN;
+
+PROC SORT DATA=TbDisparoEmail NODUPKEY;
+BY NuCnpjAgente;
+RUN;
+
+PROC SQL;
+SELECT COUNT(NuCnpjAgente) INTO :QtdNovo FROM TbDisparoEmail;
+RUN;
+
+PROC SQL;
+SELECT MAX(DtAtualizacao) FORMAT=DATE9. INTO :DtCetip FROM RELEXC.tbmarketsharediariaaberta;
+RUN;
+
+/* Disparo de e-mail */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("inf-gerenciais@bv.com.br")
+    TYPE="text/html"
+    SUBJECT="Verificação da TbAgente | Novos players";
+
+ODS html body=MAIL style=noline rs=none;
+
+PROC REPORT DATA=TbDisparoEmail nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 9pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 9pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 9pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS NuCnpjAgente NmAgente;
+RUN;
+
+PROC ODSTEXT;
+   p "Prezados,";
+   p "";
+   p "Esta semana entraram &QtdNovo. novos agentes na base de Market Share.";
+   p "Dados atualizados em &DtCetip..";
+   p "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;

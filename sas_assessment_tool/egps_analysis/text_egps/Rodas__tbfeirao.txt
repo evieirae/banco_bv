@@ -1,0 +1,204 @@
+START_METADATA
+PROJECT: Rodas__tbfeirao
+FILE_SAS: tbfeirao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -21
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40), PROC DATASETS (2x | +40), PROC APPEND (1x | +15), INFILE  (2x | +20), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 124
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, DATASETS, SQL
+HAS_DATA_STEP: Yes (5x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: id
+DETECTED_MACROS_USED: Arquivo, DIRETORIO, DIRETORIO_SAIDA, Delimitador, Diretorio, anomes, id
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): &DIRETORIO. [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): &amp;Diretorio., /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBFEIRAOARQUIVOS [DATA Step - SET; PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): &amp;Diretorio., /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASEGRC.TBFEIRAOARQUIVOS
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBFEIRAOARQUIVOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ARQUIVOS, BASEFINAL, TMP
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (no_ext: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] &amp;Diretorio.
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/*############################################################################################*/
+
+/* Programa: TbFeirao.sas                                                                       */
+
+/*############################################################################################*/
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ================ Importacao Arquivo  =================== */
+/* ======================================================== */
+
+%macro Importar;
+	%let id = %sysfunc(open(Arquivos));
+		%syscall set(id);
+		%do %while(%sysfunc(fetch(&id.)) eq 0);
+			/* Identifica o delimitador do arquivo */
+			data _null_;
+				infile "&Diretorio." dsd missover obs=1;
+				input Cabecalho	$255.;
+				Cabecalho = translate(Cabecalho, '_', ' ');
+				call symputx('Delimitador', put(substr(Cabecalho, prxmatch('/[^\w]/',Cabecalho), 1), $hex.));
+			run;
+
+			/* Importa o arquivo em uma base temporária */
+			data tmp;
+				infile "&Diretorio." dsd missover firstobs=2 dlm="&Delimitador."x;
+				format  NmArquivo $100.
+						DtInicioFeirao date9.
+						DtFimFeirao	date9.;
+				NmArquivo = "&Arquivo";
+				input
+					IdFeirao					??:     	best12.
+					NmFeirao					??:     	$255.
+					DtInicioFeirao				??:			ddmmyy10.
+					DtFimFeirao					??:			ddmmyy10.
+					NmObjetivoFeirao			??:     	$100.
+					NmTipoEvento				??:     	$100.
+					CdParceiroComercial			??:     	best6.
+					VrProducaoHistoricaPDV		??:     	commax18.2
+					NmModeloEvento				??:     	$100.
+					VrProducaoMetaFeirao		??:     	commax18.2
+					CdFilial					??:     	best12.
+					VrInvestimentoPDV			??:     	commax18.2
+					VrProducaoIncrementalPDV	??:     	commax18.2
+					VrInvestimentoBVFeirao		??:     	commax18.2
+					VrProducaoHistoricaFeirao	??:     	commax18.2
+					VrProducaoMetaPDV			??:     	commax18.2
+				;
+			run;
+
+			/* Consolida a base temporária em uma base final */
+			proc append base=BaseFinal data=tmp force;run;
+
+			/* Remove base temporária */
+			proc datasets lib=work nolist;
+				delete tmp;
+			run;
+		%end;
+	%let id = %sysfunc(close(&id.));
+%mend;
+
+data  _null_;
+     call symput('AnoMes',compress(put(today(),yymmdd10.),"-")|| '_' ||compress(put(time(),B8601TM6.0),":"));
+run;
+
+/* Lista arquivos no diretório */
+data Arquivos;
+     format Arquivo $100. Diretorio $255.
+           ARQUIVO_SAIDA $100. ARQUIVO_INICIO $100.
+             DIRETORIO_SAIDA $255.  DIRETORIO_DESTINO $255.;
+
+     Pasta = '/projetos/MISV/sas-misv-base-indicadores-varejo/inbound/TbFeirao';
+     DIRETORIO_DESTINO = '/projetos/MISV/sas-misv-base-indicadores-varejo/inbound/processados/TbFeirao';
+
+     rc = filename('pasta', Pasta);
+          id = dopen('pasta');
+                do i = 1 to dnum(id);
+                     Arquivo = dread(id, i);
+
+                     var1= prxmatch('/\.csv/i', Arquivo);
+                     arquivo_inicio = scan (Arquivo,1);
+                     ARQUIVO_SAIDA= catx('.',   catx('_', arquivo_inicio, "&anomes."), 'csv');
+                     if prxmatch('/\.csv/i', Arquivo) then do;
+                          Diretorio = catx('/', Pasta, Arquivo);
+                    DIRETORIO_SAIDA =  catx('/', DIRETORIO_DESTINO, ARQUIVO_SAIDA);
+                          output;
+                     end;
+
+                end;
+          id = dclose(id);
+     rc = filename('pasta');
+
+run;
+
+proc datasets lib=work nolist;
+	delete BaseFinal;
+run;
+quit;
+
+%Importar;
+
+/*Tratamentos*/
+PROC SQL;
+	UPDATE BaseFinal
+	SET NmFeirao = UPPER(NmFeirao);RUN;
+
+PROC SQL;
+	UPDATE BaseFinal
+	SET NmObjetivoFeirao = UPPER(NmObjetivoFeirao);RUN;
+
+PROC SQL;
+	UPDATE BaseFinal
+	SET NmTipoEvento = UPPER(NmTipoEvento);RUN;
+
+proc sql;
+create table BaseFinal as
+select
+*
+,today() format date9. As DtImportacao
+from BaseFinal
+;run;
+
+proc sql;
+delete from basegrc.TbFeiraoArquivos
+where NmArquivo in (select distinct NmArquivo from BaseFinal)
+;run;
+
+data basegrc.TbFeiraoArquivos;
+set basegrc.TbFeiraoArquivos
+	BaseFinal
+;run;
+
+%macro Mover;
+     %let id = %sysfunc(open(Arquivos));
+          %syscall set(id);
+          %do %while(%sysfunc(fetch(&id.)) eq 0);
+                X "mv &DIRETORIO. &DIRETORIO_SAIDA.";
+
+          %end;
+     %let id = %sysfunc(close(&id.));
+%mend  Mover;
+
+%MOVER;

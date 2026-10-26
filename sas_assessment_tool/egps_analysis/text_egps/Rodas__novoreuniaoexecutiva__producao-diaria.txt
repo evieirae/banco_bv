@@ -1,0 +1,144 @@
+START_METADATA
+PROJECT: Rodas__novoreuniaoexecutiva
+FILE_SAS: producao-diaria.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 83
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safra13M
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /RISCOSBVF/BA/PROCESSOS/TMP/DIARIO-PRD.CSV [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/Diario-PRD.csv
+TABLE_READ_PROVENANCE (Flow): TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/Diario-PRD.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PRODUCAO01, PRODUCAODIA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/Diario-PRD.csv
+
+END_METADATA
+================================================================================
+/* Parâmetros iniciais */
+option compress = binary;
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/libname.sas';
+
+DATA _NULL_;
+  hoje = Today();
+
+  anoHoje = YEAR(hoje);
+  ano13M = YEAR(hoje) - 1;
+  safra13M = (ano13M * 100) + MONTH(hoje);
+
+  CALL SYMPUT('safra13M', PUT(safra13M,6.));
+  CALL SYMPUT('anoHoje', PUT(anoHoje,4.));
+  CALL SYMPUT('ano13M', PUT(ano13M,4.));
+RUN;
+
+/* Buscar dados de produção */
+PROC SQL;
+  CREATE TABLE PRODUCAO01 AS
+    SELECT
+      DtAtualizacao AS DtBaseProducao FORMAT=mmddyy10.,
+      SUBSTR(PUT(NuAnoMes,6.),5,2)||"/01/"||SUBSTR(PUT(NuAnoMes,6.),1,4) AS Safra,
+	  dtcontrato as DataContrato,
+      NmGrupoProdutoMeta  AS Produto,
+	  QtCorridosDiaUtilMesSab,
+      QtTotalDiaUtilMesSab,
+      COUNT(NuContrato) AS QtdContrato,
+      SUM(VrProducao) AS VrProducao FORMAT=num18.2,
+      SUM(VrProducaoProjetado) AS VrProducaoProjetado FORMAT=num18.2,
+      SUM(VrProducaoDiaUtil) AS VrProducaoDiaUtil FORMAT=num18.2,
+      SUM(VrFinanciamento) AS VrFinanciamento FORMAT=num18.2,
+      SUM(VrMargemContribuicao) AS VrMC FORMAT=num18.2,
+      SUM(VrMargemContribuicao * VrProducao) AS VpMC FORMAT=num18.2,
+      SUM(VpTxGerencial) AS VpTaxa FORMAT=num18.2,
+      SUM(VpTirContabil) AS VpTir FORMAT=num18.2,
+      SUM(((1+(VpTxGerencial/VrProducao)) / (1+(((TxTirContabil/100) * (VrProducao))/VrProducao)) -1 ) * VrProducao) AS VpSpread FORMAT=num18.2,
+      SUM(VrComissaoParcelada) AS VrComissaoParcelada FORMAT=num18.2,
+      SUM(VrComissaoTotal) AS VrComissaoTotal FORMAT=num18.2,
+      SUM(VrCapProjetado) AS VrCap FORMAT=num18.2,
+      SUM(VrDemaisSemCompletoMaxProjetado) AS VrAuto FORMAT=num18.2,
+      SUM(VrBVMaisProjetado) AS VrSPF FORMAT=num18.2,
+      SUM(VrCompletoProjetado) AS VrCompleto FORMAT=num18.2,
+      COALESCE(SUM(CASE WHEN VrTarifaAvaliacaoBem > 0 THEN 1 END),0) AS QtdTAB,
+      COALESCE(SUM(CASE WHEN VrTarifaCadastro > 0 THEN 1 END),0) AS QtdTC,
+      SUM(VrPerdaEstimada) AS VrPerdaEstimada FORMAT=num18.2
+    FROM TMP.TBPRODUCAO
+    WHERE NuAnoMes >= &safra13M.
+/*      AND NmGrupoProdutoMeta IN ('Leves','Motos','Pesados','CVG Leves','CVG Pesados','Privado','CP','CIG')*/
+    GROUP BY 1,NuAnoMes,3,4,5,6
+    ORDER BY 1,NuAnoMes,3,4,5,6;
+RUN;
+
+PROC SQL;
+CREATE TABLE PRODUCAODIA AS
+  SELECT
+    DtBaseProducao,
+    Safra,
+	DataContrato as DataContrato,
+    Produto,
+    QtdContrato,
+    VrProducao,
+    VrProducaoProjetado,
+    VrProducaoDiaUtil,
+    VrFinanciamento,
+    VrMC,
+    (VrMC / QtCorridosDiaUtilMesSab) * QtTotalDiaUtilMesSab AS VrMCProjetado,
+    VpMC,
+    VpTaxa,
+    VpTir,
+    VpSpread,
+    VrComissaoParcelada,
+    VrComissaoTotal,
+    VrCap,
+    VrAuto,
+    VrSPF,
+    VrCompleto,
+    QtdTAB,
+    QtdTC,
+    VrPerdaEstimada
+  FROM PRODUCAO01;
+RUN;
+
+/* Exportar base de dados */
+FILENAME rsvprd '/riscosbvf/BA/processos/tmp/Diario-PRD.csv' encoding="utf-8";
+
+PROC EXPORT DATA=PRODUCAODIA OUTFILE=rsvprd REPLACE DBMS=dlm;
+  DELIMITER=';';
+RUN;
+
+X 'mv /riscosbvf/BA/processos/tmp/Diario-PRD.csv /riscosbvf/BA/processos/output';

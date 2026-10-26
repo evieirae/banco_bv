@@ -1,0 +1,239 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: TI__Apuração do Resultado - Prevent Churn
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:09 UTC
+BUSINESS_AREA: TI
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 137
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CARTAO = /financas/cartoes; FINAL = /riscosbvf/financas/varejo/dre_rateio_final
+DETECTED_MACROS_DEFINED: ano, carteira, lista_safras, mes, safra, safra_fim
+DETECTED_MACROS_USED: ano, carteira, i, lista_safras, mes, safra, safra_fim, safra_fim_max, safra_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: SAFRA_FIM_MAX, SAFRA_INI
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CARTAO.TBL_RAC_RESUMO_&CARTEIRA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CARTAO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): C:\Users\ics.jbassanesi\OneDrive - Banco Votorantim S.A\Escritório CDO - 04. Gestão de Resultados\02. Valuation\04. Medição\spk_ate_0013 (Prevent Churn Reconquista)\01. Apuração VPL\input_resultado.xlsx[SHEET='Plan1']
+TEMP/DISCARDED_FILE_INPUT: WORK.input_resultado <- C:\Users\ics.jbassanesi\OneDrive - Banco Votorantim S.A\Escritório CDO - 04. Gestão de Resultados\02. Valuation\04. Medição\spk_ate_0013 (Prevent Churn Reconquista)\01. Apuração VPL\input_resultado.xlsx[SHEET='Plan1']
+TABLE_READ_PROVENANCE (Flow): CARTAO.TBL_RAC_RESUMO_&CARTEIRA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: AGRUP_&CARTEIRA, AGRUP_FINAL, AGRUP_FINAL_AJUSTADA, AGRUP_FINAL_PONDERADA, APURACAO_CHURN, BASE_INI, PONDERADORES, RESUMO_CARTAO
+DYNAMIC REFS (Ambiguous): CARTAO.TBL_RAC_RESUMO_{CARTEIRA}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET safra_fim=%sysfunc(putn(&ano.*100 + &mes., z6.));
+%LET lista_safras=&lista_safras. &carteira.;
+%LET carteira=&safra_fim.;
+%LET ano=%eval(&ano. + 1);
+%LET mes=%eval(&mes. + 1);
+%LET safra=%scan(&lista_safras., &i.);
+
+[[ FILE_REFS_MACRO ]]
+IN|C:\Users\ics.jbassanesi\OneDrive - Banco Votorantim S.A\Escritório CDO - 04. Gestão de Resultados\02. Valuation\04. Medição\spk_ate_0013 (Prevent Churn Reconquista)\01. Apuração VPL\input_resultado.xlsx[SHEET='Plan1']|C:/USERS/ICS.JBASSANESI/ONEDRIVE - BANCO VOTORANTIM S.A/ESCRITÓRIO CDO - 04. GESTÃO DE RESULTADOS/02. VALUATION/04. MEDIÇÃO/SPK_ATE_0013 (PREVENT CHURN RECONQUISTA)/01. APURAÇÃO VPL|INPUT_RESULTADO.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Churn */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Churn */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gWoeuNAXHf3i6Ant/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname FINAL "/riscosbvf/financas/varejo/dre_rateio_final";
+
+libname CARTAO "/financas/cartoes";
+
+proc sql;
+    create table ponderadores as
+    select
+        safra,
+        Grupo_Inatividade_Ajustada,
+        sum(case when Fl_Weclever = 1 then 1 else 0 end) as qtde_teste,
+        sum(case when Fl_Weclever = 0 then 1 else 0 end) as qtde_controle,
+        case
+            when calculated qtde_controle > 0 then calculated qtde_teste / calculated qtde_controle
+            else .
+        end as ponderador
+    from input_resultado
+    where Fl_Ativou_MOB3 in ("Ativou_CPC", "Ativou_Organico", "Nao_Ativou")
+    group by safra, Grupo_Inatividade_Ajustada;
+quit;
+
+%macro churn(safra_ini, safra_fim_max);
+
+    %local safra_fim carteira ano mes lista_safras i;
+
+    %let safra_fim = &safra_ini.;
+    %let lista_safras = ;
+
+    %do %while(&safra_fim. <= &safra_fim_max.);
+
+        %let carteira = &safra_fim.;
+
+        
+
+        data base_ini;
+        set input_resultado;
+
+            keep cddimcontacartao Grupo_Inatividade_Ajustada Fl_Weclever Safra
+                 Cod_Conta Fl_Ativou_MOB3 MOB_Ativação Recorrente_Ativação;
+
+            rename MOB_Ativação = mob_ativacao Recorrente_Ativação = Recorrente_Ativacao;
+
+            where safra >= &safra_ini. and safra <= &safra_fim.
+                  and Fl_Ativou_MOB3 in ("Ativou_CPC", "Ativou_Organico", "Nao_Ativou")
+                  and MOB_Ativação = "MOB 0"
+                  and Recorrente_Ativação = 1;
+        run;
+
+        
+
+        proc sql;
+            create table resumo_cartao as
+            select CdContaCartao,
+                   max(vrmargemliquida) as margem_liquida_cartoes
+            from cartao.TBL_RAC_RESUMO_&carteira.
+            group by CdContaCartao;
+        quit;
+
+        
+
+        proc sql;
+            create table base_ini as
+            select a.*,
+                   b.margem_liquida_cartoes
+            from base_ini as a
+            left join resumo_cartao as b
+            on a.cddimcontacartao = b.CdContaCartao;
+        quit;
+
+        
+
+        proc sql;
+            create table agrup_&carteira. as
+            select
+                case Fl_Weclever
+                    when 0 then 'Controle'
+                    when 1 then 'Teste'
+                    else 'Desconhecido'
+                end as grupo,
+                &carteira. as carteira,
+                Grupo_Inatividade_Ajustada,
+                safra,
+                count(*) as qtde,
+                sum(coalesce(margem_liquida_cartoes, 0)) as margem_liquida
+            from base_ini
+            group by grupo, carteira, Grupo_Inatividade_Ajustada, safra;
+        quit;
+
+        
+
+        %let lista_safras = &lista_safras. &carteira.;
+
+        
+
+        %let ano = %substr(&safra_fim., 1, 4);
+        %let mes = %substr(&safra_fim., 5, 2);
+
+        %if &mes. = 12 %then %do;
+            %let ano = %eval(&ano. + 1);
+            %let mes = 01;
+        %end;
+        %else %do;
+            %let mes = %eval(&mes. + 1);
+        %end;
+
+        %let safra_fim = %sysfunc(putn(&ano.*100 + &mes., z6.));
+
+    %end;
+
+    
+
+    data agrup_final;
+        set _null_;
+    run;
+
+    %do i = 1 %to %sysfunc(countw(&lista_safras.));
+        %let safra = %scan(&lista_safras., &i.);
+        data agrup_final;
+            set agrup_final agrup_&safra.;
+        run;
+    %end;
+
+    
+    proc sql;
+        create table agrup_final_ajustada as
+        select
+            a.*,
+            b.ponderador,
+            case
+                when a.grupo = 'Controle' and b.ponderador > 0 then a.margem_liquida * b.ponderador
+                else a.margem_liquida
+            end as margem_ponderada
+        from agrup_final as a
+        left join ponderadores as b
+        on a.safra = b.safra and a.Grupo_Inatividade_Ajustada = b.Grupo_Inatividade_Ajustada;
+    quit;
+
+    
+
+    proc sql;
+        create table agrup_final_ponderada as
+        select
+            safra,
+            carteira,
+            Grupo_Inatividade_Ajustada,
+            grupo,
+            sum(qtde) as qtde,
+            sum(margem_liquida) as margem_liquida,
+            sum(margem_ponderada) as margem_ponderada,
+            cats('R$ ', put(sum(margem_ponderada), comma12.2)) as margem_ponderada_formatado
+        from agrup_final_ajustada
+        group by safra, carteira, Grupo_Inatividade_Ajustada, grupo;
+    quit;
+
+    
+    proc sql;
+        create table Apuracao_Churn as
+        select
+            grupo,
+            carteira,
+            safra,
+            Grupo_Inatividade_Ajustada as faixa_etaria,
+            margem_ponderada
+        from agrup_final_ponderada;
+    quit;
+
+%mend;
+%churn(202501, 202508);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Churn */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

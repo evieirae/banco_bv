@@ -1,0 +1,100 @@
+START_METADATA
+PROJECT: Rodas__inad
+FILE_SAS: 03-mensageria.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 44
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBLEVESNOVOSBVO [SAS/Local], CRM.SIMU_PROP_AQUISICAO [SAS/Local], CRM.SIMU_PROP_LEADS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBLEVESNOVOSBVO [PROC SQL - FROM], CRM.SIMU_PROP_AQUISICAO [PROC SQL - FROM], CRM.SIMU_PROP_LEADS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LEADS, MSGPROPOSTA, TBONDABVO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* Buscar dados de mensageria */
+PROC SQL;
+CREATE TABLE MsgProposta AS
+  SELECT DISTINCT
+    Num_Proposta AS NuProposta,
+    CASE WHEN Msg_Dash = '9. Sem CdSimuPrazofnnco' THEN '9. Não houve mensageria' ELSE Msg_Dash END AS Mensageria,
+    Msg_2 AS Mensageria2
+  FROM CRM.SIMU_PROP_AQUISICAO
+  WHERE
+    Num_Proposta <> .
+    AND (calculated Mensageria || Msg_2) IS NOT NULL;
+RUN;
+
+PROC SORT DATA=MsgProposta NODUPKEY;
+BY NuProposta;
+RUN;
+
+/* Buscar informações de leads  */
+PROC SQL;
+CREATE TABLE Leads AS
+  SELECT DISTINCT
+    num_proposta as NuProposta,
+    Sistema_Origem as CompraLeads,
+	CASE WHEN flag_comissao = 1 AND Sistema_Origem IN ('ICARROS','MERCADO_LIVRE','MOBIAUTO','USADOSBR') THEN 1
+		 WHEN Sistema_Origem IN ('SITE_BV','MEU_CARRO_NOVO','APP','NA_PISTA') THEN 1
+		 ELSE 0
+    END AS FlagProducao,
+	campanha_agrup as OrigemSiteBV
+  FROM
+    CRM.SIMU_PROP_LEADS
+  WHERE
+    num_proposta <> .
+    AND Sistema_Origem IS NOT NULL;
+RUN;
+
+PROC SORT DATA=Leads NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC SQL; CREATE INDEX NuProposta ON Leads; QUIT;
+
+proc sql;
+create table TbOndaBVO as
+select
+	  cdparceirocomercial,
+	  min(nuanomes) as Nuanomes
+from BASEGRC.TbLevesNovosBVO
+group by cdparceirocomercial
+;run;

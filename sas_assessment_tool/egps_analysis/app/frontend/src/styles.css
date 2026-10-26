@@ -1,0 +1,1517 @@
+/* Tipografia da marca (Indicium AI Brand Book 2026): Inter primária + Roboto Mono
+   como ACENTO (nomes de EGP/artefato, chips, JIRA — o papel de "accent typography"
+   do manual; nunca em texto corrido). Self-hosted (variable fonts, subset latin —
+   cobre PT-BR) p/ não depender de CDN dentro do Databricks App. */
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/inter-var-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto Mono";
+  src: url("./fonts/roboto-mono-var-latin.woff2") format("woff2");
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #1c1d2f;
+  --panel: #25273b;
+  --panel2: #2f3150;
+  --ink: #f5f6fa;
+  --mut: #9a9cc0;
+  --line: #3a3c5c;
+  --line-soft: #2a2c46;
+  --hover: #2a2c46;
+  --track: #3a3c5c;
+  --surface-3: #222438;
+  --accent: #3a58ee;
+  --accent2: #699bfb;
+  --on-accent: #ffffff;
+  /* indicador/foco fino que precisa contrastar com a superfície (claro: índigo; escuro: azul-claro) */
+  --accent-line: #699bfb;
+  --ok: #4caf72;          /* verde como TEXTO/acento (legível na superfície) */
+  --danger: #e0594f;
+  --warn: #e6b450;
+  --diverge: #2f2a1e;
+  --tone-ok-bg: #1f3a2a; --tone-ok-fg: #7fd6a0;
+  --tone-wip-bg: #3a341c; --tone-wip-fg: #e6c84e;
+  --tone-cyc-bg: #3a2222; --tone-cyc-fg: #ffb0a8; --tone-cyc-border: #ff7a6e;
+  --tone-indi-bg: #18324a; --tone-indi-fg: #8fc7ff; --tone-indi-border: #1f496b;
+  --tone-ext-bg: #3a2f18; --tone-ext-border: #5a4a1c;
+  --tone-todo-bg: #2a2c46; --tone-todo-fg: #aeb0d4;
+  --tone-arec-bg: #3a3a16; --tone-arec-fg: #e6e25a;   /* "A receber" — amarelo */
+  --danger-soft: #f0a8a2;
+  --fill-muted: #5b6370;
+  /* segmentos do funil (Okabe-Ito-like; mesmos valores nos 2 temas — paleta categórica
+     dual-theme). Cada par bg/on garante >=4.5:1 do rótulo. --seg-done usa --ok (verde único). */
+  --seg-todo: #9aa0a6;  --seg-todo-on: #1c1d2f;
+  --seg-wip: #e69f00;   --seg-wip-on: #1c1d2f;
+  --seg-done: #0c7d56;  --seg-done-on: #ffffff;   /* verde como PREENCHIMENTO (texto branco) */
+  --seg-block: #c0392b; --seg-block-on: #ffffff;
+  --seg-remc: #2f6fb0;  --seg-remc-on: #ffffff;  /* azul (herdou o tom do extinto "Removido"; era roxo #6d4c91) */
+  --seg-migr: #0b6b3a;  --seg-migr-on: #ffffff;   /* verde-escuro distinto do --seg-done */
+  --seg-espera: #8e5fd1; --seg-espera-on: #ffffff; /* roxo claro — distinto de todos os outros tons */
+  /* Roxo (mais escuro que --seg-espera, pro par ficar distinguível) — o tom que o extinto
+     "Removido" usava e ficou livre quando --seg-remc virou azul. Substituiu o rosa
+     Okabe-Ito (#cc79a7) em 30/09: como matiz ele funcionava, mas era o único claro e
+     pastel de uma paleta toda saturada e média-escura, e saltava da barra. Este fica no
+     mesmo peso dos vizinhos e segue distinto de --seg-wip. */
+  --seg-desat: #5b3a70; --seg-desat-on: #ffffff;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel2: #f1f0fa;
+  --ink: #1c1d2f;
+  --mut: #5a5c74;
+  --line: #dedaf4;
+  --line-soft: #ececf4;
+  --hover: #f5f5fb;
+  --track: #e6e4f2;
+  --surface-3: #f7f6fc;
+  --accent: #3a58ee;
+  --accent2: #699bfb;
+  --on-accent: #ffffff;
+  --accent-line: #3a58ee;
+  --ok: #157a42;
+  --danger: #c0392b;
+  --warn: #9a7d12;
+  --diverge: #fbf3e0;
+  --tone-ok-bg: #e3f5ea; --tone-ok-fg: #157a42;
+  --tone-wip-bg: #fbf3d6; --tone-wip-fg: #7a6000;
+  --tone-cyc-bg: #fde4e2; --tone-cyc-fg: #c0392b; --tone-cyc-border: #e0594f;
+  --tone-indi-bg: #e4ecfe; --tone-indi-fg: #2a44c0; --tone-indi-border: #bcd0fb;
+  --tone-ext-bg: #fbf0d6; --tone-ext-border: #e6d9a8;
+  --tone-todo-bg: #ececf4; --tone-todo-fg: #5a5c74;
+  --tone-arec-bg: #faf7cf; --tone-arec-fg: #6b6600;
+  --danger-soft: #c0392b;
+  --fill-muted: #7c7898;
+}
+* { box-sizing: border-box; }
+body, html, #root { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 13px/1.4 var(--font-sans);
+}
+.app { display: flex; flex-direction: column; height: 100vh; padding: 14px 18px; gap: 12px; }
+.app.app-doc { height: auto; min-height: 100vh; }  /* Resumo: scroll na página, não na tabela */
+
+.topbar { display: flex; justify-content: space-between; align-items: flex-end; }
+.topbar h1 { font-size: 18px; margin: 0; }
+.topbar .sub { color: var(--mut); font-size: 12px; }
+.topbar .who { color: var(--mut); font-size: 12px; }
+
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+/* variante compacta (abas Inputs/EGPs): formato de CARD preservado, só levemente
+   menor que o padrão (22px -> 19px; pedido 2026-08-29 — a faixa-linha de 28/08 ficou
+   pequena demais). Recolher de verdade = botão/scroll do cabeçalho (useHeaderCollapse). */
+.metrics.compact { position: relative; }
+.metrics.compact > .infotip { position: absolute; top: 6px; right: 8px; z-index: 2; }
+/* cabeçalho recolhível (botão ▴ persistente + auto-recolher ao rolar a tabela) */
+.hdr-slim { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px;
+  color: var(--mut); padding: 3px 2px; cursor: pointer; animation: overlay-in .15s ease-out; }
+.hdr-slim b { color: var(--ink); }
+.hdr-slim b.danger { color: var(--danger); }
+.hdr-toggle { white-space: nowrap; background: var(--panel2); color: var(--mut);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font-size: 12px;
+  line-height: 1.3; cursor: pointer; }
+.hdr-toggle:hover { border-color: var(--accent-line); color: var(--ink); }
+/* popover "?" acessível (InfoTip) — conceitos centrais fora do title hover-only */
+.infotip { position: relative; display: inline-flex; align-items: center; }
+.infotip-btn { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--mut); font-size: 10px; line-height: 1; cursor: pointer; padding: 0; }
+.infotip-btn:hover, .infotip-btn[aria-expanded="true"] { border-color: var(--accent-line); color: var(--ink); }
+.infotip-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  width: 340px; max-width: 72vw; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; color: var(--ink);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .3); white-space: normal; text-transform: none;
+  letter-spacing: normal; font-weight: 400; }
+/* prosa de regras de contagem do Resumo colapsada por padrão */
+.rsm-como summary { font-size: 12px; color: var(--mut); cursor: pointer; margin: 0 0 4px; }
+.rsm-como[open] summary { color: var(--ink); }
+.rsm-como > p { margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) { .hdr-slim { animation: none; } }
+.metrics.compact .card { padding: 7px 12px; }
+.metrics.compact .card-value { font-size: 19px; }
+.metrics.compact .card-label { margin-top: 1px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.card-value { font-size: 22px; font-weight: 700; }
+.card-label { color: var(--mut); font-size: 11px; margin-top: 2px; }
+.card.danger .card-value { color: var(--danger); }
+.card.ok .card-value { color: var(--ok); }
+.card.egps { border-color: var(--accent); }
+.card.egps .card-value { color: var(--accent); }
+/* Contador de EXTRAS: fica AO LADO do número do card, nunca dentro dele (spec §3.1.2).
+   Na aba EGPs é um botão (mostra QUAIS na tabela); no Resumo, um <span> — as duas formas
+   herdam a mesma aparência. */
+.card-extra { margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--tone-wip-fg); white-space: nowrap; }
+button.card-extra { background: none; border: 1px solid transparent; border-radius: 6px; padding: 1px 6px; cursor: pointer; font-family: inherit; }
+button.card-extra:hover { border-color: var(--tone-wip-fg); }
+button.card-extra.on { border-color: var(--tone-wip-fg); background: var(--tone-wip-bg); }
+
+.filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.filters select, .filters input[type="search"] {
+  background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; font-size: 12px;
+}
+.filters input[type="search"] { min-width: 220px; }
+.filters .csv-btn { margin-left: auto; white-space: nowrap; background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.filters .csv-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.filters .csv-btn:disabled { opacity: .5; cursor: default; }
+.ms-wrap { position: relative; display: inline-block; }
+.ms-btn { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12px; cursor: pointer; }
+.ms-btn:hover { border-color: var(--accent); }
+.ms-panel { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 240px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 2px; }
+.ms-opt { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; font-size: 12px; color: var(--ink); }
+.ms-opt:hover { background: var(--hover); }
+.ms-opt input { accent-color: var(--accent); }
+.ms-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.ms-clear { font-size: 11px; color: var(--mut); background: none; border: 0; cursor: pointer; text-align: left; padding: 4px 6px; }
+.ms-clear:hover { color: var(--ink); }
+.ms-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.ms-selectall { font-size: 11px; color: var(--mut); background: none; border: 0; cursor: pointer; text-align: left; padding: 4px 6px; }
+.ms-selectall:hover { color: var(--ink); }
+.ms-range-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
+.ms-range-row label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--mut); }
+.ms-range-row input[type="number"] { width: 54px; background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; font-size: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { background: var(--panel2); color: var(--mut); border: 0; padding: 6px 12px; cursor: pointer; font-size: 12px; }
+.seg button.on { background: var(--accent); color: var(--on-accent); }
+.chk { display: inline-flex; gap: 5px; align-items: center; color: var(--mut); font-size: 12px; }
+.count { margin-left: auto; color: var(--mut); font-size: 12px; }
+/* aba EGPs: contador maior + negrito (pedido visual), sem afetar o .count do Monitoramento */
+.rd-count-box { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.rd-count-box .count { margin-left: 0; }
+.readiness .count { font-size: 14px; font-weight: 700; color: var(--ink); }
+.rd-recebidos { background: var(--tone-ok-bg); color: var(--tone-ok-fg); border: 1px solid transparent; cursor: default; font-weight: 600; }
+
+.error { background: var(--tone-cyc-bg); border: 1px solid var(--danger); color: var(--tone-cyc-fg); padding: 8px 12px; border-radius: 6px; }
+
+/* header e corpo no MESMO scroller horizontal (critique 2026-08-28 P2): antes o
+   .thead ficava fora do overflow do .tbody e desalinhava no scroll-x do notebook. */
+.table-wrap { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: auto hidden; min-height: 0; }
+.table-wrap .thead, .table-wrap .tbody { min-width: 1284px; }
+.thead, .trow { display: grid; grid-template-columns: 44px minmax(220px, 3fr) 70px minmax(120px, 1.3fr) minmax(110px, 1.2fr) minmax(120px, 1.4fr) 60px 70px 80px 170px 120px 1.2fr 1fr 1.4fr 100px; align-items: center; }
+.thead { background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; }
+.thead > div, .trow > div { padding: 0 8px; overflow: hidden; }
+.tbody { flex: 1; overflow: auto; min-height: 0; }
+/* .trow não é mais o item absolutamente posicionado do virtualizador — isso vive no
+   wrapper (inline style, 1 por item). O detalhe do input abre em DetailModal (2026-08-28);
+   measureElement segue no wrapper, inócuo com linhas de altura fixa. */
+.trow { border-bottom: 1px solid var(--line-soft); }
+.trow:hover { background: var(--hover); }
+.trow.diverge { background: var(--diverge); }
+.c-art { white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 12px; }
+.c-lstat { white-space: nowrap; text-overflow: ellipsis; font-size: 11px; }
+/* Badge de completude do checklist de pré-working (InputDetailPanel) — cor de texto puro
+   (sem fundo), tokens já validados como legíveis nos 2 temas (mesmo uso de .chip.ok/.c-new). */
+.c-pwk { white-space: nowrap; text-overflow: ellipsis; font-size: 11px; text-align: center; }
+.c-pwk.pwk-completo { color: var(--tone-ok-fg); font-weight: 600; }
+.c-pwk.pwk-parcial { color: var(--tone-wip-fg); font-weight: 600; }
+.c-pwk.pwk-vazio { color: var(--mut); }
+.c-src { white-space: nowrap; text-overflow: ellipsis; color: var(--mut); font-size: 11px; }
+.c-orig { white-space: nowrap; text-overflow: ellipsis; font-size: 11px; }
+.c-area { white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--mut); }
+.c-num { text-align: right; }
+
+.pill { font-size: 11px; padding: 1px 6px; border-radius: 9px; }
+.pill.ok { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.pill.todo { background: var(--tone-cyc-bg); color: var(--danger-soft); }
+.tag { font-size: 10.5px; padding: 0 5px; border-radius: 8px; margin-right: 5px; }
+.tag.orphan { background: var(--tone-ext-bg); color: var(--warn); }
+.tag.nolink { background: var(--tone-ext-bg); color: var(--mut); border: 1px solid var(--line); white-space: nowrap; }
+.tag.exdep { background: var(--surface-3); color: var(--mut); border: 1px solid var(--line); white-space: nowrap; }
+.tag.autoprod { background: var(--tone-ok-bg); color: var(--tone-ok-fg); white-space: nowrap; cursor: help; }
+/* sanitização DERIVADA (nada gravado): tom apagado, igual ao Sanitizado do funil */
+.tag.sanderiv { background: var(--surface-3); color: var(--mut); border: 1px solid var(--line); white-space: nowrap; cursor: help; }
+/* linha de input de ex-dependência: tom apagado (cinza) — fora dos cards, só análise */
+.trow.exdep { opacity: 0.55; }
+.trow.exdep .c-art { color: var(--mut); }
+.tag.warn { color: var(--warn); }
+.tag.blocker { background: color-mix(in srgb, var(--danger) 20%, var(--panel)); color: var(--danger-soft);
+  border: 1px solid var(--danger); white-space: nowrap; margin: 0; }
+.tag.sole { background: color-mix(in srgb, var(--ok) 16%, var(--panel)); color: var(--tone-ok-fg);
+  border: 1px solid var(--ok); white-space: nowrap; margin: 0; }
+/* c-art em duas linhas: nome (com reticências) em cima, pílulas de bloqueio embaixo (à esquerda) */
+.c-art .art-name { overflow: hidden; text-overflow: ellipsis; }
+/* 2ª linha de badges: altura da linha é fixa (ROW_H), então NÃO pode quebrar — clipa o que
+   não couber em vez de empurrar a linha. A ordem no JSX é a prioridade de leitura. */
+.c-art .art-tags { display: flex; gap: 4px; margin-top: 2px; min-width: 0; overflow: hidden; }
+
+.trow select, .trow input {
+  width: 100%; background: transparent; color: var(--ink);
+  border: 1px solid transparent; border-radius: 5px; padding: 4px 6px; font-size: 12px;
+}
+.trow select:hover, .trow input:hover { border-color: var(--line); }
+.trow select:focus, .trow input:focus { border-color: var(--accent); background: var(--panel2); outline: none; }
+/* status como chip suave (fundo tonal + texto on-color), alinhado à paleta do funil */
+select.st-ok, select.st-wip, select.st-todo, select.st-muted, select.st-rcv, select.st-arec { border-radius: 9px; padding: 1px 8px; border: 1px solid transparent; font-weight: 600; }
+.trow select.st-ok { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }       /* Modernizado/Sanitizado — verde */
+.trow select.st-wip { background: var(--tone-wip-bg); color: var(--tone-wip-fg); }     /* Em ingestão — âmbar */
+.trow select.st-rcv { background: var(--tone-indi-bg); color: var(--tone-indi-fg); }   /* Recebido — azul */
+.trow select.st-arec { background: var(--tone-arec-bg); color: var(--tone-arec-fg); }  /* A receber — amarelo */
+.trow select.st-todo { background: var(--tone-todo-bg); color: var(--tone-todo-fg); }
+.trow select.st-muted { color: var(--mut); text-decoration: line-through; }
+
+/* Etapa/Status dos inputs (Monitor + detalhe de EGP): mesma configuração visual da
+   aba EGPs (.rd-etapa/.rd-status) — borda sempre visível, não só no hover. */
+.trow .c-etapa select, .egp-trow .c-etapa select {
+  border: 1px solid var(--line); background: var(--panel2); color: var(--ink);
+  border-radius: 5px; padding: 3px 6px; font-size: 11px; cursor: pointer;
+}
+.trow .c-etapa select:hover, .egp-trow .c-etapa select:hover { border-color: var(--mut); }
+.trow .c-etapa select:focus, .egp-trow .c-etapa select:focus { outline: none; border-color: var(--accent); background: var(--panel2); }
+.trow .c-status select, .egp-trow .c-status select {
+  border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 11px;
+  font-weight: 600; cursor: pointer;
+}
+.trow .c-status select:hover, .egp-trow .c-status select:hover { border-color: var(--mut); }
+.trow .c-status select:focus, .egp-trow .c-status select:focus { outline: none; border-color: var(--accent); }
+
+.empty { padding: 30px; text-align: center; color: var(--mut); }
+
+/* tabs no topo */
+.tabs { display: inline-flex; gap: 4px; margin-left: 24px; }
+.tabs button, .tabs a { background: transparent; color: var(--mut); border: 1px solid transparent; border-radius: 7px; padding: 6px 14px; font-size: 13px; cursor: pointer; text-decoration: none; transition: background .15s, color .15s, box-shadow .15s; }
+.tabs button:hover, .tabs a:hover { background: var(--hover); color: var(--ink); }
+.tabs button:focus-visible, .tabs a:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+/* ativo: cor + peso + sublinhado de acento (pistas redundantes, não só cor) */
+.tabs button.on, .tabs a.on { background: var(--panel2); color: var(--ink); border-color: var(--line); font-weight: 700; box-shadow: inset 0 -2px 0 var(--accent-line); }
+.topbar { gap: 12px; }
+
+/* linhagem */
+.lineage { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+.lin-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.lin-bar select { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12px; max-width: 260px; }
+.lin-bar select:disabled { opacity: .45; }
+.lin-bar .egp-dd { max-width: 320px; }
+.lin-bar .info { margin-left: auto; color: var(--mut); font-size: 12px; }
+.lin-bar .ghost { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.lin-hint { font-size: 11px; color: var(--mut); }
+.search-wrap { position: relative; width: 320px; }
+.search-wrap input { width: 100%; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 13px; }
+.search-drop { position: absolute; z-index: 20; top: 36px; left: 0; right: 0; margin: 0; padding: 4px; list-style: none; max-height: 320px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.search-drop li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.search-drop li:hover { background: var(--panel2); }
+.search-drop .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
+.search-drop .meta { margin-left: auto; color: var(--mut); font-size: 11px; }
+.lin-stage { position: relative; flex: 1; min-height: 0; display: flex; }
+.lin-canvas { flex: 1; min-height: 0; background: #fafafa; border: 1px solid var(--line); border-radius: 8px; }
+.lin-tip {
+  position: absolute; z-index: 30; pointer-events: none; max-width: 340px;
+  background: rgba(17, 19, 24, .96); color: var(--on-accent); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 10px; font-size: 11px; line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45); white-space: normal; word-break: break-word;
+}
+.lin-tip .t0 { font-weight: 700; font-family: var(--font-mono); margin-bottom: 3px; color: var(--on-accent); }
+.lin-bar .ghost.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+/* ---- aba EGP ---- */
+.egpview, .waves, .history { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 10px; }
+.egp-body { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.egp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.egp-head h2 { margin: 0; font-size: 17px; }
+.egp-head .muted, .muted { color: var(--mut); font-size: 12px; }
+/* Ícone de ajuda: "?" branco num círculo cinza; title= mostra a explicação no hover. */
+.help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; margin-left: 5px; border-radius: 50%;
+  background: var(--fill-muted); color: #fff; font-size: 10px; font-weight: 700;
+  line-height: 1; cursor: help; vertical-align: middle; user-select: none;
+}
+.pill.ind { background: var(--tone-indi-bg); color: var(--tone-indi-fg); }
+.pill.cyc { background: var(--tone-cyc-bg); color: var(--tone-cyc-fg); }
+.cyc-warn { background: var(--tone-cyc-bg); border: 1px solid var(--danger); color: var(--tone-cyc-fg); padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+/* Aviso PERMANENTE da fragilidade da sanitizacao derivada (aba Inputs): a regua mede
+   exclusividade contra o escopo ativo, entao chaves voltam sozinhas quando um EGP entra.
+   Tom warn (nao danger): nao e erro, e o preco de uma decisao consciente da gestao. */
+.san-fragil { border: 1px solid var(--warn); border-radius: 6px; font-size: 12px; margin: 6px 0;
+  background: color-mix(in srgb, var(--warn) 9%, var(--panel)); }
+.san-fragil > summary { padding: 7px 12px; cursor: pointer; }
+.san-fragil-lista { display: flex; flex-direction: column; gap: 2px; max-height: 30vh; overflow: auto;
+  padding: 0 12px 8px; }
+.san-fragil-linha { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0;
+  border-top: 1px solid var(--line-soft); color: inherit; text-decoration: none; }
+.san-fragil-linha:hover { background: var(--hover); }
+/* Sugestao do vinculo Substituido: aviso + 1 botao. Nada aqui muda status sozinho. */
+.vinc-sugestao { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--tone-cyc-bg); border: 1px solid var(--line); color: var(--tone-cyc-fg); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin: 6px 0; }
+.egp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.egp-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; max-height: 220px; overflow: auto; }
+.egp-panel h3 { margin: 0 0 8px; font-size: 13px; }
+.egp-panel .dep { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2px 8px; padding: 5px 0; border-bottom: 1px solid var(--line-soft); font-size: 12px; }
+.dep-proj { font-weight: 600; }
+.dep-meta { color: var(--mut); text-align: right; }
+.dep-via { grid-column: 1 / -1; color: var(--mut); font-size: 11px; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.egpview h3 { font-size: 13px; margin: 4px 0; }
+.egp-table { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-height: 200px; }
+.egp-thead, .egp-trow { display: grid; grid-template-columns: minmax(180px,2.4fr) 70px 96px 1.3fr 90px 150px 110px 1fr 1fr 1.4fr; align-items: center; }
+.egp-thead.egp-out-head, .egp-trow.egp-out-row { grid-template-columns: 42px minmax(220px,3fr) 1fr 80px 90px 120px 110px 130px; }
+/* Pipeline de migração e Pré-working (EGP detail): tabelas de 1 linha só — mesma
+   configuração visual (thead/trow, selects) das tabelas de Inputs/Outputs logo abaixo, em
+   vez do form solto que tinham antes (pedido 2026-08). */
+.egp-thead.egp-pipe-head, .egp-trow.egp-pipe-row { grid-template-columns:
+  minmax(170px,1fr) 150px minmax(110px,.7fr) minmax(150px,1fr) minmax(110px,.7fr); }
+.egp-thead.egp-pw-head, .egp-trow.egp-pw-row { grid-template-columns: 1fr 160px; }
+/* Avisos "Bloqueado por dependência" (danger) e "Dependência despriorizada" (warn) —
+   antes herdavam só .egp-panel (caixa de 220px, texto 11-12px) e passavam batido
+   (pedido 2026-08-28): destaque com fundo tintado, borda semântica e texto maior. */
+.egp-block { max-height: none; font-size: 13px; border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--panel)); }
+.egp-block h3 { font-size: 14px; margin-bottom: 6px; }
+.egp-block > .muted { font-size: 12.5px; margin-bottom: 6px; }
+.egp-block .dep { font-size: 13px; }
+.egp-block .dep-via { font-size: 12px; }
+.egp-block.egp-block-desp { border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 9%, var(--panel)); }
+.egp-table.egp-table-single { flex: 0 0 auto; min-height: 0; }
+.egp-table.egp-table-single .egp-tbody { flex: 0 0 auto; overflow: visible; }
+.egp-thead { background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; }
+.egp-thead > div, .egp-trow > div { padding: 5px 8px; overflow: hidden; }
+.egp-tbody { flex: 1; overflow: auto; min-height: 0; }
+.egp-trow { border-bottom: 1px solid var(--line-soft); }
+.egp-trow:hover { background: var(--hover); }
+.egp-trow select, .egp-trow input { width: 100%; background: transparent; color: var(--ink); border: 1px solid transparent; border-radius: 5px; padding: 4px 6px; font-size: 12px; }
+.egp-trow select:hover, .egp-trow input:hover { border-color: var(--line); }
+.egp-trow select:focus, .egp-trow input:focus { border-color: var(--accent); background: var(--panel2); outline: none; }
+.egp-trow select.st-ok { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.egp-trow select.st-wip { background: var(--tone-wip-bg); color: var(--tone-wip-fg); }
+.egp-trow select.st-rcv { background: var(--tone-indi-bg); color: var(--tone-indi-fg); }
+.egp-trow select.st-arec { background: var(--tone-arec-bg); color: var(--tone-arec-fg); }
+.egp-trow select.st-todo { background: var(--tone-todo-bg); color: var(--tone-todo-fg); }
+.egp-trow select.st-muted { color: var(--mut); text-decoration: line-through; }
+
+/* --- overlay de vínculo per-(EGP, Input) ------------------------------ */
+.rd-vinc-btn {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+.rd-vinc-btn:hover { filter: brightness(1.1); }
+.rd-vinc-btn:disabled { opacity: 0.5; cursor: wait; }
+.rd-vinc-span { display: inline-block; padding: 2px 4px; line-height: 1; font-size: 15px; opacity: 0.7; }
+/* Glyph inline no início do nome do artefato (EGP detail): pequena margem à direita
+   para separar do texto, e opacidade máxima mesmo quando a linha está esmaecida. */
+.c-art-vinc { margin-right: 6px; }
+.egp-trow-broken {
+  opacity: 0.55;
+  background: transparent;
+}
+.egp-trow-broken .c-art-vinc { opacity: 1; }             /* toggle sempre visível */
+.egp-trow-broken .c-art-vinc .rd-vinc-btn { opacity: 1; } /* mesmo dentro do row muted */
+.egp-trow-broken select:disabled,
+.egp-trow-broken input:disabled { cursor: not-allowed; }
+.c-lstat-locked { cursor: not-allowed !important; }
+.rd-badge.rd-vinc {
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(180, 83, 9, 0.12);   /* âmbar suave — mesmo tom do "produtor definido" */
+  color: #b45309;
+  margin-left: 4px;
+}
+
+/* ---- ondas ---- */
+.wave-list { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.wave-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.wave-card.cyc { border-color: var(--danger); }
+.wave-top { display: flex; align-items: center; gap: 10px; }
+.wave-name { font-weight: 700; font-size: 13px; white-space: nowrap; }
+.wave-bar { height: 8px; background: var(--track); border-radius: 5px; overflow: hidden; flex: 1; min-width: 120px; }
+.wave-meta-inline { color: var(--mut); font-size: 12px; white-space: nowrap; }
+.wave-fill { height: 100%; border-radius: 5px; }
+.wave-fill.ok { background: var(--ok); } .wave-fill.wip { background: var(--warn); } .wave-fill.todo { background: var(--fill-muted); }
+.wave-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--ink); }
+.pill.ok { background: var(--tone-ok-bg); color: var(--tone-ok-fg); } .pill.wip { background: var(--tone-wip-bg); color: var(--tone-wip-fg); } .pill.todo { background: var(--track); color: var(--mut); }
+
+/* ---- histórico ---- */
+.hist-table { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-height: 0; }
+.hist-thead, .hist-trow { display: grid; grid-template-columns: 160px 200px 120px minmax(180px,2fr) 110px 1fr 1fr; align-items: center; }
+.hist-fonte { font-size: 10px; padding: 1px 7px; border-radius: 9px; border: 1px solid transparent; white-space: nowrap; }
+.hist-fonte.f-mon { background: var(--tone-indi-bg); color: var(--tone-indi-fg); }
+.hist-fonte.f-egp { background: var(--tone-wip-bg); color: var(--tone-wip-fg); }
+.hist-fonte.f-esc { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.hist-fonte.f-vinc { background: rgba(180, 83, 9, 0.15); color: #92400e; }
+.hist-thead { background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; }
+.hist-thead > div, .hist-trow > div { padding: 5px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hist-tbody { flex: 1; overflow: auto; min-height: 0; }
+.hist-trow { border-bottom: 1px solid var(--line-soft); font-size: 12px; }
+.hist-trow:hover { background: var(--hover); }
+.c-old { color: var(--danger-soft); } .c-new { color: var(--tone-ok-fg); }
+
+/* ---- prontidão ---- */
+.readiness { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 10px; }
+.rd-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+.chip:hover { border-color: var(--mut); }
+.chip.on { outline: 2px solid var(--accent); }
+.chip.ok { color: var(--tone-ok-fg); } .chip.wip { color: var(--tone-wip-fg); } .chip.todo { color: var(--danger-soft); } .chip.cyc { color: var(--tone-cyc-fg); }
+.rd-chips-lbl { font-size: 11px; color: var(--mut); margin-right: 2px; }
+.rd-table { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: auto hidden; min-height: 0; }
+.rd-table .rd-thead, .rd-table .rd-tbody { min-width: 1800px; }
+
+/* --- Colunas congeladas: SÓ na tabela da aba EGPs (.rd-egps) ---
+   `.rd-table`/`.rd-trow` são reusados pelo Escopo (.ms-table), com larguras e 1ª coluna
+   diferentes — uma regra global aqui desalinharia as duas.
+
+   O scroll horizontal precisa sair do .rd-table e ir para o .rd-tbody: `position: sticky`
+   se ancora no container de scroll MAIS PRÓXIMO, e o .rd-tbody (overflow:auto p/ o scroll
+   vertical) seria esse container — com o X no pai, a célula rolaria junto e não congelaria
+   nada. Como o cabeçalho é irmão do corpo, ele fica num wrapper recortado e acompanha por
+   scrollLeft (onBodyScroll em ReadinessView.tsx). */
+.rd-egps { overflow: hidden; }
+.rd-egps .rd-thead-wrap { overflow: hidden; }
+.rd-egps .rd-tbody { min-width: 0; }                      /* anula a genérica acima */
+.rd-egps .rd-thead, .rd-egps .rd-trow { min-width: 1660px; }
+/* `background: inherit` faz a célula congelada acompanhar hover/seleção/flash da linha sem
+   repetir cada estado — sem fundo opaco, as outras colunas apareceriam por baixo ao rolar. */
+.rd-egps .rd-trow { background: var(--bg); }
+.rd-egps .rd-thead > *:nth-child(1), .rd-egps .rd-trow > *:nth-child(1) {
+  position: sticky; left: 0; z-index: 2; background: inherit; }
+.rd-egps .rd-thead > *:nth-child(2), .rd-egps .rd-trow > *:nth-child(2) {
+  position: sticky; left: 44px; z-index: 2; background: inherit; }
+.rd-egps .rd-thead > *:nth-child(1), .rd-egps .rd-thead > *:nth-child(2) { background: var(--panel2); }
+.rd-thead, .rd-trow { display: grid; grid-template-columns: 44px minmax(220px,2.6fr) 100px minmax(64px,0.6fr) 46px 54px 52px minmax(72px,0.8fr) 54px 54px 78px 150px 150px 150px 140px 120px 110px; align-items: center; }
+/* variante da aba EGPs no recorte "Indicium + dependências": coluna Tipo (escopo/dependência) entre EGP e Área */
+.rd-thead.with-tipo, .rd-trow.with-tipo { grid-template-columns: 44px minmax(220px,2.6fr) 100px 100px minmax(64px,0.6fr) 46px 54px 52px minmax(72px,0.8fr) 54px 54px 78px 150px 150px 150px 140px 120px 110px; }
+.rd-prontidao { display: flex; align-items: center; justify-content: center; }
+/* Coluna Sub-área BV: derivada, então fonte menor que as editáveis vizinhas. Trunca com
+   reticências — "Estratégia - cartões" não cabe em 110px e o nome inteiro fica no title. */
+.rd-subarea { font-size: 11px; color: var(--mut); overflow: hidden; padding: 0 6px;
+  white-space: nowrap; text-overflow: ellipsis; }
+.rd-respbv input { width: 100%; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px;
+  font-size: 11px; background: var(--panel); color: var(--ink); box-sizing: border-box; }
+.rd-jira input { width: 100%; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px;
+  font-size: 11px; font-family: var(--font-mono); text-transform: uppercase;
+  background: var(--panel); color: var(--ink); box-sizing: border-box; }
+.rd-jira input[aria-invalid="true"] { border-color: var(--danger); }
+.rd-jira input:hover { border-color: var(--mut); }
+.rd-jira input:focus { outline: none; border-color: var(--accent); }
+/* Estado travado: valor exibido + ✎ p/ destravar. Fica compacto pra caber na coluna
+   estreita da tabela E na célula da tabela de Pipeline do detalhe (mesmo componente). */
+.jira-locked { display: inline-flex; align-items: center; gap: 4px; }
+.jira-value { font-family: var(--font-mono); font-size: 11px;
+  padding: 2px 6px; border-radius: 4px; background: var(--tone-indi-bg); color: var(--tone-indi-fg);
+  letter-spacing: 0.02em; }
+.jira-edit-btn { background: transparent; border: none; color: var(--mut); cursor: pointer;
+  padding: 0 2px; font-size: 12px; line-height: 1; opacity: 0.7; }
+.jira-edit-btn:hover { color: var(--accent); opacity: 1; }
+
+/* Botão "EGP atualizado" (detalhe do EGP, seção "Versão atualizada") — badge + dropdown
+   com busca sobre a lista de EGPs Atualizados. 3 estados: sem vínculo (empty), sugestão
+   automática ainda não confirmada (suggested — âmbar, pede atenção), vínculo confirmado
+   pelo humano (confirmed — verde). */
+.egp-atu-section { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+/* Vínculo antecessor -> sucessor (ticket 20): o formulário de criar/desfazer, no drawer do
+   EGP. `.vinc-explica` é a linha que separa as duas coisas que o ticket achou confundidas
+   (o vínculo, que deriva status/etapa; e a comparação, que só abre o diff). */
+.vinc-explica { font-size: 11px; color: var(--mut); line-height: 1.5; margin: 6px 0 4px; max-width: 78ch; }
+.vinc-box { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 4px 0 8px; background: var(--panel); }
+.vinc-box .vinc-explica { margin-top: 0; }
+.vinc-atual { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+/* "Substitui" — o vínculo visto do lado do SUCESSOR. Fica ACIMA do bloco do sucessor
+   porque, abrindo o EGP atualizado, a 1ª pergunta é o que ele veio substituir. */
+.vinc-antec { font-size: 12px; margin: 0 0 10px; padding: 0 0 8px; border-bottom: 1px solid var(--line-soft); }
+.vinc-antec ul { list-style: none; margin: 4px 0 6px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.vinc-antec li { display: flex; align-items: baseline; gap: 4px; }
+.vinc-antec .muted { font-size: 11px; line-height: 1.5; max-width: 78ch; }
+.vinc-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.vinc-form label { display: flex; flex-direction: column; gap: 2px; }
+.vinc-form label > span { font-size: 11px; color: var(--mut); }
+.vinc-form .vinc-suc input { min-width: 320px; }
+.vinc-ajuda { flex-basis: 100%; font-size: 11px; line-height: 1.5; }
+/* Flag "EGP atualizado" na LISTA (aba EGPs) — badge ao lado do nome + tingimento sutil da
+   linha, mesmo espírito dos ícones 🔒/⚠/⏸/⛓️‍💥 vizinhos. Âmbar = sugestão automática ainda
+   NÃO confirmada (pede atenção); verde = vínculo já confirmado pelo humano no detalhe. */
+.rd-atu-badge-auto, .rd-atu-badge-confirm { font-size: 11px; padding: 1px 4px; border-radius: 4px; }
+.rd-atu-badge-auto { background: rgba(230, 180, 80, 0.16); color: var(--tone-wip-fg); }
+.rd-atu-badge-confirm { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.rd-trow.rd-atu-suggested { box-shadow: inset 3px 0 0 var(--tone-wip-fg); }
+.rd-trow.rd-atu-confirmed { box-shadow: inset 3px 0 0 var(--ok); }
+.atu-wrap { position: relative; display: inline-block; }
+.atu-btn { border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; white-space: nowrap;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; border: 1px solid transparent; }
+.atu-btn.empty { background: var(--panel2); color: var(--mut); border-color: var(--line); }
+.atu-btn.empty:hover { border-color: var(--accent); color: var(--ink); }
+.atu-btn.suggested { background: var(--tone-wip-bg); color: var(--tone-wip-fg); border-color: var(--tone-wip-fg); }
+.atu-btn.confirmed { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.atu-panel { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; width: 280px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 4px; }
+.atu-search { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 5px;
+  padding: 4px 7px; font-size: 12px; background: var(--panel2); color: var(--ink); }
+.atu-quick { display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--line-soft); padding-bottom: 4px; }
+.atu-confirm, .atu-unlink { text-align: left; background: none; border: 0; cursor: pointer; font-size: 11px; padding: 4px 6px; border-radius: 5px; color: var(--mut); }
+.atu-confirm:hover, .atu-unlink:hover { background: var(--hover); color: var(--ink); }
+.atu-confirm { color: var(--tone-wip-fg); }
+.atu-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.atu-empty { font-size: 11px; color: var(--mut); padding: 6px; text-align: center; }
+.atu-opt { display: flex; align-items: center; gap: 6px; text-align: left; background: none; border: 0;
+  cursor: pointer; padding: 5px 6px; border-radius: 5px; font-size: 12px; color: var(--ink); }
+.atu-opt:hover { background: var(--hover); }
+.atu-opt.sel { background: var(--tone-ok-bg); }
+.atu-opt-nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atu-opt-area { font-size: 10px; color: var(--mut); flex: none; }
+.atu-conf { font-size: 9px; padding: 1px 5px; border-radius: 8px; flex: none; text-transform: uppercase; }
+.atu-conf-ok { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.atu-conf-alerta { background: var(--tone-wip-bg); color: var(--tone-wip-fg); }
+.atu-conf-forcado, .atu-conf-recusado { background: var(--tone-cyc-bg); color: var(--tone-cyc-fg); }
+.rd-thead { background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; }
+.rd-thead > div, .rd-trow > div { padding: 6px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rd-resp select { max-width: 100%; width: 100%; }
+.gestao-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.gestao-add input { padding: 4px 8px; }
+.rd-th { cursor: pointer; user-select: none; } .rd-th:hover { color: var(--ink); }
+.rd-tbody { flex: 1; overflow: auto; min-height: 0; }
+.rd-trow { border-bottom: 1px solid var(--line-soft); font-size: 12px; }
+.rd-trow:hover { background: var(--hover); }
+/* destaque ao chegar do Escopo (clique abre + rola até aqui) */
+.rd-trow.flash { animation: rd-flash 2.2s ease-out; }
+@keyframes rd-flash {
+  0%, 20% { background: var(--tone-indi-bg); box-shadow: inset 3px 0 0 var(--tone-indi-fg); }
+  100% { background: transparent; box-shadow: inset 3px 0 0 transparent; }
+}
+.rd-notfound { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* botão "copiar link" no cabeçalho do EGP */
+.link-btn { margin-left: auto; background: var(--panel2); border: 1px solid var(--line); color: var(--mut);
+  border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.link-btn:hover { color: var(--ink); border-color: var(--tone-indi-fg); }
+.rd-pct { display: flex; align-items: center; gap: 8px; }
+.rd-bar { flex: 1; height: 7px; background: var(--track); border-radius: 5px; overflow: hidden; }
+.rd-fill { position: relative; height: 100%; border-radius: 5px; }
+.rd-fill.ok { background: var(--ok); } .rd-fill.wip { background: var(--warn); } .rd-fill.todo { background: var(--danger); } .rd-fill.cyc { background: var(--tone-cyc-fg); }
+/* sobreposta à ponta direita de .rd-fill (dentro dela, largura relativa ao próprio
+   preenchimento): fatia "desbloqueada via PRD" (mesma semântica de .kanban-gauge-flag) — cor
+   própria (âmbar), nunca a mesma do preenchimento normal, pra não se confundir com
+   "realmente disponível". */
+.rd-fill-prd { position: absolute; top: 0; right: 0; height: 100%; background: #f2a91c; }
+.cyc-txt { color: var(--tone-cyc-fg); font-weight: 700; }
+.pill.cyc { background: var(--tone-cyc-bg); color: var(--tone-cyc-fg); }
+.rd-deps { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+.rd-deps.has { cursor: pointer; }
+.rd-deps.has:hover .dep-tot { color: var(--ink); }
+.dep-tot { font-variant-numeric: tabular-nums; }
+.dep-bd { display: flex; gap: 3px; }
+.dep-b { font-size: 10px; padding: 0 4px; border-radius: 8px; line-height: 16px; }
+.dep-b.indi { background: var(--tone-indi-bg); color: var(--tone-indi-fg); }
+.dep-b.ext { background: var(--tone-ext-bg); color: var(--tone-wip-fg); }
+.dep-caret { color: var(--mut); font-size: 10px; }
+.rd-status select { width: 100%; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.rd-status select:hover { border-color: var(--mut); }
+.rd-status select:focus { outline: none; border-color: var(--accent); }
+.rd-etapa select { width: 100%; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 11px; cursor: pointer; background: var(--panel2); color: var(--ink); }
+.rd-etapa select:hover { border-color: var(--mut); }
+.rd-etapa select:focus { outline: none; border-color: var(--accent); }
+.rd-vinculo select { width: 100%; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 11px; cursor: pointer; background: var(--panel2); color: var(--ink); }
+.rd-vinculo select:hover { border-color: var(--mut); }
+.rd-vinculo select:focus { outline: none; border-color: var(--accent); }
+.c-idx, .rd-idx { text-align: right; color: var(--mut); font-size: 11px; font-variant-numeric: tabular-nums; }
+.rd-expand { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; background: var(--surface-3); border-bottom: 1px solid var(--line-soft); }
+.rd-exp-lbl { font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; margin-right: 4px; }
+.dep-chip { font-size: 11px; padding: 2px 9px; border-radius: 12px; border: 1px solid transparent; white-space: nowrap; }
+.dep-chip.indi { background: var(--tone-indi-bg); color: var(--tone-indi-fg); border-color: var(--tone-indi-border); }
+.dep-chip.ext { background: var(--tone-ext-bg); color: var(--tone-wip-fg); border-color: var(--tone-ext-border); }
+.dep-chip.cyc { box-shadow: inset 0 0 0 1px var(--tone-cyc-border); color: var(--tone-cyc-fg); }
+
+/* aba Resumo */
+.resumo { flex: none; overflow: visible; display: flex; flex-direction: column; gap: 26px; padding: 6px 2px 28px; }
+.resumo h3 { margin: 2px 2px -8px; font-size: 15px; font-weight: 700; color: var(--ink); }
+.resumo .muted { color: var(--mut); font-size: 12px; margin: -10px 2px 0; }
+
+/* Tabela "card" do Resumo — paleta fixa (independe do tema), no estilo do painel */
+.rsm-card { background: #fff; border-radius: 16px; overflow: hidden; width: 100%;
+  box-shadow: 0 14px 36px rgba(20, 22, 60, .10), 0 1px 0 rgba(20,22,60,.04); }
+.rsm-tbl { border-collapse: collapse; width: 100%; font-size: 14px; color: #1c2333; }
+.rsm-tbl th, .rsm-tbl td { padding: 11px 15px; text-align: right; }
+.rsm-tbl th:first-child, .rsm-tbl td:first-child { text-align: left; }
+
+/* cabeçalho indigo */
+.rsm-tbl thead th { background: #3b46e6; color: #fff; font-weight: 700; font-size: 12.5px; line-height: 1.3; vertical-align: middle; }
+
+/* corpo: 1ª coluna navy + zebra nas demais */
+.rsm-tbl tbody td:first-child { background: #161d2e; color: #fff; font-weight: 700; }
+.rsm-tbl tbody td:not(:first-child) { background: #fff; border-bottom: 1px solid #eef0f5; }
+.rsm-tbl tbody tr:nth-child(even) td:not(:first-child) { background: #f7f8fc; }
+
+/* linha de total */
+.rsm-tbl tbody tr.tot td:first-child { background: #161d2e; }
+.rsm-tbl tbody tr.tot td { font-weight: 800; border-top: 2px solid #3b46e6; border-bottom: none; }
+.rsm-tbl tbody tr.tot td:not(:first-child) { background: #ececf8; }
+
+/* destaques da tabela "origem" */
+.rsm-tbl td.pos { color: #15935f; font-weight: 700; }
+.rsm-tbl td.zero { color: #9aa3b2; }
+.rsm-tbl tbody tr.hl td:not(:first-child) { background: #e9f6ef; }
+.rsm-tbl td.neg { color: #c0392b; font-weight: 700; }
+.rsm-tbl td, .rsm-tbl th { font-variant-numeric: tabular-nums; }
+
+/* pares escopo | + dependências, lado a lado, com chip de universo */
+.rsm-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 16px; align-items: start; }
+.rsm-block { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rsm-chip { align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 999px; }
+.rsm-chip.esc { background: var(--tone-indi-bg); color: var(--tone-indi-fg); border: 1px solid var(--tone-indi-border); }
+.rsm-chip.deps { background: var(--tone-wip-bg); color: var(--tone-wip-fg); border: 1px solid transparent; }
+
+/* coluna % modernizado: mini-barra + valor (paleta fixa — card branco independe do tema) */
+.rsm-pct { white-space: nowrap; }
+.rsm-pct .rsm-bar { display: inline-block; vertical-align: middle; width: 72px; height: 7px;
+  background: #e8eaf3; border-radius: 4px; overflow: hidden; margin-right: 8px; }
+.rsm-pct .rsm-bar > div { height: 100%; background: #0c7d56; border-radius: 4px; }
+
+/* Funil x mês de priorização (.rsm-tbl.fmt): tabela larga (9 etapas x N status) — rola
+   na horizontal dentro do card, com a coluna "Mês" fixa. Cores fixas de papel aqui
+   dentro (ver nota do .rsm-card); os tokens --seg-* são idênticos nos 2 temas, então
+   podem ser usados no cabeçalho de status. */
+.rsm-scroll { overflow-x: auto; }
+.rsm-tbl.fmt { font-size: 12px; width: auto; min-width: 100%; }
+.rsm-tbl.fmt th, .rsm-tbl.fmt td { padding: 6px 9px; white-space: nowrap; }
+.rsm-tbl.fmt thead th.fmt-etapa { text-align: center; font-size: 11.5px; white-space: normal;
+  min-width: 90px; border-left: 2px solid #2a34c4; }
+.rsm-tbl.fmt thead th.fmt-st { text-align: center; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .2px; padding: 4px 9px; }
+.rsm-tbl.fmt thead th.fmt-st.grp { border-left: 2px solid #2a34c4; }
+/* 1ª coluna (mês) grudada na borda ao rolar — fundo navy já vem do .rsm-tbl base */
+.rsm-tbl.fmt th.fmt-mes, .rsm-tbl.fmt tbody td:first-child { position: sticky; left: 0; z-index: 2; }
+.rsm-tbl.fmt th.fmt-mes { background: #3b46e6; z-index: 3; text-align: left; }
+.rsm-tbl.fmt tbody td.grp { border-left: 2px solid #dfe2f2; }
+.rsm-tbl.fmt tbody tr.tot td.grp { border-left: 2px solid #c9cdec; }
+/* legenda logo abaixo do card (o gap de 26px da .resumo afastaria demais) */
+.resumo > .funnel-legend { margin: -18px 2px 0; align-items: center; }
+
+/* toggle de tema */
+.who { display: flex; align-items: center; gap: 10px; }
+.theme-btn { background: transparent; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 3px 9px; font-size: 14px; cursor: pointer; line-height: 1; }
+.theme-btn:hover { border-color: var(--mut); }
+
+/* aba Prioridades */
+.prio { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 10px; }
+.prio-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.prio-add input, .prio-add select { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.prio-add .q { min-width: 240px; }
+.prio-add button { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 6px; padding: 7px 14px; font-size: 12px; cursor: pointer; }
+.prio-add button:disabled { opacity: .5; cursor: default; }
+.prio-drop { position: absolute; z-index: 20; top: 38px; left: 0; margin: 0; padding: 4px; list-style: none; max-height: 280px; overflow: auto; width: 360px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); }
+.prio-drop li { padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; display: flex; gap: 8px; align-items: center; }
+.prio-drop li:hover { background: var(--panel2); }
+.prio-drop .meta { margin-left: auto; color: var(--mut); font-size: 11px; }
+.prio-table { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-height: 0; }
+.prio-thead, .prio-trow { display: grid; grid-template-columns: 96px minmax(220px, 2fr) 150px 1fr 1.6fr 64px; align-items: center; }
+.prio-thead { background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; }
+.prio-thead > div, .prio-trow > div { padding: 5px 8px; overflow: hidden; }
+.prio-tbody { flex: 1; overflow: auto; min-height: 0; }
+.prio-trow { border-bottom: 1px solid var(--line-soft); }
+.prio-trow:hover { background: var(--hover); }
+.prio-ord { display: flex; align-items: center; gap: 6px; }
+.prio-ord button { background: transparent; color: var(--mut); border: 1px solid var(--line); border-radius: 5px; cursor: pointer; font-size: 11px; line-height: 1; padding: 2px 5px; }
+.prio-ord button:hover { border-color: var(--mut); color: var(--ink); }
+.prio-ord button:disabled { opacity: .35; cursor: default; }
+.prio-egp { font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.prio-egp .sub { color: var(--mut); font-weight: 400; font-size: 11px; margin-left: 6px; }
+.tag.free { background: var(--tone-ext-bg); color: var(--tone-wip-fg); }
+.prio-trow select, .prio-trow input { width: 100%; background: transparent; color: var(--ink); border: 1px solid transparent; border-radius: 5px; padding: 4px 6px; font-size: 12px; }
+.prio-trow select:hover, .prio-trow input:hover { border-color: var(--line); }
+.prio-trow select:focus, .prio-trow input:focus { border-color: var(--accent); background: var(--panel2); outline: none; }
+.prio-trow select.st-ok { background: var(--tone-ok-bg); color: var(--tone-ok-fg); }
+.prio-trow select.st-wip { background: var(--tone-wip-bg); color: var(--tone-wip-fg); }
+.prio-trow select.st-todo { background: var(--tone-todo-bg); color: var(--tone-todo-fg); }
+.prio-trow select.st-muted { color: var(--mut); text-decoration: line-through; }
+/* opções renderizam no popup nativo (não segue o data-theme) — fixa contraste */
+.prio-trow select option { color: var(--ink); background: var(--panel); }
+.prio-drop .free-opt { color: var(--mut); font-style: italic; }
+.prio-del { background: transparent; border: 0; color: var(--mut); cursor: pointer; font-size: 14px; }
+.prio-del:hover { color: var(--danger); }
+
+/* ---- ordenação / seleção / clique (monitoramento + EGPs) ---- */
+.sort-th { cursor: pointer; user-select: none; }
+.thead .sort-th:hover { color: var(--ink); }
+.c-art.clickable, .rd-trow.clickable { cursor: pointer; }
+/* .c-art.clickable é um <a> (deep-link do input): sem cor/sublinhado de link — o sublinhado
+   só no hover, como era quando a célula era <div role="button">. */
+a.c-art.clickable { color: inherit; text-decoration: none; }
+.c-art.clickable:hover { text-decoration: underline; }
+.trow.sel, .rd-trow.sel { background: var(--hover); }
+
+/* ---- drawer de detalhe do input ---- */
+.drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 40; }
+.drawer { position: fixed; top: 0; right: 0; height: 100vh; width: min(460px, 92vw); z-index: 41;
+  background: var(--panel); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.35);
+  display: flex; flex-direction: column; padding: 14px 16px; overflow: auto; gap: 6px; }
+.drawer-head { display: flex; align-items: center; gap: 10px; }
+/* nome do EGP na tabela da aba EGPs é um <a> real (deep-link /egps/<id>): botão do
+   meio/ctrl+clique abrem em nova guia; clique normal é interceptado e abre o modal. */
+.rd-egp-link { color: inherit; text-decoration: none; }
+.rd-egp-link:hover { text-decoration: underline; }
+/* strip de stats no topo do modal de EGP — espelho VISÍVEL das colunas da tabela
+   (pedido 2026-08-28): contêiner único segmentado (não N cards soltos), rótulo
+   uppercase em cima e valor grande embaixo, divisor vertical entre células. */
+.egp-stats { display: flex; align-items: stretch; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel2);
+  padding: 9px 2px; margin: 2px 0 4px; }
+.egp-stat { display: flex; flex-direction: column; gap: 5px; justify-content: center;
+  padding: 2px 16px; border-left: 1px solid var(--line-soft); min-width: 0; }
+.egp-stat:first-child { border-left: none; }
+.egp-stat-k { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--mut); }
+.egp-stat-v { font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px;
+  font-variant-numeric: tabular-nums; }
+.egp-stat-v b { font-size: 15px; }
+.egp-stat-v .ms-badge { font-size: 11px; padding: 2px 9px; }
+.egp-stat-pct .rd-bar { width: 110px; flex: none; display: inline-block; }
+.egp-stat-pct .rd-fill { display: block; }
+.egp-stat-lstat { flex: 1; min-width: 200px; }
+.egp-stat-lstat .egp-lstat { font-size: 12.5px; }
+.egp-lstat { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+/* Modal centrado de detalhe (EGP/Input) — substituiu o expand inline .rd-expand-detail:
+   scroll aninhado ruim em notebook (pedido 2026-08-28; formato escolhido: modal, não
+   drawer). Mesmo padrão de rolagem dos drawers: o modal INTEIRO rola (1 scrollbar). */
+.modal { position: fixed; inset: 0; margin: auto; width: min(1160px, 94vw); height: min(90vh, 940px);
+  z-index: 41; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .3), 0 32px 88px rgba(0, 0, 0, .5);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: modal-in .18s cubic-bezier(.16, 1, .3, 1); }
+.modal-narrow { width: min(760px, 94vw); }
+.modal-x { position: absolute; top: 12px; right: 14px; z-index: 3; background: var(--panel); }
+.modal-head { flex-shrink: 0; padding: 12px 52px 10px 18px; border-bottom: 1px solid var(--line); }
+.modal-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px;
+  display: flex; flex-direction: column; gap: 12px; }
+/* dentro do modal quem rola é o .modal-body (1 scrollbar) — neutraliza os overflows
+   internos herdados do layout inline antigo; alturas viram content-driven */
+.modal-body .egp-body { flex: none; overflow: visible; }
+/* a tabela interna herda flex:1 + overflow:hidden do layout inline antigo — dentro do
+   modal isso cortava a última linha; aqui ela vira 100% content-driven (quem rola é o
+   .modal-body). O radius do topo migra p/ o thead (sem overflow:hidden p/ recortar). */
+.modal-body .egp-table { min-height: 0; flex: none; height: auto; overflow: visible; }
+.modal-body .egp-table .egp-thead { border-radius: 7px 7px 0 0; }
+.modal-body .egp-tbody { overflow: visible; flex: none; }
+.modal-body .egp-head { padding-right: 40px; }   /* não colidir com o ✕ */
+.modal-body .egp-head h2 { font-size: 19px; letter-spacing: -.01em; }
+/* rótulos de seção do modal no mesmo vocabulário dos cabeçalhos de tabela do app */
+.modal-body .egp-body > h3 { margin: 6px 0 0; padding-top: 14px; border-top: 1px solid var(--line-soft);
+  font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--mut); }
+.drawer { animation: drawer-in .2s cubic-bezier(.16, 1, .3, 1); }
+.drawer-overlay { animation: overlay-in .15s ease-out; }
+@keyframes modal-in { from { opacity: 0; transform: scale(.985); } }
+@keyframes drawer-in { from { transform: translateX(28px); opacity: 0; } }
+@keyframes overlay-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .modal, .drawer, .drawer-overlay { animation: none; }
+}
+.drawer-title { font-weight: 700; font-size: 14px; word-break: break-all; flex: 1; color: var(--ink); font-family: var(--font-mono); }
+.drawer-x { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 6px; cursor: pointer; padding: 2px 9px; }
+.drawer-x:hover { border-color: var(--accent-line); }
+.drawer-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12px; margin: 8px 0; }
+.drawer-meta .k { color: var(--mut); }
+.drawer-meta span:not(.k):not(.pill) { word-break: break-word; }
+.drawer h4, .input-detail h4 { margin: 12px 0 4px; font-size: 13px; color: var(--ink); }
+/* Detalhe do input (InputDetailPanel dentro do DetailModal aberto pela tabela de
+   Inputs) — mesmo layout de conteúdo do antigo drawer (.drawer-head/-meta/
+   -egps/-audit são classes standalone, reaproveitadas aqui), só sem a moldura fixa. */
+.input-detail { display: flex; flex-direction: column; gap: 6px; }
+.drawer-egps { display: flex; flex-direction: column; gap: 4px; max-height: 38vh; overflow: auto; }
+.drawer-egp { display: flex; justify-content: space-between; gap: 10px; align-items: center; text-align: left;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; cursor: pointer; color: var(--ink); font-size: 12px;
+  text-decoration: none; }
+.drawer-egp:hover { border-color: var(--accent); }
+.de-meta { color: var(--mut); white-space: nowrap; font-size: 11px; }
+/* Linha de EGP do detalhe de input: nome à esquerda, contexto à direita (recorte · etapa ·
+   status · área/mês). O recorte é o que decide se aquele consumidor pesa na decisão, então
+   ele também colore a BORDA da linha — não só uma pílula que some no meio do texto. */
+.drawer-egp .de-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.de-tags { display: flex; align-items: center; gap: 6px; flex: none; }
+.de-etapa { color: var(--mut); font-size: 11px; white-space: nowrap;
+  max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.de-status { font-size: 10px; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.de-status.vazio { color: var(--mut); background: var(--panel); }
+.tag.esc { font-size: 10px; white-space: nowrap; cursor: help; }
+/* --tone-indi-* é o token do escopo Indicium no app inteiro; dependência usa o neutro */
+.tag.esc.esc-indi { background: var(--tone-indi-bg); color: var(--tone-indi-fg); }
+.tag.esc.esc-dep { background: var(--tone-todo-bg); color: var(--tone-todo-fg); }
+.tag.esc.esc-ex, .tag.esc.esc-fora { background: transparent; color: var(--mut);
+  border: 1px dashed var(--line); }
+.drawer-egp.esc-indi { border-left: 3px solid var(--tone-indi-border); }
+.drawer-egp.esc-dep { border-left: 3px solid var(--tone-todo-fg); }
+/* fora do recorte (ex-dep e fora): tracejado + apagado — dá pra ver que existe sem competir
+   com quem realmente depende. */
+.drawer-egp.esc-ex, .drawer-egp.esc-fora { background: transparent; border-style: dashed;
+  color: var(--mut); }
+.drawer-egp.esc-fora .de-name { text-decoration: line-through; text-decoration-thickness: 1px; }
+.drawer-egp.quebrado { opacity: .55; }
+.drawer-egp.quebrado .de-name { text-decoration: line-through; }
+h4 .h4-sub { font-size: 12px; font-weight: 400; margin-left: 8px; }
+/* lista de EGPs do mês: 1 EGP por linha (grid-tabela) com etapa/status/inputs/resp + seletor de mês */
+.prio-egps { display: flex; flex-direction: column; margin-top: 10px; border-top: 1px solid var(--line-soft); padding-top: 6px; overflow-x: auto; }
+.pe-row { display: grid; min-width: 960px;
+  grid-template-columns: minmax(240px, 2fr) 110px minmax(140px, 1fr) 150px 64px 72px minmax(110px, 1fr) 150px;
+  gap: 8px; align-items: center; padding: 3px 6px; border-bottom: 1px solid var(--line-soft); font-size: 12px; }
+.pe-row:last-child { border-bottom: 0; }
+.pe-row:hover { background: var(--panel2); }
+.pe-head { color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--line); }
+.pe-head:hover { background: transparent; }
+.pe-row .num { text-align: right; }
+.pe-egp { background: none; border: 0; color: var(--ink); font-size: 12px; font-weight: 600; text-align: left;
+  cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0;
+  text-decoration: none; }
+.pe-egp:hover { color: var(--accent); }
+.pe-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); min-width: 0; }
+.pe-status { padding: 1px 7px; border-radius: 9px; font-size: 11px; white-space: nowrap; }
+.drawer-audit { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+/* Checklist de pré-working (InputDetailPanel): rótulo mais largo que o .gm-field padrão
+   (90px) porque "Dados sensíveis (LGPD)" não cabe — override só neste contexto. */
+.drawer-pwk { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.drawer-pwk .gm-field { grid-template-columns: 128px 1fr; }
+.drawer-pwk .gm-field input[type="checkbox"] { width: auto; }
+.pwk-checkbox { display: flex; align-items: center; gap: 6px; }
+/* % de completude no título do checklist — mesmos tokens do badge da tabela (c-pwk). */
+.pwk-pct-ok { color: var(--tone-ok-fg); font-weight: 700; }
+.pwk-pct-mid { color: var(--tone-wip-fg); font-weight: 700; }
+.pwk-pct-zero { color: var(--mut); font-weight: 700; }
+.pwk-advanced { background: var(--tone-ok-bg); color: var(--tone-ok-fg); border: 1px solid transparent;
+  border-radius: 6px; padding: 6px 10px; font-size: 12px; margin-bottom: 6px; }
+.da-row { display: flex; flex-direction: column; border-bottom: 1px solid var(--line-soft); padding: 3px 0; }
+.da-campo { color: var(--mut); }
+.da-who { color: var(--mut); font-size: 10px; }
+
+
+/* ---- aba Indicium (lista DOR1) ---- */
+.ind-thead, .ind-trow { display: grid; grid-template-columns: minmax(240px,3fr) 1.4fr 1.2fr 130px 70px 44px; align-items: center; }
+.ind-thead { background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; }
+.ind-thead > div, .ind-trow > div { padding: 7px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ind-trow { border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.ind-trow.clickable { cursor: pointer; }
+.ind-trow.clickable:hover { background: var(--hover); }
+.ind-trow.inativo { opacity: .5; }
+.rd-th { cursor: pointer; user-select: none; }
+
+/* ---- landing (visão geral) ---- */
+.landing { display: flex; flex-direction: column; gap: 14px; margin-bottom: 6px; }
+.lg-title { font-size: 12px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+.lg-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.lg-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.lg-card .lg-val { font-size: 24px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.lg-card .lg-lbl { font-size: 12px; color: var(--mut); margin-top: 3px; }
+.lg-card .lg-extra { font-size: 13px; font-weight: 600; color: var(--mut); }
+.lg-card.danger .lg-val { color: var(--danger); }
+.lg-card.big { background: var(--panel); border-color: var(--accent); }
+.lg-card.big .lg-val { font-size: 30px; }
+
+/* ---- escopo: adicionar/remover ---- */
+.btn-add { background: var(--accent); color: var(--on-accent); border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.btn-add:disabled { opacity: .5; cursor: default; }
+.filters .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; display: inline-block; }
+.row-x { background: transparent; border: 1px solid var(--line); color: var(--mut); border-radius: 5px; cursor: pointer; padding: 1px 7px; font-size: 12px; }
+.row-x:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ---- funis de migração (landing) ---- */
+.funnels { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; margin-bottom: 18px; }
+/* Funil sozinho (extras): fica com a MESMA largura do primeiro funil dos pares acima,
+   em vez de esticar por toda a linha — os três funis de migração ficam comparáveis. */
+.funnels.solo { grid-template-columns: repeat(auto-fit, minmax(360px, calc(50% - 7px))); }
+.funnel { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.funnel-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.funnel-head h3 { margin: 0; font-size: 14px; color: var(--ink); }
+.funnel-prog { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mut); }
+.funnel-prog .fp-num { font-weight: 700; color: var(--ink); white-space: nowrap; }
+.funnel-prog .fp-pct { white-space: nowrap; }
+.prog-track { flex: 1; height: 8px; background: var(--track); border-radius: 5px; overflow: hidden; }
+.prog-fill { width: 100%; height: 100%; background: var(--ok); border-radius: 5px; transform-origin: left; transition: transform .3s; }
+.funnel-bars { display: flex; align-items: stretch; gap: 6px; height: 220px; }
+.fb-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.fb-stack { flex: 1; display: flex; flex-direction: column-reverse; border-radius: 4px; overflow: hidden; background: var(--panel); }
+.fb-seg { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; min-height: 0; }
+.fb-label { font-size: 10px; color: var(--mut); text-align: center; margin-top: 5px; line-height: 1.15; height: 2.4em; overflow: hidden; }
+.funnel-empty { height: 120px; display: flex; align-items: center; justify-content: center; color: var(--mut); font-size: 13px; text-align: center; padding: 0 20px; }
+.funnel-topstats { display: flex; flex-wrap: wrap; gap: 16px; margin: -4px 0 12px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
+.funnel-topstats .fts { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mut); }
+.funnel-topstats .fts i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.funnel-topstats .fts b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+.funnel-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.funnel-legend .leg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--mut); }
+.funnel-legend .leg i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+
+/* ---- tempo por etapa (landing) ---- */
+.te-rows { display: flex; flex-direction: column; gap: 8px; }
+.te-row { display: grid; grid-template-columns: 150px 1fr 90px; align-items: center; gap: 8px; }
+.te-label { font-size: 12px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.te-track { height: 16px; background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; }
+.te-bar { height: 100%; min-width: 2px; transition: width .3s; }
+.te-bar-conosco { background: var(--seg-wip); }
+.te-bar-combv { background: var(--accent); }
+.te-value { font-size: 12px; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.te-value .te-n { color: var(--mut); font-weight: 400; }
+.te-leg-conosco, .te-leg-combv { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+.te-leg-conosco { background: var(--seg-wip); }
+.te-leg-combv { background: var(--accent); }
+@media (max-width: 640px) {
+  .te-row { grid-template-columns: 120px 1fr 90px; }
+}
+
+/* ---- aging (EGPs em curso, tabela) ---- */
+.aging-thead, .aging-trow { display: grid; grid-template-columns: minmax(160px,2fr) minmax(110px,1.2fr) minmax(90px,1fr) 1fr; align-items: center; }
+.aging-thead { background: var(--panel2); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .4px; }
+.aging-thead > div, .aging-trow > div { padding: 5px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.aging-trow { font-size: 12px; border-bottom: 1px solid var(--line-soft); }
+.aging-trow:last-child { border-bottom: none; }
+.aging-dias { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.aging-espera { font-weight: 400; color: var(--mut); font-size: 11px; }
+
+/* ---- retrabalho (lista de pares de etapa) ---- */
+.retrab-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.retrab-list li { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 8px; background: var(--panel); border-radius: 6px; }
+.retrab-de, .retrab-para { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retrab-de { color: var(--mut); }
+.retrab-para { color: var(--ink); font-weight: 600; }
+.retrab-arrow { color: var(--mut); flex-shrink: 0; }
+.retrab-n { margin-left: auto; color: var(--mut); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* Toggle Migração/Ingestão no topo da aba Tempo por Etapa — 2 botões, 1 ativo por vez. */
+.seg-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg-toggle button { background: var(--panel2); color: var(--mut); border: none; padding: 6px 14px;
+  font-size: 12px; font-weight: 600; cursor: pointer; }
+.seg-toggle button + button { border-left: 1px solid var(--line); }
+.seg-toggle button.on { background: var(--accent); color: #fff; }
+
+/* ---- editor de pipeline (detalhe do EGP) ---- */
+.pipe-jira { font-size: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--panel); color: var(--fg); font-family: var(--font-mono);
+  min-width: 140px; text-transform: uppercase; }
+.pipe-jira[aria-invalid="true"] { border-color: var(--danger); outline: none; }
+
+/* dependência de produtor ausente (SAS/Local sem EGP produtor no corpus) */
+.pill.dep-missing { background:#4a3410; color:#ffcf8f; border:1px solid #8a5a1a; }
+.dep-missing-note { color:#ffcf8f; font-size:.85em; opacity:.95; }
+
+/* identidade física do input SAS/Local: path físico resolvido + homônimo (1 nome = N tabelas) */
+.c-src .src-path { font-size:10px; color:var(--mut); opacity:.8; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pill.homonimo { background:#4a1d1d; color:#ffb3b3; border:1px solid #8a2a2a; margin-top:3px; display:inline-block; }
+
+/* Família de safras (ADR 0002): a linha representa N tabelas datadas colapsadas numa
+   unidade de ingestão. `familia` é informativo (quantas safras); `misto` avisa que as
+   safras estão em etapas/status diferentes entre si. */
+.pill.familia { background:#1e2f4d; color:#b8d0ff; border:1px solid #33507f; }
+.pill.misto { background:#3d3410; color:#ffe0a3; border:1px solid #6f5a1c; }
+
+
+/* referência dinâmica: nome resolvido em runtime (macro/loop SAS), não tabela física fixa */
+.pill.dinamica { background:#2e2440; color:#d6c2ff; border:1px solid #5a4a85; margin-top:3px; display:inline-block; }
+
+/* ---- escopo de migração (reaproveita .readiness / .rd-* ) ---- */
+.ms-summary { font-size: 13px; color: var(--ink); padding: 8px 12px; background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 8px; }
+.ms-summary b { font-variant-numeric: tabular-nums; }
+.ms-sum-sep { margin: 0 10px; color: var(--line); }
+.ms-sum-mut { color: var(--mut); }
+.ms-sem-fonte { margin-left: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 600;
+  font-size: 12px; color: var(--tone-cyc-fg); background: var(--tone-cyc-bg);
+  border: 1px solid var(--tone-cyc-border); white-space: nowrap; cursor: help;
+  font-variant-numeric: tabular-nums; }
+/* grade própria: Tipo e #deps estreitos; sem coluna de prontidão/pill */
+.ms-table .rd-thead, .ms-table .rd-trow {
+  grid-template-columns: 44px minmax(200px,2.6fr) 120px 1.2fr 60px 70px minmax(150px,1.5fr) 90px 130px 130px 80px 96px;
+}
+.ms-flag-dep { color: var(--danger); font-weight: 600; font-size: 12px; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.ms-flag-ok { color: var(--mut); }
+.ms-dep-count { margin-left: 8px; color: var(--danger); font-size: 12px; font-weight: 600;
+  white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* destaque escopo x dependência */
+.ms-scope-row { box-shadow: inset 3px 0 0 var(--tone-indi-fg); }
+.ms-dep-row { background: var(--surface-3); }
+.ms-dep-row .c-art { color: var(--mut); }
+.ms-badge { font-size: 10px; padding: 1px 7px; border-radius: 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ms-badge.scope { background: var(--tone-indi-bg); color: var(--tone-indi-fg); }
+.ms-badge.dep { background: var(--tone-ext-bg); color: var(--tone-wip-fg); }
+.ms-badge.exdep { background: var(--surface-3); color: var(--mut); border: 1px solid var(--line); }
+/* fora do recorte: o mais apagado da escala — é o único que não representa trabalho nosso */
+.ms-badge.fora { background: transparent; color: var(--mut); border: 1px dashed var(--line); }
+/* `extra`: chegou depois da linha de base (versão nova ou casca). Tom de "atenção, não
+   erro" — reusa a paleta wip, distinta de escopo/dep/ex, porque não é nem um nem outro. */
+.ms-badge.extra { background: var(--tone-wip-bg); color: var(--tone-wip-fg); }
+/* tipo do extra: ícone + rótulo, embaixo do badge. Quebra em duas linhas quando o EGP
+   tem mais de um tipo (acontece: antecessores com vínculos diferentes). */
+.xt-tipos { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+.xt-tipo { display: inline-flex; align-items: center; gap: 2px; font-size: 9px;
+  color: var(--mut); white-space: nowrap; }
+.xt-ico { flex: none; }
+/* Papel no vínculo: mesma anatomia do tipo de extra (ícone + palavra), um pouco mais
+   forte porque vale para qualquer linha, não só para extra. NÃO usa --seg-desat como
+   cor de texto: aquele roxo é tom de PREENCHIMENTO da barra e some sobre o fundo escuro. */
+.xt-tipo.vinc-papel { color: var(--ink); font-weight: 600; }
+/* "ainda é dependência": override manual da via resolvida. Mesma métrica do .ms-badge
+   (convive com ele na mesma célula), mas com afordância de botão. */
+.dep-keep-btn { display: block; margin-top: 3px; font-size: 10px; padding: 1px 7px;
+  border-radius: 9px; white-space: nowrap; cursor: pointer; background: transparent;
+  color: var(--mut); border: 1px dashed var(--line); }
+.dep-keep-btn:hover:not(:disabled) { color: var(--ink); border-style: solid; }
+.dep-keep-btn:disabled { opacity: .5; cursor: default; }
+.dep-keep-btn.on { background: var(--tone-ext-bg); color: var(--tone-wip-fg);
+  border: 1px solid transparent; }
+.ms-openbar { padding: 0 0 8px; }
+
+/* aba Priorização: rótulo fixo, cards de resumo e controle de mover EGP */
+.prio-fixed { font-size: 12px; color: var(--ink); }
+.prio-snap { font-size: 12px; color: var(--mut); }
+.prio-preview-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 8px 0; padding: 8px 12px; font-size: 13px;
+  border: 1px solid var(--warn); border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+.prio-metrics { margin: 8px 0; grid-template-columns: repeat(auto-fit, minmax(150px, 230px)); }
+.prio-move { display: flex; gap: 4px; align-items: center; }
+/* seletor de mês só no hover/foco da linha (ou quando fixado) — menos ruído visual */
+.pe-row .prio-move { visibility: hidden; }
+.pe-row:hover .prio-move, .pe-row:focus-within .prio-move, .pe-row.pinned .prio-move { visibility: visible; }
+.prio-move select { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 3px 6px; font-size: 11px; }
+.prio-clear { background: var(--panel2); color: var(--mut); border: 1px solid var(--line);
+  border-radius: 6px; padding: 3px 7px; font-size: 11px; cursor: pointer; }
+.prio-clear:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
+.prio-clear:disabled, .prio-move select:disabled { opacity: .5; cursor: default; }
+/* editor da capacidade (gestão) na linha de recorte da Priorização */
+.prio-cap { display: inline-flex; align-items: center; gap: 4px; }
+.prio-cap input { width: 74px; background: var(--panel2); color: var(--ink); font-weight: 700;
+  border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font-size: 12px; }
+.prio-cap input:focus { border-color: var(--accent); }
+/* linha explicativa dos cards da Priorização (abaixo do label) */
+.prio-metrics .card-desc { font-size: 10px; color: var(--mut); margin-top: 2px; }
+
+/* ── Gestão de EGPs/Inputs (aba Gestão, topo) ────────────────────────────── */
+.gm { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.gm-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gm-head h3 { margin: 0; }
+.gm-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.gm-switch button { background: var(--panel2); color: var(--mut); border: 0; padding: 6px 14px;
+  cursor: pointer; font-size: 12px; }
+.gm-switch button.on { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.gm-kpis { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.gm-kpi { background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 14px; min-width: 170px; }
+.gm-kpi .card-value { font-size: 20px; font-weight: 700; }
+.gm-kpi .card-label { font-size: 11px; color: var(--mut); }
+.gm-tbl td { vertical-align: middle; }
+.gm-tbl .gm-num { text-align: right; font-variant-numeric: tabular-nums; }
+/* DENTRO de .rsm-card (cartão BRANCO de paleta fixa que independe do tema — ver bloco
+   rsm acima): cores fixas de "papel", NUNCA var(--ink)/var(--mut)/var(--track) — no dark
+   elas viram branco-sobre-branco (bug 2026-07). */
+.gm-date { background: transparent; color: #1c2333; border: 1px dashed transparent;
+  border-radius: 5px; padding: 2px 6px; cursor: pointer; font-size: 12px; }
+.gm-date:hover { border-color: #3b46e6; color: #3b46e6; }
+.gm-resumo { display: block; width: 100%; max-width: 380px; background: transparent; border: 0;
+  color: #1c2333; text-align: left; cursor: pointer; font-size: 12px; padding: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gm-resumo:hover { color: #3b46e6; text-decoration: underline; }
+.gm-tbl tbody td.muted { background: #fff; color: #9aa3b2; font-weight: 400; }
+/* 1ª coluna = switch "Com BV" (estreita, colada no nome); 2ª = nome. Ambas com o fundo
+   escuro (o rsm-tbl base só escurece a 1ª). Regras vêm depois -> vencem por ordem. */
+.gm-tbl th:first-child, .gm-tbl td:first-child { width: 1%; white-space: nowrap; padding-right: 6px; }
+.gm-tbl tbody td:nth-child(2),
+.gm-tbl tbody tr:nth-child(even) td:nth-child(2) { background: #161d2e; color: #fff; font-weight: 700; }
+/* nome do projeto: cap + ellipsis (nomes de input tendem a ser longos) — botão "copiar"
+   ao lado preserva o texto completo p/ quem precisar (revela no hover da linha). */
+.gm-tbl tbody td:nth-child(2) { max-width: 260px; }
+.gm-nome { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.gm-nome-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gm-copy { opacity: 0; background: transparent; border: 0; color: inherit; cursor: pointer;
+  padding: 2px; border-radius: 3px; display: inline-flex; align-items: center;
+  transition: opacity 120ms, background 120ms; }
+.gm-tbl tbody tr:hover .gm-copy { opacity: 0.65; }
+.gm-copy:hover { opacity: 1 !important; background: rgba(255, 255, 255, 0.15); }
+.gm-copy:focus-visible { opacity: 1; outline: 1px solid #3b46e6; outline-offset: 1px; }
+.gm-copy.ok { opacity: 1 !important; color: #7cf29b; }
+/* Alinhamento (pedido): header tudo centralizado; corpo centralizado com exceções por coluna.
+   Posições fixas valem nas 2 variantes (etapa = 5ª sempre; último status = última sempre).
+   dias/dias BV ficam à direita via .gm-num (acima). */
+.gm-tbl thead th, .gm-tbl thead th:first-child { text-align: center; }
+.gm-tbl tbody td { text-align: center; }
+.gm-tbl tbody td:first-child { text-align: right; }    /* switch Com BV — colado no nome */
+.gm-tbl tbody td:nth-child(2) { text-align: left; }    /* nome do projeto */
+.gm-tbl tbody td:nth-child(5) { text-align: left; }    /* etapa */
+.gm-tbl tbody td:last-child { text-align: left; }      /* último status */
+.gm-chart-title { margin: 0; padding: 12px 16px 8px; font-size: 13px; color: #1c2333; }
+.gm-chart-empty { color: #9aa3b2; font-size: 12px; padding: 0 16px 14px; }
+/* bar charts VERTICAIS (concluídos por colaborador · migrações por mês), lado a lado */
+.gm-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.gm-vchart { display: flex; align-items: flex-end; gap: 14px; height: 200px; padding: 4px 18px 34px; }
+/* dense: >12 barras — gap reduzido a ~20% e labels rotacionados -45° p/ caber sem truncar */
+.gm-vchart.dense { gap: 3px; padding-bottom: 48px; }
+.gm-vchart.dense .gm-vbar-label {
+  right: 50%; left: auto; transform-origin: right top; transform: rotate(-45deg);
+  max-width: none; overflow: visible; text-overflow: unset; text-align: right;
+}
+.gm-vbar { flex: 1; min-width: 0; max-width: 72px; height: 100%; position: relative; display: flex;
+  flex-direction: column; align-items: center; justify-content: flex-end; }
+.gm-vbar-n { font-size: 11px; font-weight: 700; color: #1c2333; margin-bottom: 2px; }
+.gm-vbar-fill { width: 68%; background: #0c7d56; border-radius: 4px 4px 0 0; min-height: 3px; }
+.gm-vbar-fill.indigo { background: #3b46e6; }
+.gm-vbar-fill.indigo.partial { background: #a5a9d9; }
+.gm-vbar-fill.amber { background: #e69f00; }
+.gm-vbar-fill.rose { background: #c0392b; }
+.gm-vbar-fill.rose.partial { background: #d99b93; }
+/* barra empilhada (atribuídos por colaborador): trilho cinza = total; verde = concluídos */
+.gm-vbar-stack { width: 68%; background: #dfe3ee; border-radius: 4px 4px 0 0; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end; min-height: 3px; }
+.gm-vbar-stack .gm-vbar-fill.in-stack { width: 100%; border-radius: 0; min-height: 0; }
+/* N barras lado-a-lado dentro do grupo (ex.: sanitizados/modernizados (BV)/recebidos por
+   semana) — cada coluna tem o número por cima da própria barra. */
+.gm-vbar-pair { width: 82%; height: 100%; display: flex; align-items: flex-end;
+  justify-content: center; gap: 3px; }
+.gm-vbar-pair-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; }
+.gm-vbar-pair-col .gm-vbar-fill.multi { width: 100%; min-height: 0; }
+.gm-vbar-pair-col .gm-vbar-n { font-size: 10px; }
+.gm-vbar-fill.amber.partial { background: #f0c880; }
+/* legenda no topo do card (grupo de N barras) */
+.gm-chart-legend { display: flex; gap: 14px; padding: 0 16px 6px; font-size: 11px; color: #5a6372; }
+/* estatística extra do card (ex.: total sem classificação, fora das colunas do gráfico) */
+.gm-chart-footer { padding: 6px 16px 12px; font-size: 11px; color: #5a6372; border-top: 1px solid #eceff5; margin-top: 4px; }
+.gm-chart-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.gm-chart-legend-swatch { width: 10px; height: 10px; border-radius: 2px; background: #0c7d56; }
+.gm-chart-legend-swatch.indigo { background: #3b46e6; }
+.gm-chart-legend-swatch.amber { background: #e69f00; }
+.gm-chart-legend-swatch.rose { background: #c0392b; }
+.gm-vbar-label { position: absolute; top: 100%; margin-top: 5px; max-width: 110%;
+  font-size: 10px; color: #5a6372; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* date picker nativo acompanha o tema (ícone do calendário legível no dark) */
+.gm-modal input[type="date"] { color-scheme: dark; }
+[data-theme="light"] .gm-modal input[type="date"] { color-scheme: light; }
+/* status no sidepanel */
+.gm-status { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  background: var(--panel); font-size: 12px; }
+.gm-status-last { border-color: var(--accent-line); }
+.gm-status-meta { color: var(--mut); font-size: 11px; margin-bottom: 4px; }
+.gm-status-texto { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+/* Drawer da Gestão: com as seções de Inputs/Pré-working/Outputs o conteúdo passou a ficar
+   mais alto que a viewport — volta pro comportamento padrão de .drawer (rola INTEIRO, como
+   os outros drawers do app) em vez do frame de altura fixa com só o Histórico rolando por
+   dentro (isso cortava Outputs/Último status/Histórico quando havia muitos inputs). */
+.gm-hist { display: flex; flex-direction: column; gap: 6px; }
+.gm-add-btn { margin-top: 12px; flex-shrink: 0; }
+
+/* Editor de Etapa/Status/Responsável dentro do drawer de status (só EGP) — grava na hora,
+   independente do comentário; é o que move o card no Kanban da Gestão. */
+.gm-pipe-edit { display: flex; flex-direction: column; gap: 6px; padding: 10px 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.gm-pipe-edit select { cursor: pointer; }
+.gm-toggle-btn { background: var(--panel2); color: var(--mut); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; font-size: 12px; width: 100%; cursor: pointer; text-align: left; }
+.gm-toggle-btn.on { background: color-mix(in srgb, var(--seg-done) 22%, var(--panel2)); color: var(--seg-done);
+  border-color: var(--seg-done); font-weight: 700; }
+.gm-toggle-btn:disabled { opacity: .6; cursor: default; }
+
+/* Switch "Com BV" da tabela de Gestão (slider). Estado ON = bola com o BV. */
+.gm-bv-toggle { display: inline-flex; cursor: pointer; }
+.gm-bv-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.gm-bv-track {
+  width: 34px; height: 18px; border-radius: 999px; background: var(--fill-muted);
+  position: relative; transition: background .15s;
+}
+.gm-bv-thumb {
+  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; transition: left .15s;
+}
+.gm-bv-toggle input:checked + .gm-bv-track { background: var(--accent); }
+.gm-bv-toggle input:checked + .gm-bv-track .gm-bv-thumb { left: 18px; }
+.gm-bv-toggle input:disabled + .gm-bv-track { opacity: .5; }
+.gm-bv-log { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.gm-bv-ev { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.gm-bv-del { background: transparent; border: none; color: var(--danger); cursor: pointer; padding: 0 4px; }
+.gm-bv-corr { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+/* modal (comentário / edição de data) */
+.gm-modal-overlay { z-index: 50; }
+.gm-modal { position: fixed; z-index: 51; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(520px, 94vw); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.gm-modal-sm { width: min(380px, 94vw); }
+.gm-modal h4 { margin: 0; font-size: 14px; }
+.gm-field { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; font-size: 12px; }
+.gm-field > span { color: var(--mut); }
+.gm-field input, .gm-field select, .gm-field textarea { background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12px; width: 100%; }
+.gm-field input:disabled { opacity: .6; }
+.gm-field-area { align-items: start; }
+/* Listas de Inputs (read-only) e Outputs (recebimento manual editável) dentro do drawer de
+   status do EGP (GestaoStatusPanel).
+   overflow-x:hidden explícito — só setar overflow-y:auto faz o overflow-x computar como
+   "auto" também (regra do CSS), o que abria uma barra horizontal indevida (linhas já têm
+   ellipsis/min-width:0, não deveriam nunca precisar rolar na horizontal).
+   flex-shrink:0 é ESSENCIAL: .drawer é uma flex column de altura fixa (100vh); qualquer
+   filho direto com overflow != visible tem seu min-height automático recalculado p/ 0 pela
+   spec do Flexbox (é "scrollável", então "pode" encolher até sumir) — sem flex-shrink:0 o
+   algoritmo de encolhimento zerava esta lista inteira (ficava com 0px de altura, invisível)
+   sempre que o conteúdo do drawer passava de 100vh, mesmo com itens de sobra pra mostrar. */
+.gm-sublist { display: flex; flex-direction: column; gap: 4px; max-height: 20vh;
+  overflow-y: auto; overflow-x: hidden; flex-shrink: 0; }
+.gm-sub-row { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px;
+  font-size: 12px; color: var(--ink); }
+.gm-sub-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.gm-sub-row-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.gm-sub-row-etapa { font-size: 10px; color: var(--mut); white-space: nowrap; }
+/* Variante clicável de .gm-sub-row-name — seção "Usado por" do Input no drawer de status
+   (pedido cliente BV 2026-08): abre aquele EGP direto no Kanban de EGPs (onOpenEgp). */
+.gm-sub-row-link { background: none; border: 0; padding: 0; margin: 0; font: inherit;
+  font-size: 12px; color: var(--ink); cursor: pointer; text-align: left; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 2px; }
+.gm-sub-row-link:hover, .gm-sub-row-link:focus-visible { color: var(--accent); text-decoration-color: var(--accent); }
+/* Linha de output no drawer de status do EGP: nome+badges na 1ª linha (mesmo layout de
+   .gm-sub-row padrão), toggle "Recebido"+data manual na 2ª — por isso vira coluna aqui
+   (o .gm-sub-row base, usado pelos Inputs read-only, continua 1 linha só). */
+.gm-out-row { flex-direction: column; align-items: stretch; gap: 4px; }
+.gm-sub-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.gm-out-manual { display: flex; align-items: center; gap: 6px; }
+.gm-toggle-btn-sm { width: auto; flex: 1; min-width: 0; padding: 4px 8px; }
+.gm-out-date { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 6px; font-size: 11px; flex-shrink: 0; }
+.gm-out-date:disabled, .gm-toggle-btn-sm:disabled { opacity: .6; cursor: default; }
+.gm-field textarea { resize: vertical; font-family: inherit; }
+.gm-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+/* ── Kanban de EGPs (aba Gestão) ──────────────────────────────────────────── */
+/* board com scroll horizontal; cada coluna rola verticalmente por conta própria — sem
+   lib de drag-and-drop, card clica -> abre o drawer de status (que move a coluna sozinho). */
+.kanban-board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
+.kanban-col { flex: 0 0 240px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; display: flex; flex-direction: column; max-height: 640px; overflow: hidden; }
+.kanban-col.fantasma { border-style: dashed; opacity: .85; }
+.kanban-col-head { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 10px 12px; font-size: 12.5px; font-weight: 700; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: var(--panel); }
+.kanban-col-count { color: var(--mut); font-weight: 400; }
+.kanban-col-body { display: flex; flex-direction: column; gap: 8px; padding: 10px; overflow-y: auto; }
+.kanban-col-empty { text-align: center; font-size: 12px; padding: 10px 0; }
+.kanban-card { display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px;
+  font: inherit; color: var(--ink); }
+.kanban-card.clickable { cursor: pointer; }
+.kanban-card.clickable:hover, .kanban-card.clickable:focus-visible { border-color: var(--accent-line); }
+.kanban-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+.kanban-card-title { font-size: 12.5px; font-weight: 700; overflow-wrap: anywhere; }
+.kanban-pill { flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
+  white-space: nowrap; }
+.kanban-card-area { font-size: 11px; margin-bottom: 2px; }
+/* nome da tabela modernizada ("Tbl. Corresp.") no card de input / carga fria */
+.kanban-card-tabela { font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink); background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 4px; padding: 2px 5px; margin-bottom: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gm-sub-row:has(.gm-sub-row-tabela) { flex-wrap: wrap; }
+.gm-sub-row-tabela { flex-basis: 100%; order: 3; font-size: 10.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* card de CARGA FRIA (output que precisa de histórico) — cor própria (ciano/gelo) p/ não ser
+   confundido com um input; a faixa lateral + badge tornam claro que é prioridade a avaliar */
+.kanban-card.carga-fria { background: color-mix(in srgb, #29b6f6 14%, var(--panel2));
+  border-color: #29b6f6; border-left: 4px solid #0288d1; }
+.kanban-cf-badge { align-self: flex-start; margin-bottom: 2px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
+  white-space: nowrap; background: #0288d1; color: #fff; }
+.kanban-card-gauge-col { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+/* carga fria no card de EGP: só o floco acima do anel; finalizada = floco com check verde */
+.kanban-cf-ico { position: relative; display: inline-flex; line-height: 1; }
+.kanban-cf-ico.ok::after { content: "✔"; position: absolute; right: -8px; bottom: -3px; font-size: 11px;
+  font-weight: 700; color: #fff; background: #2e7d32; border-radius: 50%; width: 14px; height: 14px;
+  display: flex; align-items: center; justify-content: center; }
+/* corpo do card: métricas à esquerda + anel de prontidão preenchendo o espaço vazio à direita */
+.kanban-card-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kanban-card-metrics { display: flex; flex-direction: column; gap: 2px; }
+.kanban-card-metric { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.kanban-card-metric.active { font-weight: 700; color: var(--accent); }
+/* "+N em PRD": inputs desbloqueados via Ingestão PRD/Aplicação de Grant, ainda não
+   Modernizados — mesma cor âmbar da 2ª fatia do anel/barra (ver .kanban-gauge-flag). */
+.kanban-card-prd-badge { color: #f2a91c; font-weight: 600; }
+.kanban-gauge { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; }
+.kanban-gauge-inner { width: 32px; height: 32px; border-radius: 50%; background: var(--panel2);
+  display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
+/* variante compacta — coluna "Prontidão" da aba EGPs (linha de tabela densa) */
+.kanban-gauge-sm { width: 28px; height: 28px; }
+.kanban-gauge-sm .kanban-gauge-inner { width: 20px; height: 20px; font-size: 8px; }
+/* flag/2ª cor do anel: fatia do % vinda de inputs "desbloqueados" via Ingestão PRD/
+   Aplicação de Grant, ainda não Modernizados (ver Gauge secondaryPct em GestaoKanban.tsx) —
+   nunca a mesma cor de "pronto", pra não se confundir com o resto do anel. */
+.kanban-gauge-flag { margin-left: 2px; font-size: 0.85em; }
+/* mesma flag reaproveitada na barra linear "% modernizado" da aba EGPs (rd-fill-prd) e na
+   anotação textual da coluna "Faltam" (rd-prd-note). */
+.rd-prd-note { font-size: 10.5px; color: var(--muted); margin-left: 3px; }
+/* Rodapé do card: Responsável interno · Responsável BV · switch "Com BV" — linhas
+   opcionais (cada uma some se não tiver dado/prop), empilhadas num wrapper com 1 única
+   borda superior (senão cada linha desenharia a sua, dobrando o traço quando 2+ aparecem
+   juntas). O switch reusa o slider .gm-bv-toggle/.gm-bv-track/.gm-bv-thumb da tabela de
+   Gestão. */
+.kanban-card-meta { display: flex; flex-direction: column; gap: 5px;
+  margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--line); }
+.kanban-card-meta-row { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--mut); }
+.kanban-card-resp-ico { font-size: 10px; opacity: .75; }
+.kanban-card-bv-label { flex-shrink: 0; }
+/* EGP devolvido de PRD p/ validação em DES (revisão de regras de negócio) — contador manual
+   > 0 pinta o CONTORNO do card (só a borda, sem fundo) de laranja. Cor única: o contador diz
+   quantas vezes, a borda só diz "está em revisão". --rev também alimenta o selo do drawer.
+   Fundo escuro no selo p/ não sumir no dark (mesma regra de .pill.familia). */
+.em-revisao { --rev: #fb8c00; --rev-dk: #b36200; }
+.kanban-card.em-revisao { border-color: var(--rev); box-shadow: 0 0 0 1px var(--rev); }
+/* caixa do contador no drawer (GestaoStatusPanel) — mesma cor do card. Cores fixas (não
+   vars de tema) p/ não dar branco-sobre-branco no dark. */
+.rev-box { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0;
+  display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.rev-box.em-revisao { background: var(--rev-dk); border-color: var(--rev); color: #fff; }
+.rev-box-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rev-ctrl { display: inline-flex; align-items: center; gap: 6px; }
+.rev-ctrl button { width: 22px; height: 22px; padding: 0; line-height: 1; border-radius: 4px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.rev-ctrl button:disabled { opacity: .4; cursor: default; }
+.rev-n { min-width: 16px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rev-box-msg { font-size: 11.5px; }
+.kanban-bv-dias { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.kanban-bv-dias.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); }
+.kanban-bv-dias.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.kanban-bv-dias.danger { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
+
+/* ── Acompanhamento (Kanban do cliente, separado por Responsável BV) ────────── */
+.acomp-grupo { display: flex; flex-direction: column; gap: 8px; }
+/* recolhido: só o título; sem o gap sobrando entre quadros vizinhos */
+.acomp-grupo.colapsado { gap: 0; }
+/* o <h4> é a faixa; o botão dentro dele ocupa a linha toda (alvo de clique generoso) */
+.acomp-grupo-head { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.acomp-grupo-toggle { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  width: 100%; background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+  color: inherit; font: inherit; text-align: left; }
+.acomp-grupo-toggle:hover .acomp-grupo-nome,
+.acomp-grupo-toggle:focus-visible .acomp-grupo-nome { color: var(--accent2); }
+.acomp-grupo-caret { color: var(--mut); font-size: 11px; width: 11px; flex: none; }
+.acomp-grupo-nome { font-size: 15px; font-weight: 700; }
+.acomp-grupo-head .muted { font-size: 12px; font-weight: 400; }
+.acomp-grupos-bar { display: flex; justify-content: flex-end; }
+/* .ghost é escopado por bloco neste arquivo (ver .lin-bar/.gestao-add) — repete o visual aqui */
+.acomp-grupos-bar .ghost { background: var(--panel2); color: var(--mut); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; }
+.acomp-grupos-bar .ghost:hover { color: var(--accent2); border-color: var(--accent2); }
+
+/* ── Monitoramento Outputs ───────────────────────────────────────────────── */
+/* 7 colunas: # · Artefato · Categoria · Área(s) · Produtores · Consumidores · Tipo */
+.thead.outputs-table, .trow.outputs-table {
+  grid-template-columns: 44px minmax(200px, 3fr) 100px minmax(110px, 1.2fr) 90px 100px 130px;
+}
+.c-out-type { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+
+/* ── Aba Guia (onboarding dos analistas) ─────────────────────────────────── */
+.guia { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column;
+  gap: 18px; width: 100%; max-width: 1400px; margin: 0 auto; }
+.guia-sec > h2 { margin: 0 0 6px; font-size: 19px; }
+.guia-sec > h3 { margin: 0 0 8px; font-size: 15px; }
+.guia-lead { margin: 0 0 12px; font-size: 13px; line-height: 1.55; max-width: 860px; }
+.guia-flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+.guia-step { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 150px; flex: 1;
+  font-size: 12px; }
+.guia-step > span:last-child { color: var(--mut); font-size: 11px; }
+.guia-step-ico { font-size: 16px; }
+.guia-arrow { align-self: center; color: var(--mut); font-size: 15px; }
+.guia-terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.guia-term { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+.guia-term > span { color: var(--mut); line-height: 1.45; }
+.guia-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.guia-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.guia-card > p { margin: 0; font-size: 12px; color: var(--mut); line-height: 1.5; flex: 1; }
+.guia-card-head { display: flex; align-items: center; gap: 8px; }
+.guia-card-title { font-weight: 700; font-size: 13px; }
+.guia-open { margin-left: auto; background: var(--panel2); border: 1px solid var(--line);
+  color: var(--mut); border-radius: 6px; padding: 2px 9px; font-size: 11px; cursor: pointer;
+  white-space: nowrap; }
+.guia-open:hover { color: var(--accent2); border-color: var(--accent2); }
+.guia-edita { font-size: 11px; color: var(--ink); }
+.guia-table { border-collapse: collapse; width: 100%; font-size: 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.guia-table th { text-align: left; background: var(--panel2); color: var(--mut); font-size: 11px;
+  padding: 7px 10px; border-bottom: 1px solid var(--line); }
+.guia-table td { padding: 7px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.guia-table td:first-child { font-weight: 600; white-space: nowrap; }
+.guia-table tr:last-child td { border-bottom: 0; }
+.guia-faq { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 12px; margin-bottom: 6px; font-size: 12px; }
+.guia-faq summary { cursor: pointer; font-weight: 600; }
+.guia-faq p { margin: 8px 0 2px; color: var(--mut); line-height: 1.5; }
+@media (max-width: 900px) { .guia-arrow { display: none; } .guia-table td:first-child { white-space: normal; } }
+
+/* controles do cartão BRANCO da gestão de analistas (.rsm-card, paleta fixa): theme-btn
+   usa vars do tema — no dark o "+ Adicionar" ficava invisível/feio no cartão. */
+.gestao-add input { background: #fff; color: #1c2333; border: 1px solid #d5d9e6; border-radius: 6px; }
+.gestao-add input::placeholder { color: #9aa3b2; }
+.gestao-add .theme-btn { background: #3b46e6; color: #fff; border: 0; padding: 5px 12px; font-size: 12px; }
+.gestao-add .theme-btn:hover:not(:disabled) { background: #2f38c4; border: 0; }
+.gestao-add .theme-btn:disabled { opacity: .55; cursor: default; }
+.rsm-card .muted { color: #5a6372; }
+
+/* selo de status terminal (Migrado/Despriorizado) nas listas Depende de/Alimenta */
+.dep-selo { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px;
+  font-size: 9px; font-weight: 700; line-height: 14px; vertical-align: middle; white-space: nowrap; }
+
+/* --- Organograma (aba Home): 3 grupos lado a lado, na coluna direita --- */
+.org { display: flex; flex-direction: column; gap: 14px; }
+.org-title { margin: 0; font-size: 18px; }
+.org-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.org-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.org-col:not(:first-child) { border-left: 1px dashed var(--line); padding-left: 12px; }
+.org-col-title { margin: 0 0 2px; font-size: 12px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--mut); text-align: center; }
+.org-people { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+/* card vertical: avatar em cima, nome/papel centralizados embaixo */
+.org-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; min-width: 0; }
+.org-avatar { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel2); border: 1px solid var(--line); }
+.org-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.org-initials { font-size: 15px; font-weight: 600; color: var(--accent); }
+.org-nome { font-size: 12px; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.org-papel { font-size: 11px; color: var(--mut); }
+.org-legend { font-size: 11px; color: var(--mut); align-self: flex-start; text-align: left;
+  margin-top: auto; padding-top: 12px; }
+
+/* Home: página em 2 colunas — guia (esquerda, empilhada) + organograma (direita) */
+.home-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 32px; align-items: start; }
+.home-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+@media (max-width: 900px) { .home-grid { grid-template-columns: 1fr; } }
+
+/* badges reutilizadas pela aba EGPs Atualizados (herdadas da ex-aba Macros) */
+.mf-flag { display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: 8px; font-size: 10px;
+  background: var(--panel2); color: var(--mut); border: 1px solid var(--line); }
+.mf-flag.mf-warn { color: var(--warn, #b8860b); border-color: color-mix(in srgb, var(--warn, #b8860b) 40%, transparent); }
+
+/* --- Comparação com a versão atualizada (seção "Versão atualizada" do detalhe do EGP).
+   A aba dedicada foi aposentada em 2026-09; sobrou o layout de colunas do detalhe. */
+.egpa-detail-cols { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 6px; }
+.egpa-detail-cols > div { flex: 1; min-width: 280px; }
+
+/* --- Aba Perguntas (Genie embutido). O Genie embutido só renderiza em tema claro e não aceita
+   tema/cor pelo embed; o conteúdo vem de outro domínio, então CSS do app não entra nele. O fundo
+   do iframe é transparente: sem o branco fixo, o texto escuro do Genie cai sobre o fundo escuro.
+   No dark mode, invert + hue-rotate escurece o painel inteiro (branco -> ~#1a1a1a, perto do
+   --bg) e devolve os matizes (logo, gráficos) para perto do original. Truque visual: se o Genie
+   mudar o próprio estilo pode ficar estranho, mas não quebra nada. A borda fica no wrapper para
+   não ser invertida junto. */
+.genie-frame-wrap { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.genie-frame {
+  display: block; width: 100%; height: calc(100vh - 170px); min-height: 600px; border: 0;
+  background: #ffffff; color-scheme: light;
+}
+:root[data-theme="dark"] .genie-frame { filter: invert(0.9) hue-rotate(180deg); }
+
+/* App na AWS (ADR 0005): faixa da sincronização e tela de sem acesso */
+.sync-banner { padding: 6px 16px; font-size: 13px; background: var(--panel2); color: var(--mut); }
+.sync-banner-atrasada { background: var(--tone-cyc-bg); color: var(--tone-cyc-fg); font-weight: 600; }
+.sem-acesso { max-width: 560px; margin: 15vh auto; padding: 0 16px; text-align: center; }

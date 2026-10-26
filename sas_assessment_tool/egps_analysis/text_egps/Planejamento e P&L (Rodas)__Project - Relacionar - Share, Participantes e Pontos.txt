@@ -1,0 +1,276 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - Relacionar - Share, Participantes e Pontos
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:38 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 202
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASES = /projetos/MISV/data/bases; CAMP = /infogrc/campanhas/historico
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBBVRELACIONAR [SAS/Local], BASEGRC.TBRITOFINAL [SAS/Local], BASES.TBPOTENCIALRODAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], CAMP.PREMIO_VENDEDOR_SAIDA_ABR25 [SAS/Local], CAMP.PREMIO_VENDEDOR_SAIDA_FEV25 [SAS/Local], CAMP.PREMIO_VENDEDOR_SAIDA_JAN25 [SAS/Local], CAMP.PREMIO_VENDEDOR_SAIDA_MAI25 [SAS/Local], CAMP.PREMIO_VENDEDOR_SAIDA_MAR25 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASES, CAMP
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.QUERY_FOR_TBPOTENCIALRODAS2, WORK.QUERY_FOR_TBRITOFINAL, WORK.TBBVRELACIONAR
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBBVRELACIONAR [PROC SQL - FROM], BASEGRC.TBRITOFINAL [PROC SQL - FROM], BASES.TBPOTENCIALRODAS [PROC SQL - FROM], BASES.TBPRODUCAO [PROC SQL - FROM], CAMP.PREMIO_VENDEDOR_SAIDA_ABR25 [DATA Step - SET], CAMP.PREMIO_VENDEDOR_SAIDA_FEV25 [DATA Step - SET], CAMP.PREMIO_VENDEDOR_SAIDA_JAN25 [DATA Step - SET], CAMP.PREMIO_VENDEDOR_SAIDA_MAI25 [DATA Step - SET], CAMP.PREMIO_VENDEDOR_SAIDA_MAR25 [DATA Step - SET], WORK.QUERY_FOR_TBPOTENCIALRODAS2 [PROC SQL - FROM], WORK.QUERY_FOR_TBRITOFINAL [PROC SQL - JOIN], WORK.TBBVRELACIONAR [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: PONTOS, TBPRODUCAO, WORK.FINAL, WORK.QUERY_FOR_TBPOTENCIALRODAS2, WORK.QUERY_FOR_TBRITOFINAL, WORK.TBBVRELACIONAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Potencial */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Potencial */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dG7jcVcwr8kktgHP/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.TBBVRELACIONAR AS
+   SELECT t1.NuAnoMes,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.NmGrupo,
+          t1.NmCampanha,
+          t1.NmTipoEvento,
+          t1.DtInicio,
+          t1.DtFim,
+          t1.CdProduto,
+          t1.NmGrupoProdutoCampanha
+      FROM BASEGRC.TBBVRELACIONAR t1
+      WHERE t1.NuAnoMes >= 202507 AND t1.NmGrupoProdutoCampanha = 'Leves/CVG Leves/Leves-BVO'
+		AND t1.NmGrupo NOT = 'Grupo Controle' AND t1.NmTipoEvento = 'BV Relacionar';
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBRITOFINAL AS
+   SELECT t1.NuAnoMes,
+          t1.CdParceiroComercial,
+          SUM(t1.VrProducao) FORMAT=NUMX18.2 AS SUM_of_VrProducao,
+          SUM(t1.Part_APNP) AS Part_APNP,
+          SUM(t1.Part_Cancelada) AS Part_Cancelada,
+          SUM(t1.Part_Card) AS Part_Card,
+          SUM(t1.Part_Negada) AS Part_Negada,
+          SUM(t1.Part_SemCard) AS Part_SemCard,
+          SUM(t1.Part_ContratosBV) AS Part_ContratosBV,
+          SUM(t1.Part_Mercado) AS Part_Mercado,
+		  SUM(t1.VrGravamesMercado) FORMAT=NUMX18.2 AS SUM_of_VrGravamesMercado
+      FROM BASEGRC.TBRITOFINAL t1
+
+      GROUP BY t1.NuAnoMes,
+               t1.CdParceiroComercial;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBPOTENCIALRODAS2 AS
+   SELECT t1.NuAnoMes,
+		  t1.CdParceiroComercial,
+          t1.NmGrupoProduto,
+	      t1.NmAreaEstruturaComercialC,
+          t1.NmSubEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+		  t1.FlAtivo,
+		  COALESCE(t1.FlPorteA,"P") as FlPorteA,
+		  CASE WHEN t1.fxidade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS Estado_bem,
+		  t2.NmCampanha,
+          t2.NmTipoEvento,
+		  t2.NmGrupoProdutoCampanha,
+
+            COALESCE((SUM(t1.QtGravamesMercado)),0) AS QtGravamesMercado,
+            COALESCE((SUM(t1.VrGravamesMercado)),0) AS VrGravamesMercado,
+            COALESCE((SUM(t1.QtContrato)),0) AS QtContrato,
+            COALESCE((SUM(t1.VrProducao)),0) AS VrProducao,
+			COALESCE((SUM(t1.VrMargemContribuicao)),0) AS Margem,
+			COALESCE((SUM(t1.VrMargemContribuicaoFinal)),0) AS MargemFinal
+
+      FROM BASES.TBPOTENCIALRODAS t1
+	  LEFT JOIN WORK.TBBVRELACIONAR t2
+		ON (t1.NuAnoMes = t2.NuAnoMes and t1.CdParceiroComercial = t2.CdParceiroComercial)
+
+      WHERE t1.NuAnoMes >= 202507 and t1.CdParceiroComercial not =. and t1.flatualizacaoMercado = 1
+		and t1.NmGrupoProduto in ('Leves') and t1.fxidade not = 'ZeroKM' and t1.FlAtivo = "S"
+
+      GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.FINAL AS
+   SELECT t2.*,
+  		  t1.Part_APNP,
+          t1.Part_Cancelada,
+          t1.Part_Card,
+          t1.Part_Negada,
+          t1.Part_SemCard,
+          t1.Part_ContratosBV,
+          t1.Part_Mercado
+
+FROM WORK.QUERY_FOR_TBPOTENCIALRODAS2 t2
+LEFT JOIN WORK.QUERY_FOR_TBRITOFINAL t1
+	  	ON (t2.NuAnoMes = t1.NuAnoMes and t2.CdParceiroComercial = t1.CdParceiroComercial)
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Potencial */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Pontuação */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Pontuação */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-LWywGQNYWkrPcT1r/code.sas */
+/* =========================INÍCIO TASK========================= */
+Libname Camp '/infogrc/campanhas/historico';
+
+DATA PONTOS;
+SET
+CAMP.PREMIO_VENDEDOR_SAIDA_JAN25
+CAMP.PREMIO_VENDEDOR_SAIDA_FEV25
+CAMP.PREMIO_VENDEDOR_SAIDA_MAR25
+CAMP.PREMIO_VENDEDOR_SAIDA_ABR25
+CAMP.PREMIO_VENDEDOR_SAIDA_MAI25
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Pontuação */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Participantes */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Participantes */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-kvATbX9xcSJ29ZFa/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.TBBVRELACIONAR AS
+   SELECT t1.NuAnoMes,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.NmGrupo,
+          t1.NmCampanha,
+          t1.NmTipoEvento,
+          t1.DtInicio,
+          t1.DtFim,
+          t1.CdProduto,
+          t1.NmGrupoProdutoCampanha
+      FROM BASEGRC.TBBVRELACIONAR t1
+      WHERE t1.NuAnoMes >= 202506 AND t1.NmGrupoProdutoCampanha = 'Leves/CVG Leves/Leves-BVO'
+		AND t1.NmGrupo NOT = 'Grupo Controle';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Participantes */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção e MC */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção e MC */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vjudZb6C8w46wSe8/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME bases '/projetos/MISV/data/bases';
+
+PROC SQL;
+   CREATE TABLE TBPRODUCAO AS
+   SELECT
+
+          t1.NuAnoMes, 
+          t1.NmGrupoProdutoMeta as Produto,
+          t1.DsTipoCanalProducao, 
+ 	      t1.NmCanalEstruturaComercial, 
+		  t1.NmSubEstruturaComercialC, 
+		  t1.NmAreaEstruturaComercialC, 
+		  t1.CdParceiroComercial,
+          CASE WHEN t1.fxidade = 'ZeroKM' THEN 'Novos' ELSE 'Usados' END AS Estado_bem,
+            (COUNT(t1.NuContrato)) AS QtdeContrato,
+            (SUM(t1.VrProducao)) AS VrProducao, 
+            (SUM(t1.VrProducaoProjetado)) AS VrProducaoProjetado,  
+			(SUM(t1.VrMargemContribuicao)) AS Margem,
+			(SUM(t1.VrMargemContribuicaoFinal)) AS MargemFinal
+      FROM BASES.TBPRODUCAO t1
+
+	  WHERE t1.NuAnoMes BETWEEN 202412 AND 202505 
+		AND t1.NmGrupoProdutoMeta IN ('Leves', 'Leves-BVO', 'CVG Leves') 
+		AND t1.FxIdade NOT = 'ZeroKM'
+
+	  GROUP BY 1,2,3,4,5,6,7,8; 
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção e MC */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.FINAL AS
+   SELECT t2.*,
+  		  t1.Part_APNP,
+          t1.Part_Cancelada,
+          t1.Part_Card,
+          t1.Part_Negada,
+          t1.Part_SemCard,
+          t1.Part_ContratosBV,
+          t1.Part_Mercado
+
+FROM WORK.QUERY_FOR_TBPOTENCIALRODAS2 t2
+LEFT JOIN WORK.QUERY_FOR_TBRITOFINAL t1
+	  	ON (t2.NuAnoMes = t1.NuAnoMes and t2.CdParceiroComercial = t1.CdParceiroComercial)
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

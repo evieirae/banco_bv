@@ -1,0 +1,197 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Base Real - Seguros
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 131
+CODE_TASKS_COUNT: 3
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], BASES.TBSEGUROCANCELAMENTO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM], BASES.TBSEGUROCANCELAMENTO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: DADOS_REAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|/infogrc/utils/all-includes.sas|/INFOGRC/UTILS|ALL-INCLUDES.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção + Seguros */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção + Seguros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-RW1D8x4Hwh91chcf/code.sas */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/all-includes.sas';
+PROC SQL;
+CREATE TABLE DADOS_REAL AS SELECT
+NuAnoMes,
+NmGrupoProdutoMeta,
+CdColaborador,
+NmColaborador,
+CdParceiroComercial,
+NmSubEstruturaComercialC,
+NmAreaEstruturaComercialC,
+COUNT(NuContrato) AS Qtde_Contratos,
+SUM(VrSeguros) AS VrSeguros,
+SUM(VrProducao) AS VrProducao,
+SUM(FlBVMais) AS QtdeSPF,
+SUM(FlCap) AS QtdeAP,
+SUM(FlRCF) AS QtdeRCF,
+SUM(FlCasco) AS QtdeCasco,
+SUM(FlGarantiaMecanica) AS QtdeGM,
+SUM(FlCompleto) AS QtdeCompleto,
+SUM(VrBVMais) AS VrSPF,
+SUM(VrCap) AS VrAP,
+SUM(VrRCF) AS VrRCF,
+SUM(VrCasco) AS VrCasco,
+SUM(VrGarantiaMecanica) AS VrGM,
+SUM(VrCompleto) AS VrCompleto,
+SUM(VrCap + VrBVMais) AS SPF_AP,
+SUM	(VrRCF,VrGarantiaMecanica,VrCompleto,VrCasco) AS SeguroAuto
+FROM BASES.TBPRODUCAO
+
+WHERE NuAnoMes BETWEEN 202506 AND 2025007
+AND NmGrupoProdutoMeta IN ('Leves', 'Leves-BVO', 'Motos', 'Pesados', 'CVG Leves', 'CVG Pesados')
+AND DsTipoCanalProducao IN ('MULTIMARCAS', 'CONCESSIONARIAS')
+
+GROUP BY
+1,2,3,4,5
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção + Seguros */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Cancelamentos */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Cancelamentos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-r8gmZHnekGwyPSlY/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE DADOS_REAL AS SELECT
+
+DISTINCT(CdColaborador),
+NuAnoMes,
+NmColaborador,
+NmGrupoProdutoMeta,
+MobCancelamento,
+SUM(VrBVMais) AS VrSPF,
+SUM(VrCap) AS VrAP,
+SUM(VrGarantiaMecanica) AS VrGM,
+SUM(VrRCF) AS VrRCF,
+SUM(VrCasco) AS VrCasco,
+SUM(VrAutoTotal) AS VrAutoTotal
+
+FROM BASES.TBSEGUROCANCELAMENTO
+
+WHERE NuAnoMes BETWEEN 202401 AND 202412
+AND NuContrato IS NOT NULL
+AND MobCancelamento <=6
+
+GROUP BY
+1,2,3,4,5
+
+ORDER BY
+2
+
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Cancelamentos */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/all-includes.sas';
+PROC SQL;
+CREATE TABLE DADOS_REAL AS SELECT
+NuAnoMes,
+NmGrupoProdutoMeta,
+CdColaborador,
+NmColaborador,
+CdParceiroComercial,
+NmSubEstruturaComercialC,
+NmAreaEstruturaComercialC,
+COUNT(NuContrato) AS Qtde_Contratos,
+SUM(VrSeguros) AS VrSeguros,
+SUM(VrProducao) AS VrProducao,
+SUM(FlBVMais) AS QtdeSPF,
+SUM(FlCap) AS QtdeAP,
+SUM(FlRCF) AS QtdeRCF,
+SUM(FlCasco) AS QtdeCasco,
+SUM(FlGarantiaMecanica) AS QtdeGM,
+SUM(FlCompleto) AS QtdeCompleto,
+SUM(VrBVMais) AS VrSPF,
+SUM(VrCap) AS VrAP,
+SUM(VrRCF) AS VrRCF,
+SUM(VrCasco) AS VrCasco,
+SUM(VrGarantiaMecanica) AS VrGM,
+SUM(VrCompleto) AS VrCompleto,
+SUM(VrCap + FlBVMais) AS SPF_AP,
+SUM	(VrRCF,VrGarantiaMecanica,VrCompleto,VrCasco) AS SeguroAuto
+FROM BASES.TBPRODUCAO
+
+WHERE NuAnoMes BETWEEN 202506 AND 2025007
+AND NmGrupoProdutoMeta IN ('Leves', 'Leves-BVO', 'Motos', 'Pesados', 'CVG Leves', 'CVG Pesados')
+AND DsTipoCanalProducao IN ('MULTIMARCAS', 'CONCESSIONARIAS')
+
+GROUP BY
+1,2,3,4,5
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */

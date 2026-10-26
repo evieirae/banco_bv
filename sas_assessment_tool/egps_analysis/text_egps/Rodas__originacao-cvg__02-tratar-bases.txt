@@ -1,0 +1,155 @@
+START_METADATA
+PROJECT: Rodas__originacao-cvg
+FILE_SAS: 02-tratar-bases.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 82
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m0, Base_m1, CAPTURA_DU
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_00, WORK.BASE_00_DU
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_00, WORK.BASE_00_DU, WORK.TBORIGINACAO_2, WORK.TBPROPOSTA, WORK.TEMPODATA, WORK.TEMPODATA_DU
+TABLE_READ_PROVENANCE (Flow): WORK.BASE_00 [DATA Step - SET], WORK.BASE_00_DU [DATA Step - SET], WORK.TBORIGINACAO_2 [PROC SQL - FROM], WORK.TBPROPOSTA [PROC SQL - FROM], WORK.TEMPODATA [PROC SQL - JOIN], WORK.TEMPODATA_DU [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_00, BASE_00_DU, BASE_FINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE BASE_00 AS
+SELECT
+	'BASE_MENSAL' AS TpBase,
+	A.DtAtualizacaoOriginacao,
+	A.DtReferencia	format date9.,
+	A.DtEntradaProposta,
+	day(A.DtEntradaProposta) as Dia_DtEntradaProposta,
+	B.QtCorridosDiaUtilDia,
+	B.SgDiaSemana,
+	B.QtTotalDiaUtilMes,
+	B.StData,
+	A.TpDados,
+	A.NuAnoMes,
+	A.NmGrupoProdutoMeta,
+	a.NmSubEstruturaComercialA,
+	a.FxIdade,
+	CASE WHEN QtCorridosDiaUtilDia = &CAPTURA_DU THEN 'S' ELSE 'N' END AS FL_COMPARATIVO,
+	CASE WHEN QtCorridosDiaUtilDia <= &CAPTURA_DU THEN QtCorridosDiaUtilDia ELSE 0 END AS FL_DU,
+
+	CASE WHEN A.NUANOMES = &Base_m1 THEN &Base_m1 ELSE 0 END AS FL_Base_m1,
+	CASE WHEN A.NUANOMES = &Base_m0 THEN &Base_m0 ELSE 0 END AS FL_Base_m0,
+
+	CASE WHEN A.NuAnoMes = &Base_m1 THEN b.QtCorridosDiaUtilDia ELSE 0 END AS QtCorridosDiaUtilDia_M1,
+	CASE WHEN A.NuAnoMes = &Base_m0 THEN b.QtCorridosDiaUtilDia ELSE 0 END AS QtCorridosDiaUtilDia_M0,
+
+	CASE WHEN A.NuAnoMes = &Base_m1 THEN b.QtTotalDiaUtilMes ELSE 0 END AS QtTotalDiaUtilMes_M1,
+	CASE WHEN A.NuAnoMes = &Base_m0 THEN b.QtTotalDiaUtilMes ELSE 0 END AS QtTotalDiaUtilMes_M0,
+
+	A.QtTotalDiaUtilMes AS QtTotalDiaUtilMesOrig,
+	A.QtCorridosDiaUtilMes AS QtCorridosDiaUtilMesOrig,
+
+	SUM(Qtd) AS Qtd,
+	sum(VrLiberado) as VrLiberado format commax18.2
+
+FROM WORK.TbProposta A
+
+LEFT JOIN WORK.TempoData B
+	ON B.NUANOMES = A.NUANOMES
+AND B.DtTempo = A.DtEntradaProposta
+
+where
+	TpDados = 'Originacao'
+/*AND QtCorridosDiaUtilDia IS NOT NULL */
+AND A.NmGrupoProdutoMeta IN ('CVG Leves', 'CVG Pesados')
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24
+order by 4,11
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_00_DU AS
+SELECT
+	'BASE_DU' AS TpBase,
+	A.DtAtualizacaoOriginacao,
+	A.DtReferencia	format date9.,
+	A.DtEntradaProposta,
+	day(A.DtEntradaProposta) as Dia_DtEntradaProposta,
+	B.QtCorridosDiaUtilDia,
+	B.SgDiaSemana,
+	B.QtTotalDiaUtilMes,
+	B.StData,
+	A.TpDados,
+	A.NuAnoMes,
+	A.NmGrupoProdutoMeta,
+	a.NmSubEstruturaComercialA,
+	a.FxIdade,
+	CASE WHEN QtCorridosDiaUtilDia = &CAPTURA_DU THEN 'S' ELSE 'N' END AS FL_COMPARATIVO,
+	CASE WHEN QtCorridosDiaUtilDia <= &CAPTURA_DU THEN QtCorridosDiaUtilDia ELSE 0 END AS FL_DU,
+
+	CASE WHEN A.NUANOMES = &Base_m1 THEN &Base_m1 ELSE 0 END AS FL_Base_m1,
+	CASE WHEN A.NUANOMES = &Base_m0 THEN &Base_m0 ELSE 0 END AS FL_Base_m0,
+
+	CASE WHEN A.NuAnoMes = &Base_m1 THEN b.QtCorridosDiaUtilDia ELSE 0 END AS QtCorridosDiaUtilDia_M1,
+	CASE WHEN A.NuAnoMes = &Base_m0 THEN b.QtCorridosDiaUtilDia ELSE 0 END AS QtCorridosDiaUtilDia_M0,
+
+	CASE WHEN A.NuAnoMes = &Base_m1 THEN b.QtTotalDiaUtilMes ELSE 0 END AS QtTotalDiaUtilMes_M1,
+	CASE WHEN A.NuAnoMes = &Base_m0 THEN b.QtTotalDiaUtilMes ELSE 0 END AS QtTotalDiaUtilMes_M0,
+
+	SUM(Qtd) AS Qtd,
+	sum(VrLiberado) as VrLiberado format commax18.2
+
+FROM WORK.TbOriginacao_2 A
+
+LEFT JOIN WORK.TempoData_DU B
+	ON B.NUANOMES = A.NUANOMES
+AND B.DtTempo = A.DtEntradaProposta
+
+where
+	TpDados = 'Originacao'
+AND QtCorridosDiaUtilDia IS NOT NULL
+AND A.NmGrupoProdutoMeta IN ('CVG Leves', 'CVG Pesados')
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22
+order by 4,11
+
+;RUN;
+
+DATA BASE_FINAL;
+SET WORK.BASE_00
+	WORK.BASE_00_DU;
+;RUN;

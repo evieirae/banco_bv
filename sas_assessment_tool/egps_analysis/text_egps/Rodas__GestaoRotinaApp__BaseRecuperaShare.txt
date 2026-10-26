@@ -1,0 +1,319 @@
+START_METADATA
+PROJECT: Rodas__GestaoRotinaApp
+FILE_SAS: BaseRecuperaShare.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 35)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -3
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 236
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: IqA0, SafraM0, SafraM1, SafraM2, SafraM3, iqHoje
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBRITOFINAL [SAS/Local], DWBI_DIME.TBDIMTEMPODATA [DBCON], TMP.TBBVCOMPENSA [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /riscosbvf/BA/bases_gerenciais/tbritofinal.sas7bdat
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBRITOFINAL [PROC SQL - FROM], BASEGRC.TBSHAREMISSAO [PROC SORT - DATA=], DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], TMP.TBBVCOMPENSA [PROC SQL - FROM], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /riscosbvf/BA/bases_gerenciais/tbritofinal.sas7bdat
+INTERNAL READS (Temp/Local): BASEGRC.TBSHAREMISSAO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBSHAREMISSAO
+APPEND_ONLY_OUTPUTS: BASEGRC.TBSHAREMISSAO
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): BASEGRC.TBSHAREMISSAO
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/MissaoRecuperaShare.csv
+TEMP/DISCARDED OUTPUTS: TBBVCOMPENSA, TBCONCORRENTE, TBDIMTEMPODATA, TBSHARE, TBSHAREMISSAO, TBSHAREMISSAOFINAL, TBSHARETARGET
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /riscosbvf/BA/bases_gerenciais/tbritofinal.sas7bdat
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+%VerificaAtualizacao(/riscosbvf/BA/bases_gerenciais/tbritofinal.sas7bdat,100,150);
+
+PROC SQL;
+CREATE TABLE TbShare AS
+  SELECT
+  	  Pot.nuanomes
+	 ,cats(POT.CdParceiroComercial,'-',POT.NmLoja) as NmParceiroComercial
+     ,POT.CdParceiroComercial
+	 ,SUM(POT.QtContrato) AS Part_ContratosBV
+	 ,SUM(POT.QtGravamesMercado) AS Part_Mercado
+	 ,SUM(POT.QtContrato) / SUM(POT.QtGravamesMercado) as Share
+  FROM   TMP.TbPotencialRodas POT
+  WHERE 1=1
+    AND POT.nuanomes Between &SafraM1. and &SafraM0.
+  /*AND POT.nuanomes Between &SafraM2. and &SafraM1.*/ /*quando inicio de mes e ainda n ter share, utiliza share mes anterior*/
+    AND POT.FlAtualizacaoMercado = 1
+	And CASE WHEN POT.FxIdade IS NULL THEN ''
+         WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+         END = 'Usados'
+	and Pot.NmGrupoProduto = 'Leves'
+	and POT.NmCanalEstruturaComercialC = 'Canal Veiculos'
+	and POT.FlAtivo = 'S'
+	and POT.NmTipoParceiroComercial in ('Concessionaria','Loja')
+GROUP BY   1,2,3
+;run;
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDimTempoData AS
+SELECT * FROM connection to dbcon
+(
+select
+NuAnoMes,
+Max(NuDiaSemanaMes) as NuDiaSemanaMes
+FROM DWBI_DIME.TbDimTempoData
+Where NuAnoMes >= 202501
+Group By NuAnoMes
+);quit;
+
+PROC SQL;
+CREATE TABLE TbShareTarget AS
+  SELECT
+  	  Pot.NuAnoMes
+	 ,pot.NmAreaEstruturaComercialC
+	 ,cats(POT.CdParceiroComercial,'-',POT.NmLoja) as NmParceiroComercial
+     ,POT.CdParceiroComercial
+	 ,POT.DsLoginN1C
+	 ,POT.DsLoginN2C
+	 ,POT.DsLoginN3C
+	 ,POTM0.Part_ContratosBV as Part_ContratosBVAtu
+	 ,POTM1.Part_Contratosbv as Part_ContratosBVAnt
+	 ,POTM0.Part_Mercado as Part_MercadoAtu
+	 ,POTM1.Part_Mercado as Part_MercadoAnt
+	 ,POTM1.Share    as ShareM1
+	 ,POTM0.Share    as ShareM0
+	 ,case when	POTM1.Share > POTM0.Share then 'Dentro' else 'Fora' end as Campanha
+	 ,Case when SUM(POT.QtContrato) / SUM(POT.QtGravamesMercado) > 0.5 then 0.5
+			else SUM(POT.QtContrato) / SUM(POT.QtGravamesMercado) End as ShareTarget
+/*	,SUM(POT.QtContrato) AS Part_ContratosBV*/
+/*  ,SUM(POT.QtGravamesMercado) AS Part_Mercado*/
+
+  FROM   TMP.TbPotencialRodas POT
+
+  	left join TbShare as PotM1
+		on PotM1.CdParceiroComercial = POT.CdParceiroComercial
+		and POTM1.nuanomes = &SafraM1.
+/*		and POTM1.nuanomes = &SafraM2.*/
+
+	left join TbShare as PotM0
+		on POTM0.CdParceiroComercial = POT.CdParceiroComercial
+		and POTM0.nuanomes = &SafraM0.
+/*		and POTM0.nuanomes = &SafraM1.*/
+
+  WHERE 1=1
+    AND POT.nuanomes Between &SafraM3. and &SafraM1.
+/*AND POT.nuanomes Between &SafraM4. and &SafraM2.*/ /*inicio do mes ainda n tem share, utiliza a comparação dos ultimos 3 meses válidos (m2 a m4)*/
+AND POT.FlAtualizacaoMercado = 1
+	And CASE WHEN POT.FxIdade IS NULL THEN ''
+         WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+         END = 'Usados'
+	and Pot.NmGrupoProduto = 'Leves'
+	and POT.NmCanalEstruturaComercialC = 'Canal Veiculos'
+	and POT.FlAtivo = 'S'
+	and POT.NmTipoParceiroComercial in ('Concessionaria','Loja')
+	and pot.NmAreaEstruturaComercialC IN ('Canal Belo Horizonte', 'Canal Guarulhos')
+/*	and POTM1.Share > POTM0.Share*/
+GROUP BY   1,2,3,4,5,6,7,8,9,10,11,12,13,14
+order by POT.CdParceiroComercial, calculated Sharetarget desc
+;run;
+
+PROC SORT data=TbShareTarget NODUPKEY;
+  BY CdParceiroComercial;
+RUN;
+
+proc sql;
+create table TbBVCompensa as
+select distinct CdParceiroCampanha as CdparceiroComercial
+from tmp.TbBVCompensa
+where  1=1
+and anomes = '202602' /*SEMPRE M-0*/
+and CdparceiroComercial<>.
+and FlStatusDaMeta=0
+;run;
+
+proc sql;
+create table TbConcorrente as
+select distinct
+CdparceiroComercial,
+Banco,
+Sum(coalesce(Qtd_APNP_Conco_MesmaLj,0)) + sum (Coalesce(Qtd_Sem_Prop_MesmaLj,0)) as TotalConc
+from basegrc.TBRITOFINAL
+where  1=1
+and nuanomes = &SafraM0.
+/*and nuanomes = &SafraM1.*/
+and BAnco not in ('','BV')
+/*and Qtd_APNP_Conco_MesmaLj > 0*/
+group by 1,2
+order by 1, 3 desc
+;run;
+
+PROC SORT data=TbConcorrente NODUPKEY;
+  BY CdParceiroComercial;
+RUN;
+
+DAta TbConcorrente;
+set TbConcorrente /*(Where=(Banco in ('Santander','C6')))*/
+;run;
+
+%Gerar_TbSemanas_InicioSegunda(&IqA0.,&iqHoje.);
+
+PROC SQL;
+CREATE TABLE TbShareMissao AS
+  SELECT distinct
+		&SafraM1. as NuAnoMes
+		,Sht.NmAreaEstruturaComercialC
+		,Sht.NmParceiroComercial
+		,Sht.CdParceiroComercial
+		,Sht.DsLoginN1C
+		,Sht.DsLoginN2C
+		,Sht.DsLoginN3C
+		,Sht.ShareM1
+		,Sht.ShareM0
+	  	,Sht.ShareTarget
+		,Part_ContratosBVAnt
+		,Part_ContratosBVAtu
+		,Part_MercadoAtu
+		,Part_MercadoAnt
+		,tbs.NuSemana
+		,Campanha
+		,today() as dt_atualizacao format ddmmyy10.
+	  	,Case when (Sht.ShareTarget * PotM1.Part_Mercado ) / dt.NuDiaSemanaMes < 1 then 1
+				else ceil((Sht.ShareTarget * PotM1.Part_Mercado ) / dt.NuDiaSemanaMes) End AS Missao
+
+  FROM   TbShareTarget Sht
+
+	Left join TbShare as PotM1
+	on PotM1.CdParceiroComercial = Sht.CdParceiroComercial
+/*	and POTM1.nuanomes = &SafraM1.*/
+		and POTM1.nuanomes = &SafraM2.
+
+	left join TbShare as PotM0
+		on POTM0.CdParceiroComercial = Sht.CdParceiroComercial
+/*		and POTM0.nuanomes = &SafraM0.*/
+			and POTM0.nuanomes = &SafraM1.
+
+	left join TbDimTempoData as Dt
+/*		on Dt.NuAnoMes = &SafraM0.*/
+		on Dt.NuAnoMes = &SafraM1.
+
+	/*inner join TbConcorrente as Tbc
+		on Sht.CdParceiroComercial = Tbc.CdParceiroComercial*/
+
+	LEFT join TbBVCompensa as Tbcomp
+		on Sht.CdParceiroComercial = Tbcomp.CdParceiroComercial
+
+	left join TBSEMANAS as Tbs
+		on tbs.DtTempo = today()
+  WHERE 1=1
+  and (PotM0.Part_Mercado >=1
+  and Campanha='Dentro'
+  and ShareM0<=0.33
+  AND Tbcomp.CdParceiroComercial NE .)
+  OR (Campanha<>'Dentro'
+	AND Tbcomp.CdParceiroComercial NE .)
+  order by
+		Sht.DsLoginN1C
+		,Sht.DsLoginN2C
+		,Sht.DsLoginN3C
+,CAMPANHA
+,Part_MercadoAtu desc
+
+;run;
+
+data TbShareMissaoFinal;
+    set TbShareMissao;
+    by DsLoginN1C;
+
+    if first.DsLoginN1C then RunNumber = 1;
+    else RunNumber + 1;
+run;
+
+proc sql;
+create table TbShareMissaoFinal as
+select
+	*,
+	case when RunNumber = 1 then "ESPECIALBV"
+		 WHEN RunNumber = 2 then "SEM CUPOM"
+		 WHEN RunNumber = 3	THEN "GRUPO CONTROLE"
+		 when RunNumber = 4 then "ESPECIALBV"
+		 WHEN RunNumber = 5 then "SEM CUPOM"
+		 WHEN RunNumber = 6	THEN "GRUPO CONTROLE"
+		 end as flCupom /*teste AB: 50% com cupom*/
+
+/*case when RunNumber = 1 then "ESPECIALBV"
+		 WHEN RunNumber = 2 then "SEM CUPOM"
+		 WHEN RunNumber = 3	THEN "ESPECIALBV"
+		 when RunNumber = 4 then "SEM CUPOM"
+		 WHEN RunNumber = 5 then "GRUPO CONTROLE"
+		 WHEN RunNumber = 6	THEN "GRUPO CONTROLE"
+		 end as flCupom*/ /*teste AB: 50% com cupom*/
+
+from TbShareMissaoFinal
+where RunNumber<=6;
+run;
+/**/
+/*DATA X;*/
+/*SET WORK.TBSHAREMISSAOFINAL;*/
+/**/
+/*IF RUNNUMBER IN (1,3) AND Part_MercadoAnt <=5 AND Part_MercadoAnt IN (2,4,5,6);*/
+/**/
+/*;RUN;*/
+/**/
+/*PROC SQL;*/
+/*CREATE TABLE Y AS*/
+/*SELECT*/
+/*A.*,*/
+/**/
+/*B.CdParceiroComercial AS PC_NOVO,*/
+/*B.Part_MercadoAnt AS Part_MercadoAnt_NOVO*/
+/**/
+/*FROM WORK.TbShareMissaoFinal A*/
+/**/
+/*LEFT JOIN WORK.X B ON B.DsLoginN1C = A.DsLoginN1C*/
+/**/
+/*WHERE A.RunNumber IN (2,4)*/
+/**/
+/*;RUN;*/
+
+proc append base=basegrc.TbShareMissao data = TbShareMissaoFinal force
+	;run;
+
+PROC SORT DATA=basegrc.TbShareMissao NODUPKEY;
+BY CdParceiroComercial NuAnoMes NuSemana dt_atualizacao;
+RUN;
+
+/*EXporta CSV */
+proc export
+data=TbShareMissaoFinal (Drop=ShareM0 ShareM1 dt_atualizacao CdParceiroComercial)
+file='/riscosbvf/BA/processos/output/MissaoRecuperaShare.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

@@ -1,0 +1,159 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Consulta_Carteira_New_Automatizada
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:48 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 8
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 106
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: data
+DETECTED_MACROS_USED: data
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_RCVRY.AGENCY [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.UDA2 [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_RCVRY.AGENCY [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.UDA2 [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\1.GESTAO_CARTEIRA_PORTFOLIO\0.ANALISES_CARTEIRAS\4.SALDO_REMANESCENTE\CART_SALDO\BASE_CARTEIRA_20250821.xlsx
+TEMP/DISCARDED OUTPUTS: BASE_CARTEIRA_&DATA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET data=%sysfunc(putn(%sysfunc(today()), yymmddn8.));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-FN63mNHpAfgfEibO/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let data = %sysfunc(putn(%sysfunc(today()), yymmddn8.));
+%put &data;
+
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table BASE_CARTEIRA_&data. as select * from connection to perm
+(
+SELECT
+  CAST(A.CONTRATO_LEGADO AS INT64) AS CONTRATO_LEGADO ,
+  CAST(A.DT_ENVIO_ASSESSORIA AS DATE) AS DT_ENVIO_ASSESSORIA,
+  CAST(A.DATA_CONTRATO AS DATE) AS DATA_CONTRATO,
+  A.ASSESSORIA,
+  A.COMPLEMENTO_ASSESSORIA,
+  A.PRODUTO,
+  A.NOME_CLIENTE,
+  SAFE_CAST(A.SALDO_ATUAL AS FLOAT64) AS SALDO_ATUAL,
+  SAFE_CAST(A.DIAS_EM_ATRASO AS INT64) AS DIAS_EM_ATRASO,
+  CAST(A.FASE AS INT64) AS FASE,
+  A.PLANO,
+  SAFE_CAST(A.QTD_PARCELAS_PAGAS AS INT64) AS QTD_PARCELAS_PAGAS,
+  SAFE_CAST(A.PARCELAS_NAO_PAGAS AS INT64) AS PARCELAS_NAO_PAGAS,
+  SAFE_CAST(A.PARCELAS_VINCENDAS AS INT64) AS PARCELAS_VINCENDAS,
+  SAFE_CAST(A.VALOR_PARCELA AS FLOAT64) AS VALOR_PARCELA,
+  CASE
+    WHEN A.PRODUTO = 'Aviso' THEN 'IMPLANTACAO DE SALDO'
+    WHEN A.PRODUTO = 'Saldo' AND SAFE_CAST(A.PARCELAS_VINCENDAS AS INT64) = 0 THEN 'APENAS QUITACAO'
+    WHEN A.PRODUTO = 'Saldo' AND SAFE_CAST(A.PARCELAS_VINCENDAS AS INT64) > 0 THEN 'ATUALIZACAO OU QUITACAO'
+  END AS MOD_NEGOCIACAO,
+  CASE
+    WHEN A.PRODUTO = 'Saldo' AND SAFE_CAST(A.PARCELAS_NAO_PAGAS AS INT64) BETWEEN 1 AND 3 THEN '1 A 3'
+    WHEN A.PRODUTO = 'Saldo' AND SAFE_CAST(A.PARCELAS_NAO_PAGAS AS INT64) BETWEEN 4 AND 24 THEN '4 A 24'
+    WHEN A.PRODUTO = 'Saldo' AND SAFE_CAST(A.PARCELAS_NAO_PAGAS AS INT64) = 0 AND SAFE_CAST(A.PARCELAS_VINCENDAS AS INT64) > 0 THEN 'Em dia'
+  END AS MOD_PARCELAS
+FROM (
+  SELECT DISTINCT
+    DQ.DMACCT AS CONTRATO_LEGADO,
+    DQ.DMQCHGDT AS DATA_CONTRATO,
+    DQ.DMHOSTUP AS DT_ENVIO_ASSESSORIA,
+    CASE
+      WHEN AG.AGFIRM = 'RR SALDO' THEN 'FLEX'
+      WHEN AG.AGFIRM = 'SALDO REMANESC. - RN' THEN 'RN'
+      WHEN AG.AGFIRM = 'TOLEDO SALDO' THEN 'TOLEDO'
+      ELSE 'SUSPENSO'
+    END AS ASSESSORIA,
+    AG.AGFIRM AS COMPLEMENTO_ASSESSORIA,
+    CASE
+      WHEN DQ.DMLABEL2 = 'SD01' THEN 'Saldo'
+      WHEN DQ.DMLABEL2 = 'AV01' THEN 'Aviso'
+    END AS PRODUTO,
+    DQ.DMNAME AS NOME_CLIENTE,
+    U2.U2VLAVICLI AS SALDO_ATUAL,
+    DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) AS DIAS_EM_ATRASO,
+    CASE
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) BETWEEN 6 AND 90 THEN '1'
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) BETWEEN 91 AND 180 THEN '2'
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) BETWEEN 181 AND 360 THEN '3'
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) BETWEEN 361 AND 540 THEN '4'
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) BETWEEN 541 AND 720 THEN '5'
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) BETWEEN 721 AND 1080 THEN '6'
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) BETWEEN 1081 AND 1440 THEN '7'
+      WHEN DATE_DIFF(CURRENT_DATE(), DATE(DQ.DMDLQDT), DAY) >= 1441 THEN '8'
+    END AS FASE,
+    U2.U2PLANO AS PLANO,
+    U2.U2QTDPARC AS QTD_PARCELAS_PAGAS,
+    U2.U2QTDPANPG AS PARCELAS_NAO_PAGAS,
+    U2.U2QTDPAVINC AS PARCELAS_VINCENDAS,
+    U2.U2VLTOTPARC AS VALOR_PARCELA
+  FROM `bv-pdbd-prd.trusted_rcvry.delqmst` DQ
+  INNER JOIN `bv-pdbd-prd.trusted_rcvry.uda2` U2
+    ON DQ.DMACCT = U2.U2ACCT AND DQ.DMACCTG = U2.U2ACCTG
+  INNER JOIN `bv-pdbd-prd.trusted_rcvry.agency` AG
+    ON DQ.DMAGENCY = AG.AGAGENCY
+  WHERE DQ.DMLABEL2 IN ('SD01','AV01')
+    AND DQ.DMSTATUS IS NULL
+) A);QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.BASE_CARTEIRA_20250821
+    OUTFILE='N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\1.GESTAO_CARTEIRA_PORTFOLIO\0.ANALISES_CARTEIRAS\4.SALDO_REMANESCENTE\CART_SALDO\BASE_CARTEIRA_20250821.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,178 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_leves
+FILE_SAS: 03-Data Maxima e Bases.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 95
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: FREQ, SQL
+HAS_DATA_STEP: Yes (8x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtCtpPPR, DtCtpSim, LstD3CSm, SafraM2
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): INFCVS.TBSIMULACOES [SAS/Local], PPR.PPR_ANALITICO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.MENSAGERIA2
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: PRICING
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.MENSAGERIA2
+TABLE_READ_PROVENANCE (Flow): INFCVS.TBSIMULACOES [DATA Step - SET], PPR.PPR_ANALITICO [DATA Step - SET], PRICING.MENSAGERIA [DATA Step - SET; PROC FREQ - DATA=; PROC SQL - FROM], WORK.MENSAGERIA2 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): PRICING.MENSAGERIA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PRICING.MENSAGERIA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_LEVES, CONFERENCIA_CONVSIMU, CONFERENCIA_DATAS, CONFERENCIA_PPR, MAXD3, MENSAGERIA2, MENSAGERIA_00
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*CORTES BASES - RODAR SEMPRE QUE O MÊS VIRA*/
+/*atualizar com M-2*/
+/**/
+/*DATA MENSAGERIA (COMPRESS=YES);*/
+/*SET INFCVS.TBSIMULACOES;*/
+/*IF Produto = 'Leves'*/
+/*and NuAnoMes >= 202401*/
+/*and NuAnoMes <= 202412*/
+/*and TpPessoa = 'PF' */
+/*and SistemaInicial in ('PPAR')*/
+/*and Canal IN ('MULTIMARCAS','LOJA CANAL NEGOCIOS')*/
+/*AND FlSimuValidaDiaEfet = 1;*/
+/*RUN;*/
+/**/
+/*DATA PRICING.MENSAGERIA2;*/
+/*SET MENSAGERIA;*/
+/*RUN;*/
+
+/*RODAR COM OS ÚLTIMOS DOIS MESES 1X NO DIA*/
+
+options compress=binary;
+
+data Mensageria_00 ;
+    set INFCVS.tbsimulacoes (where=(NuAnoMes >= &SafraM2.))
+;run;
+
+data MENSAGERIA2 ;
+    set Mensageria_00 (where=(Produto = 'Leves'
+and TpPessoa = 'PF'
+and SistemaInicial in ('PPAR','PPAR2')
+and Canal IN ('MULTIMARCAS','LOJA CANAL NEGOCIOS')
+AND FlSimuValidaDiaEfet = 1 ))
+;run;
+
+/*X 'rm /riscosbvf/Mazzuca/mensageria.sas7bdat';*/
+
+proc sql;
+	delete from PRICING.MENSAGERIA
+		where NuAnoMes >= &SafraM2.;
+	quit;
+
+proc sql;
+	insert into PRICING.MENSAGERIA
+	select * from WORK.MENSAGERIA2;
+quit;
+
+	data PRICING.MENSAGERIA;
+	set PRICING.MENSAGERIA
+	;run;
+
+/*A PARTIR DAQUI RODAR TODA VEZ QUE O PROCESSO FOR USADO*/
+
+DATA BASE_LEVES;
+SET PPR.PPR_ANALITICO;
+IF Safra >= 202401
+AND Produto = 'Leves';
+RUN;
+
+/*DATA MAXIMA DE SIMULAÇÕES CONVSIMU*/
+
+PROC SQL;
+SELECT MAX(DtInclusaoGravame) INTO :DtCtpSim FROM PRICING.MENSAGERIA WHERE NuAnoMes >= 202510;
+RUN;
+
+DATA conferencia_convsimu;
+set = 'convsimu';
+data = put(&DtCtpSim.,DATE9.);
+RUN;
+
+/*DATA MAXIMA CONTRATO*/
+
+PROC SQL;
+SELECT MAX(DtContrato) INTO :DtCtpPPR FROM BASE_LEVES;
+RUN;
+
+DATA conferencia_ppr;
+set = 'ppr';
+data = put(&DtCtpPPR.,DATE9.);
+
+RUN;
+
+/*TODAS AS DATAS MAXIMAS*/
+
+DATA CONFERENCIA_DATAS;
+SET conferencia_convsimu conferencia_ppr;
+RUN;
+
+/*D3 CONTRATO*/
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD3PPR FROM TbD3 WHERE D3 <= &DtCtpPPR.;
+RUN;
+
+/*D0 CONTRATO*/
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD0PPR FROM TbD0 WHERE D0 <= &DtCtpPPR.;
+RUN;
+
+/*D3 SIMULACAO*/
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD3CSm FROM TbD3 WHERE D3 <= &DtCtpSim.;
+RUN;
+
+/*D0 SIMULACAO*/
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD0CSm FROM TbD0 WHERE D0 <= &DtCtpSim.;
+RUN;
+
+DATA maxd3;
+set = 'convsimud3';
+data = put(&LstD3CSm.,DATE9.);
+RUN;
+/*D0 SIMULACAO*/
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD0CSm FROM TbD0 WHERE D0 <= &DtCtpSim.;
+RUN;
+
+/*COLOCAR FREQ NO EMAIL DE FINALIZAÇÃO DO PROCESSO*/
+
+PROC FREQ DATA=PRICING.MENSAGERIA;
+TABLE Mensageria*NuAnoMes /nopercent nocum nofreq norow;
+RUN;

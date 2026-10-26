@@ -1,0 +1,383 @@
+START_METADATA
+PROJECT: Rodas__Difer_Valor_Financ_PMT
+FILE_SAS: Difer_Valor_Financ_PMT.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -20
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (2x | +40), FILENAME  (2x | +24), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 309
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TEMPO = /infogrc/tmp/
+DETECTED_MACROS_DEFINED: DtCorte
+DETECTED_MACROS_USED: DtCorte, QtCont, QtContSolar
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], AUXL.TBSEGUROSPROPOSTAS [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], DBCRED.TBPROPOSTASEGURO [DBCON], TMP.APRO_SIMU_TBSIMULACAOGERAL [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TEMPO
+IMPORTED FILES (Requires Ingestion): /infogrc/tmp/ValidaParcela.csv, /infogrc/tmp/ValidaParcelaSolar.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat
+TABLE_READ_PROVENANCE (Flow): AUXL.TBSEGUROSPROPOSTAS [PROC SQL - JOIN], CONVSIMU.TBSIMULACOES [PROC SQL - JOIN], DBCRED.TBPROPOSTASEGURO [Pass-Through Native (DBCON) - FROM], TEMPO.VALIDAPARCELA [PROC SQL - FROM], TEMPO.VALIDAPARCELASOLAR [PROC SQL - FROM], TMP.APRO_SIMU_TBSIMULACAOGERAL [DATA Step - SET], TMP.TBORIGINACAO [DATA Step - SET; PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/tmp/ValidaParcela.csv, /infogrc/tmp/ValidaParcelaSolar.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat
+INTERNAL READS (Temp/Local): TEMPO.VALIDAPARCELA, TEMPO.VALIDAPARCELASOLAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TEMPO.VALIDAPARCELA, TEMPO.VALIDAPARCELASOLAR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TEMPO.VALIDAPARCELA, TEMPO.VALIDAPARCELASOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: APROSIMU, SEGCOMPLETO, TBORIGINACAO, VALIDAPARCELA, VALIDAPARCELAQTD, VALIDAPARCELASOLAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 2, sas: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/tmp/ValidaParcela.csv
+[CODE REF] /infogrc/tmp/ValidaParcelaSolar.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat
+
+END_METADATA
+================================================================================
+/*============================================================================================*/
+/* Tema: Diferença Valor de Financiamento Calculado pela PMT                       			  */
+/* Autor:    Luis Gustavo - MIS Varejo				                                          */
+/* Versão:   001																			  */
+/* Dta: 20/12/20234                															  */
+/*============================================================================================*/
+/* Autor:    Gustavo Domingues - MIS IGE				                                      */
+/* Descr:   INcluido novas colunas com cenarios de cada divergnencia (Mapeados por LArissa Broghi)*/
+/* Dta: 27/08/2025                															  */
+/*============================================================================================*/
+/* Autor:    Gustavo Domingues - MIS IGE				                                      */
+/* Descr:   Retirado giovanna.arruda@bv.com.brdo mailling de envio 							  */
+/* Dta: 24/02/2026                															  */
+/*============================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat,24,300);
+libname tempo '/infogrc/tmp/';
+
+%Let DtCorte = Today()-1;
+
+Data Aprosimu (Keep=DtSimulacaoInicial PcEntradaAjustada CdSimulacaoInicial VrEntrada);
+set tmp.APRO_SIMU_TBSIMULACAOGERAL (Where=(DtSimulacaoInicial >= &DtCorte.))
+;run;
+
+Data TbOriginacao (Keep=DtEntradaProposta VrEntrada nuproposta);
+set tmp.TbOriginacao (Where=(DtEntradaProposta >= &DtCorte.))
+;run;
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE SegCompleto AS
+SELECT * FROM connection to dbcon
+(
+select
+nuproposta,
+1 as FlAutoCompleto
+FROM DBCRED.TbPropostaSeguro
+where 1=1
+and CdProdutoSeguro in (538,205,153,144)
+);quit;
+
+PROC SQL;
+create table tempo.ValidaParcela as
+/*create table ValidaParcela1 as */
+select
+VrFinanciamento FORMAT num18.2
+,QtParcelas
+,VrPrestacao FORMAT num18.2
+,PcCoeficiente
+,(VrPrestacao/PcCoeficiente)-VrFinanciamento as DifVrFinanciamentoRecalc FORMAT num18.2
+,NuProposta
+,DtEntradaProposta
+,nmgrupoprodutometa
+,StProposta
+,NmCanalEstruturaComercial
+,NmAreaEstruturaComercial
+,*
+from tmp.tboriginacao
+where nmgrupoprodutometa in ('Leves','Motos','CVG Leves','Pesados','CVG Pesados')
+and dtentradaproposta>= &DtCorte.
+and case when ((VrPrestacao/PcCoeficiente)-VrFinanciamento) < -10 then 'Erro'
+when ((VrPrestacao/PcCoeficiente)-VrFinanciamento) > 10 then 'Erro'
+else 'Certo' end <>'Certo'
+/* and cdparceirocomercial = 384666*/
+/*and NmAreaEstruturaComercial in('Canal Londrina','Canal Criciúma','Canal Cascavel')*/
+/*and StProposta='AP'*/
+;run;
+
+proc sql;
+create table validaparcela as
+select parc.VrFinanciamento
+,parc.QtParcelas
+,parc.VrPrestacao
+,parc.PcCoeficiente
+,parc.VrPrestacao / PcCoeficiente as VrReal FORMAT=numx18.2
+,Calculated VrReal - parc.VrFinanciamento as Diferença FORMAT=numx18.2
+,Case when Calculated Diferença between -200 and  200 then 'Arredondamento'
+	  when Calculated Diferença < -200  			  then 'Pagou a menos'
+	  when Calculated Diferença > 200  			  	  then 'Pagou a mais' end as Status
+,Ori.VrEntrada as ValorEntrada_Proposta FORMAT=numx18.2
+,Apro.VrEntrada as ValorEntrada_Simulação FORMAT=numx18.2
+,coalesce(Apro.VrEntrada,0) - coalesce(Ori.VrEntrada,0) as Dif_EntreEntradas
+/*,Apro.PcEntradaAjustada as EntradaAjustadaSimu*/
+,Prod.VrProducao as VrProposta
+,Calculated VrReal / parc.VrFinanciamento as VariaçãoDaDiferença
+,Round(FLOOR(ABS(Calculated Dif_EntreEntradas)) - FLOOR(ABS(Calculated Diferença))) as ValidaçãoRefEntrada
+,Case when SegCom.FlAutoCompleto = 1 then 'AutoCompleto' else '' end as LevantamentoAutocompleto
+
+,Case 	when FLOOR(ABS(Calculated Diferença)) = 899  Then 'Seg Auto Parcial 594'
+		when FLOOR(ABS(Calculated Diferença)) = 982  Then 'Seg Auto Parcial 547'
+		when FLOOR(ABS(Calculated Diferença)) = 1601 Then 'Seg Auto Parcial 540'
+		when FLOOR(ABS(Calculated Diferença)) = 2423 Then 'Seg Auto Parcial 547 e 608'
+		when FLOOR(ABS(Calculated Diferença)) = 2882 Then 'Seg Auto Parcial 557'
+		when FLOOR(ABS(Calculated Diferença)) = 2808 Then 'Seg Auto Parcial 577'
+		when FLOOR(ABS(Calculated Diferença)) = 3332 Then 'Seg Auto Parcial 547 e 608 e 594'
+		when FLOOR(ABS(Calculated Diferença)) = 5106 Then 'Seg Auto Parcial 566'
+		when FLOOR(ABS(Calculated Diferença)) = 7915 Then 'Seg Auto Parcial 5106 e 577'
+		when FLOOR(ABS(Calculated Diferença)) = 3322 Then 'Seg Auto Parcial 547 e 608 e 594'
+		End as LevantamentoSeguroAutoParcial
+ ,Seg.VrAuto as Seguros
+
+,Case 	when Calculated Status = 'Pagou a menos' and Calculated ValidaçãoRefEntrada IN(0,.,-1,1) 			then 'Pagou a menos - entrada ajustada'
+		when Calculated Status = 'Arredondamento' and Calculated LevantamentoAutocompleto = 'AutoCompleto' 	then 'Arred - Auto Completo'
+		when Calculated Status = 'Arredondamento' and Calculated LevantamentoAutocompleto = '' 				then 'Arred - SEM Auto Completo'
+		when Calculated Status = 'Pagou a menos' and FLOOR(ABS(Calculated ValidaçãoRefEntrada)) IN(1298,1299,1300)		then 'Pagou a menos - TC'
+		when Calculated Status = 'Pagou a menos' and FLOOR(ABS(Calculated ValidaçãoRefEntrada)) IN(788,789,790)		then 'Pagou a menos - TAB Pesados'
+		when Calculated VariaçãoDaDiferença between 1.05 and 1.20 and parc.nmgrupoprodutometa ='CVG Leves' 	then 'EGV - 120%'
+		when Calculated LevantamentoSeguroAutoParcial <> '' 												then Calculated LevantamentoSeguroAutoParcial
+		when Calculated Status = 'Pagou a mais' and FLOOR(ABS(Calculated ValidaçãoRefEntrada)) IN(788,789,790)		then 'Pagou a mais - TAB Pesados'
+		when Calculated Status = 'Pagou a mais' and FLOOR(ABS(Calculated ValidaçãoRefEntrada)) IN(443,444,445)		then 'Pagou a mais - TAB Leves'
+		when Calculated Status = 'Pagou a menos' and FLOOR(ABS(Calculated ValidaçãoRefEntrada)) IN(443,444,445)		then 'Pagou a mais - TAB Leves'
+
+				when parc.NmGrupoProdutoMeta = 'Motos' and FLOOR(ABS(Seg.VrAuto)) IN(614)		then 'seguro auto parcial de motos (código 569)'
+		when parc.NmGrupoProdutoMeta = 'Motos' and FLOOR(ABS(Seg.VrAuto)) IN(899)		then 'seguro auto parcial de motos (código 594)'
+
+ENd as SubCenario
+/*,parc.DifVrFinanciamentoRecalc NAO ENTRA*/
+,parc.NuProposta
+,parc.DtEntradaProposta
+,parc.nmgrupoprodutometa
+,parc.StProposta
+,parc.NmCanalEstruturaComercial
+,parc.NmAreaEstruturaComercial
+,conv.nuversaomotor
+,conv.sistemainicial
+,conv.sistemafinal
+,parc.DsLoginN1C
+,parc.CdParceiroComercial
+,parc.NmParceiroComercial
+,prod.VrTarifaCadastro
+,prod.VrTarifaAvaliacaoBem
+,prod.QtSeguros
+,prod.FlBVMais
+,prod.FlCap
+,prod.FlDemais
+,prod.FlDemaisSemCompleto
+,prod.FlCompleto
+,prod.FlGarantiaMecanica
+,prod.FlRCF
+,prod.FlCasco
+,prod.FlGap
+,prod.FlDFI
+,prod.VrSeguros
+,prod.VrBVMais
+,prod.VrCap
+,prod.VrDemais
+,prod.VrCompleto
+,prod.VrGarantiaMecanica
+,prod.VrRCF
+,prod.VrCasco
+,prod.VrGap
+,prod.VrDFI
+from tempo.ValidaParcela parc
+left join convsimu.tbsimulacoes conv on conv.nuproposta= parc.nuproposta
+left join tmp.tbproducao prod on prod.nuproposta = parc.nuproposta
+left join tboriginacao Ori on Ori.nuproposta = parc.nuproposta
+left join auxl.TBSEGUROSPROPOSTAS as Seg on Seg.nuproposta = parc.nuproposta
+left join SegCompleto as SegCom on SegCom.nuproposta = parc.nuproposta
+left join Aprosimu as Apro on Apro.CdSimulacaoInicial = conv.CdSimulacaoInicial
+/*where parc.nuproposta in (702257993)*/
+/*where parc.NmAreaEstruturaComercial in('Canal Londrina','Canal Criciúma','Canal Cascavel')*/
+;run;
+
+PROC SQL;
+SELECT COUNT(DISTINCT NuProposta) INTO :QtCont FROM tempo.ValidaParcela;
+RUN;
+
+PROC SQL;
+CREATE TABLE ValidaParcelaqtd AS
+SELECT StProposta, COUNT(*) AS QtdRegistros FROM tempo.ValidaParcela GROUP BY 1;
+RUN;
+%Macro DispararEmail();
+%if &QtCont. gt 0 %then %do;
+  %ExportaCSVDIR(ValidaParcela,ValidaParcela,/infogrc/tmp);
+  FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("rafael.arruda@bv.com.br","natalia.bibikow@bv.com.br","janaina.ferreira@bv.com.br","wanderson.dangelo@bv.com.br","larissa.borghi@bv.com.br","andrea.falconi@bv.com.br","eliane.vieira@bv.com.br",
+		"jose.pires@bv.com.br","rafael.magno@bv.com.br","renato.rmuller@bv.com.br","#bvf-pricing-veiculos@bv.com.br","fabio.sonehara@bv.com.br",
+		"paula.souza@bv.com.br","aline.pinheiro@bv.com.br","anna.esposito@bv.com.br","luis.santos@bv.com.br","ramon.sales@bv.com.br","carolina.vilella@bv.com.br",
+		"renato.vieira@bv.com.br","janaina.ferreira@bv.com.br","mauricio.imaeda@bv.com.br","paulo.floro@bv.com.br","laiza.costa@bv.com.br",
+		"vinicius.maran@bv.com.br","aline.kaludin@bv.com.br","thiago.assis@bv.com.br","brq.rsilva2@bv.com.br","romarcio.silva@bv.com.br")
+	CT="text/html"
+	IMPORTANCE='high'
+    SUBJECT="Acompanhamento da Diferença no Valor de Financiamento Calculado pela PMT"
+    ATTACH=('/infogrc/tmp/ValidaParcela.csv' encoding='utf-8' outencoding='utf-8');
+  DATA _NULL_;
+	FILE MAIL_INI;
+	    PUT '<html><body>';
+		PUT "<p>Prezada Equipe,";
+		PUT "<br>";
+		PUT "<br>Este e-mail tem intuito de informar sobre a diferença identificada em D-1 no valor de";
+		PUT "<br>financiamento calculado pela PMT estipulada em proposta. Base com mais informações disponivel no caminho /infogrc/tmp";
+		PUT "<br>Estamos utilizando o valor acima de 10 reais como premissa no check";
+		PUT "<br>";
+		PUT "<br>Espero que isso ajude! Se precisar de mais alguma coisa, estou à disposição.";
+		PUT "<br>";
+		PUT "<br>Informações Gerenciais</p>";
+		PUT '</body></html>';
+  RUN;
+  X 'rm /infogrc/tmp/ValidaParcela.csv';
+%end;
+%Mend;
+%DispararEmail;
+
+/*============================================================================================*/
+/* Tema: Diferença Valor de Financiamento SOLAR Calculado pela PMT (Replicada de Rodas)      */
+/* Autor:    Gustavo Domingues - MIS IGE			                                          */
+/* Versão:   001																			  */
+/* Dta: 30/04/2025                															  */
+/*============================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat,24,300);
+libname tempo '/infogrc/tmp/';
+
+PROC SQL;
+create table tempo.ValidaParcelaSolar as
+select
+VrFinanciamento FORMAT num18.2
+,QtParcelas
+,VrPrestacao FORMAT num18.2
+,PcCoeficiente
+,(VrPrestacao/PcCoeficiente)-VrFinanciamento as DifVrFinanciamentoRecalc FORMAT num18.2
+,NuProposta
+,DtEntradaProposta
+,nmgrupoprodutometa
+,StProposta
+,NmCanalEstruturaComercial
+,NmAreaEstruturaComercial
+,*
+from tmp.tboriginacao
+where nmgrupoprodutometa in ('Solar')
+and dtentradaproposta>= today()-1
+and case when ((VrPrestacao/PcCoeficiente)-VrFinanciamento) < -10 then 'Erro'
+when ((VrPrestacao/PcCoeficiente)-VrFinanciamento) > 10 then 'Erro'
+else 'Certo' end <>'Certo'
+/* and cdparceirocomercial = 384666*/
+/*and NmAreaEstruturaComercial in('Canal Londrina','Canal Criciúma','Canal Cascavel')*/
+/*and StProposta='AP'*/
+;run;
+
+proc sql;
+create table ValidaParcelaSolar as
+select parc.VrFinanciamento
+,parc.QtParcelas
+,parc.VrPrestacao
+,parc.PcCoeficiente
+/*,parc.DifVrFinanciamentoRecalc*/
+,parc.NuProposta
+,parc.DtEntradaProposta
+,parc.nmgrupoprodutometa
+,parc.StProposta
+,parc.NmCanalEstruturaComercial
+,parc.NmAreaEstruturaComercial
+,conv.nuversaomotor
+,sistemainicial
+,sistemafinal
+,parc.DsLoginN1C
+,parc.CdParceiroComercial
+,parc.NmParceiroComercial
+,prod.VrTarifaCadastro
+,prod.VrTarifaAvaliacaoBem
+,QtSeguros
+,FlBVMais
+,FlCap
+,FlDemais
+,FlDemaisSemCompleto
+,FlCompleto
+,FlGarantiaMecanica
+,FlRCF
+,FlCasco
+,FlGap
+,FlDFI
+,VrSeguros
+,VrBVMais
+,VrCap
+,VrDemais
+,VrCompleto
+,VrGarantiaMecanica
+,VrRCF
+,VrCasco
+,VrGap
+,VrDFI
+from tempo.ValidaParcelaSolar parc
+left join convsimu.tbsimulacoes conv on conv.nuproposta= parc.nuproposta
+left join tmp.tbproducao prod on prod.nuproposta = parc.nuproposta
+/*where parc.NmAreaEstruturaComercial in('Canal Londrina','Canal Criciúma','Canal Cascavel')*/
+;run;
+
+PROC SQL;
+SELECT COUNT(DISTINCT NuProposta) INTO :QtContSolar FROM tempo.ValidaParcelaSolar;
+RUN;
+
+PROC SQL;
+CREATE TABLE ValidaParcelaqtd AS
+SELECT StProposta, COUNT(*) AS QtdRegistros FROM tempo.ValidaParcelaSolar GROUP BY 1;
+RUN;
+%Macro DispararEmail();
+%if &QtContSolar. gt 0 %then %do;
+  %ExportaCSVDIR(ValidaParcelaSolar,ValidaParcelaSolar,/infogrc/tmp);
+  FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+/*	TO=("larissa.borghi@bv.com.br","natalia.bibikow@bv.com.br","janaina.ferreira@bv.com.br","wanderson.dangelo@bv.com.br","andrea.falconi@bv.com.br","eliane.vieira@bv.com.br","jose.pires@bv.com.br","rafael.magno@bv.com.br","renato.rmuller@bv.com.br","#bvf-pricing-veiculos@bv.com.br","fabio.sonehara@bv.com.br","paula.souza@bv.com.br","aline.pinheiro@bv.com.br","anna.esposito@bv.com.br","luis.santos@bv.com.br","ramon.sales@bv.com.br","carolina.vilella@bv.com.br","renato.vieira@bv.com.br","janaina.ferreira@bv.com.br","mauricio.imaeda@bv.com.br")*/
+	TO=("rafael.arruda@bv.com.br","aline.pinheiro@bv.com.br","lidia.lemos@bv.com.br","carlos.trevisan@bv.com.br","bruno.goncalves@bv.com.br")
+
+	CT="text/html"
+	IMPORTANCE='high'
+    SUBJECT="SOLAR - Acompanhamento da Diferença no Valor de Financiamento Calculado pela PMT"
+    ATTACH=('/infogrc/tmp/ValidaParcelaSolar.csv' encoding='utf-8' outencoding='utf-8');
+  DATA _NULL_;
+	FILE MAIL_INI;
+	    PUT '<html><body>';
+		PUT "<p>Prezada Equipe,";
+		PUT "<br>";
+		PUT "<br>Este e-mail tem intuito de informar sobre a diferença identificada em D-1 no valor de";
+		PUT "<br>financiamento calculado pela PMT estipulada em proposta. Base com mais informações disponivel no caminho /infogrc/tmp";
+		PUT "<br>Estamos utilizando o valor acima de 10 reais como premissa no check";
+		PUT "<br>";
+		PUT "<br>Espero que isso ajude! Se precisar de mais alguma coisa, estou à disposição.";
+		PUT "<br>";
+		PUT "<br>Informações Gerenciais</p>";
+		PUT '</body></html>';
+  RUN;
+  X 'rm /infogrc/tmp/ValidaParcela.csv';
+%end;
+%Mend;
+%DispararEmail;

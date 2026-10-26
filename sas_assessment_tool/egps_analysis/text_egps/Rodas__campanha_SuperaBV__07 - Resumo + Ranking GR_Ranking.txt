@@ -1,0 +1,179 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 07 - Resumo + Ranking GR_Ranking.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -28
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 93
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: RANK, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CSBV = /infogrc/Campanha_SuperaBV; CSBV_BKP = /infogrc/Incentivo_Comercial/Bases_BKP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], CSBV.ESTRUTURA_COMERCIAL_01 [SAS/Local], CSBV.TBSUPERABV_RESUMO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_SUPERABV_RESUMO_03, WORK.BASE_SUPERABV_RESUMO_NOVA, WORK.ESTRUTURA_GR
+IMPORTED_LIBNAMES: CSBV
+EXPORTED_LIBNAMES: CSBV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_SUPERABV_RESUMO_01, WORK.BASE_SUPERABV_RESUMO_02, WORK.BASE_SUPERABV_RESUMO_03, WORK.BASE_SUPERABV_RESUMO_NOVA, WORK.ESTRUTURA_GR, WORK.ESTRUTURA_GR_01, WORK.ESTRUTURA_GR_02
+TABLE_READ_PROVENANCE (Flow): CSBV.ESTRUTURA_COMERCIAL_01 [DATA Step - SET], CSBV.TBSUPERABV_RESUMO [PROC SQL - FROM], WORK.BASE_SUPERABV_RESUMO_01 [PROC RANK - DATA=], WORK.BASE_SUPERABV_RESUMO_02 [PROC SQL - FROM], WORK.BASE_SUPERABV_RESUMO_03 [DATA Step - SET], WORK.BASE_SUPERABV_RESUMO_NOVA [PROC SORT - DATA=], WORK.ESTRUTURA_GR [PROC SORT - DATA=], WORK.ESTRUTURA_GR_01 [PROC SORT - DATA=], WORK.ESTRUTURA_GR_02 [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CSBV.ESTRUTURA_COMERCIAL_01, CSBV.TBSUPERABV_RESUMO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CSBV.TBSUPERABV_RESUMO_GR_TRI
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SUPERABV_RESUMO, BASE_SUPERABV_RESUMO_03, BASE_SUPERABV_RESUMO_NOVA, ESTRUTURA_GR, PRIMEIRO_RANKING, WORK.BASE_SUPERABV_RESUMO_01, WORK.BASE_SUPERABV_RESUMO_02, WORK.ESTRUTURA_GR_01, WORK.ESTRUTURA_GR_02
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CSBV '/infogrc/Campanha_SuperaBV';
+LIBNAME CSBV_BKP '/infogrc/Incentivo_Comercial/Bases_BKP';
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO AS
+SELECT
+
+today() as Data format ddmmyy10.,
+/*A.NmCanalEstruturaComercial,*/
+/*A.NmSubEstruturaComercialA,*/
+/*A.NmAreaEstruturaComercial,*/
+/*'' AS LstSubstituicao,*/
+/*'' AS LstColaboradorFocal,*/
+/*A.DsLoginN3A,*/
+/*A.DsLoginN2A,*/
+/*A.CdColaborador,*/
+/*A.NmGrupoCargoColaborador,*/
+A.DsLoginN1,
+/*'' AS NmEstadoColaborador,*/
+
+sum(VrPontosTotalRanking) as VrPontosTotalRanking
+
+FROM CSBV.TBSUPERABV_RESUMO A
+
+/*where a.NUANOMES = &Base_Mes.*/
+WHERE NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias')
+
+GROUP BY 1,2
+
+;RUN;
+
+DATA ESTRUTURA_GR;
+SET CSBV.ESTRUTURA_COMERCIAL_01;
+WHERE NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias')
+;RUN;
+
+PROC SORT DATA=WORK.ESTRUTURA_GR OUT=WORK.ESTRUTURA_GR_01;BY DsLoginN1 DESCENDING NuAnoMes;RUN;
+PROC SORT DATA=WORK.ESTRUTURA_GR_01 OUT=WORK.ESTRUTURA_GR_02 NODUPKEY;BY DsLoginN1;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO_NOVA AS
+SELECT
+
+A.Data,
+
+B.NmCanalEstruturaComercial,
+B.NmSubEstruturaComercialA,
+B.NmAreaEstruturaComercial,
+B.DsLoginN2A,
+
+A.DsLoginN1,
+A.VrPontosTotalRanking
+
+FROM BASE_SUPERABV_RESUMO A
+
+LEFT JOIN WORK.ESTRUTURA_GR_02 B ON B.DSLOGINN1 = A.DSLOGINN1
+
+;RUN;
+
+PROC SORT DATA=WORK.BASE_SUPERABV_RESUMO_NOVA OUT=WORK.BASE_SUPERABV_RESUMO_01;
+BY NmCanalEstruturaComercial NmSubEstruturaComercialA NmAreaEstruturaComercial DESCENDING VrPontosTotalRanking;
+;RUN;
+
+proc rank data=WORK.BASE_SUPERABV_RESUMO_01 descending out=WORK.BASE_SUPERABV_RESUMO_02 ties=dense;
+    var VrPontosTotalRanking;
+    ranks Ranking_VrPontosTotal;
+    by NmCanalEstruturaComercial NmSubEstruturaComercialA NmAreaEstruturaComercial;
+run;
+
+/*********************************************/
+/*TABELA COM O PRIMEIRO DO RANKING POR FILIAL*/
+/*********************************************/
+
+PROC SQL;
+CREATE TABLE PRIMEIRO_RANKING AS
+SELECT
+
+/*NUANOMES,*/
+NmCanalEstruturaComercial,
+NmSubEstruturaComercialA,
+NmAreaEstruturaComercial,
+DsLoginN2A,
+DsLoginN1,
+VrPontosTotalRanking
+
+FROM BASE_SUPERABV_RESUMO_02 A
+
+WHERE Ranking_VrPontosTotal = 1 AND NmCanalEstruturaComercial <> ''
+
+ORDER BY 1,2,3,4
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO_03 AS
+SELECT
+
+A.Data,
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NmAreaEstruturaComercial,
+A.DsLoginN2A,
+A.DsLoginN1,
+a.Ranking_VrPontosTotal,
+A.VrPontosTotalRanking format commax20.2,
+
+B.VrPontosTotalRanking AS VrPontosPrimeiroRankingFilial format commax20.2,
+A.VrPontosTotalRanking - B.VrPontosTotalRanking as VrGAP_PontosPrimRankingFilial format commax20.2
+
+FROM WORK.BASE_SUPERABV_RESUMO_02 A
+
+LEFT JOIN PRIMEIRO_RANKING B ON
+
+/*B.NUANOMES = A.NUANOMES*/
+/*and */B.NmCanalEstruturaComercial = A.NmCanalEstruturaComercial
+and B.NmSubEstruturaComercialA = A.NmSubEstruturaComercialA
+and B.NmAreaEstruturaComercial = A.NmAreaEstruturaComercial
+and B.DsLoginN2A = A.DsLoginN2A
+
+where a.NmCanalEstruturaComercial <> '' /*and a.NUANOMES = &Base_Mes.*/
+
+;RUN;
+
+DATA CSBV.TbSuperaBV_Resumo_GR_Tri;
+SET work.BASE_SUPERABV_RESUMO_03;
+;RUN;

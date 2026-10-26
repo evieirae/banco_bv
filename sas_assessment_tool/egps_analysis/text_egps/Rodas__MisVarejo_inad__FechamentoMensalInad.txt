@@ -1,0 +1,196 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_inad
+FILE_SAS: FechamentoMensalInad.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (3x | +60), FILENAME  (2x | +24)
+----------------------------------------
+LINES_OF_CODE: 121
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM1, safraM4
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], BASES.TBINAD [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBCOLABORADOR [PROC SQL - JOIN], BASES.TBINAD [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/tmp/Fechamento_Inad15_&amp;safraM1..csv, /riscosbvf/BA/processos/tmp/Fechamento_Inad30_&amp;safraM1..csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/tmp/Fechamento_Inad15_&safraM1..csv, /riscosbvf/BA/processos/tmp/Fechamento_Inad30_&safraM1..csv
+TEMP/DISCARDED OUTPUTS: TBFECHAMENTOINAD15, TBFECHAMENTOINAD30
+DYNAMIC REFS (Ambiguous): {SAFRAM1}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 5 paths (csv: 2, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/Fechamento_Inad15_&amp;safraM1..csv
+[CODE REF] /riscosbvf/BA/processos/tmp/Fechamento_Inad30_&amp;safraM1..csv
+
+END_METADATA
+================================================================================
+/* ================================================================= */
+/* ================ Libname e Parametros =========================== */
+/* ================================================================= */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+/* ================================================================== */
+/* ================ Fechamento Mensal INAD 30 ======================= */
+/* ================================================================== */
+
+proc sql;
+create table x as
+select
+max(DtAtualizacao) format date9.
+from bases.TbInad
+where FlElegivelInad15  = 1
+;run;
+
+proc sql;
+select max(DtVencimento) format date9.
+from bases.TbInad
+where FlElegivelInad15  = 1
+;run;
+
+/*Somente GR Pesados - Inad 30 alterar a data para 3 meses antes da data de fechamento*/
+/*Ex: Fechamento é de Abril então o NuAnoMes da entrada da proposta será de Janeiro, 3 meses antes*/
+
+PROC SQL;
+CREATE TABLE TbFechamentoInad30 AS
+select
+        month(Inad30.DtEntradaProposta) AS Mes_Base
+        ,year(Inad30.DtEntradaProposta) AS Ano_Base
+        ,Colaborador.IdMatricula AS ID_RH
+        ,Inad30.NmColaborador
+        ,11596 AS Produto
+        ,sum(coalesce(Inad30.VrParcelaInad30,0)) AS VrParcelaInad30 format commax18.2
+        ,sum(Inad30.VrParcelaElegivelInad30) AS  VrParcelaElegivelInad30 format commax18.2
+        ,(sum(coalesce(Inad30.VrParcelaInad30,0))/sum(Inad30.VrParcelaElegivelInad30))*100 AS Valor format commax10.2
+
+    from bases.TbInad Inad30
+        inner join bases.TbColaborador Colaborador
+            on Inad30.CdColaborador = Colaborador.CdColaborador
+    where Inad30.FlElegivelInad30  = 1
+        and year(Inad30.DtEntradaProposta)*100+month(Inad30.DtEntradaProposta) = &safraM4.
+        and NmGrupoProdutoMeta = 'Pesados'
+        and NmCanalEstruturaComercial = 'Canal Veiculos'
+        and Colaborador.CdGrupoCargoColaborador in (20)
+    group by 1,2,3,4,5
+
+;run;
+
+proc export
+data=TbFechamentoInad30
+file="/riscosbvf/BA/processos/tmp/Fechamento_Inad30_&safraM1..csv" replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/* Configurando o sistema de email */
+options emailsys=smtp emailhost="smtprelay.bvnet.bv" emailport=25;
+
+/* Definindo o email com anexos e conteúdo HTML */
+filename emailout email
+    to="misvarejo@bv.com.br"
+    from="misvarejo@bv.com.br"
+    subject="Fechamento Mensal Inad30"
+    attach=("/riscosbvf/BA/processos/tmp/Fechamento_Inad30_&safraM1..csv")
+    content_type="text/html";
+
+/* Enviando o email */
+data _null_;
+    file emailout;
+    put '<html>';
+    put '<body>';
+    put '<p>Olá,</p>';
+    put '<p>Este email é automático e contém anexos com o fechamento mensal Inad30.</p>';
+    put '<p>Antes de enviar os arquivos para o RH é necessário fazer a validação dos números.</p>';
+    put '<p>O passo a passo para validação está no confluence <a href="https://confluence.bvnet.bv/display/IGE/RH+-+Fechamento+INAD+15+e+30">RH - Fechamento INAD 15 e 30</a>.</p>';
+    put '</body>';
+    put '</html>';
+run;
+
+/*Somente GR Motos*/
+
+proc sql;
+create table TbFechamentoInad15 as
+select
+		month(Inad15.DtVencimento) AS Mes_Base
+		,year(Inad15.DtVencimento) AS Ano_Base
+		,Colaborador.IdMatricula AS ID_RH
+		,Inad15.NmColaborador
+		,9578 AS Produto
+		,sum(coalesce(Inad15.VrParcelaInad15,0)) AS VrParcelaInad15 format commax18.2
+		,sum(Inad15.VrParcelaElegivelInad15) AS  VrParcelaElegivelInad15 format commax18.2
+		,(sum(coalesce(Inad15.VrParcelaInad15,0))/sum(Inad15.VrParcelaElegivelInad15))*100 AS Valor format commax10.2
+
+	from bases.TbInad Inad15
+		inner join bases.TbColaborador Colaborador
+			on Inad15.CdColaborador = Colaborador .CdColaborador
+	where Inad15.FlElegivelInad15  = 1
+		and year(Inad15.DtVencimento)*100+month(Inad15.DtVencimento) = &safraM1.
+		and NmGrupoProdutoMeta = 'Motos'
+		and NmCanalEstruturaComercial = 'Canal Veiculos'
+		and Colaborador.CdGrupoCargoColaborador in (16)
+	group by 1,2,3,4,5
+
+;run;
+
+proc export
+data=TbFechamentoInad15
+file="/riscosbvf/BA/processos/tmp/Fechamento_Inad15_&safraM1..csv" replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/* Configurando o sistema de email */
+options emailsys=smtp emailhost="smtprelay.bvnet.bv" emailport=25;
+
+/* Definindo o email com anexos e conteúdo HTML */
+filename emailout email
+    to="misvarejo@bv.com.br"
+    from="misvarejo@bv.com.br"
+    subject="Fechamento Mensal Inad15 Motos"
+    attach=("/riscosbvf/BA/processos/tmp/Fechamento_Inad15_&safraM1..csv")
+    content_type="text/html";
+
+/* Enviando o email */
+data _null_;
+    file emailout;
+    put '<html>';
+    put '<body>';
+    put '<p>Olá,</p>';
+    put '<p>Este email é automático e contém anexos com o fechamento mensal Inad15 motos.</p>';
+    put '<p>Antes de enviar os arquivos para o RH é necessário fazer a validação dos números.</p>';
+    put '<p>O passo a passo para validação está no confluence <a href="https://confluence.bvnet.bv/display/IGE/RH+-+Fechamento+INAD+15+e+30">RH - Fechamento INAD 15 e 30</a>.</p>';
+    put '</body>';
+    put '</html>';
+run;

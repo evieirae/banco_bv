@@ -1,0 +1,164 @@
+START_METADATA
+PROJECT: Rodas__GestaoRotinaApp
+FILE_SAS: Foco_GR.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -1
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 100
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SafraM0, SafraM1, SafraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBMETANAOISONOMICA [SAS/Local], BASES.TBMETANI_ATINGMETAS_DASH [SAS/Local], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [DBCON], DWBI_DTWH.TBCOLABORADOR [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBFOCO_GR [PROC SORT - DATA=], BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], BASES.TBMETANI_ATINGMETAS_DASH [PROC SQL - FROM], DWBI_DIME.TBDIMHIERARQUIACOMERCIAL [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): BASEGRC.TBFOCO_GR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBFOCO_GR
+APPEND_ONLY_OUTPUTS: BASEGRC.TBFOCO_GR
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): BASEGRC.TBFOCO_GR
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/tbvisitagrfocoinput.csv
+TEMP/DISCARDED OUTPUTS: TBCOLABORADORESATIVOS, TBFOCOGR_V01, TBFOCOGR_V02, TBGR_FOCOFINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+options validvarname=any;
+%include '/infogrc/utils/all-includes.sas';
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table TbColaboradoresAtivos as
+select *
+from connection to dbcon
+(SELECT HierarquiaComercial.NmEstruturaComercial
+,HierarquiaComercial.NmSubEstruturaComercial
+,HierarquiaComercial.NmAreaEstruturaComercial
+,Colaborador.CdColaboradorRH as IdMatricula
+,HierarquiaComercial.CdColaborador as CdColaboradorBI
+,HierarquiaComercial.NmColaborador
+,HierarquiaComercial.NmCargoColaborador
+,HierarquiaComercial.CdEstadoColaborador
+,HierarquiaComercial.NmEstadoColaborador
+,HierarquiaComercial.DtNascimento
+,HierarquiaComercial.DsLogin as DsLogin
+,HierarquiaComercial.DsEmail as DsEmail
+,HierarquiaComercial.NmColaboradorImediato
+,HierarquiaComercial.DsLoginColaboradorImediato
+,HierarquiaComercial.DtAdmissaoColaborador
+,year(HierarquiaComercial.DtAdmissaoColaborador)*100 + month(HierarquiaComercial.DtAdmissaoColaborador) as NuAnoMesAdmissao
+FROM DWBI_DIME.TbDimHierarquiaComercial HierarquiaComercial
+LEFT JOIN DWBI_DTWH.TbColaborador Colaborador
+ON  HierarquiaComercial.CdColaborador = Colaborador.CdPessoa
+AND Colaborador.CdSistemaOrigem = 202
+AND today() BETWEEN Colaborador.DtInicioVigencia and Colaborador.DtFimVigencia
+WHERE today() BETWEEN HierarquiaComercial.DtInicioVigencia AND HierarquiaComercial.DtFimVigencia
+AND YEAR(HierarquiaComercial.DtInicioVigencia) BETWEEN YEAR(today())-1 AND YEAR(today())
+AND HierarquiaComercial.CdEstadoColaborador  in (5)
+AND HierarquiaComercial.CdEstruturaComercial = 8
+order by HierarquiaComercial.NmSubEstruturaComercial,
+HierarquiaComercial.NmAreaEstruturaComercial,
+HierarquiaComercial.NmColaborador
+)
+;
+run;
+quit;
+
+proc sql;
+create table TbFocoGr_V01 as
+select distinct
+
+ &SafraM0. as Safra
+,dashM1.DsLoginN1
+,dashM1.NmAreaEstruturaComercial
+,sum(dashM1.VrProducao) as Meta
+,sum(dashM1.VrProducaoRealizado) as Producao
+,sum(dashM1.VrProducaoRealizado)/sum(dashM1.VrProducao) as Atingmento
+,sum(dashM1.VrProducao)-coalesce(sum(dashM1.VrProducaoRealizado),0) as Saldo
+
+from bases.tbmetani_atingmetas_Dash dashM1
+
+	inner join TbColaboradoresAtivos tbcolab on tbcolab.DsLogin = dashM1.DsLoginN1
+
+where 1=1
+/*and dashM0.FlPorteA in ('M','G','GG')*/
+and dashM1.NuAnoMes =&SafraM1.
+and dashM1.produto ='Leves'
+and NuAnoMesAdmissao <= &SafraM6.
+/*and dashM0.dsloginn1 = 'bruno.dias'*/
+/*and NmParceiroComercial='103 - SAVOL VEICULOS'*/
+group by 1,2,3
+;run;
+
+proc sort data=TbFocoGr_V01  ;by descending saldo ;run;
+proc sort data=TbFocoGr_V01  ;by NmAreaEstruturaComercial ;run;
+
+data TbFocoGr_V02;
+    set TbFocoGr_V01 ;
+    by  NmAreaEstruturaComercial  ;
+    retain Top 0;
+    if first.NmAreaEstruturaComercial  then Top = 0;
+    Top + 1;
+   if Top <=5
+;run;
+
+proc sql;
+create table TbGr_FocoFinal as
+select distinct
+
+a.NuAnomes ,
+a.DsloginN1,
+a.DsloginN2A,
+a.DsloginN3A,
+case when a.DsLoginn1 = b.DsLoginn1 then 1 else 0 end as Indicado,
+case when a.DsLoginn1 = b.DsLoginn1 then 1 else 0 end as Confirmado,
+'' as Just
+from basegrc.TBMETANAOISONOMICA as a
+	left join TbFocoGr_V02 as b
+	on a.DsLoginn1 = b.DsLoginn1
+where a.nuanomes=&SafraM0.
+and a.Produto='Leves'
+and a.DsloginN1 <> ''
+;run;
+
+proc sql;
+	insert into Basegrc.TbFoco_GR
+	select * from TbGr_FocoFinal;
+quit;
+
+proc sort data=Basegrc.TbFoco_GR  nodupkey; by NuAnomes DsloginN1 ;run;
+
+proc export
+data=TbGr_FocoFinal
+file="/riscosbvf/BA/processos/output/tbvisitagrfocoinput.csv" replace
+dbms=dlm;
+delimiter=';';
+run;

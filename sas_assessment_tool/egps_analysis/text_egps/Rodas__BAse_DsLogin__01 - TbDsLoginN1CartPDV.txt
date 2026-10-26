@@ -1,0 +1,212 @@
+START_METADATA
+PROJECT: Rodas__BAse_DsLogin
+FILE_SAS: 01 - TbDsLoginN1CartPDV.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -9
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (1x | +20), FILENAME  (2x | +24)
+----------------------------------------
+LINES_OF_CODE: 135
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CARTPDV = /infogrc/Base_DsloginN1CartPDV
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_ANALITICA, WORK.BASE_CONSOLIDADA
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CARTPDV
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ANALITICA, WORK.BASE_CONSOLIDADA
+TABLE_READ_PROVENANCE (Flow): TMP.TBPRODUCAO [PROC SQL - FROM], WORK.BASE_ANALITICA [DATA Step - SET], WORK.BASE_CONSOLIDADA [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CARTPDV.TBDSLOGINN1CARTPDV_AGRUP, CARTPDV.TBDSLOGINN1CARTPDV_CONTRATO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbDsLoginN1CartPDV.csv
+TEMP/DISCARDED OUTPUTS: BASE_ANALITICA, BASE_CONSOLIDADA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME CARTPDV '/infogrc/Base_DsloginN1CartPDV';
+
+/* Envio de Email */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("guilherme.mendes@bv.com.br")
+
+SUBJECT="TbDsLoginN1CartPDV | Inicio da atualização";
+
+DATA _NULL_;
+    FILE MAIL;
+        PUT "Prezados,";
+        PUT ;
+        PUT "Iniciando o script da TbDsLoginN1CartPDV";
+        PUT ;
+		PUT ;
+        PUT "Base consolidada esta em CARTPDV.TbDsLoginN1CartPDV_Agrup";
+        PUT ;
+		PUT ;
+        PUT "Base analitica esta em CARTPDV.TbDsLoginN1CartPDV_Contrato";
+        PUT ;
+        PUT "Favor não responder este e-mail.";
+        PUT ;
+        PUT "Atenciosamente,";
+        PUT ;
+        PUT "Equipe de informações Gerenciais";
+        PUT "Banco BV";
+        PUT ;
+
+PROC SQL;
+CREATE TABLE BASE_ANALITICA AS
+SELECT
+
+NUANOMES,
+CdParceiroComercial,
+NmGrupoProdutoMeta,
+FxIdade,
+DsLoginN1CartPDV,
+NmSubEstruturaComercialA,
+NmCanalEstruturaComercial,
+NmAreaEstruturaComercial,
+DsTipoCanalProducao,
+CdColaborador,
+NmColaborador,
+DsLoginN1,
+DsLoginN2A,
+QtSeguros,
+DtContrato,
+NuContrato,
+FxIdade,
+
+SUM(VRPRODUCAO) AS PROD format commax20.2,
+sum(VrProducaoProjetado) as ProdProj format commax20.2,
+SUM(VrMargemContribuicao) AS MC format commax20.2,
+SUM(VrMargemProjetado) AS MC_Proj format commax20.2,
+COUNT(NUCONTRATO) AS QTD
+
+FROM TMP.TBPRODUCAO
+
+WHERE
+	NUANOMES >= 202301
+and NmGrupoProdutoMeta in ('Leves', 'Motos', 'Pesados')
+/*and DsLoginN1 in ('aarao.souza', 'juliana.carvalho')*/
+/*and DsLoginN1CartPDV = 'aarao.souza'*/
+
+/*and FxIdade <> 'ZeroKM'*/
+AND NmCanalEstruturaComercial = 'Canal Veiculos'
+/*AND DsLoginN1CartPDV <> ''*/
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17
+;RUN;
+
+DATA CARTPDV.TbDsLoginN1CartPDV_Contrato;
+SET WORK.BASE_ANALITICA;
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_CONSOLIDADA AS
+SELECT
+
+NUANOMES,
+CdParceiroComercial,
+NmGrupoProdutoMeta,
+FxIdade,
+DsLoginN1CartPDV,
+NmSubEstruturaComercialA,
+NmCanalEstruturaComercial,
+NmAreaEstruturaComercial,
+DsTipoCanalProducao,
+CdColaborador,
+NmColaborador,
+DsLoginN1,
+DsLoginN2A,
+QtSeguros,
+FxIdade,
+/*NuContrato,*/
+
+SUM(VRPRODUCAO) AS PROD format commax20.2,
+sum(VrProducaoProjetado) as ProdProj format commax20.2,
+SUM(VrMargemContribuicao) AS MC format commax20.2,
+SUM(VrMargemProjetado) AS MC_Proj format commax20.2,
+COUNT(NUCONTRATO) AS QTD
+
+FROM TMP.TBPRODUCAO
+
+WHERE
+	NUANOMES >= 202301
+and NmGrupoProdutoMeta in ('Leves', 'Motos', 'Pesados')
+/*and DsLoginN1 in ('aarao.souza', 'juliana.carvalho')*/
+/*and DsLoginN1CartPDV = 'aarao.souza'*/
+
+/*and FxIdade <> 'ZeroKM'*/
+AND NmCanalEstruturaComercial = 'Canal Veiculos'
+/*AND DsLoginN1CartPDV <> ''*/
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+;RUN;
+
+DATA CARTPDV.TbDsLoginN1CartPDV_Agrup;
+SET WORK.BASE_CONSOLIDADA;
+;RUN;
+
+proc export
+data=BASE_CONSOLIDADA
+file='/riscosbvf/BA/processos/output/TbDsLoginN1CartPDV.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/* Envio de Email */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("guilherme.mendes@bv.com.br")
+
+SUBJECT="TbDsLoginN1CartPDV | Fim da atualização";
+
+DATA _NULL_;
+    FILE MAIL;
+        PUT "Prezados,";
+        PUT ;
+        PUT "Finalizado o script da TbDsLoginN1CartPDV";
+        PUT ;
+		PUT ;
+        PUT "Base consolidada esta em CARTPDV.TbDsLoginN1CartPDV_Agrup";
+        PUT ;
+		PUT ;
+        PUT "Base analitica esta em CARTPDV.TbDsLoginN1CartPDV_Contrato";
+        PUT ;
+        PUT "Favor não responder este e-mail.";
+        PUT ;
+        PUT "Atenciosamente,";
+        PUT ;
+        PUT "Equipe de informações Gerenciais";
+        PUT "Banco BV";
+        PUT ;

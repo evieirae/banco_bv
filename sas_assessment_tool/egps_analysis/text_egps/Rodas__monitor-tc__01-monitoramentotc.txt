@@ -1,0 +1,230 @@
+START_METADATA
+PROJECT: Rodas__monitor-tc
+FILE_SAS: 01-monitoramentotc.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -209
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 142
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: FL_ALERTA, FL_ALERTA_2, TC_MAX, TC_MIN, TC_VAR_MAX, TC_VAR_MAX_PF, TC_VAR_MIN
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/libname.sas
+TABLE_READ_PROVENANCE (Flow): TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ANALITICO_VALOR, BASE_DATA, BASE_DATA_2, PARAMETRO, PARAMETRO_2, TC, TC2, TC_CALC, TC_TPCLIENTE, TC_VALORES
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/libname.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/libname.sas';
+
+/*DATAS DE CADA PRODUTO*/
+PROC SQL;
+CREATE TABLE BASE_DATA AS SELECT
+NMGRUPOPRODUTOMETA AS PRODUTO_REF
+,MAX(DTCONTRATO) AS DATA_REF FORMAT DDMMYY10.
+FROM TMP.TBPRODUCAO
+where NMGRUPOPRODUTOMETA IN('Leves','Motos')
+GROUP BY 1
+;RUN;
+
+PROC SQL;
+CREATE TABLE TC AS SELECT
+A.NMGRUPOPRODUTOMETA
+,MAX(A.DTCONTRATO)                                    AS DATA FORMAT DDMMYY10.
+,MIN(A.VrTarifaCadastro)                                     AS Valor_Minimo
+,AVG(A.VrTarifaCadastro)                                     AS Valor_Medio
+,MAX(A.VrTarifaCadastro)                                     AS Valor_Maximo
+,SUM(CASE WHEN VRTARIFACADASTRO > 0 THEN 1 ELSE 0 END)/
+COUNT(NUCONTRATO)                                          AS TC
+
+FROM TMP.TBPRODUCAO AS A
+INNER JOIN BASE_DATA AS B
+ON B.PRODUTO_REF = A.NMGRUPOPRODUTOMETA
+AND B.DATA_REF = A.DTCONTRATO
+WHERE NMGRUPOPRODUTOMETA IN('Leves','Motos')
+GROUP BY 1
+ORDER BY NMGRUPOPRODUTOMETA
+;RUN;
+
+/*BASE DE DATA COM AS INFORMAÇÕES DE TIPO PESSOA*/
+
+PROC SQL;
+CREATE TABLE BASE_DATA_2 AS SELECT
+NMGRUPOPRODUTOMETA AS PRODUTO_REF
+,TPPESSOA AS TPPESSOA_REF
+,MAX(DTCONTRATO) AS DATA_REF FORMAT DDMMYY10.
+FROM TMP.TBPRODUCAO
+WHERE NMGRUPOPRODUTOMETA IN('Leves','Motos')
+
+GROUP BY 1,2
+;RUN;
+
+PROC SQL;
+CREATE TABLE TC2 AS SELECT
+A.NMGRUPOPRODUTOMETA
+,A.TPPESSOA
+,MAX(A.DTCONTRATO)                                    AS DATA FORMAT DDMMYY10.
+,MIN(A.VrTarifaCadastro)                                     AS Valor_Minimo
+,AVG(A.VrTarifaCadastro)                                     AS Valor_Medio
+,MAX(A.VrTarifaCadastro)                                     AS Valor_Maximo
+,SUM(CASE WHEN A.VRTARIFACADASTRO > 0 THEN 1 ELSE 0 END)/
+COUNT(A.NUCONTRATO)                                          AS TC
+
+FROM TMP.TBPRODUCAO AS A
+INNER JOIN BASE_DATA_2 AS B
+ON A.NMGRUPOPRODUTOMETA = B.PRODUTO_REF
+AND A.TPPESSOA = B.TPPESSOA_REF
+AND A.DTCONTRATO = B.DATA_REF
+
+WHERE NMGRUPOPRODUTOMETA IN('Leves'/*,'Motos'*/)
+
+GROUP BY 1,2
+ORDER BY NMGRUPOPRODUTOMETA
+;RUN;
+
+/*Base com a TC calculada*/
+
+Proc sql;
+Create table TC_CALC as select
+
+NMGRUPOPRODUTOMETA AS PRODUTO
+,DATA
+,Valor_Minimo format dollar10.2
+,Valor_Medio format dollar10.2
+,Valor_Maximo format dollar10.2
+,TC format percent10.2
+,CASE WHEN Valor_Maximo > &TC_VAR_MAX. OR Valor_Minimo < &TC_VAR_MIN. THEN 'Alerta'
+ELSE 'S/Alerta' END AS Alerta_Valor
+,CASE WHEN TC > &TC_MAX. OR TC < &TC_MIN. THEN 'Alerta' ELSE 'S/Alerta' END AS Alerta_Taxa
+
+FROM TC
+
+;RUN;
+
+/*BASE POR TIPO DE CLIENTE (PF/PJ)*/
+
+Proc sql;
+Create table TC_TPCLIENTE as select
+
+NMGRUPOPRODUTOMETA AS PRODUTO
+,TPPESSOA AS Tipo_Cliente
+,DATA
+,Valor_Minimo format dollar10.2
+,Valor_Medio format dollar10.2
+,Valor_Maximo format dollar10.2
+/*,TC format percent10.2*/
+,CASE WHEN TPPESSOA = 'J' AND Valor_Medio > &TC_VAR_MAX. OR Valor_Medio < &TC_VAR_MIN. THEN 'Alerta'
+      WHEN TPPESSOA = 'F' AND Valor_Medio > &TC_VAR_MAX_PF. OR Valor_Medio < &TC_VAR_MIN. THEN 'Alerta'
+ELSE 'S/Alerta' END AS Alerta_Valor
+/*,CASE WHEN TC > &TC_MAX. OR TC < &TC_MIN. THEN 'Alerta' ELSE 'S/Alerta' END AS Alerta_Taxa*/
+
+FROM TC2
+
+;RUN;
+
+/*ABERTURA DE VALORES E MIX DE CONTRATOS*/
+PROC SQL;
+CREATE TABLE TC_VALORES AS SELECT
+A.NMGRUPOPRODUTOMETA AS PRODUTO
+,VrTarifaCadastro format dollar10.2
+,MAX(A.DTCONTRATO) AS DATA FORMAT DDMMYY10.
+,COUNT(A.NUCONTRATO) AS QT_CONTRATOS
+
+FROM TMP.TBPRODUCAO AS A
+INNER JOIN BASE_DATA AS B
+ON A.NMGRUPOPRODUTOMETA = B.PRODUTO_REF
+AND A.DTCONTRATO = B.DATA_REF
+
+WHERE NMGRUPOPRODUTOMETA = 'Leves' and A.VrTarifaCadastro IS NOT NULL
+GROUP BY 1,2
+;RUN;
+
+/*TABELA ANALITICA DOS CASOS DE VALORES ALERTA DE TC*/
+
+PROC SQL;
+CREATE TABLE ANALITICO_VALOR AS SELECT
+A.NUPROPOSTA AS PROPOSTA
+,A.NUCONTRATO AS CONTRATO
+,A.NMGRUPOPRODUTOMETA AS PRODUTO
+,A.VRTARIFACADASTRO AS VALOR_TC
+ ,MAX(A.DTCONTRATO) AS DATA FORMAT DDMMYY10.
+
+FROM TMP.TBPRODUCAO AS A
+INNER JOIN BASE_DATA AS B
+ON A.NMGRUPOPRODUTOMETA = B.PRODUTO_REF
+AND A.DTCONTRATO = B.DATA_REF
+
+WHERE A.NMGRUPOPRODUTOMETA = 'Leves' AND A.VrTarifaCadastro IS NOT NULL
+AND A.VrTarifaCadastro NOT IN(749,839,924,990,999,1099)
+
+GROUP BY 1,2,3
+
+;RUN;
+
+/*PARAMETRO*/
+DATA PARAMETRO;
+SET TC_CALC;
+WHERE PRODUTO = 'Leves';
+IF Alerta_Taxa = 'Alerta' THEN FL_ALERTA=1; ELSE FL_ALERTA=0;
+;RUN;
+
+/*Macro alerta leves*/
+
+DATA _NULL_;
+SET PARAMETRO;
+
+CALL SYMPUT ('FL_ALERTA',FL_ALERTA);
+WHERE PRODUTO = 'Leves'
+;RUN;
+%PUT &FL_ALERTA;
+
+/*PARAMETRO VALOR*/
+DATA PARAMETRO_2;
+SET TC_CALC;
+WHERE PRODUTO = 'Leves';
+IF Alerta_Valor = 'Alerta' THEN FL_ALERTA_2=1; ELSE FL_ALERTA_2=0;
+;RUN;
+
+/*Macro alerta leves*/
+
+DATA _NULL_;
+SET PARAMETRO_2;
+
+CALL SYMPUT ('FL_ALERTA_2',FL_ALERTA_2);
+WHERE PRODUTO = 'Leves'
+;RUN;
+%PUT &FL_ALERTA_2;

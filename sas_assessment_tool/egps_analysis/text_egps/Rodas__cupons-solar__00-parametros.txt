@@ -1,0 +1,98 @@
+START_METADATA
+PROJECT: Rodas__cupons-solar
+FILE_SAS: 00-parametros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 38
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: HOML = /projetos/MISV/data/bases; TMP = /projetos/MISV/data/bases/tmp
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m2, CAPTURA_DU
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/Calendario.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/CALENDARIO.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], HOML.TBTEMPODATA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TEMPODATA
+IMPORTED_LIBNAMES: HOML
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/Calendario.sas, /infogrc/utils/libname.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TEMPODATA
+TABLE_READ_PROVENANCE (Flow): HOML.TBTEMPODATA [PROC SQL - FROM], WORK.TEMPODATA [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/Calendario.sas, /infogrc/utils/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): HOML.TBTEMPODATA
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_STDATA, FLTEMPODATA, TEMPODATA, TEMPODATA_DU
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/Calendario.sas
+[CODE REF] /infogrc/utils/libname.sas
+
+END_METADATA
+================================================================================
+/*VM - PASTA cupom-solar*/
+
+/* Executar código de geração da base */
+
+%include '/infogrc/utils/libname.sas';
+libname TMP '/projetos/MISV/data/bases/tmp';
+libname HOML '/projetos/MISV/data/bases';
+%include '/infogrc/utils/Calendario.sas';
+
+PROC SQL;
+CREATE TABLE FlTempoData as
+SELECT
+*
+FROM HOML.TBTEMPODATA A
+WHERE STDATA = 1
+;RUN;
+
+DATA _NULL_;
+	CALL SYMPUT ('Base_m0',COMPRESS(INPUT(PUT(INTNX('MONTHS',TODAY(),0,'END'),YYMMN6.),6.)));
+	CALL SYMPUT ('Base_m1',COMPRESS(INPUT(PUT(INTNX('MONTHS',TODAY(),-1,'END'),YYMMN6.),6.)));
+	CALL SYMPUT ('Base_m2',COMPRESS(INPUT(PUT(INTNX('MONTHS',TODAY(),-2,'END'),YYMMN6.),6.)));
+	CALL SYMPUT ('Base_m3',COMPRESS(INPUT(PUT(INTNX('MONTHS',TODAY(),-3,'END'),YYMMN6.),6.)));
+	CALL SYMPUT ('Base_m4',COMPRESS(INPUT(PUT(INTNX('MONTHS',TODAY(),-4,'END'),YYMMN6.),6.)));
+RUN;
+
+PROC SQL;
+CREATE TABLE TempoData as
+SELECT * FROM HOML.TBTEMPODATA A
+WHERE A.NUANOMES >= &Base_m2.
+;RUN;
+
+PROC SQL;
+CREATE TABLE TempoData_DU as
+SELECT * FROM HOML.TBTEMPODATA A
+WHERE A.NUANOMES >= &Base_m2. AND FlDiaUtil = 'S'
+;RUN;
+
+/*CAPTURA STDATA*/
+DATA BASE_STDATA;
+SET WORK.TEMPODATA;
+IF STDATA = 1 THEN CAPTURA_DU = QtCorridosDiaUtilDia;
+ELSE CAPTURA_DU = 0;
+CALL SYMPUT ('CAPTURA_DU',CAPTURA_DU);
+;RUN;
+%PUT &CAPTURA_DU;

@@ -1,0 +1,294 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_motos
+FILE_SAS: 05 - Separacao Publicos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 199
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.TBMOLICARMOTOS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.TBMOLICARMOTOS [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PUBLICO_PPR_FINAL_SIMU, PUBLICO_PPR_SIMU
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*Código para separar os públicos do PPR da base de simulação*/
+
+PROC SQL;
+CREATE TABLE PUBLICO_PPR_SIMU AS
+SELECT
+
+A.CdSimulacaoInicial,
+A.DtSimulacaoInicial,
+A.DtEntradaProposta,
+A.NuCpfCnpj,
+A.ProbabilidadeAprovacao as PcProbabilidadeAprovacao,
+A.NuProposta,
+A.Filial,
+A.Canal,
+
+CASE WHEN B.QtCilindradaVeiculo BETWEEN 0 AND 124 THEN 'BAIXA'
+	 WHEN B.QtCilindradaVeiculo BETWEEN 125 AND 349 THEN 'MÉDIA'
+	 WHEN B.QtCilindradaVeiculo BETWEEN 350 AND 5000 THEN 'ALTA'
+														ELSE 'NÃO ENCONTRADO'
+													END AS FxCilindrada,
+
+A.IdadeBem,
+
+CASE WHEN COALESCE(A.FxIdade,A.FxIdade) = 'ZeroKM' then 'ZeroKM'
+     WHEN COALESCE(A.FxIdade,A.FxIdade) = '0 a 2 anos' then '0 a 2 anos'
+     WHEN COALESCE(A.FxIdade,A.FxIdade) = '3 a 7 anos' then '3 a 7 anos'
+     WHEN COALESCE(A.FxIdade,A.FxIdade) = '8 a 10 anos' then '8 a 10 anos'
+     WHEN COALESCE(A.FxIdade,A.FxIdade) in ('Acima 10 anos','Acima de 10 anos') then 'Acima 10 anos'
+	 ELSE 'ERRO' END AS FxIdade,
+
+CASE WHEN A.IdadeBem between -1 and 1 then 'ZeroKM a 1 ano'
+     WHEN A.IdadeBem between 2 and 3 then '2 a 3 anos'
+     WHEN A.IdadeBem between 4 and 10  then '4 a 10 anos'
+	 ELSE 'ERRO' END AS FxIdade2,
+
+A.FxEntrada,
+A.FxPrazo,
+
+A.Mensageria,
+A.Mensageria2,
+
+CASE WHEN A.Mensageria in ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+'0. Aprovado','1. Alta chance', '2. Tem chance')
+and A.Mensageria2 not in ('3. Recusado', '4. Recusado Reversível','6. Plano Recusado') then 'Mensageria Positiva'
+
+WHEN A.Mensageria in ('6. Recusado','3. Recusado','6. Plano Recusado') or
+(A.Mensageria in ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%',
+'0. Aprovado','1. Alta chance', '2. Tem chance')
+and A.Mensageria2 in ('3. Recusado', '4. Recusado Reversível','6. Plano Recusado')) then 'Recusado'
+
+else 'Demais Msgs'
+end as AGRUPAMENTO_MSG,
+
+/*ESTRATEGIAS PPR*/
+CASE WHEN A.DtSimulacaoInicial >= '23Oct2023'D and A.DtSimulacaoInicial <= '06Nov2023'D and A.Filial in (
+'Canal Jundiaí',
+'Canal Criciúma ',
+'Canal Belo Horizonte',
+'Canal Guarulhos',
+'Canal Freguesia',
+'Canal ABC',
+'Canal Morumbi',
+'Canal Belém',
+'Canal Ceará I',
+'Canal Campinas II') THEN
+	 CASE WHEN SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '34' THEN 'PADRÃO'
+		  WHEN SUBSTR(A.NUCPFCNPJ,6,2) between '35' and '69' THEN 'DESAFIANTE'
+		  WHEN SUBSTR(A.NUCPFCNPJ,6,2) between '70' and '99' THEN 'CONTROLE'
+		  ELSE 'ERRO' end
+
+WHEN A.DtSimulacaoInicial >= '07Nov2023'D and A.DtSimulacaoInicial <= '03Dec2023'D and A.Filial in (
+'Canal Santos',
+'Canal Recife',
+'Canal Rio de Janeiro I',
+'Canal Rio de Janeiro II',
+'Canal Ceará II',
+'Canal Sorocaba',
+'Canal Bauru',
+'Canal São José do Rio Preto',
+'Canal Uberlândia',
+'Canal Contagem',
+'Canal Varginha',
+'Canal Ipatinga',
+'Canal Manaus',
+'Canal Cuiabá',
+'Canal Campo Grande',
+'Canal São Luís',
+'Canal Florianópolis',
+'Canal Porto Alegre',
+'Canal Caxias do Sul',
+'Canal Curitiba I',
+'Canal Curitiba II') THEN
+	 CASE WHEN SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '34' THEN 'PADRÃO'
+		  WHEN SUBSTR(A.NUCPFCNPJ,6,2) between '35' and '69' THEN 'DESAFIANTE'
+		  WHEN SUBSTR(A.NUCPFCNPJ,6,2) between '70' and '99' THEN 'CONTROLE'
+		  ELSE 'ERRO' end
+
+WHEN A.DtSimulacaoInicial >= '04Dec2023'D and A.DtSimulacaoInicial <= '27Dec2023'D and SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '34' THEN 'PADRÃO'
+WHEN A.DtSimulacaoInicial >= '04Dec2023'D and A.DtSimulacaoInicial <= '27Dec2023'D and SUBSTR(A.NUCPFCNPJ,6,2) between '35' and '69' THEN 'DESAFIANTE'
+WHEN A.DtSimulacaoInicial >= '04Dec2023'D and A.DtSimulacaoInicial <= '27Dec2023'D and SUBSTR(A.NUCPFCNPJ,6,2) between '70' and '99' THEN 'CONTROLE'
+
+WHEN A.DtSimulacaoInicial >= '28Dec2023'D and A.DtSimulacaoInicial <= '08Feb2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '49' THEN 'PADRÃO'
+WHEN A.DtSimulacaoInicial >= '28Dec2023'D and A.DtSimulacaoInicial <= '08Feb2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '50' and '79' THEN 'DESAFIANTE 2.0'
+WHEN A.DtSimulacaoInicial >= '28Dec2023'D and A.DtSimulacaoInicial <= '08Feb2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '80' and '99' THEN 'CONTROLE'
+
+WHEN A.DtSimulacaoInicial >= '09Feb2024'D and A.DtSimulacaoInicial <= '26Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '09' THEN 'PADRÃO'
+WHEN A.DtSimulacaoInicial >= '09Feb2024'D and A.DtSimulacaoInicial <= '26Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '10' and '19' THEN 'DESAFIANTE 3'
+WHEN A.DtSimulacaoInicial >= '09Feb2024'D and A.DtSimulacaoInicial <= '26Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '20' and '29' THEN 'CONTROLE'
+WHEN A.DtSimulacaoInicial >= '09Feb2024'D and A.DtSimulacaoInicial <= '26Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '30' and '69' THEN 'PADRÃO'
+WHEN A.DtSimulacaoInicial >= '09Feb2024'D and A.DtSimulacaoInicial <= '26Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '70' and '89' THEN 'DESAFIANTE 3'
+WHEN A.DtSimulacaoInicial >= '09Feb2024'D and A.DtSimulacaoInicial <= '26Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '90' and '99' THEN 'CONTROLE'
+
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '09' THEN 'PADRÃO'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '10' and '19' THEN 'DESAFIANTE 3'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '20' and '29' THEN 'CONTROLE'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '30' and '69' THEN 'PADRÃO AJUST'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '70' and '89' THEN 'DESAF 3 AJUST'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '90' and '99' THEN 'CONTROLE'
+
+ELSE 'ERRO'
+END AS FG_PUBLICO,
+
+/*POLITICAS DE CREDITO*/
+CASE
+WHEN A.DtSimulacaoInicial >= '23Oct2023'D and A.DtSimulacaoInicial <= '13Mar2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '29' THEN 'CRED-DESAFIANTE'
+WHEN A.DtSimulacaoInicial >= '23Oct2023'D and A.DtSimulacaoInicial <= '13Mar2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '30' and '99' THEN 'CRED-CAMPEA'
+WHEN A.DtSimulacaoInicial >= '14Mar2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '29' THEN 'CRED-CAMPEA'
+WHEN A.DtSimulacaoInicial >= '14Mar2024'D and SUBSTR(A.NUCPFCNPJ,6,2) between '30' and '99' THEN 'CRED-DESAFIANTE'
+
+WHEN A.DtSimulacaoInicial >= '05Apr2024'D and A.Regional in ('Canal Motos') THEN 'CRED-DESAFIANTE'
+
+ELSE 'ERRO' END AS FG_PUBLICO_CRED,
+
+/*ESTRETEGIAS LIMITE PA*/
+/*A.DtSimulacaoInicial >= '09Feb2024'D and */
+
+CASE
+WHEN A.DtSimulacaoInicial <= '26Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '14' THEN 'PA-CONTROLE'
+WHEN A.DtSimulacaoInicial <= '26Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '15' and '55' THEN 'PA-ACAO'
+WHEN A.DtSimulacaoInicial <= '26Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '56' and '80' THEN 'PA-CONTROLE'
+WHEN A.DtSimulacaoInicial <= '26Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '81' and '89' THEN 'PA-ACAO'
+WHEN A.DtSimulacaoInicial <= '26Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '90' and '99' THEN 'PA-CONTROLE'
+
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '04' THEN 'PA-ACAO'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '05' and '14' THEN 'PA-CONTROLE'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '15' and '24' THEN 'PA-ACAO'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '25' and '49' THEN 'PA-CONTROLE'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '50' and '79' THEN 'PA-ACAO AJUST'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '80' and '89' THEN 'PA-CONTROLE'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '90' and '94' THEN 'PA-ACAO AJUST'
+WHEN A.DtSimulacaoInicial >= '27Apr2024'D AND SUBSTR(A.NUCPFCNPJ,6,2) between '95' and '99' THEN 'PA-CONTROLE'
+
+ELSE 'ERRO' END AS FG_PUBLICO_PA,
+
+CASE WHEN A.DtSimulacaoInicial >= '08Mar2024'D and A.Filial in ('Canal Santos','Canal Jundiaí','Canal Bauru') THEN 'FILIAIS PILOTO'
+WHEN A.DtSimulacaoInicial >= '05Apr2024'D and A.Regional in ('Canal Motos') THEN 'FILIAIS PILOTO'
+ELSE 'DEMAIS FILIAIS' END AS FG_PILOTO_ENTMIN,
+
+CASE WHEN A.DtSimulacaoInicial >= '27Apr2024'd THEN 'PÓS AJUSTE PE' ELSE 'ANTES AJUSTE PE' END AS FG_AJUSTE_PE_PRICING,
+CASE WHEN A.DtSimulacaoInicial >= '10Apr2024'd THEN 'PÓS AJUSTE PE-CRED' ELSE 'ANTES AJUSTE PE-CRED' END AS FG_AJUSTE_PE_CRED,
+
+CASE WHEN A.EntradaMinima in ('00% a 4,99%','05% a 9,99%') THEN 'MÍNIMA ATÉ 10%'
+WHEN A.EntradaMinima in ('10% a 14,99%','15% a 19,99%') THEN 'MÍNIMA ATÉ 20%'
+WHEN A.EntradaMinima in ('20% a 24,99%','25% a 29,99%') THEN 'MÍNIMA ATÉ 30%'
+WHEN A.EntradaMinima in ('30% a 34,99%','35% a 39,99%') THEN 'MÍNIMA ATÉ 40%'
+WHEN A.EntradaMinima in ('40% a 44,99%','45% a 49,99%') THEN 'MÍNIMA ATÉ 50%'
+WHEN A.EntradaMinima in ('50% a 54,99%' '55% a 59,99%') THEN 'MÍNIMA ATÉ 60%'
+WHEN A.EntradaMinima in ('60% a 64,99%','65% a 69,99%') THEN 'MÍNIMA ATÉ 70%'
+WHEN A.EntradaMinima in ('70% a 74,99%','75% a 79,99%') THEN 'MÍNIMA ATÉ 80%'
+WHEN A.EntradaMinima in ('80% a 84,99%','85% a 89,99%') THEN 'MÍNIMA ATÉ 90%'
+WHEN A.EntradaMinima in ('90% a 94,99%','95% a 99,99%') THEN 'MÍNIMA ATÉ 100%'
+ELSE 'Desconhecido' END AS FX_ENTRADA_MIN
+
+FROM MENSAGERIA AS A
+
+LEFT JOIN AUXL.TbMolicarMotos AS B ON A.CdMolicar = B.CdMolicar
+
+WHERE A.DtSimulacaoInicial >='23Oct2023'D
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22;
+quit;
+
+PROC SQL;
+CREATE TABLE PUBLICO_PPR_FINAL_SIMU AS
+SELECT
+
+A.CdSimulacaoInicial,
+A.DtSimulacaoInicial,
+A.DtEntradaProposta,
+A.NuProposta,
+A.NuCpfCnpj,
+A.PcProbabilidadeAprovacao,
+A.FG_PUBLICO,
+A.FG_PUBLICO_CRED,
+A.FG_PUBLICO_PA,
+
+A.FG_AJUSTE_PE_PRICING,
+A.FG_AJUSTE_PE_CRED,
+
+/*MARCAÇÕES DE ENTRADA MINIMA*/
+A.FX_ENTRADA_MIN,
+A.FG_PILOTO_ENTMIN,
+
+/*MARCAÇÕES DE MENSAGERIA*/
+A.AGRUPAMENTO_MSG,
+A.Mensageria,
+A.Mensageria2,
+
+A.Filial,
+A.Canal,
+
+A.IdadeBem,
+A.FxIdade,
+A.FxIdade2,
+
+A.FxCilindrada,
+
+A.FxEntrada,
+A.FxPrazo,
+
+CASE WHEN A.PcProbabilidadeAprovacao <= 0.5 THEN 'ZERO'
+WHEN A.PcProbabilidadeAprovacao <= 5.3 THEN 'ATÉ 5,25'
+	 WHEN A.PcProbabilidadeAprovacao <= 6.5 THEN '5,5-6,5'
+	 WHEN A.PcProbabilidadeAprovacao <= 7.0 THEN '6,75-7,0'
+	 WHEN A.PcProbabilidadeAprovacao <= 8.0 THEN '7,25-8,0'
+	 WHEN A.PcProbabilidadeAprovacao <= 8.4 THEN '8,25'
+	 WHEN A.PcProbabilidadeAprovacao <= 10 THEN '>= 8,5'
+	 ELSE 'ZERO'
+END AS AGRUPAMENTO_RTG,
+
+CASE WHEN A.PcProbabilidadeAprovacao <= 0.5 THEN 'ZERO'
+WHEN A.PcProbabilidadeAprovacao <= 5.4 THEN 'ATÉ 5,25'
+	 WHEN A.PcProbabilidadeAprovacao <= 7.4 THEN '5,5-7,25'
+	 WHEN A.PcProbabilidadeAprovacao <= 7.9 THEN '7,5-7,75'
+	 WHEN A.PcProbabilidadeAprovacao = 8.0 THEN '8,0'
+	 WHEN A.PcProbabilidadeAprovacao <= 8.9 THEN '8,25-8,75'
+	 WHEN A.PcProbabilidadeAprovacao <= 10 THEN '9-10'
+	 ELSE 'ZERO'
+END AS AGRUPAMENTO_RTG_AJUST
+
+FROM PUBLICO_PPR_SIMU AS A
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26;
+QUIT;

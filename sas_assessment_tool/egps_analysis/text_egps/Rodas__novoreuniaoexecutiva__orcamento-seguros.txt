@@ -1,0 +1,159 @@
+START_METADATA
+PROJECT: Rodas__novoreuniaoexecutiva
+FILE_SAS: orcamento-seguros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -77
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), CALL EXECUTE (1x | +45), PROC APPEND (1x | +15), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 99
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: RELEXC = /infogrc/relatorioexecutivo; RELEXC2 = /infogrc/novoreuniaoexecutiva/bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: tipo
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: TIPO
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): RELEXC.TBMETA [SAS/Local], RELEXC2.ORCAMENTOSEGUROS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: RELEXC, RELEXC2
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): RELEXC.TBMETA [PROC SQL - FROM], RELEXC2.ORCAMENTOSEGUROS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RELEXC.TBMETA, RELEXC2.ORCAMENTOSEGUROS
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ORC, ORC2_01, ORC2_02, ORCAMENTO, ORC_COMPLETO, ORC_QTDE, TPSEGUROS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+LIBNAME RELEXC '/infogrc/relatorioexecutivo';
+LIBNAME RELEXC2 '/infogrc/novoreuniaoexecutiva/bases';
+
+DATA TpSeguros;
+INPUT seguro$ 1-9;
+CARDS;
+AutoTotal
+SPF
+Cap
+Demais
+;
+RUN;
+
+PROC SQL;
+  CREATE TABLE TpSeguros AS SELECT STRIP(seguro) AS seguro FROM TpSeguros;
+RUN;
+
+%macro GeraOrcamento(tipo);
+PROC SQL;
+  CREATE TABLE orc AS
+    SELECT
+	  "01/"||SUBSTR(PUT(NuAnoMes,6.),5,2)||"/"||SUBSTR(PUT(NuAnoMes,6.),1,4) AS Data,
+	  NmGrupoProdutoMeta AS Produto,
+	  UPPER(COALESCE(DsTipoCanalProducao,'DESCONHECIDO')) AS Canal,
+	  "&tipo." AS Seguro,
+	  SUM(CASE WHEN Tipo = 'Orçamento' AND TpValor = "QtContrato&tipo.Dn" AND NmGrupoProdutoMeta LIKE 'CVG%' AND NuAnoMes <= 202012 THEN QtDenominador END) AS QtdeContrato FORMAT=NUMX18.0,
+	  SUM(CASE WHEN Tipo = 'Orçamento' AND TpValor = "QtContrato&tipo.Nm" AND NmGrupoProdutoMeta LIKE 'CVG%' AND NuAnoMes <= 202012 THEN QtNumerador END) AS Qtde FORMAT=NUMX18.0,
+	  SUM(CASE WHEN Tipo = 'Orçamento' AND TpValor = "Vr&tipo." THEN VrMedida ELSE 0 END) AS Premio FORMAT=NUMX18.2
+    FROM RELEXC.TbMeta
+	WHERE NmGrupoProdutoMeta IN ('CVG Leves','CVG Pesados','Privado','CP','CIG','Privado','Solar')
+	  AND NmGrupoProdutoMeta IS NOT NULL
+	  AND NuAnoMes >= 202007
+	GROUP BY 1,2,3,4
+	HAVING (calculated Premio) > 0;
+RUN;
+
+proc append data=orc BASE=orcamento;run;
+%mend;
+
+DATA _null_;
+SET TpSeguros;
+call execute ('%GeraOrcamento('||seguro||')');
+RUN;
+
+PROC SQL;
+  CREATE TABLE orc2_01 AS
+    SELECT
+	  '01/'||PUT(Mes,z2.)||'/'||PUT(Ano,4.) AS Data,
+	  NmGrupoSubProduto AS Produto,
+	  Canal,
+	  SUM(Quantidade) AS QtdElegivel
+    FROM RELEXC2.Orcamentoseguros
+    WHERE Ano >= 2020
+      AND NmGrupoSubProduto IN ('CVG Leves','CVG Pesados','Privado','CP','CIG','Privado','Solar')
+	  AND Metrica = 'Contrato'
+    GROUP BY 1,2,3;
+RUN;
+
+PROC SQL;
+  CREATE TABLE orc2_02 AS
+    SELECT
+	  '01/'||PUT(Mes,z2.)||'/'||PUT(Ano,4.) AS Data,
+	  NmGrupoSubProduto AS Produto,
+	  Canal,
+	  CASE WHEN Metrica NOT IN ('SPF','CAP','Completo') THEN 'Demais'
+           WHEN Metrica = 'CAP' THEN 'Cap'
+		   WHEN Metrica = 'Completo' THEN 'AutoTotal'
+           ELSE Metrica END AS Metrica,
+	  SUM(Quantidade) AS Qtde
+    FROM RELEXC2.Orcamentoseguros
+    WHERE Ano >= 2020
+      AND NmGrupoSubProduto IN ('CVG Leves','CVG Pesados','Privado','CP','CIG','Privado','Solar')
+	  AND Metrica <> 'Contrato'
+    GROUP BY 1,2,3,4;
+RUN;
+
+PROC SQL;
+  CREATE TABLE orc_qtde AS
+    SELECT
+	  A.Data,
+	  A.Produto,
+	  UPPER(A.CANAL) AS Canal,
+	  A.Metrica,
+	  B.QtdElegivel FORMAT=numx12.2,
+	  A.Qtde FORMAT=numx12.2
+	FROM orc2_02 A
+	LEFT JOIN orc2_01 B
+	  ON A.Data = B.Data
+	 AND A.Produto = B.Produto
+	 AND A.Canal = B.Canal;
+
+PROC SQL;
+  CREATE TABLE ORC_COMPLETO AS
+    SELECT
+	  A.Data,
+	  A.Produto,
+	  A.Canal,
+	  A.Seguro,
+	  COALESCE(B.QtdElegivel,A.QtdeContrato,0) AS QtdElegivel FORMAT=numx18.2,
+	  COALESCE(B.Qtde,A.Qtde,0) AS Qtde FORMAT=numx18.2,
+	  A.Premio FORMAT=numx18.2
+	FROM orcamento A
+	LEFT JOIN ORC_QTDE B
+	  ON A.Data = B.Data
+	  AND A.Produto = B.Produto
+	  AND A.Canal = B.Canal
+	  AND A.Seguro = B.Metrica;
+RUN;

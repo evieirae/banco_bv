@@ -1,0 +1,588 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__MONITORAMENTO_PREPAG_FULL_VALUATION_V1
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:19 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -77
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 450
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MSRM = /riscosbv/mercado/publico; PP_ORIG = /riscosbv/mercado/NII/PREPAGAMENTO/MONITORAMENTO/ORIGINAL; PP_SIMU = /riscosbv/mercado/NII/PREPAGAMENTO/MONITORAMENTO/SIMULADA; SAIDA = /riscosbv/mercado/NII/padronizado; WALID = /riscosbv/mercado/NII/walid
+DETECTED_MACROS_DEFINED: dtref
+DETECTED_MACROS_USED: dtref
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): PP_ORIG.EXPORTCASHFLOW_20250829 [SAS/Local], PP_SIMU.EXPORTCASHFLOW_20250829 [SAS/Local], WALID.CHOQUES_EVE [SAS/Local], WALID.CURVA_PRE_20250829 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CASHFLOW_TAXA_DU
+IMPORTED_LIBNAMES: PP_ORIG, PP_SIMU, WALID
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.CASHFLOW_FINAL, WORK.CASHFLOW_FINAL_AUX2, WORK.CASHFLOW_TAXA_DU, WORK.EXPORTCASHFLOW, WORK.VALIDABASEINICIO
+TABLE_READ_PROVENANCE (Flow): PP_ORIG.EXPORTCASHFLOW_20250829 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], PP_SIMU.EXPORTCASHFLOW_20250829 [DATA Step - SET; PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)], WALID.CHOQUES_EVE [PROC SQL - JOIN], WALID.CURVA_PRE_20250829 [PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)], WORK.CASHFLOW_FINAL [PROC SQL - FROM], WORK.CASHFLOW_FINAL_AUX2 [PROC SQL - FROM], WORK.CASHFLOW_TAXA_DU [PROC SQL - FROM], WORK.EXPORTCASHFLOW [PROC SQL - FROM], WORK.VALIDABASEINICIO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CASHFLOW_TAXA_DU, CASHFLOW_TAXA_DU_CHOQUE, CASHFLOW_VERTICE, VERTICES, VF_MTM_EVE, VF_MTM_EVE_CONSOLIDADO, WORK.CASHFLOW_AUX, WORK.CASHFLOW_AUX2, WORK.CASHFLOW_FINAL, WORK.CASHFLOW_FINAL_AUX, WORK.CASHFLOW_FINAL_AUX2, WORK.CASHFLOW_FINAL_MONITORAMENTO, WORK.CASHFLOW_MONITORAMENTO_RESUMO, WORK.EXPORTCASHFLOW, WORK.SAIDA_SIMUL, WORK.VALIDABASE, WORK.VALIDABASEINICIO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET dtref=20250829;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1 - GERAR ARQUIVO  */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1 - GERAR ARQUIVO  */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-zSJA4wcf7xwXlzW8/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let dtref= 20250829;
+
+
+libname msrm '/riscosbv/mercado/publico';
+libname walid '/riscosbv/mercado/NII/walid';
+libname PP_ORIG '/riscosbv/mercado/NII/PREPAGAMENTO/MONITORAMENTO/ORIGINAL';
+libname PP_SIMU '/riscosbv/mercado/NII/PREPAGAMENTO/MONITORAMENTO/SIMULADA';
+libname saida '/riscosbv/mercado/NII/padronizado';
+
+
+
+
+proc sql;
+create table work.ValidaBaseInicio as
+	select 	  t1.BUSINESS_DATE,
+	          t1.TIMESTEPS_KEEPSLASH,
+	          t1.'Grupo de Conciliacao'n,
+	          t1.'Tipo de Negociacao'n,
+	          t1.Veiculo,
+	          t1.'Produto Gerencial'n,
+	          t1.'Mesa Operacao'n,
+	          t1.'Carteira Gerencial'n,
+	          t1.'Book Gerencial'n,
+	          t1.'Modalidade SIC'n,
+	          t1.'Tipo Taxa'n,
+	          t1.SCENARIO_NAMES,
+	          
+	            (SUM(t1.CashFlow)) FORMAT=BEST19. AS SUM_of_CashFlowSIMU,
+	          
+	            (SUM(t2.CashFlow)) FORMAT=BEST19. AS SUM_of_CashFlowORIG,
+			Calculated SUM_of_CashFlowSIMU - Calculated SUM_of_CashFlowORIG as Dif_SIMU_ORIG
+from PP_ORIG.EXPORTCASHFLOW_&dtref. (where= ('Tipo Taxa'n = 'TIR')) as t1
+left join PP_SIMU.EXPORTCASHFLOW_&dtref. (where= (SCENARIO_NAMES = 'Base Scenario' and 'Tipo Taxa'n = 'TIR')) as t2
+	on
+	t1.BUSINESS_DATE = t2.BUSINESS_DATE and
+	t1.TIMESTEPS_KEEPSLASH = t2.TIMESTEPS_KEEPSLASH and
+	t1.'Grupo de Conciliacao'n = t2.'Grupo de Conciliacao'n and
+	t1.'Tipo de Negociacao'n = t2.'Tipo de Negociacao'n and
+	t1.Veiculo = t2.Veiculo and
+	t1.'Produto Gerencial'n = t2.'Produto Gerencial'n and
+	t1.'Mesa Operacao'n = t2.'Mesa Operacao'n and
+	t1.'Carteira Gerencial'n = t2.'Carteira Gerencial'n and
+	t1.'Book Gerencial'n = t2.'Book Gerencial'n and
+	t1.'Modalidade SIC'n = t2.'Modalidade SIC'n and
+	t1.'Tipo Taxa'n = t2.'Tipo Taxa'n
+	group by
+			  t1.BUSINESS_DATE,
+	          t1.TIMESTEPS_KEEPSLASH,
+	          t1.'Grupo de Conciliacao'n,
+	          t1.'Tipo de Negociacao'n,
+	          t1.Veiculo,
+	          t1.'Produto Gerencial'n,
+	          t1.'Mesa Operacao'n,
+	          t1.'Carteira Gerencial'n,
+	          t1.'Book Gerencial'n,
+	          t1.'Modalidade SIC'n,
+	          t1.'Tipo Taxa'n,
+	          t1.SCENARIO_NAMES;
+run;
+PROC SQL;
+   create table WORK.ValidaBase as
+   select distinct t1.'Modalidade SIC'n,
+
+          
+            (SUM(t1.SUM_of_CashFlowSIMU)) FORMAT=COMMAX19.2 as SUM_of_SUM_of_CashFlowSIMU,
+          
+            (SUM(t1.SUM_of_CashFlowORIG)) FORMAT=COMMAX19.2 as SUM_of_SUM_of_CashFlowORIG,
+          
+            (SUM(t1.Dif_SIMU_ORIG)) FORMAT=COMMAX19.2 as SUM_of_Dif_SIMU_ORIG
+      from WORK.ValidaBaseInicio t1
+      group by t1.'Modalidade SIC'n;
+
+
+QUIT;
+
+;
+data WORK.EXPORTCASHFLOW;
+	set  PP_SIMU.EXPORTCASHFLOW_&dtref.;
+
+	IF 'Book Gerencial'n = "37 - ACCRUAL PRE" and
+	  'Carteira Gerencial'n = "18 - PRE  FIXADO" and
+	  'Mesa Operacao'n = "2 - RENDA FIXA LOCAL CORP" then 'Mesa Operacao'n = '24 - BSM RENDA FIXA';
+	IF 'Book Gerencial'n = "37 - ACCRUAL PRE" and
+	  'Carteira Gerencial'n = "18 - PRE  FIXADO" then 'Carteira Gerencial'n = '141 - BSM POS';
+	IF  'Book Gerencial'n = "37 - ACCRUAL PRE"  then 'Book Gerencial'n = '37 - BSM OP COM INTERNACAO POS';
+
+	IF 'Book Gerencial'n = "540 - HA FINANCEIRA" and
+	  'Carteira Gerencial'n = "186 - VAREJO" and
+	  'Mesa Operacao'n = "2 - RENDA FIXA LOCAL CORP" then 'Mesa Operacao'n = '23 - ALM';
+
+	IF 'Produto Gerencial'n = "CESSAO_POS_3533" then 'Mesa Operacao'n = '23 - ALM';
+
+	IF 'Book Gerencial'n = "540 - HA FINANCEIRA" and
+	  'Carteira Gerencial'n = "186 - VAREJO" then 'Carteira Gerencial'n = '109 - VAREJO';
+
+	IF 'Produto Gerencial'n = "CESSAO_POS_3533" then 'Carteira Gerencial'n = "186 - VAREJO";
+
+WHERE 'Tipo Taxa'n = 'TIR'
+;
+run;
+
+
+proc sql;
+create table WORK.EXPORTCASHFLOW as
+select 	t1.BUSINESS_DATE,
+        t1.TIMESTEPS_KEEPSLASH,
+        t1.'Grupo de Conciliacao'n,
+        t1.'Tipo de Negociacao'n,
+        t1.Veiculo,
+        t1.'Produto Gerencial'n,
+        t1.'Mesa Operacao'n,
+        t1.'Carteira Gerencial'n,
+        t1.'Book Gerencial'n,
+        t1.'Modalidade SIC'n,
+        t1.'Tipo Taxa'n,
+		t1.SCENARIO_NAMES,
+		sum(t1.CashFlow) as CashFlow,
+		sum(t1.Interest_cashflow) as Interest_cashflow,
+		sum(t1.Principal_cashflow) as Principal_cashflow
+	  from WORK.EXPORTCASHFLOW as t1
+      group by t1.BUSINESS_DATE,
+               t1.TIMESTEPS_KEEPSLASH,
+               t1.'Grupo de Conciliacao'n,
+               t1.'Tipo de Negociacao'n,
+               t1.Veiculo,
+               t1.'Produto Gerencial'n,
+               t1.'Mesa Operacao'n,
+               t1.'Carteira Gerencial'n,
+               t1.'Book Gerencial'n,
+               t1.'Modalidade SIC'n,
+               t1.'Tipo Taxa'n,
+               t1.SCENARIO_NAMES
+;
+quit;
+
+;
+PROC SQL;
+   CREATE TABLE WORK.CASHFLOW_AUX AS
+   SELECT *
+      FROM WORK.EXPORTCASHFLOW t1
+	  WHERE t1.SCENARIO_NAMES = 'Base Scenario'
+;
+QUIT;
+
+
+PROC SQL;
+   CREATE TABLE WORK.CASHFLOW_AUX2 AS
+   SELECT 	*,
+   			t1.CashFlow as VF,
+   		  	t2.CashFlow as VF_Base
+      FROM WORK.EXPORTCASHFLOW t1 left join CASHFLOW_AUX t2
+		on 	  	t1.TIMESTEPS_KEEPSLASH = t2.TIMESTEPS_KEEPSLASH AND
+				t1.'Grupo de Conciliacao'n = t2.'Grupo de Conciliacao'n AND
+	          	t1.'Tipo de Negociacao'n = t2.'Tipo de Negociacao'n AND
+	          	t1.Veiculo = t2.Veiculo AND
+				t1.'Produto Gerencial'n = t2.'Produto Gerencial'n AND
+	          	t1.'Mesa Operacao'n = t2.'Mesa Operacao'n AND
+	          	t1.'Carteira Gerencial'n = t2.'Carteira Gerencial'n AND
+	          	t1.'Book Gerencial'n =  t2.'Book Gerencial'n AND
+	          	t1.'Modalidade SIC'n = t2.'Modalidade SIC'n AND
+	           	t1.'Tipo Taxa'n = t2.'Tipo Taxa'n
+;
+QUIT;
+
+
+proc sql;
+create table cashflow_taxa_du as
+select t1.*,
+       t2.*
+	from CASHFLOW_AUX2 as t1
+	left join walid.CURVA_PRE_&dtref. as t2
+	on t1.TIMESTEPS_KEEPSLASH = t2.Data
+	ORDER BY t1.TIMESTEPS_KEEPSLASH,
+			   t1.'Grupo de Conciliacao'n,
+               t1.'Tipo de Negociacao'n,
+               t1.Veiculo,
+               t1.'Produto Gerencial'n,
+               t1.'Mesa Operacao'n,
+               t1.'Carteira Gerencial'n,
+               t1.'Book Gerencial'n,
+               t1.'Modalidade SIC'n,
+               t1.'Tipo Taxa'n,
+               t1.SCENARIO_NAMES
+;
+quit;
+
+
+data vertices;
+	input vertice1 vertice2;
+	datalines;
+1 21
+21 42
+42 63
+63 126
+126 189
+189 252
+252 378
+378 504
+504 756
+756 1008
+1008 1260
+1260 1512
+1512 1764
+1764 2016
+2016 2268
+2268 2520
+2520 3780
+3780 5040
+5040 7560
+;
+run;
+
+
+proc sql;
+	create table CashFlow_vertice as
+	select 	t1.*,
+			t4.vertice1,
+			t4.vertice2,
+			(case	when t1.DU >= 7560 then 0
+					else (t4.vertice2 - t1.DU)/(t4.vertice2 - t4.vertice1)
+			end) as prop_vertice1,
+			(case	when t1.DU >= 7560 then t1.DU/7560
+					else (t1.DU - t4.vertice1)/(t4.vertice2 - t4.vertice1)
+			end) as prop_vertice2
+
+	from WORK.cashflow_taxa_du as t1
+	left join vertices as t4
+	on t1.DU >= t4.vertice1 and t1.DU < t4.vertice2
+	having t1.DU > 0;
+quit;
+
+
+proc sql;
+create table cashflow_taxa_du_choque as
+select t1.*,
+       t2.NmChoque,
+	   t2.Choque as ChoqueVertice1,
+	   t3.Choque as ChoqueVertice2,
+	   t2.Choque * t1.prop_vertice1 + t3.Choque * t1.prop_vertice2 as Choque_interpolado
+	from CashFlow_vertice as t1
+	left join walid.choques_EVE as t2
+	on t1.vertice1 = t2.DU
+	left join walid.choques_EVE as t3
+	on t1.vertice2 = t3.DU
+	AND t2.NmChoque = t3.NmChoque
+	ORDER BY t1.TIMESTEPS_KEEPSLASH,
+			   t1.'Grupo de Conciliacao'n,
+               t1.'Tipo de Negociacao'n,
+               t1.Veiculo,
+               t1.'Produto Gerencial'n,
+               t1.'Mesa Operacao'n,
+               t1.'Carteira Gerencial'n,
+               t1.'Book Gerencial'n,
+               t1.'Modalidade SIC'n,
+               t1.'Tipo Taxa'n,
+			   t1.VF,
+               t1.SCENARIO_NAMES
+;
+quit;
+
+
+
+proc sql;
+	create table VF_MtM_EVE as
+	select 	t1.*,
+			t1.VF_Base/(1+Taxa/100)**(DU/252) as MtM_Base, 
+			t1.VF/(1+Taxa/100)**(DU/252) as MtM_Choq_PREPAG, 
+			t1.VF - VF_Base as Delta_VF_VFBase, 
+			t1.VF/(1+Taxa/100+Choque_interpolado)**(DU/252) as MtM_Choq_EVE, 
+			Calculated MtM_Choq_EVE - Calculated MtM_Base as DeltaEVE, 
+			Calculated MtM_Choq_EVE - Calculated MtM_Choq_PREPAG as DeltaEVEChoq 
+
+	from cashflow_taxa_du_choque
+			(where = ('Book Gerencial'n not in ('37 - ACCRUAL PRE' , '564 - OVER 60'))) as t1
+;
+quit;
+
+
+proc sql;
+create table VF_MTM_EVE_Consolidado as
+select 	t1.BUSINESS_DATE,
+		t1.DU,
+        t1.'Grupo de Conciliacao'n,
+        t1.'Tipo de Negociacao'n,
+        t1.Veiculo,
+        t1.'Produto Gerencial'n,
+        t1.'Mesa Operacao'n,
+        t1.'Carteira Gerencial'n,
+        t1.'Book Gerencial'n,
+        t1.'Modalidade SIC'n,
+        t1.'Tipo Taxa'n,
+		t1.SCENARIO_NAMES,
+		t1.NmChoque,
+
+
+		sum(t1.VF) as VF,
+		sum(t1.VF_Base) as VF_Base,
+		sum(t1.MtM_Base) as MtM_Base,
+		sum(t1.MtM_Choq_PREPAG) as MtM_Choq_PREPAG,
+		sum(t1.Delta_VF_VFBase) as Delta_VF_VFBase,
+		sum(t1.MtM_Choq_EVE) as MtM_Choq_EVE,
+		sum(t1.DeltaEVE) as DeltaEVE,
+		sum(t1.DeltaEVEChoq) as DeltaEVEChoq
+	  from VF_MtM_EVE as t1
+      group by 	t1.BUSINESS_DATE,
+				t1.DU,
+		        t1.'Grupo de Conciliacao'n,
+		        t1.'Tipo de Negociacao'n,
+		        t1.Veiculo,
+		        t1.'Produto Gerencial'n,
+		        t1.'Mesa Operacao'n,
+		        t1.'Carteira Gerencial'n,
+		        t1.'Book Gerencial'n,
+		        t1.'Modalidade SIC'n,
+		        t1.'Tipo Taxa'n,
+				t1.SCENARIO_NAMES,
+				t1.NmChoque
+;
+quit;
+
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.CASHFLOW_Final_aux AS
+   SELECT *
+      FROM VF_MtM_EVE t1
+	  WHERE t1.SCENARIO_NAMES = 'Base Scenario';
+QUIT;
+
+
+PROC SQL;
+   CREATE TABLE WORK.CASHFLOW_Final_aux2 AS
+   SELECT t1.*,
+   			t2.DeltaEVE as DeltaEVE_Base
+      FROM VF_MtM_EVE t1 LEFT JOIN CASHFLOW_Final_aux T2
+		on 	t1.'Grupo de Conciliacao'n = t2.'Grupo de Conciliacao'n AND
+			t1.'Tipo de Negociacao'n = t2.'Tipo de Negociacao'n AND
+			t1.Veiculo = t2.Veiculo AND
+			t1.'Produto Gerencial'n = t2.'Produto Gerencial'n AND
+			t1.'Mesa Operacao'n = t2.'Mesa Operacao'n AND
+			t1.'Carteira Gerencial'n = t2.'Carteira Gerencial'n AND
+			t1.'Book Gerencial'n =  t2.'Book Gerencial'n AND
+			t1.'Modalidade SIC'n = t2.'Modalidade SIC'n AND
+			t1.'Tipo Taxa'n = t2.'Tipo Taxa'n AND
+			t1.NmChoque = t2.NmChoque AND
+			t1.TIMESTEPS_KEEPSLASH = t2.TIMESTEPS_KEEPSLASH
+;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.CASHFLOW_FINAL AS
+   SELECT 	*,
+   			DeltaEVE - DeltaEVE_Base as Dif_DeltaEVE,
+			(DeltaEVE - DeltaEVE_Base)/1000000000 as Dif_Perc_DeltaEVE,
+			DeltaEVEChoq - DeltaEVE_Base as Dif_DeltaEVE_Choq,
+			(DeltaEVEChoq - DeltaEVE_Base)/1000000000 as Dif_Perc_DeltaEVE_Choq
+   FROM WORK.CASHFLOW_Final_aux2
+;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.CASHFLOW_MONITORAMENTO_RESUMO AS
+   SELECT t1.BUSINESS_DATE,
+		  t1.SCENARIO_NAMES,
+          t1.NmChoque,
+		  
+            (SUM(t1.DeltaEVE)) AS SUM_of_DeltaEVE format= commax16.2,
+          
+            (SUM(t1.Dif_DeltaEVE)) AS SUM_of_Dif_DeltaEVE format= commax16.2,
+          
+            (SUM(t1.Dif_Perc_DeltaEVE)) AS SUM_of_Dif_Perc_DeltaEVE format= percentn8.2,
+
+          
+            (SUM(t1.Dif_DeltaEVE_Choq)) AS SUM_of_Dif_DeltaEVE_Choq format= commax16.2,
+          
+            (SUM(t1.Dif_Perc_DeltaEVE_Choq)) AS SUM_of_Dif_Perc_DeltaEVE_Choq format= percentn8.2
+
+      FROM WORK.CASHFLOW_FINAL t1
+      GROUP BY t1.BUSINESS_DATE,
+			   t1.SCENARIO_NAMES,
+               t1.NmChoque;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.CASHFLOW_FINAL_MONITORAMENTO AS
+   SELECT DISTINCT t1.BUSINESS_DATE,
+          t1.TIMESTEPS_KEEPSLASH,
+          t1.'Grupo de Conciliacao'n,
+          t1.'Tipo de Negociacao'n,
+          t1.Veiculo,
+          t1.'Produto Gerencial'n,
+          t1.'Mesa Operacao'n,
+          t1.'Carteira Gerencial'n,
+          t1.'Book Gerencial'n,
+          t1.'Modalidade SIC'n,
+          t1.'Tipo Taxa'n,
+          t1.SCENARIO_NAMES,
+          t1.CashFlow,
+          
+            (SUM(t1.Interest_cashflow)) AS SUM_of_Interest_cashflow,
+          
+            (SUM(t1.Principal_cashflow)) AS SUM_of_Principal_cashflow,
+          
+            (SUM(t1.VF)) AS SUM_of_VF,
+          
+            (SUM(t1.VF_Base)) AS SUM_of_VF_Base,
+          t1.DU,
+          
+            (SUM(t1.MtM_Base)) AS SUM_of_MtM_Base,
+          
+            (SUM(t1.MtM_Choq_PREPAG)) AS SUM_of_MtM_Choq_PREPAG,
+          
+            (SUM(t1.Delta_VF_VFBase)) AS SUM_of_Delta_VF_VFBase,
+          
+            (SUM(t1.MtM_Choq_EVE)) AS SUM_of_MtM_Choq_EVE,
+          
+            (SUM(t1.DeltaEVE)) AS SUM_of_DeltaEVE,
+          
+            (SUM(t1.DeltaEVEChoq)) AS SUM_of_DeltaEVEChoq,
+          
+            (SUM(t1.DeltaEVE_Base)) AS SUM_of_DeltaEVE_Base
+      FROM WORK.CASHFLOW_FINAL t1
+      GROUP BY t1.BUSINESS_DATE,
+               t1.TIMESTEPS_KEEPSLASH,
+               t1.'Grupo de Conciliacao'n,
+               t1.'Tipo de Negociacao'n,
+               t1.Veiculo,
+               t1.'Produto Gerencial'n,
+               t1.'Mesa Operacao'n,
+               t1.'Carteira Gerencial'n,
+               t1.'Book Gerencial'n,
+               t1.'Modalidade SIC'n,
+               t1.'Tipo Taxa'n,
+               t1.SCENARIO_NAMES,
+               t1.CashFlow,
+               t1.DU;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1 - GERAR ARQUIVO  */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 2 - EXPORT_SAIDA_SIMUL */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 18 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 2 - EXPORT_SAIDA_SIMUL */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-UtgGc2e2bF8Dtad8/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let dtref= 20250829;
+
+
+libname msrm '/riscosbv/mercado/publico';
+libname walid '/riscosbv/mercado/NII/walid';
+libname PP_ORIG '/riscosbv/mercado/NII/PREPAGAMENTO/MONITORAMENTO/ORIGINAL';
+libname PP_SIMU '/riscosbv/mercado/NII/PREPAGAMENTO/MONITORAMENTO/SIMULADA';
+libname saida '/riscosbv/mercado/NII/padronizado';
+
+;
+data WORK.EXPORTCASHFLOW;
+	set  PP_SIMU.EXPORTCASHFLOW_&dtref.;
+
+	IF 'Book Gerencial'n = "37 - ACCRUAL PRE" and
+	  'Carteira Gerencial'n = "18 - PRE  FIXADO" and
+	  'Mesa Operacao'n = "2 - RENDA FIXA LOCAL CORP" then 'Mesa Operacao'n = '24 - BSM RENDA FIXA';
+	IF 'Book Gerencial'n = "37 - ACCRUAL PRE" and
+	  'Carteira Gerencial'n = "18 - PRE  FIXADO" then 'Carteira Gerencial'n = '141 - BSM POS';
+	IF  'Book Gerencial'n = "37 - ACCRUAL PRE"  then 'Book Gerencial'n = '37 - BSM OP COM INTERNACAO POS';
+
+	IF 'Book Gerencial'n = "540 - HA FINANCEIRA" and
+	  'Carteira Gerencial'n = "186 - VAREJO" and
+	  'Mesa Operacao'n = "2 - RENDA FIXA LOCAL CORP" then 'Mesa Operacao'n = '23 - ALM';
+
+	IF 'Produto Gerencial'n = "CESSAO_POS_3533" then 'Mesa Operacao'n = '23 - ALM';
+
+	IF 'Book Gerencial'n = "540 - HA FINANCEIRA" and
+	  'Carteira Gerencial'n = "186 - VAREJO" then 'Carteira Gerencial'n = '109 - VAREJO';
+
+	IF 'Produto Gerencial'n = "CESSAO_POS_3533" then 'Carteira Gerencial'n = "186 - VAREJO";
+
+WHERE 'Tipo Taxa'n = 'TIR'
+;
+run;
+
+PROC SQL;
+   CREATE TABLE WORK.SAIDA_SIMUL AS
+   SELECT DISTINCT t1.BUSINESS_DATE,
+          t1.TIMESTEPS_KEEPSLASH,
+          t1.'Grupo de Conciliacao'n,
+          t1.'Tipo de Negociacao'n,
+          t1.Veiculo,
+          t1.'Produto Gerencial'n,
+          t1.'Mesa Operacao'n,
+          t1.'Carteira Gerencial'n,
+          t1.'Book Gerencial'n,
+          t1.'Modalidade SIC'n,
+          t1.'Tipo Taxa'n,
+          
+            (SUM(t1.CashFlow)) FORMAT=BEST19. AS SUM_of_CashFlow,
+          
+            (SUM(t1.Interest_cashflow)) FORMAT=BEST18. AS SUM_of_Interest_cashflow,
+          
+            (SUM(t1.Principal_cashflow)) FORMAT=BEST19. AS SUM_of_Principal_cashflow,
+          t1.SCENARIO_NAMES
+      FROM WORK.EXPORTCASHFLOW t1
+      GROUP BY t1.BUSINESS_DATE,
+               t1.TIMESTEPS_KEEPSLASH,
+               t1.'Grupo de Conciliacao'n,
+               t1.'Tipo de Negociacao'n,
+               t1.Veiculo,
+               t1.'Produto Gerencial'n,
+               t1.'Mesa Operacao'n,
+               t1.'Carteira Gerencial'n,
+               t1.'Book Gerencial'n,
+               t1.'Modalidade SIC'n,
+               t1.'Tipo Taxa'n,
+               t1.SCENARIO_NAMES;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 2 - EXPORT_SAIDA_SIMUL */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

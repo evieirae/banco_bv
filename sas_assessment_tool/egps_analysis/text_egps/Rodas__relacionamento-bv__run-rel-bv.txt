@@ -1,0 +1,268 @@
+START_METADATA
+PROJECT: Rodas__relacionamento-bv
+FILE_SAS: run-rel-bv.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 32)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 165
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: GRC = /infogrc; INFGER = /infogrc/relatorioexecutivo; QDV = /infogrc/qualidadevendas/; RISKS = /riscosbvf/plan_mesas/comp_total/
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /RISCOSBVF/BA/PROCESSOS/TMP/TBLIQUIDACAOANTECIPADA_3M.CSV [SAS/Local], BASES.TBEXTLIQUIDACAO [SAS/Local], RISKS.BASEUNICARODAS_2020 [SAS/Local], RISKS.BASEUNICARODAS_2021 [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_FINAL, WORK.BASE_TBORIGINACAO, WORK.BASE_TBPRODUCAO, WORK.BASE_TESTE, WORK.BASE_TESTE_TESTE, WORK.DADOS_CLIENTE, WORK.TBLIQUIDACAOANTECIPADA_3M
+IMPORTED_LIBNAMES: RISKS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/TbLiquidacaoAntecipada_3M.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_FINAL, WORK.BASE_TBORIGINACAO, WORK.BASE_TBPRODUCAO, WORK.BASE_TESTE, WORK.BASE_TESTE_TESTE, WORK.DADOS_CLIENTE, WORK.DADOS_CLIENTE_2, WORK.TBLIQUIDACAOANTECIPADA_3M
+TABLE_READ_PROVENANCE (Flow): BASES.TBEXTLIQUIDACAO [PROC SQL - JOIN], RISKS.BASEUNICARODAS_2020 [DATA Step - SET], RISKS.BASEUNICARODAS_2021 [DATA Step - SET], TMP.TBORIGINACAO [DATA Step - SET], TMP.TBPRODUCAO [DATA Step - SET], WORK.BASE_FINAL [DATA Step - SET], WORK.BASE_TBORIGINACAO [PROC SQL - FROM; PROC SQL - JOIN], WORK.BASE_TBPRODUCAO [PROC SQL - JOIN], WORK.BASE_TESTE [PROC SORT - DATA=], WORK.BASE_TESTE_TESTE [PROC SQL - FROM], WORK.DADOS_CLIENTE [PROC SORT - DATA=], WORK.DADOS_CLIENTE_2 [PROC SQL - JOIN], WORK.TBLIQUIDACAOANTECIPADA_3M [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/libname.sas, /riscosbvf/BA/processos/tmp/TbLiquidacaoAntecipada_3M.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RISKS.BASEUNICARODAS_2020, RISKS.BASEUNICARODAS_2021
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_FINAL, BASE_FINAL_01, BASE_PROD_LIQ, BASE_TBORIGINACAO, BASE_TBPRODUCAO, BASE_TESTE, BASE_TESTE_TESTE, DADOS_CLIENTE, TBLIQUIDACAOANTECIPADA_3M, TBLIQUIDACAOANTECIPADA_3M_2, WORK.DADOS_CLIENTE_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/TbLiquidacaoAntecipada_3M.csv
+
+END_METADATA
+================================================================================
+options validvarname=any;
+options nofmterr;
+
+option compress = binary;
+%include '/infogrc/utils/libname.sas';
+LIBNAME INFGER '/infogrc/relatorioexecutivo';
+LIBNAME QDV '/infogrc/qualidadevendas/';
+
+libname grc '/infogrc';
+LIBNAME RISKS '/riscosbvf/plan_mesas/comp_total/';
+
+/*******************/
+/*DADOS DE PRODUÇÃO*/
+/*******************/
+
+DATA Base_TbProducao;
+SET tmp.TbProducao;
+WHERE NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados')
+	AND NuAnoMes >= 201807
+/*	and nucpfcnpj = '33099184837'*/
+/*	AND NUCPFCNPJ in ('00023778105','02917847808','75685175272','15454469890')
+	and nucpfcnpj in ('00103914447', '00006934480', '1253346569','1255881860','1259132811','1263742874','1263886604','1264086105','1274255198','1296185435','1300426764','1305488555','1307474675','1310475237','1320537480','1331985617','1341198600')*/
+;RUN;
+
+DATA Base_TbOriginacao;
+SET tmp.TbOriginacao;
+WHERE NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos', 'CVG Leves', 'CVG Pesados')
+	AND NuAnoMes >= 201807
+/*	and nucpfcnpj = '33099184837'*/
+/*AND NUCPFCNPJ in ('00023778105','02917847808','75685175272','15454469890')*/
+/*	and nucpfcnpj in ('00103914447', '00006934480', '1253346569','1255881860','1259132811','1263742874','1263886604','1264086105','1274255198','1296185435','1300426764','1305488555','1307474675','1310475237','1320537480','1331985617','1341198600')*/
+;RUN;
+
+PROC SQL;
+CREATE TABLE Base_Prod_Liq AS
+SELECT
+
+a.NuCpfCnpj,
+A.NuProposta,
+A.nuanomes,
+A.DtEntradaProposta,
+A.NuContratoGestao AS NuContrato,
+C.DtContrato,
+a.NmGrupoProdutoMeta,
+a.CdMarca,
+a.CdModelo,
+a.AaModelo,
+a.AaFabricacao,
+B.TpLiquidacao,
+B.QtParcelas,
+B.QtParcelaAntecipada,
+A.StProposta,
+A.FlBancoBrasil,
+A.FlBradesco,
+A.FlItau,
+A.FlPan,
+A.FlSafra,
+A.FlSantander,
+A.FlMontadoras,
+A.FlOutros,
+A.FlConcorrente,
+
+case when B.NUANOMES=. then a.nuanomes else B.NUANOMES end AS NuAnoMes_Liquidado,
+B.NUCONTRATO AS NUCONTRATO_LIQ,
+case when B.NUANOMES=. then a.nuanomes else B.NUANOMES+3 end as NUANOMES_LIQUIDADO_3M,
+B.TpLiquidacao AS TpLiquidacao,
+B.DtLiquidacaoEfetiva,
+
+CASE WHEN A.NuProposta <> . THEN 1 ELSE 0 END AS FL_PROPOSTA,
+CASE WHEN A.NuContratoGestao <> . THEN 1 ELSE 0 END AS FL_CONTRATO,
+CASE WHEN B.NUCONTRATO = A.NuContratoGestao AND B.DtLiquidacaoEfetiva <> . THEN 1 ELSE 0 END AS FL_LIQUIDADO
+
+FROM WORK.Base_TbOriginacao A
+
+LEFT JOIN bases.TBEXTLIQUIDACAO B ON B.NUCONTRATO = A.NuContratoGestao
+LEFT JOIN WORK.BASE_TBPRODUCAO C ON C.NUCONTRATO = A.NuContratoGestao
+
+/*where a.nucpfcnpj = '33099184837'*/
+
+order by 1,3
+
+;RUN;
+
+proc sql;
+create table Base_Final as
+select distinct
+Pliq.*
+,case when Ori.nuanomes<>. and Ori.NuContratoGestao <> . then 'Sim' else 'Não' end as FlaRelacionamentoBV
+,case when Ori.nuanomes<>. and Ori.NuContratoGestao <> . then 1 else 0 end as FlaRelacionamentoBV_2
+
+,case when Ori.nuanomes<>. and Ori.FlConcorrente= 1 and calculated FlaRelacionamentoBV_2 = 0 then 'Sim' else 'Não' end as FlaRelacionamentoMercado
+,case when Ori.nuanomes<>. and Ori.FlConcorrente= 1 and calculated FlaRelacionamentoBV_2 = 0 then 1 else 0 end as FlaRelacionamentoMercado_2
+
+,case when Ori.nuanomes<>. and Ori.FlConcorrente= 0 and calculated FlaRelacionamentoBV_2 = 0 and calculated FlaRelacionamentoMercado_2 = 0 then 'Sim' else 'Não' end as FlaRelacionamentoSemBvMerado
+,case when Ori.nuanomes<>. and Ori.FlConcorrente= 0 and calculated FlaRelacionamentoBV_2 = 0 and calculated FlaRelacionamentoMercado_2 = 0 then 1 else 0 end as FlaRelacionamentoSemBvMerado_2
+
+from Base_Prod_Liq Pliq
+
+left join Base_TbOriginacao Ori on Ori.nucpfcnpj = Pliq.nucpfcnpj
+and Ori.nuanomes between Pliq.NuAnoMes_Liquidado and Pliq.NuAnoMes_Liquidado+3
+
+where FL_LIQUIDADO=1 /*and Pliq.nucpfcnpj = '00008993483'*/
+
+order by Pliq.NuAnoMes_Liquidado, Pliq.NuCpfCnpj, CALCULATED FlaRelacionamentoBV_2 DESC, CALCULATED FlaRelacionamentoMercado_2 DESC, CALCULATED FlaRelacionamentoSemBvMerado_2 DESC
+;run;
+
+data base_teste;
+set work.Base_Final;
+/*where nucpfcnpj = '00074605623';*/
+;run;
+
+PROC SORT DATA=WORK.BASE_TESTE OUT=BASE_TESTE_TESTE NODUPKEY;BY NuAnoMes_Liquidado NuCpfCnpj ;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_FINAL_01 AS
+SELECT DISTINCT
+
+NUCPFCNPJ,
+NuAnoMes_Liquidado,
+
+FlaRelacionamentoBV,
+FlaRelacionamentoBV_2,
+FlaRelacionamentoMercado,
+FlaRelacionamentoMercado_2,
+FlaRelacionamentoSemBvMerado,
+FlaRelacionamentoSemBvMerado_2
+
+FROM WORK.BASE_TESTE_TESTE A
+
+/*WHERE A.NUCPFCNPJ = '03025516038' and a.NuAnoMes_Liquidado = 202107*/
+
+ORDER BY 1
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbLiquidacaoAntecipada_3M as
+SELECT
+
+B.DtAtualizacao as DtAtualizacaoProducao,
+A.*,
+B.*,
+/*D.*,*/
+
+C.VrPropostaOriginada as VrLiberadoOrig,
+C.VrPDD as VrPerdaEsperadaOrig,
+C.VrFinanciamento as VrFinanciamentoOrig,
+C.VpSpread as VpSpreadOrig,
+C.VpTxGerencial as VpTxGerencialOrig,
+C.VpTirContabil as VpTirContabilOrig,
+C.FlTxAlterada as QtTxAlteradaOrig,
+C.VpIdade as VpIdadeOrig,
+C.VpPrazo as VpPrazoOrig,
+C.VpEntrada as VpEntradaOrig,
+C.VpScore as VpScoreOrig,
+C.VrLiberadoProjetado as VrLiberadoProjetadoOrig
+
+FROM WORK.BASE_TESTE_TESTE A
+
+LEFT JOIN WORK.BASE_TBPRODUCAO B ON B.NUCONTRATO = A.NUCONTRATO
+LEFT JOIN WORK.BASE_TBORIGINACAO C ON C.NuContratoGestao = A.NUCONTRATO
+/*LEFT JOIN FI_PRODT.TBDBMKUNIFICADA D ON D.NUCPFCNPJ = A.NUCPFCNPJ*/
+
+;RUN;
+
+DATA DADOS_CLIENTE;
+SET RISKS.BASEUNICARODAS_2020 - RISKS.BASEUNICARODAS_2021;
+;RUN;
+
+PROC SORT DATA=WORK.DADOS_CLIENTE OUT=WORK.DADOS_CLIENTE_2 NODUPKEY;BY nucpfcnpj;RUN;
+
+PROC SQL;
+CREATE TABLE TbLiquidacaoAntecipada_3M_2 AS
+SELECT
+
+B.UF_Cliente,
+B.dstipoprofissional,
+B.QtAnosIdadePessoa,
+B.DsEstadoCivil,
+B.cdsexo,
+B.dtnascimento,
+B.Tipo_Cliente,
+B.Renda,
+
+CASE
+	WHEN B.Renda > 0 AND B.Renda <= 3000 THEN '0-3mil'
+	WHEN B.Renda > 3000 AND B.Renda <= 6000 THEN '3-6mil'
+	WHEN B.Renda > 6000 AND B.Renda <= 9000 THEN '6-9mil'
+	WHEN B.Renda > 9000 AND B.Renda <= 12000 THEN '9-12mil'
+	WHEN B.Renda > 12000 AND B.Renda <= 15000 THEN '12-15mil'
+	WHEN B.Renda > 15000 THEN '> 15Mil'
+
+else 'demais'
+end as Fx_renda,
+
+A.*
+
+FROM WORK.TbLiquidacaoAntecipada_3M A
+
+LEFT JOIN WORK.DADOS_CLIENTE_2 B ON B.NUCPFCNPJ = A.NUCPFCNPJ
+
+;RUN;
+
+filename exprt '/riscosbvf/BA/processos/tmp/TbLiquidacaoAntecipada_3M.csv' encoding="utf-8";
+
+proc export
+data=TbLiquidacaoAntecipada_3M_2
+outfile=exprt replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/*proc contents data=TMP.TBPOTENCIALRODAS details ;run;*/
+
+X 'mv /riscosbvf/BA/processos/tmp/TbLiquidacaoAntecipada_3M.csv /riscosbvf/BA/processos/output/';

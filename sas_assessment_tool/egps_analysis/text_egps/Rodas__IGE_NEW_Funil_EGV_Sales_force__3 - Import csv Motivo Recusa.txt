@@ -1,0 +1,139 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 3 - Import csv Motivo Recusa.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 50)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -27
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40), INFILE  (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 84
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/IGE_NEW/EGV/FUNIL_SALES_FORCE_CN/CSV_SALESFORCE/MOTIVORECUSA.CSV [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/MotivoRecusa.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/MotivoRecusa.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: COMERCIAL, CONTA, DA, DE, FECHAMENTO, ID, LEAD, MOTIVO, NOME, OPORTUNIDADE, ORIGEM, PERDA, WORK.MOTIVORECUSA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/MotivoRecusa.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	3 - Import csv Motivo Recusa.sas														| */
+/* | Descricao: Programa para importar arquivo dos motvios de recusa dos atendimentos realizados pelos GRs via salesforce canal de négocios egv.					| */
+/* |		Arquivo extraído manualmente de:						| */
+/* |	 https://bancobv.lightning.force.com/lightning/r/Report/00OTT000007Nzd32AC/view?queryScope=userFoldersCreatedByMe		| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de MOTIVOS DE RECUSAS atualizada=========================*/
+/* ======================================================================================*/
+
+DATA WORK.MotivoRecusa;
+    LENGTH
+        Fase             $ 43
+        'Data de fechamento'n   8
+        'Data de criação'n   8
+        'Origem do lead'n $ 7
+        'CPF/CNPJ'n        8
+        'Nome do Cliente/Grupo comercial'n $ 40
+        'Lead/Conta'n    $ 1
+        Telefone         $ 17
+        'ID da oportunidade'n $ 15
+        'ID da conta'n   $ 15
+        'Motivo da perda'n $ 55
+        'Comentários'n   $ 1 ;
+    DROP
+        Telefone_000 ;
+    FORMAT
+        Fase             $CHAR43.
+        'Data de fechamento'n DDMMYY10.
+        'Data de criação'n DDMMYY10.
+        'Origem do lead'n $CHAR7.
+        'CPF/CNPJ'n      BEST11.
+        'Nome do Cliente/Grupo comercial'n $CHAR40.
+        'Lead/Conta'n    $CHAR1.
+        Telefone         $CHAR17.
+        'ID da oportunidade'n $CHAR15.
+        'ID da conta'n   $CHAR15.
+        'Motivo da perda'n $CHAR55.
+        'Comentários'n   $CHAR1. ;
+    INFORMAT
+        Fase             $CHAR43.
+        'Data de fechamento'n DDMMYY10.
+        'Data de criação'n DDMMYY10.
+        'Origem do lead'n $CHAR7.
+        'CPF/CNPJ'n      BEST11.
+        'Nome do Cliente/Grupo comercial'n $CHAR40.
+        'Lead/Conta'n    $CHAR1.
+        Telefone         $CHAR17.
+        'ID da oportunidade'n $CHAR15.
+        'ID da conta'n   $CHAR15.
+        'Motivo da perda'n $CHAR55.
+        'Comentários'n   $CHAR1. ;
+    INFILE '/infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/MotivoRecusa.csv'
+	FIRSTOBS=2
+        LRECL=2000
+        ENCODING="LATIN1"
+        /*TERMSTR=CRLF*/
+        DLM=';'
+        MISSOVER
+        DSD ;
+    INPUT
+        Fase             : $CHAR43.
+        'Data de fechamento'n : ?? DDMMYY10.
+        'Data de criação'n : ?? DDMMYY10.
+        'Origem do lead'n : $CHAR7.
+        'CPF/CNPJ'n      : ?? BEST11.
+        'Nome do Cliente/Grupo comercial'n : $CHAR40.
+        'Lead/Conta'n    : $CHAR1.
+        Telefone_000     : $1.
+        Telefone         : $CHAR17.
+        'ID da oportunidade'n : $CHAR15.
+        'ID da conta'n   : $CHAR15.
+        'Motivo da perda'n : $CHAR55.
+        'Comentários'n   : $CHAR1. ;
+RUN;

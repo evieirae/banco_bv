@@ -1,0 +1,95 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_Atualiza_Base_SaidaDeRisco
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:12 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 37
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CONTATOS = /riscosbv/cobranca/rribeiro/contatos
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CONTATOS
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\Gestao_de_Carteira_Ferramentas\Gestao_de_ferramentas\071 - Cobrança Digital\Trilha Oferta Reneg\00.Bases\base_comunicacao.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.base_comunicacao <- N:\DVMD\Cobrança\Gestao_de_Carteira_Ferramentas\Gestao_de_ferramentas\071 - Cobrança Digital\Trilha Oferta Reneg\00.Bases\base_comunicacao.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_COMUNICACAO
+TABLE_READ_PROVENANCE (Flow): WORK.BASE_COMUNICACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CONTATOS.AUX_SAIDADERISCO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.BASE_COMUNICACAO;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\Gestao_de_Carteira_Ferramentas\Gestao_de_ferramentas\071 - Cobrança Digital\Trilha Oferta Reneg\00.Bases\base_comunicacao.csv|N:/DVMD/COBRANÇA/GESTAO_DE_CARTEIRA_FERRAMENTAS/GESTAO_DE_FERRAMENTAS/071 - COBRANÇA DIGITAL/TRILHA OFERTA RENEG/00.BASES|BASE_COMUNICACAO.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00_Map_LIB */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-pBUkq1xjCakg9UBi/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CONTATOS '/riscosbv/cobranca/rribeiro/contatos';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00_Map_LIB */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01_DB_SaidaDeRisco */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01_DB_SaidaDeRisco */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-rsYgQiosnGbEqTWt/code.sas */
+/* =========================INÍCIO TASK========================= */
+Options Reuse=yes Compress=binary;
+
+PROC SQL;
+CREATE TABLE CONTATOS.AUX_SAIDADERISCO AS
+SELECT DISTINCT
+  TODAY() Format = yymmdd10. AS DT_REF
+, A.*
+, Case When Length(Compress(Put(Input(A.cd_cpf_cnpj,best14.),14.))) <=11 Then Put(Input(A.cd_cpf_cnpj,best14.),z11.) Else Put(Input(A.cd_cpf_cnpj,best14.),z14.) End As NuCPFCNPJ
+, CASE When A.vr_nova_tx_juros < A.tx_pactuada_conc THEN 1 ELSE 0 END AS Flag_ReducTaxa
+FROM WORK.BASE_COMUNICACAO AS A
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01_DB_SaidaDeRisco */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

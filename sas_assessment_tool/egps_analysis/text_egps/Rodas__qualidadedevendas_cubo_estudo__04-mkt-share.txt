@@ -1,0 +1,85 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_cubo_estudo
+FILE_SAS: 04-mkt-share.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 32
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SafraXM
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): RELEXC.TBMARKETSHAREDIARIAABERTA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): RELEXC.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: MARKETSHARE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+  CREATE TABLE MarketShare AS
+    SELECT
+      'Market Share' AS TpDados,
+      DtAtualizacao AS DtAtualizacaoMktShare FORMAT=mmddyy10.,
+      INPUT(PUT(DtGravame,8.), yymmdd8.) AS DtReferencia FORMAT=mmddyy10.,
+      INPUT(PUT(DtGravame,8.), yymmdd8.) AS DtGravame2 FORMAT=mmddyy10.,
+      NuAnoMes,
+      TpVeiculo AS NmGrupoProdutoMeta,
+      Filial AS NmAreaEstruturaComercial,
+      Regional AS NmSubEstruturaComercialA,
+      FxPrazo AS FxParcela,
+      Fl_Esg AS Combustivel,
+      CASE WHEN DsSUV = 'Não SUV' THEN 'N' ELSE 'S' END AS DsMolicarConfiguracao,
+      CASE WHEN StVeiculo = 'Novos' THEN 'ZeroKM'
+           WHEN FxIdade = 'Acima 10 anos' THEN 'Acima de 10 anos'
+           ELSE FxIdade END AS FxIdade,
+      CASE WHEN Bancos = 'BV' THEN 'BV' ELSE 'Mercado' END AS Bancos,
+      SUM(GravTotal) AS Qtd
+    FROM
+      RELEXC.TbMarketShareDiariaAberta
+    WHERE
+      TpArquivo = 'mf'
+      AND NuAnoMes >= &SafraXM.
+      AND AjusteManual = 'N'
+    GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13;
+RUN;
+
+PROC SQL; CREATE INDEX NuAnoMes ON MarketShare; QUIT;
+PROC SQL; CREATE INDEX NmGrupoProdutoMeta ON MarketShare; QUIT;
+
+PROC SQL;
+SELECT MAX(DtAtualizacaoMktShare) INTO :DtMkt FROM MarketShare;
+RUN;

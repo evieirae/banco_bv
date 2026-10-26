@@ -1,0 +1,556 @@
+START_METADATA
+PROJECT: Rodas__monitor-tc
+FILE_SAS: 02-isencaotc.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 423
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SAFRA
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CLIE_CRM.TBCLIENTEBVRELACIONAMENTO [BIGQUERY], CDCCG.TBCONTRATO [DBCON], CDCCG.TBCONTRATOFINANCEIRO [DBCON], CONVSIMU.TBSIMULACOES [SAS/Local], DBA.TBPESSOASOBANALISE [DBCON], DBA.TBPROPOSTA [DBCON], DWBI_DTWH.TBCONTACARTAO [DBCON], DWBI_DTWH.TBPESSOA [DBCON], DWBI_DTWH.TBPROPOSTA [DBCON], DWBI_DTWH.TBPROPOSTAFINANCEIRO [DBCON], DWBI_DTWH.TBVIGENCIAESTADOCONTACRTO [DBCON], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CLIE_CRM.TBCLIENTEBVRELACIONAMENTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], CDCCG.TBCONTRATO [Pass-Through Native (DBCON) - FROM], CDCCG.TBCONTRATOFINANCEIRO [Pass-Through Native (DBCON) - JOIN], CONVSIMU.TBSIMULACOES [PROC SQL - FROM], DBA.TBPESSOASOBANALISE [Pass-Through Native (DBCON) - FROM], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBCONTACARTAO [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBPESSOA [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBPROPOSTAFINANCEIRO [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBVIGENCIAESTADOCONTACRTO [Pass-Through Native (DBCON) - JOIN], TMP.TBPRODUCAO [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ALERTA_PAGAMENTO, BASE_CLIENTES_ATIVOS, BASE_CLIENTES_ATIVOS_00, BASE_CLIENTES_ATIVOS_2, BASE_CLIENTES_ATIVOS_3, BASE_DATA_3, BASE_LA, BASE_LA_LIMPA, BASE_OCORRENCIAS, BASE_OCORRENCIAS_PRE, CLIENTEBVBQ, CONTA_CARTAO, CONTRATOS_CLIENTEBV, CONTRATOS_CLIENTEBV_SUM, CONTRATOS_CLIENTES_CONTACARTAO, DEMAIS_CTOS, DEMAIS_CTOS_00, DEMAIS_CTOS_02, DEMAIS_CTOS_1, DEMAIS_CTOS_NEG, PROPOSTAS_ISENCAO_TC, PROPOSTAS_ISENCAO_TC_FINAL, PROPOSTAS_ISENCAO_TC_VTESTE_00, TBDTREFSIM, VALIDACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*MONITORAMENTO DE CLIENTES E STATUS DE TC*/
+
+PROC SQL;
+%CONECTADB(SERVER=PTA);
+CREATE TABLE BASE_CLIENTES_ATIVOS AS
+SELECT * FROM CONNECTION TO DBCON
+(
+SELECT
+A.NUPROPOSTA,
+A.NUCPFCNPJ,
+A.FLCLIENTEATIVO,
+B.DTENTRADAPROPOSTA
+/*C.NUCONTRATO,*/
+/*C.DTCONTRATO*/
+
+FROM DBA.TbPessoaSobAnalise as a
+LEFT JOIN DBA.TbProposta as b
+on a.nuproposta = b.nuproposta
+/*LEFT JOIN CDCCG.TBCONTRATO AS C*/
+/*ON A.NUCPFCNPJ = C.NUCPFCNPJ*/
+/*LEFT JOIN CDCCG.TBCONTRATOFINANCEIRO AS D*/
+/*ON C.NUCONTRATO = D.NUCONTRATO*/
+
+where b.dtentradaproposta>='20220101'
+/*AND C.NUCONTRATO IS NOT NULL*/
+
+)
+;RUN;
+
+PROC SORT DATA= BASE_CLIENTES_ATIVOS DUPOUT=DUPLO OUT=BASE_CLIENTES_ATIVOS_00 NODUPKEY;
+BY
+NUPROPOSTA
+DTENTRADAPROPOSTA
+NUCPFCNPJ
+;RUN;
+
+/*ADICIONANDO O NUMERO DO CONTRATO*/
+
+PROC SQL;
+CREATE TABLE BASE_CLIENTES_ATIVOS_2 AS SELECT
+A.*
+,B.NUCONTRATO
+,B.DTCONTRATO
+,B.NMGRUPOPRODUTOMETA
+FROM BASE_CLIENTES_ATIVOS_00 AS A
+RIGHT JOIN TMP.TBPRODUCAO AS B
+ON A.NUPROPOSTA = B.NUPROPOSTA
+AND A.NUCPFCNPJ = B.NUCPFCNPJ
+
+WHERE B.DTENTRADAPROPOSTA>='01JAN2022'D
+;RUN;
+
+PROC SORT DATA=BASE_CLIENTES_ATIVOS_2 DUPOUT=DUPLI OUT=BASE_CLIENTES_ATIVOS NODUPKEY;
+BY
+NUCPFCNPJ
+NUPROPOSTA
+DTENTRADAPROPOSTA
+NuContrato
+DtContrato
+;RUN;
+
+/*PEGANDO OS DEMAIS CONTRATOS NA TBPRODUCAO*/
+PROC SQL;
+CREATE TABLE DEMAIS_CTOS AS SELECT
+A.NUANOMES
+,A.NUCONTRATO
+,A.NUCPFCNPJ
+,A.NMGRUPOPRODUTOMETA
+,A.DTCONTRATO
+,A.DtLiquidacaoEfetiva
+,A.DtCancelamento
+,B.DTCONTRATO AS ULTIMO_CTO
+,CASE WHEN A.DtCancelamento=. AND A.DtLiquidacaoEfetiva=. THEN 'S'
+	   WHEN A.DtLiquidacaoEfetiva>B.DTCONTRATO THEN 'S'
+	   WHEN A.DtCancelamento>B.DTCONTRATO THEN 'S'
+ELSE 'N' END AS Fl_ativo
+
+FROM TMP.TBPRODUCAO AS A
+LEFT JOIN BASE_CLIENTES_ATIVOS AS B
+ON A.NUCPFCNPJ = B.NUCPFCNPJ
+AND A.NUCONTRATO NE B.NUCONTRATO
+
+WHERE A.DTCONTRATO <= B.DTCONTRATO
+ORDER BY A.NUCPFCNPJ,A.DTCONTRATO DESC
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE DEMAIS_CTOS_00 AS SELECT * FROM DEMAIS_CTOS
+WHERE Fl_ativo='S'
+;RUN;
+
+PROC SORT DATA=DEMAIS_CTOS_00 DUPOUT=DUPLI OUT=DEMAIS_CTOS_1 NODUPKEY;
+BY
+NUCPFCNPJ
+;RUN;
+
+/*DOUBLE CHECK NEGADOS*/
+PROC SQL;
+CREATE TABLE DEMAIS_CTOS_02 AS SELECT
+*
+,COUNT(NUCPFCNPJ) AS QT_CLIENTE
+FROM DEMAIS_CTOS
+GROUP BY NUCPFCNPJ
+HAVING Fl_ativo='N'
+AND QT_CLIENTE=1
+
+;RUN;
+
+PROC SORT DATA=DEMAIS_CTOS_02 DUPOUT=DUPLI OUT=DEMAIS_CTOS_NEG NODUPKEY;
+BY
+NUCPFCNPJ
+;RUN;
+
+/*ENRIQUECENDO MARCACAO DE CLIENTE ATIVO*/
+PROC SQL;
+CREATE TABLE BASE_CLIENTES_ATIVOS_3 AS SELECT
+A.*
+,B.Fl_ativo
+,C.Fl_ativo AS Fl_ativo_NEG
+,COALESCE(B.Fl_ativo,C.Fl_ativo,A.FLCLIENTEATIVO) AS FL_ATIVO_2
+
+FROM BASE_CLIENTES_ATIVOS AS A
+LEFT JOIN DEMAIS_CTOS_1 AS B
+
+ON A.NUCPFCNPJ = B.NUCPFCNPJ
+AND A.DTCONTRATO = B.ULTIMO_CTO
+
+LEFT JOIN DEMAIS_CTOS_NEG AS C
+ON A.NUCPFCNPJ = C.NUCPFCNPJ
+AND A.DTCONTRATO = C.ULTIMO_CTO
+
+;RUN;
+
+PROC SORT DATA=BASE_CLIENTES_ATIVOS_3 DUPOUT=DUPLI OUT=BASE_CLIENTES_ATIVOS NODUPKEY;
+BY
+NUCPFCNPJ
+NUPROPOSTA
+DTENTRADAPROPOSTA
+NuContrato
+DtContrato
+;RUN;
+
+/*BASE COM STATUS DE TC*/
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table Propostas_Isencao_TC as
+select * from connection to dbcon
+(
+SELECT
+year(B.DTENTRADAPROPOSTA)*100 + month(B.DTENTRADAPROPOSTA) as NuAnoMes,
+B.NuPropostaOrigem as Nuproposta,
+B.DTENTRADAPROPOSTA ,
+a.FLISENCAOTAXACADASTRO
+,CASE WHEN B.CDSUBPRODUTO IN (26,39,6,8,19,25,55) THEN 'Leves'
+      WHEN B.CDSUBPRODUTO IN (10,42,54,61,9,22,23,62,63) THEN 'Motos'
+	  WHEN B.CDSUBPRODUTO IN (24,27,38,53,37,40,58) THEN 'Pesados'
+	  WHEN B.CDSUBPRODUTO IN (28) THEN 'Privado'
+	  WHEN B.CDSUBPRODUTO IN (2,3,4,5,17,34,35,18,41) THEN 'CP'
+	  WHEN B.CDSUBPRODUTO IN (52,57) THEN 'CVG Leves'
+	  WHEN B.CDSUBPRODUTO IN (21,60) THEN 'CVG Pesados'
+      ELSE 'OUTROS' END AS PRODUTO
+
+FROM DWBI_DTWH.TBPROPOSTAFINANCEIRO AS A
+
+INNER JOIN DWBI_DTWH.TBPROPOSTA AS B
+
+ON A.CDPROPOSTA = B.CDPROPOSTA
+
+WHERE B.DTENTRADAPROPOSTA>='20220101'
+/*YEAR(B.DTENTRADAPROPOSTA)=2021*/ /*AND MONTH(B.DTENTRADAPROPOSTA)=06*/
+
+/*HAVING PRODUTO <> 'OUTROS'*/
+
+)
+;RUN;
+Proc sort data= Propostas_Isencao_TC dupout=dupli out=Propostas_Isencao_TC nodupkey;
+By
+Nuproposta
+dtentradaproposta
+;run;
+
+/* GERA BASE CONTA/CARTAO */
+PROC SQL;
+%CONECTADB(SERVER=BI);
+
+CREATE TABLE CONTA_CARTAO AS
+SELECT *
+FROM CONNECTION TO DBCON
+(
+SELECT
+
+A.NUCPFCNPJ,
+1 AS FLAG_CONTA,
+VECC.CDESTADOCONTACARTAO,
+DATE(VECC.DTINCOVGNCAESTDOCNTACRTO) AS DTINCOVGNCAESTDOCNTACRTO ,
+DATE(VECC.DTFIMVGNCAESTDOCNTACRTO) AS DTFIMVGNCAESTDOCNTACRTO
+
+FROM DWBI_DTWH.TBCONTACARTAO TCC
+
+INNER JOIN DWBI_DTWH.TBPESSOA A
+ON TCC.CDPESSOATITULARCONTA = A.CDPESSOA
+
+INNER JOIN DWBI_DTWH.TBVIGENCIAESTADOCONTACRTO VECC
+ON TCC.CDCONTACARTAO = VECC.CDCONTACARTAO AND VECC.CDESTADOCONTACARTAO IN (80, 81, 83, 84,92,95,96, 98)
+
+/*WHERE VECC.DTFIMVGNCAESTDOCNTACRTO>='20211001' */
+)
+;QUIT;
+
+/*********************************REESCRITA 22/10/2024**************************************************************
+IDÉIA É SOBREPOR AS FLAGS COM BASE EM SIMULAÇÃO E BASE DE CONTAS NO BQ
+********************************************************************************************************************/
+
+proc sql;
+create table TbDtRefSim as
+select distinct NuAnoMes,NuCPFCNPJ, DtSimulacaoInicial, NuProposta, DtEntradaProposta, NuContrato, Produto from CONVSIMU.TBSIMULACOES as A
+WHERE NuAnoMes = 202410
+/*AND FlUltimaSimulacaoValida = 1*/
+AND NuProposta <> . /*Somente simulações que geraram propostas*/
+and NuCPFCNPJ is not null /*Há casos de Privado com simulações sem CPF (????)*/
+and StProposta not in ('C','N') /*Sem propostas Negadas ou Canceladas*/ ;
+run;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage);
+   Create table clientebvBQ as
+   select * from connection to perm
+     (select distinct
+	nucpfcnpj,
+	dtiniciocontacontrato,
+	dtfimcontacontrato,
+	nmtipoproduto,
+	nmproduto,
+	nmmodalidadeproduto
+from bv-pdbd-prd.dvry_clie_crm.tbclientebvrelacionamento)
+where nucpfcnpj in (select distinct nucpfcnpj from TbDtRefSim);
+   disconnect from perm;
+quit;
+
+proc sql;
+create table contratos_clientebv as
+select
+	a.nucontrato,
+	a.nucpfcnpj,
+	a.nuproposta,
+	a.DtEntradaProposta,
+	a.DtSimulacaoInicial,
+	a.Produto as ProdutoSimu,
+	b.dtiniciocontacontrato,
+	b.dtfimcontacontrato,
+	b.nmtipoproduto,
+	b.nmproduto,
+	b.nmmodalidadeproduto,
+	/*	possui contrato ativo na data do contrato*/
+ 	case	when b.dtiniciocontacontrato ne . and a.DtSimulacaoInicial > datepart(b.dtiniciocontacontrato)
+												and a.DtSimulacaoInicial <= coalesce(datepart(b.dtfimcontacontrato), '31dec2099'd) then 1 else . end as fl_contrato_ativo,
+	/*	possui qualquer contrato encerrado na data do contrato*/
+	case	when b.dtiniciocontacontrato ne . and a.DtSimulacaoInicial > coalesce(datepart(b.dtfimcontacontrato), '31dec2099'd) then 1 else . end as fl_contrato_encerrado,
+	/*	possui conta digital ativa na data do contrato*/
+	case	when b.dtiniciocontacontrato ne . and b.NmTipoProduto EQ 'Conta Digital' and a.DtSimulacaoInicial > datepart(b.dtiniciocontacontrato)
+												and a.DtSimulacaoInicial <= coalesce(datepart(b.dtfimcontacontrato), '31dec2099'd) then 1 else . end as fl_conta_ativa,
+	/*	possui cartão na data do contrato*/
+	case	when b.dtiniciocontacontrato ne . and b.NmTipoProduto EQ 'Cartão' and a.DtSimulacaoInicial > datepart(b.dtiniciocontacontrato)
+												and a.DtSimulacaoInicial <= coalesce(datepart(b.dtfimcontacontrato), '31dec2099'd) then 1 else . end as fl_cartao_ativo,
+	/*	possui contrato diferente de conta e cartao na data do contrato*/
+	case	when b.dtiniciocontacontrato ne . and b.NmTipoProduto NOT IN ('Conta Digital' ,'Cartão') and a.DtSimulacaoInicial > datepart(b.dtiniciocontacontrato)
+												and a.DtSimulacaoInicial <= coalesce(datepart(b.dtfimcontacontrato), '31dec2099'd) then 1 else . end as fl_ctt_dif_conta_cartao_ativo,
+	/*	conta digital foi contratado entre a data de entrada da proposta e a data do contrato*/
+	case 	when b.dtiniciocontacontrato ne . and b.NmTipoProduto EQ 'Conta Digital' and a.DtSimulacaoInicial > datepart(b.dtiniciocontacontrato)
+												and a.DtSimulacaoInicial <= coalesce(datepart(b.dtfimcontacontrato), '31dec2099'd)
+												and datepart(b.dtiniciocontacontrato) BETWEEN a.dtentradaproposta and a.DtSimulacaoInicial then 1 else . end as fl_conta_integrada
+from TbDtRefSim a
+left join clientebvBQ b
+	on a.nucpfcnpj= b.nucpfcnpj
+	and datepart(b.dtiniciocontacontrato) <= a.DtSimulacaoInicial /* somente relacionamentos até a data da simulacao*/
+	and b.nmproduto NE 'Seguro' /* seguro deveria estar sempre atrelado a outro produto */
+;run;
+
+proc sql;
+create table contratos_clientebv_sum as
+select
+	nucontrato,
+	nucpfcnpj,
+	nuproposta,
+	DtSimulacaoInicial,
+	ProdutoSimu,
+	/*dtcontrato,*/
+	dtentradaproposta,
+	max(fl_contrato_ativo) as fl_contrato_ativo,
+	max(fl_contrato_encerrado) as fl_contrato_encerrado,
+	max(fl_conta_ativa) as fl_conta_ativa,
+	max(fl_cartao_ativo) as fl_cartao_ativo ,
+	max(fl_ctt_dif_conta_cartao_ativo) as fl_ctt_dif_conta_cartao_ativo,
+	max(fl_conta_integrada) as fl_conta_integrada
+from contratos_clientebv
+group by 1,2,3,4,5,6
+;run;
+
+data contratos_clientes_contacartao; set contratos_clientebv_sum;
+/*verifica se clientes possuem contrato ativo além da conta/cartão.*/
+	if fl_conta_ativa = 1 and fl_ctt_dif_conta_cartao_ativo = 1 then fl_conta_ativa_2 = .; else fl_conta_ativa_2 = fl_conta_ativa;
+	if fl_cartao_ativo = 1 and fl_ctt_dif_conta_cartao_ativo = 1 then fl_cartao_ativo_2 = .; else fl_cartao_ativo_2 = fl_cartao_ativo;
+run;
+
+/*****************************************FIM REESCRITA 22/10/2024***************************************************
+*********************************************************************************************************************
+********************************************************************************************************************/
+
+/*CONSOLIDAÇÃO*/
+PROC SQL;
+CREATE TABLE PROPOSTAS_ISENCAO_TC_VTESTE_00 AS SELECT
+A.NUANOMES
+,A.NUPROPOSTA
+,B.NUCONTRATO
+,B.NMGRUPOPRODUTOMETA
+,B.NUCPFCNPJ
+,F.NUCPFCNPJ AS NUCPFCNPJ_CONTACARTAO
+,A.DTENTRADAPROPOSTA
+,B.DTCONTRATO
+,A.FLISENCAOTAXACADASTRO
+,F.fl_conta_ativa_2
+,F.fl_cartao_ativo_2
+,E.Fl_ativo
+
+,CASE WHEN A.FLISENCAOTAXACADASTRO = 'A' THEN 'ISENTO'
+      WHEN A.FLISENCAOTAXACADASTRO = 'N' THEN 'N_ISENTO'
+	  WHEN A.FLISENCAOTAXACADASTRO = 'S' THEN 'SOLICITOU_ISENCAO'
+	  ELSE 'ERROR' END AS STATUS_TC
+
+,CASE WHEN B.VRTARIFACADASTRO > 0 THEN 1 ELSE 0 END AS FLAG_VRTC
+
+,COALESCE(B.NMGRUPOPRODUTOMETA,A.PRODUTO) AS PRODUTO
+,COALESCE(F.fl_cartao_ativo_2,0) AS FLAG_CARTAO
+,COALESCE(F.fl_conta_ativa_2,0) AS FLAG_CONTA
+
+FROM PROPOSTAS_ISENCAO_TC AS A
+
+INNER JOIN TMP.TBPRODUCAO AS B
+ON A.NUPROPOSTA = B.NUPROPOSTA
+
+LEFT JOIN Base_Clientes_Ativos AS E
+ON A.NUPROPOSTA = E.NUPROPOSTA
+AND B.NUCPFCNPJ = E.NUCPFCNPJ
+
+LEFT JOIN contratos_clientes_contacartao AS F
+ON A.NUPROPOSTA = F.NUPROPOSTA
+AND B.NUCPFCNPJ =F.NUCPFCNPJ
+
+HAVING PRODUTO IN('Leves','Motos','Pesados') AND NUANOMES=&SAFRA.
+
+;RUN;
+
+PROC SORT DATA= PROPOSTAS_ISENCAO_TC_VTESTE_00 DUPOUT=DUPLI OUT=PROPOSTAS_ISENCAO_TC_FINAL NODUPKEY;
+BY NUPROPOSTA
+NUCONTRATO
+DTENTRADAPROPOSTA
+DTCONTRATO
+NUCPFCNPJ
+;RUN;
+
+/*INCOERENCIAS TC*/
+PROC SQL;
+CREATE TABLE ALERTA_PAGAMENTO AS SELECT
+*
+,CASE WHEN Fl_ativo ='S' AND STATUS_TC NE 'ISENTO' THEN 'CLIENTE_ATIVO_N_ISENTO'
+      WHEN (FLAG_CARTAO=1 AND FLAG_CONTA=1) AND STATUS_TC NE 'ISENTO' THEN 'CLIENTE_CARTAO_N_ISENTO'
+	  WHEN Fl_ativo ='N' AND (FLAG_CARTAO=0 AND FLAG_CONTA=0) AND STATUS_TC NE 'N_ISENTO' THEN 'NAO_CLIENTE_ISENTO'
+	  ELSE 'ERROR' END AS STATUS_ANALISE_ISENCAO
+
+FROM PROPOSTAS_ISENCAO_TC_FINAL
+
+WHERE CASE WHEN Fl_ativo ='S' AND STATUS_TC NE 'ISENTO' THEN 'CLIENTE_ATIVO_N_ISENTO'
+      WHEN FLAG_CARTAO =1 AND STATUS_TC NE 'ISENTO' THEN 'CLIENTE_CARTAO_N_ISENTO'
+	  WHEN Fl_ativo ='N' AND FLAG_CARTAO=0 AND STATUS_TC NE 'N_ISENTO' THEN 'NAO_CLIENTE_ISENTO'
+	  ELSE 'ERROR' END NE 'ERROR'
+
+;RUN;
+
+/*BASE DE CLIENTES LA*/
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+create table Base_LA as
+select * from connection to dbcon
+(
+SELECT
+
+A.DtContrato
+,A.NUCONTRATO
+,A.NuCpfCnpj
+,A.DtLiquidacaoEfetiva
+,a.DtCancelamento
+,B.DTFIMVIGENCIA
+,'Antecipados' AS FL_TIPO
+
+FROM CDCCG.TBCONTRATO AS A
+
+LEFT JOIN CDCCG.TBCONTRATOFINANCEIRO AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+
+WHERE  A.DTLIQUIDACAOEFETIVA IS NOT NULL AND DtCancelamento IS NULL AND YEAR(B.DTFIMVIGENCIA)>=2021
+AND A.DTLIQUIDACAOEFETIVA < B.DTFIMVIGENCIA
+
+)
+;RUN;
+
+PROC SORT DATA= Base_LA DUPOUT=DUPLI OUT=Base_LA_limpa nodupkey;
+by
+nucontrato
+dtcontrato
+;run;
+
+PROC SQL;
+CREATE TABLE VALIDACAO AS SELECT A.*
+,B.NUCPFCNPJ AS NUCPFCNPJ_LA
+,B.NUCONTRATO AS NUCONTRATO_LA
+,B.DtLiquidacaoEfetiva
+,B.DTFIMVIGENCIA
+,CASE WHEN B.NUCPFCNPJ IS NOT NULL AND B.NUCONTRATO NE A.NUCONTRATO THEN 1 ELSE 0 END AS FL_LA
+
+FROM ALERTA_PAGAMENTO AS A
+LEFT JOIN Base_LA AS B
+ON A.NUCPFCNPJ = B.NUCPFCNPJ
+/*WHERE A.DTCONTRATO BETWEEN '01OCT2021'D AND '31OCT2021'D*/
+
+;RUN;
+
+proc sort data=VALIDACAO dupout=dupli out=VALIDACAO nodupkey;
+by
+nucontrato
+dtcontrato
+;run;
+
+/*Base de monitoramento de ocorrencias */
+Proc Sql;
+Create table Base_Ocorrencias_PRE as select
+A.NUPROPOSTA
+,A.NUCONTRATO
+,A.NUCPFCNPJ
+,A.DTENTRADAPROPOSTA       as Data_Proposta
+,A.DTCONTRATO              as Data_Contrato format ddmmyy10.
+,A.NMGRUPOPRODUTOMETA      AS Produto
+,A.STATUS_TC               as Status_TC
+,A.STATUS_ANALISE_ISENCAO  as Analise_Status
+,CASE WHEN INPUT(A.NUCPFCNPJ,15.) IN (SELECT NUCPFCNPJ FROM CONTA_CARTAO) THEN 1 ELSE 0 END AS FLC
+
+FROM VALIDACAO AS A
+
+LEFT JOIN CONTA_CARTAO AS C
+ON INPUT(A.NUCPFCNPJ,15.)=C.NUCPFCNPJ
+/*AND B.DTENTRADAPROPOSTA BETWEEN C.DTINCOVGNCAESTDOCNTACRTO AND C.DTFIMVGNCAESTDOCNTACRTO*/
+AND A.DTENTRADAPROPOSTA >= C.DTINCOVGNCAESTDOCNTACRTO
+/*AND B.DTENTRADAPROPOSTA <= C.DTFIMVGNCAESTDOCNTACRTO*/
+
+/*INNER JOIN BASE_DATA_3 AS B*/
+/*ON B.PRODUTO_REF = A.NMGRUPOPRODUTOMETA*/
+/*AND B.DATA_REF = A.DTCONTRATO*/
+
+HAVING STATUS_TC NE 'SOLICITOU_ISENCAO' AND FLC NE 1
+/*AND A.DTCONTRATO<='14FEB2022'D*/
+;RUN;
+
+/*DATAS DE CADA PRODUTO*/
+PROC SQL;
+CREATE TABLE BASE_DATA_3 AS SELECT
+Produto AS PRODUTO_REF
+,MAX(Data_Contrato) AS DATA_REF FORMAT DDMMYY10.
+FROM Base_Ocorrencias_PRE
+where Produto IN('Leves','Motos')
+GROUP BY 1
+;RUN;
+
+/*Base de monitoramento de ocorrencias */
+Proc Sql;
+Create table Base_Ocorrencias as select
+A.NUPROPOSTA
+,A.NUCONTRATO
+,A.NUCPFCNPJ
+,A.Data_Proposta
+,A.Data_Contrato
+,A.Produto
+,A.Status_TC
+,A.Analise_Status
+
+FROM Base_Ocorrencias_PRE AS A
+INNER JOIN BASE_DATA_3 AS B
+ON A.Data_Contrato = B.DATA_REF
+AND A.PRODUTO = B.PRODUTO_REF
+
+;RUN;
+proc sort data=Base_Ocorrencias dupout=dupli out=Base_Ocorrencias nodupkey;
+By
+Nuproposta
+Nucontrato
+Data_Proposta
+Data_Contrato
+Produto
+Status_TC
+Analise_Status
+;run;

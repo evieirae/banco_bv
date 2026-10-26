@@ -1,0 +1,489 @@
+START_METADATA
+PROJECT: Rodas__abandono
+FILE_SAS: abandono.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -30
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (2x | +24), PROC APPEND (2x | +30), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 355
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, FREQ, SORT, SQL
+HAS_DATA_STEP: Yes (9x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: _timer_start, anomes_corte
+DETECTED_MACROS_USED: MaxCupom, MaxTx, MinAbandono, _timer_start, dt_atu, dt_corte_cp, dt_tx_gcp, dur, mes_atu
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBORIGINACAO [SAS/Local], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_PRMTO_SIMULACAO_PRECIFICACO [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_OBSRVCO_RSPNSVEL [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRAZO_FNNCO [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRECIFICACAO [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_CUPOM [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_GARANTIA [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRZO_FNNCO_PRPSA [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: LEADS, SOLITMP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBORIGINACAO [DATA Step - SET], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_PRMTO_SIMULACAO_PRECIFICACO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_OBSRVCO_RSPNSVEL [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRAZO_FNNCO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRECIFICACAO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_CUPOM [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_GARANTIA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRZO_FNNCO_PRPSA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], LEADS.ABANDONO [PROC FREQ - DATA=; PROC SQL - FROM], SOLITMP.APRO_SIMU_CUPOM [PROC FREQ - DATA=; PROC SQL - FROM], SOLITMP.BASE_TX_VAR_CUPOM [PROC FREQ - DATA=; PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): LEADS.ABANDONO, SOLITMP.APRO_SIMU_CUPOM, SOLITMP.BASE_TX_VAR_CUPOM
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): LEADS.ABANDONO, SOLITMP.ABANDONO, SOLITMP.APRO_SIMU_CUPOM, SOLITMP.BASE_TX_VAR_CUPOM
+APPEND_ONLY_OUTPUTS: SOLITMP.APRO_SIMU_CUPOM, SOLITMP.BASE_TX_VAR_CUPOM
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): SOLITMP.APRO_SIMU_CUPOM, SOLITMP.BASE_TX_VAR_CUPOM
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ABANDONO_PARCIAL, BASE_TX_VAR_CUPOM, BASE_TX_VAR_CUPOM_AJUSTE, BASE_TX_VAR_CUPOM_AJUSTE_ND, CUPOM, CUPOM_AJUSTE, TBABANDONOGCP, TBABANDONOGCPNEW, TBORIG, TESTE, TX_VAR_CUPOM_PROP
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* Start timer */
+%let _timer_start = %sysfunc(datetime());
+
+/***********************************************************************************************|
+|					CÓDIGO NOVO (PARTINDO DO GCP)												|
+|***********************************************************************************************/
+
+options compress=binary errorabend;
+
+%include '/infogrc/utils/all-includes.sas';
+
+%let anomes_corte = 202312;
+/*%let dt_corte = 03apr2024;*/
+
+/* Busca data máxima da tabela funil parceiros final */
+PROC SQL ;
+	SELECT max(DT_INCLUSAO_CUPOM) format date9. INTO: MaxCupom FROM SOLITMP.APRO_SIMU_CUPOM;
+;QUIT;
+
+%put &MaxCupom.;
+
+PROC SQL ;
+	SELECT max(DT_SIMULACAO_PROPOSTA) format date9. INTO: MaxTx FROM solitmp.base_tx_var_cupom
+;
+;QUIT;
+
+%put &MaxTx.;
+
+/* Cria variáveis utilizadas no processo */
+data _null_;
+
+	dt_atu = today()-1;
+
+	dt_cupom = intnx('day',intnx('day',"&MaxCupom."d,1),0);
+	mes_atu = put(year(intnx('month',dt_atu,0)),4.)||put(month(intnx('month',dt_atu,0)),z2.);
+	dt_corte_cp = "'"||put(year(dt_cupom),4.)||"-"||put(month(dt_cupom),z2.)||"-"||put(day(dt_cupom),z2.)||"'";
+
+	dt_tx = intnx('day',intnx('day',"&MaxTx."d,1),0);
+	dt_tx_gcp = "'"||put(year(dt_tx),4.)||"-"||put(month(dt_tx),z2.)||"-"||put(day(dt_tx),z2.)||"'";
+
+	call symputx('dt_corte_cp',dt_corte_cp);
+	call symputx('dt_atu',put(dt_atu,date9.));
+	call symputx('dt_corte_gcp',dt_corte_gcp);
+	call symputx('dt_tx_gcp',dt_tx_gcp);
+	call symputx('mes_atu',mes_atu);
+
+run;
+
+%put &dt_atu.;
+%put &dt_corte_cp.;
+%put &dt_tx_gcp.;
+%put &mes_atu.;
+
+PROC SQL;
+CONNECT TO bigquery AS perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+CREATE TABLE TbAbandonoGCP AS
+SELECT
+	  cd_simulacao_proposta
+  	  ,datepart(dt_simulacao_proposta) as dt_simulacao_proposta format DDMMYY10.
+  	  ,cd_parceiro_comercial
+  	  ,fl_abandonada
+  	  ,datepart (dt_inclusao) as dt_inclusao format DDMMYY10.
+  	  ,ds_login
+  	  ,nm_contato_observacao
+  	  ,ds_motivo_classificacao
+  	  ,ds_detalhe_motivo_clssfcco
+  	  ,ds_concorrencia
+  	  ,ds_classificacao
+  	  ,pc_propensao
+  	  ,cd_grupo_homogenio
+	  ,ds_objecao_motivo_clssfcco
+      ,ds_detalhe_preco_concorrencia
+  	  ,qt_parcela
+  	  ,vr_preco_cliente
+
+FROM connection to perm
+
+     	(SELECT DISTINCT
+  a.cd_simulacao_proposta,
+  a.dt_simulacao_proposta,
+  a.cd_parceiro_comercial,
+  a.fl_abandonada,
+  d.dt_inclusao,
+  d.ds_login,
+  d.nm_contato_observacao,
+  d.ds_motivo_classificacao,
+  d.ds_detalhe_motivo_clssfcco,
+  d.ds_concorrencia,
+  d.ds_classificacao,
+  a.pc_propensao,
+  a.cd_grupo_homogenio,
+  d.ds_objecao_motivo_clssfcco,
+  d.ds_detalhe_preco_concorrencia,
+  d.qt_parcela,
+  d.vr_preco_cliente
+
+FROM
+`bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta` as a
+  LEFT JOIN `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_obsrvco_rspnsvel` as d
+    ON a.cd_simulacao_proposta = d.cd_simulacao_proposta
+WHERE
+  a.fl_abandonada IS NOT NULL
+  AND a.dt_simulacao_proposta > '2024-08-18'
+  );
+
+DISCONNECT FROM perm
+;QUIT;
+
+/* Busca data máxima da tabela funil parceiros final */
+PROC SQL ;
+	SELECT min(DT_SIMULACAO_PROPOSTA) format date9. INTO: MinAbandono FROM TbAbandonoGCP;
+;QUIT;
+
+%put &MinAbandono.;
+
+proc sql;
+create table TbAbandonoGCPNew as
+select
+INPUT(CD_SIMULACAO_PROPOSTA,9.) AS CD_SIMULACAO_PROPOSTA
+,DT_SIMULACAO_PROPOSTA
+,INPUT(CD_PARCEIRO_COMERCIAL,6.) AS CD_PARCEIRO_COMERCIAL
+,FL_ABANDONADA
+,DT_INCLUSAO
+,DS_LOGIN
+,NM_CONTATO_OBSERVACAO
+,DS_MOTIVO_CLASSIFICACAO
+,DS_DETALHE_MOTIVO_CLSSFCCO
+,DS_CONCORRENCIA
+,DS_CLASSIFICACAO
+,INPUT(PC_PROPENSAO,.4) AS PC_PROPENSAO
+,INPUT(CD_GRUPO_HOMOGENIO,.4) AS CD_GRUPO_HOMOGENIO
+	  ,ds_objecao_motivo_clssfcco
+      ,ds_detalhe_preco_concorrencia
+	  ,qt_parcela
+  	  ,vr_preco_cliente
+from
+TbAbandonoGCP
+;run;
+
+data abandono_parcial;
+	set TbAbandonoGCPNew;
+	anomes = compress(put(year(dt_simulacao_proposta),4.)||put(month(dt_simulacao_proposta),z2.));
+
+	length Class $50.;
+
+	/* Vendedor e Desistência do Cliente */
+	if nm_contato_observacao = 'Vendedor' and ds_classificacao = 'Desistência do cliente' then do;
+		if ds_motivo_classificacao = 'Quebra de crédito' then Class = 'DC-QC';
+		else if ds_motivo_classificacao = 'Valor da parcela' then Class = 'DC-VP';
+	end;
+
+	/* Vendedor e Fechou na concorrência */
+	if nm_contato_observacao = 'Vendedor' and ds_classificacao = 'Fechou com a concorrência' then do;
+		if ds_motivo_classificacao = 'Quebra de crédito' then Class = 'FC-QC';
+		else if ds_motivo_classificacao = 'Valor da parcela' then Class = 'FC-VP';
+	end;
+
+run;
+
+data leads.abandono;
+	set abandono_parcial;
+run;
+
+/* Exclui o período indicado da base histórica */
+proc sql;
+	delete from leads.abandono
+	where dt_simulacao_proposta >= "&MinAbandono."d
+;quit;
+
+proc sql;
+	insert into leads.abandono
+	select * from abandono_parcial;
+quit;
+
+proc freq data=leads.abandono;
+	table DT_SIMULACAO_PROPOSTA;
+	where DT_SIMULACAO_PROPOSTA >= '01may2024'd;
+run;
+
+data solitmp.abandono;
+	set abandono_parcial;
+run;
+
+/* Stop timer */
+data teste;
+  format dur time13.0;
+  dur = datetime() - &_timer_start;
+  put 30*'-' / ' TOTAL DURATION:' dur time13.0 / 30*'-';
+  call symputx('dur',put(dur,time13.0));
+run;
+
+%put &dur.;
+
+/* Envia email informando o término do processo */
+OPTIONS
+		EMAILHOST=smtprelay.bvnet.bv
+		EMAILPORT=25
+		EMAILAUTHPROTOCOL=NONE
+		EMAILID="ramon.sales@bv.com.br"
+	;
+	FILENAME MAIL EMAIL
+	CONTENT_TYPE="text/html"
+	TO=("ramon.sales@bv.com.br","valter.morais@bv.com.br")
+/*	CC=("valter.morais@bv.com.br","luis.santos@bv.com.br","gustavo.santos@bv.com.br")*/
+
+	SUBJECT="Bases Abandono de Simulação - &dt_atu.";
+
+			ods html3
+			body=MAIL
+			style=SASWEB
+			rs=none;
+
+			TITLE;
+
+			ods text="Prezado(a),";
+			ods text=' ';
+			ods text="O Processo que gera a base Abandono de Simulação está finalizado.";
+			ods text=' ';
+			ods text="Tempo de Execução em h:mm:ss => &dur. ";
+			ods text=' ';
+			ods text='Att,';
+			ods text=' ';
+			ods text='Equipe de Dados';
+			ods text='Tribo Veículos';
+
+ods html3 close;
+
+/******************************************************************************************************|
+| 											BASE CUPOM												   |
+|******************************************************************************************************/
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table cupom as
+   select * from connection to perm
+     (
+SELECT DISTINCT
+	  a.cd_simulacao_proposta								as _CD_SIMULACAO_PROPOSTA
+	, a.dt_simulacao_proposta								as _DT_SIMULACAO_PROPOSTA
+	, a.sg_sistema_origem									as _SG_SISTEMA_ORIGEM
+    , g.cd_cupom_beneficio_parceiro							as _cd_cupom_beneficio_parceiro
+    , g.fl_ativo 											as _fl_ativo_cupom
+    , g.dt_inclusao 										as _dt_inclusao_cupom
+
+FROM bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta	a
+
+LEFT JOIN bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta_cupom g
+            on a.cd_simulacao_proposta = g.cd_simulacao_proposta
+
+WHERE a.Sg_Sistema_Origem in ('APAR','PPAR','ACOM','SIMUVEIC','SIMUKVVL','SIMUKVMT','SIMUAPPBV')
+and a.dt_simulacao_proposta >= &dt_corte_cp. and g.cd_cupom_beneficio_parceiro is not null
+
+		);
+   disconnect from perm;
+quit;
+
+data cupom_ajuste;
+
+retain cd_simulacao_proposta cd_cupom_beneficio_parceiro FL_ATIVO_CUPOM DT_INCLUSAO_CUPOM;
+
+set cupom (where=(datepart(_DT_INCLUSAO_CUPOM) <= "&dt_atu."d));
+
+	format FL_ATIVO_CUPOM $1.
+		   DT_INCLUSAO_CUPOM DDMMYY8.;
+
+	cd_simulacao_proposta = input(_cd_simulacao_proposta,20.);
+	cd_cupom_beneficio_parceiro = input(_cd_cupom_beneficio_parceiro,20.);
+	DT_INCLUSAO_CUPOM = datepart(_DT_INCLUSAO_CUPOM);
+	FL_ATIVO_CUPOM = _FL_ATIVO_CUPOM;
+
+	drop
+
+	_cd_simulacao_proposta
+	_cd_cupom_beneficio_parceiro
+	_DT_INCLUSAO_CUPOM
+    _FL_ATIVO_CUPOM
+	_SG_SISTEMA_ORIGEM
+	_dt_simulacao_proposta;
+
+run;
+
+proc append data=cupom_ajuste
+			base=SOLITMP.APRO_SIMU_CUPOM force;
+run;
+
+proc freq data=SOLITMP.APRO_SIMU_CUPOM;
+	table DT_INCLUSAO_CUPOM;
+run;
+
+/******************************************************************************************************|
+| 											EXTRAI INFOS TX CUPOM										   |
+|******************************************************************************************************/
+/*%let dt_tx_gcp = '2024-11-01';*/
+
+Proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table base_tx_var_cupom as
+   select * from connection to perm
+     (
+SELECT DISTINCT a.cd_simulacao_proposta as  _cd_simulacao_proposta,
+				a.sg_sistema_origem as		_sg_sistema_origem,
+				a.dt_simulacao_proposta as  _dt_simulacao_proposta,
+				c.tx_variacao_cupom as 		_tx_variacao_cupom,
+				c.pc_bv_compensa as			_pc_bv_compensa,
+				f.nu_proposta as			_nu_proposta
+
+FROM bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta	a
+LEFT JOIN bv-pdbd-prd.trusted_apro_simu.tb_prmto_simulacao_precificaco b
+			ON a.cd_simulacao_proposta = b.cd_simulacao_proposta
+LEFT JOIN bv-pdbd-prd.trusted_apro_simu.tb_simulacao_precificacao c
+			ON b.cd_prmto_simulacao_precificaco = c.cd_prmto_simulacao_precificaca
+LEFT JOIN bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta_garantia d
+			ON a.cd_simulacao_proposta = d.cd_simulacao_proposta
+LEFT JOIN bv-pdbd-prd.trusted_apro_simu.tb_simulacao_prazo_fnnco e
+			ON d.cd_simulacao_dado_fnnco = e.cd_simulacao_dado_fnnco
+LEFT JOIN bv-pdbd-prd.trusted_apro_simu.tb_simulacao_przo_fnnco_prpsa f
+			ON e.cd_simulacao_prazo_fnnco = f.cd_simulacao_prazo_fnnco
+
+where a.dt_simulacao_proposta >= &dt_tx_gcp.
+and (c.tx_variacao_cupom is not null or c.pc_bv_compensa is not null)
+	);
+   disconnect from perm;
+quit;
+
+data base_tx_var_cupom_ajuste;
+
+	set base_tx_var_cupom;
+
+	format SG_SISTEMA_ORIGEM $20.
+		   DT_SIMULACAO_PROPOSTA date9.;
+
+	cd_simulacao_proposta = input(_cd_simulacao_proposta,20.);
+	dt_simulacao_proposta = datepart(_dt_simulacao_proposta);
+	SG_SISTEMA_ORIGEM = _SG_SISTEMA_ORIGEM;
+    tx_variacao_cupom = input(_tx_variacao_cupom,20.);
+	pc_bv_compensa = input(_pc_bv_compensa,20.);
+	nu_proposta = input(_nu_proposta,20.);
+
+	if pc_bv_compensa = 0 and tx_variacao_cupom = 0 then delete;
+	if pc_bv_compensa = . and tx_variacao_cupom = . then delete;
+	if pc_bv_compensa = 0 and tx_variacao_cupom = . then delete;
+	if pc_bv_compensa = . and tx_variacao_cupom = 0 then delete;
+
+	drop
+
+	_cd_simulacao_proposta
+	_dt_simulacao_proposta
+	_SG_SISTEMA_ORIGEM
+    _tx_variacao_cupom
+	_pc_bv_compensa
+	_nu_proposta;
+
+run;
+/*NOTE: The data set WORK.BASE_TX_VAR_CUPOM_AJUSTE has 65913 observations and 6 variables.*/
+
+proc sort data=base_tx_var_cupom_ajuste out=base_tx_var_cupom_ajuste_nd nodupkey dupout=dup;
+	by cd_simulacao_proposta;
+run;
+/*NOTE: There were 65913 observations read from the data set WORK.BASE_TX_VAR_CUPOM_AJUSTE.*/
+/*NOTE: 13326 observations with duplicate key values were deleted.*/
+/*NOTE: The data set WORK.BASE_TX_VAR_CUPOM_AJUSTE_ND has 52587 observations and 6 variables.*/
+
+/*data solitmp.base_tx_var_cupom;*/
+/*	set base_tx_var_cupom_ajuste_nd;*/
+/*run;*/
+
+/* Busca Tx Gerencial na base de proposta */
+data tborig;
+	set bases.tboriginacao
+	(where=(nuanomes>=&mes_atu. and nuproposta ne .)
+	keep = nuanomes nuproposta qtparcelas txgerencial);
+run;
+
+proc sql;
+	create table tx_var_cupom_prop as
+	select t1.*, t2.qtparcelas, t2.txgerencial
+	from base_tx_var_cupom_ajuste_nd t1 left join tborig t2
+						 				on t1.nu_proposta = t2.nuproposta;
+quit;
+/*NOTE: Table WORK.CUPOM_AJUSTE_PROP created, with 85642 rows and 7 columns.*/
+
+/*data solitmp.base_tx_var_cupom;*/
+/*	set tx_var_cupom_prop;*/
+/*run;*/
+
+proc append data=tx_var_cupom_prop
+			base=solitmp.base_tx_var_cupom force;
+run;
+
+proc freq data=solitmp.base_tx_var_cupom;
+	table DT_SIMULACAO_PROPOSTA;
+run;
+
+/* Stop timer */
+data teste;
+  format dur time13.0;
+  dur = datetime() - &_timer_start;
+  put 30*'-' / ' TOTAL DURATION:' dur time13.0 / 30*'-';
+  call symputx('dur',put(dur,time13.0));
+run;
+
+%put &dur.;
+
+/* Envia email informando o término do processo */
+OPTIONS
+		EMAILHOST=smtprelay.bvnet.bv
+		EMAILPORT=25
+		EMAILAUTHPROTOCOL=NONE
+		EMAILID="ramon.sales@bv.com.br"
+	;
+	FILENAME MAIL EMAIL
+	CONTENT_TYPE="text/html"
+	TO=("ramon.sales@bv.com.br","valter.morais@bv.com.br")
+/*	CC=("valter.morais@bv.com.br","luis.santos@bv.com.br","gustavo.santos@bv.com.br")*/
+
+	SUBJECT="Bases Cupom - &dt_atu.";
+
+			ods html3
+			body=MAIL
+			style=SASWEB
+			rs=none;
+
+			TITLE;
+
+			ods text="Prezado(a),";
+			ods text=' ';
+			ods text="O Processo que gera as bases Cupom está finalizado.";
+			ods text=' ';
+			ods text="Tempo de Execução em h:mm:ss => &dur. ";
+			ods text=' ';
+			ods text='Att,';
+			ods text=' ';
+			ods text='Equipe de Dados';
+			ods text='Tribo Veículos';
+
+ods html3 close;

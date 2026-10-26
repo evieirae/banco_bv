@@ -1,0 +1,207 @@
+START_METADATA
+PROJECT: Rodas__Base_Sinergia_Solar
+FILE_SAS: 01 - tbparceiroautorizadosolar.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -2
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 137
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: SNS = /infogrc/Base_Sinergia_Solar/Bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], DBCOR.TBFAVORECIDOAUTORIZADO [DBCON], DBCRED.TBPROPOSTA [DBCON], DBPAGAMENTO.TBINFORMACAOBANCARIAPAGAMENTO [DBCON], DBPAGAMENTO.TBPAGAMENTO [DBCON], DBPAGAMENTO.TBPESSOAPAGAMENTO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SNS
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): DBCOR.TBFAVORECIDOAUTORIZADO [Pass-Through Native (DBCON) - FROM], DBCRED.TBPROPOSTA [Pass-Through Native (DBCON) - FROM; Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.TBINFORMACAOBANCARIAPAGAMENTO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.TBPAGAMENTO [Pass-Through Native (DBCON) - FROM; Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.TBPESSOAPAGAMENTO [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TBPARCEIROAUTORIZADO_SOLAR.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SNS.TBPARCEIROAUTORIZADO_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TBPARCEIROAUTORIZADO_SOLAR.csv
+TEMP/DISCARDED OUTPUTS: TBFAVORECIDOAUTORIZADO, TBPARCEIROAUTORIZADO, TBPARCEIROAUTORIZADO_SOLAR, TBPARCEIROAUTORIZADO_SOLAR1, WORK.BASE_PESQUISA_SOLAR, WORK.TBPARC_FAVORECIDO_SAIDA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TBPARCEIROAUTORIZADO_SOLAR.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/*##############################################################################################*/
+/* Programa: TbParceiroAutorizado_Solar.sas															*/
+/* Autor:    Tribo de Dados - Squad MIS Comercial												*/
+/* Versão:   16.07.2020 - Implementar o processo TbParceiroAutorizadoSolar no diretório governado	*/
+/*																								*/
+/*##############################################################################################*/
+
+/* ======================================================== */
+/* ====================== PARAMETROS ====================== */
+/* ======================================================== */
+
+option compress = binary;
+options FULLSTIMER source source2;
+options mprint mlogic symbolgen;
+
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+LIBNAME SNS '/infogrc/Base_Sinergia_Solar/Bases';
+
+%CRIAVARDB;
+/*base com os parceiros autorizados do Solar*/
+PROC SQL;
+%CONECTADB (server=CTR);
+Create Table TBPARCEIROAUTORIZADO_SOLAR1 as
+SELECT Distinct NuCpfCnpj, NmTitular, FlAtivo, TpPessoa, datepart(DtCadastro) as DtCadastro format Date9.
+from connection to dbcon
+(
+Select AUTO.NmTitular,
+	AUTO.FlAtivo,
+	AUTO.TpPessoa,
+	AUTO.DtCadastro,
+	AUTO.NuCpfCnpj,
+	ULTIMO_PGTO.ULTIMO_PAGAMENTO,
+	ULTIMO_PGTO.QTD,
+	ULTIMO_PGTO.TOTAL_VALOR
+	FROM DBCOR..TbFavorecidoAutorizado AUTO
+	LEFT JOIN (
+		SELECT PEPGTO.NuCpfCnpj,
+				MAX(PGTO.DtPagamento) AS ULTIMO_PAGAMENTO,
+				count(pgto.CdPagamento) AS QTD,
+				sum(pgto.VrLiberado) AS TOTAL_VALOR
+
+		FROM DBPAGAMENTO..TbPagamento PGTO INNER JOIN DBCRED..TbProposta PT
+		ON PGTO.NuContratoGestao = PT.NuContratoGestao
+			  INNER JOIN DBPAGAMENTO..TbInformacaoBancariaPagamento INFOPGTO ON INFOPGTO.CdInformacaoBancariaPagto = pgto.CdInforBancariaPagtoFavorecido
+			  INNER JOIN DBPAGAMENTO..TbPessoaPagamento PEPGTO ON PEPGTO.CdPessoaPagamento = infopgto.CdPessoaPagamento WHERE PT.CdSubProduto = 70
+			  AND PT.CdLoja = 378215
+		GROUP BY PEPGTO.NuCpfCnpj) ULTIMO_PGTO ON ULTIMO_PGTO.NuCpfCnpj = auto.nuCpfCnpj WHERE AUTO.cdParceiroComercial = 378215
+)
+;
+Quit;
+
+/*CÓDIGO PARA GERAR FAVORECIDOS MEU PARCEIRO SOLAR*/
+Proc Sql;
+%CONECTADB (server=CTR);
+Create Table TBPARCEIROAUTORIZADO as
+SELECT NuProposta
+		,NuContratoGestao
+		,DatePart(DtPagamento) as DtPagamento Format DDMMYY10.
+		,CdPagamento
+		,VrLiberado
+    	,NuCpfCnpj
+from connection to dbcon
+(
+SELECT  P.NuProposta
+		, P.NuContratoGestao
+		, PGTO.DtPagamento
+		, PGTO.CdPagamento
+		, PGTO.VrLiberado
+    	, PEPGTO.NuCpfCnpj
+FROM DBCRED..TbProposta P
+	INNER JOIN DBPAGAMENTO..TbPagamento PGTO
+		ON PGTO.NuContratoGestao = P.NuContratoGestao
+    INNER JOIN DBPAGAMENTO..TbInformacaoBancariaPagamento INFOPGTO
+    	ON INFOPGTO.CdInformacaoBancariaPagto = pgto.CdInforBancariaPagtoFavorecido
+    INNER JOIN DBPAGAMENTO..TbPessoaPagamento PEPGTO
+    	ON PEPGTO.CdPessoaPagamento = infopgto.CdPessoaPagamento
+WHERE P.CdSubProduto = 70
+  AND P.CdLoja = 418254
+  AND P.DtStatusProposta > '09oct2017'
+  AND P.NuContratoGestao IS NOT NULL)
+  ;
+  QUIT;
+
+Proc Sql;
+%CONECTADB (server=CTR);
+Create Table TbFavorecidoAutorizado as
+SELECT
+		NuCpfCnpj,
+		NmTitular,
+		FlAtivo,
+		TpPessoa,
+		DatePart(DtCadastro) as DtCadastro Format DDMMYY10.
+from connection to dbcon
+(
+SELECT DISTINCT NuCpfCnpj, NmTitular, FlAtivo, TpPessoa, DtCadastro
+
+FROM DBCOR..TbFavorecidoAutorizado
+WHERE cdParceiroComercial = 418254)
+;
+QUIT;
+
+Proc Sql;
+Create Table Work.TbParc_Favorecido_Saida as
+Select
+	  Favorecido.NmTitular
+	, Favorecido.FlAtivo
+	, Favorecido.TpPessoa
+	, Favorecido.DtCadastro
+	, Favorecido.NuCpfCnpj
+	, Max(ParceriroAutorizado.DtPagamento) as ULTIMO_PAGAMENTO Format DDMMYY10.
+	, Count(ParceriroAutorizado.CdPagamento) as QTD
+	, Sum(ParceriroAutorizado.VrLiberado) as TOTAL_VALOR
+
+From TbFavorecidoAutorizado as Favorecido
+Left Join TBPARCEIROAUTORIZADO as ParceriroAutorizado ON Favorecido.NuCpfCnpj = ParceriroAutorizado.NuCpfCnpj
+Group by 1,2,3,4,5;
+Quit;
+
+Data Work.Base_Pesquisa_Solar;
+Set TBPARCEIROAUTORIZADO_SOLAR1
+	TbParc_Favorecido_Saida;
+Run;
+
+/*Gerando base saida com parceiro Solar e FDS*/
+Proc Sql;
+Create Table TBPARCEIROAUTORIZADO_SOLAR as
+Select Distinct
+	  NmTitular
+	, FlAtivo
+	, TpPessoa
+	, DtCadastro
+	, NuCpfCnpj
+	, ULTIMO_PAGAMENTO Format DDMMYY10.
+	, QTD
+	, TOTAL_VALOR
+
+From Base_Pesquisa_Solar;
+Quit;
+
+Proc Sort Nodupkey Data = TBPARCEIROAUTORIZADO_SOLAR; by NuCpfCnpj; Quit;
+
+Data SNS.TBPARCEIROAUTORIZADO_SOLAR;
+Set TBPARCEIROAUTORIZADO_SOLAR
+;Run;
+
+proc export
+data=TBPARCEIROAUTORIZADO_SOLAR
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TBPARCEIROAUTORIZADO_SOLAR.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TBPARCEIROAUTORIZADO_SOLAR.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";

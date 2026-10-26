@@ -1,0 +1,310 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_motos
+FILE_SAS: 07 - Infos Producao - Funil Total.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 226
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CRM.RENTABILIDADE_ANALITICO_FINANCAS [SAS/Local], PROJETOS.TBPRODUCAO [SAS/Local], SHMESA.BASEUNICARODAS_2023 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: SOLITMP
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): CRM.RENTABILIDADE_ANALITICO_FINANCAS [PROC SQL - JOIN], PROJETOS.TBPRODUCAO [PROC SQL - JOIN], SHMESA.BASEUNICARODAS_2023 [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SOLITMP.FUNIL_PRICING_MOTOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: INFOS_PRODUCAO, PRODUCAO_PPR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+   CREATE TABLE INFOS_PRODUCAO AS
+   SELECT
+
+'Producao' as TpDados,
+A.Safra,
+A.DtEntradaProposta,
+A.DtContrato,
+G.NuSemana as FG_SEMANA,
+
+COALESCE(E.FG_PUBLICO,'SEM PPR') AS FG_PUBLICO,
+COALESCE(E.FG_PUBLICO_CRED,'SEM PPR') AS FG_PUBLICO_CRED,
+COALESCE(E.FG_PUBLICO_PA,'SEM PPR') AS FG_PUBLICO_PA,
+
+COALESCE(E.FG_AJUSTE_PE_PRICING, 'SEM PPR') AS FG_AJUSTE_PE_PRICING,
+COALESCE(E.FG_AJUSTE_PE_CRED, 'SEM PPR') AS FG_AJUSTE_PE_CRED,
+
+COALESCE(E.FG_PILOTO_ENTMIN,'Desconhecido') AS FG_PILOTO_ENTMIN,
+COALESCE(E.FX_ENTRADA_MIN,'Desconhecido') AS FX_ENTRADA_MIN,
+
+COALESCE(E.AGRUPAMENTO_RTG,'SEM PPR') AS AGRUPAMENTO_RTG,
+COALESCE(E.AGRUPAMENTO_RTG_AJUST,'SEM PPR') AS AGRUPAMENTO_RTG_AJUST,
+COALESCE(E.Mensageria,'SEM PPR') AS Mensageria,
+A.DsTipoCanalProducao as Canal,
+A.DsFilial as Filial,
+
+E.FxCilindrada,
+
+CASE WHEN A.Regional = 'Canal Rodas e EGV I - Regional I' then 'C1R1'
+     WHEN A.Regional = 'Canal Rodas e EGV I - Regional II' then 'C1R2'
+	 WHEN A.Regional = 'Canal Rodas e EGV II - Regional I' then 'C2R1'
+	 WHEN A.Regional = 'Canal Rodas e EGV II - Regional II' then 'C2R2'
+	 WHEN A.Regional = 'Canal Rodas e EGV III - Regional I' then 'C3R1'
+	 WHEN A.Regional = 'Canal Rodas e EGV III - Regional II' then 'C3R2'
+	 WHEN A.Regional = 'Canal Motos' then 'Canal Motos'
+	 ELSE 'ERRO' END AS Regional,
+
+CASE WHEN A.FxIdade = 'ZeroKM' then 'ZeroKM'
+     WHEN A.FxIdade = '0 a 2 anos' then '0 a 2 anos'
+     WHEN A.FxIdade = '3 a 7 anos' then '3 a 7 anos'
+     WHEN A.FxIdade = '8 a 10 anos' then '8 a 10 anos'
+     WHEN A.FxIdade in ('Acima 10 anos','Acima de 10 anos') then 'Acima 10 anos'
+	 ELSE 'ERRO' END AS FxIdade,
+
+CASE WHEN A.QtAnosIdade between -1 and 1 then 'ZeroKM a 1 ano'
+     WHEN A.QtAnosIdade between 2 and 3 then '2 a 3 anos'
+     WHEN A.QtAnosIdade between 4 and 10  then '4 a 10 anos'
+	 ELSE 'ERRO' END AS FxIdade2,
+
+CASE WHEN A.PcEntradaAjustada = 0 THEN '01 - Sem entrada'
+WHEN A.PcEntradaAjustada BETWEEN 0.1 AND 10 THEN '02 - Ate 10%'
+WHEN A.PcEntradaAjustada BETWEEN 10.1 AND 20 THEN '03 - Ate 20%'
+WHEN A.PcEntradaAjustada BETWEEN 15.1 AND 30 THEN '04 - Ate 30%'
+WHEN A.PcEntradaAjustada BETWEEN 20.1 AND 40 THEN '05 - Ate 40%'
+WHEN A.PcEntradaAjustada BETWEEN 25.1 AND 50 THEN '06 - Ate 50%'
+WHEN A.PcEntradaAjustada >= 50.1 THEN '07 - Acima 50%'
+END AS FxEntrada,
+
+A.PrazoFinanciamento as FxPrazo,
+
+E.Mensageria,
+E.AGRUPAMENTO_MSG,
+
+CASE WHEN A.FlTxAlterada = 0 THEN 'SEM PA'
+ELSE 'COM PA'
+END AS FLAG_PA,
+
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VrMargem) AS VrMargem,
+SUM(A.RUPE*A.VrFinanciamento) AS PE_PND,
+SUM(A.VpSpread) as SPREAD_PND,
+SUM(A.VpTxGerencial) as TAXA_PND,
+SUM(A.VrFinanciamento) as VrFinanciamento,
+SUM(C.FlBVMais) as SPF_TT,
+SUM(C.FlCompleto) as COMPLETO_TT,
+SUM(C.FlBVMaisEleg) as ELEGIVEIS_SPF,
+SUM(C.FlDemaisEleg) as ELEGIVEIS_COMPLETO,
+SUM(A.FlTxAlterada) as PA_TT,
+SUM(A.FlPropostaEfetivada) as QtdContratos,
+SUM(CASE WHEN A.FlTxAlterada = 1 then VarTaxaAlterada/100*A.VrProducao else 0 end) as TamanhoPA_PND,
+SUM(A.PcProbabilidadeAprovacao*A.VrProducao) as Rating_Medio_Prod,
+SUM(A.VpTirContabil) as TIR_PND,
+SUM(A.TaxaTabela/100*A.VrProducao) as TaxaTabela_PND,
+SUM(B.Inad_30_1pmt) AS INAD30_PND,
+SUM(B.Val_prt_30_1pmt) AS Val_prt_30_1pmt,
+COALESCE(SUM(CASE WHEN C.VrTarifaCadastro > 0 THEN 1 END),0) AS QtdTC
+
+FROM BASE_LEVES as A
+LEFT JOIN SHMESA.baseunicarodas_2023 AS B ON A.NuProposta=B.NuProposta
+LEFT JOIN PROJETOS.TBPRODUCAO AS C ON A.NuProposta=C.NuProposta
+LEFT JOIN PUBLICO_PPR_FINAL_SIMU AS E on A.NuProposta=E.NuProposta
+LEFT JOIN CRM.RENTABILIDADE_ANALITICO_FINANCAS AS F ON A.NuContrato=F.NuContrato
+LEFT JOIN TBSEMANAS as G ON A.DtContrato=G.DtTempo
+
+/*DATA INICIO PPR: 23/OUT/2023*/
+WHERE A.DtEntradaProposta >= '01Jan2024'd AND A.VrProducao > 0
+/*AND A.DsTipoCanalProducao = 'MULTIMARCAS' */
+AND A.TpPessoa = 'F'
+AND A.Produto = 'Motos'
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25;
+QUIT;
+
+PROC SQL;
+CREATE TABLE PRODUCAO_PPR AS
+SELECT
+
+'Producao' as TpDados,
+Safra,
+
+DtEntradaProposta,
+/*DtContrato,*/
+
+FG_SEMANA,
+FG_PUBLICO,
+FG_PUBLICO_CRED,
+FG_PUBLICO_PA,
+
+FG_AJUSTE_PE_PRICING,
+FG_AJUSTE_PE_CRED,
+
+FG_PILOTO_ENTMIN,
+FX_ENTRADA_MIN,
+
+AGRUPAMENTO_RTG,
+AGRUPAMENTO_RTG_AJUST,
+Filial,
+Canal,
+Regional,
+
+FxIdade,
+FxIdade2,
+
+FxEntrada,
+
+FxCilindrada,
+Mensageria,
+AGRUPAMENTO_MSG,
+FLAG_PA,
+
+SUM(VrProducao) as VrProducao,
+SUM(VrMargem) AS VrMargem,
+SUM(PE_PND) AS PE_PND,
+SUM(SPREAD_PND) as SPREAD_PND,
+SUM(TAXA_PND) as TAXA_PND,
+SUM(VrFinanciamento) as VrFinanciamento,
+SUM(SPF_TT) as SPF_TT,
+SUM(COMPLETO_TT) as COMPLETO_TT,
+SUM(ELEGIVEIS_SPF) as ELEGIVEIS_SPF,
+SUM(ELEGIVEIS_COMPLETO) as ELEGIVEIS_COMPLETO,
+SUM(PA_TT) as PA_TT,
+SUM(QtdContratos) as QtdContratos,
+SUM(TamanhoPA_PND) as TamanhoPA_PND,
+SUM(Rating_Medio_Prod) as Rating_Medio_Prod,
+SUM(TIR_PND) as TIR_PND,
+SUM(TaxaTabela_PND) as TaxaTabela_PND,
+SUM(INAD30_PND) AS INAD30_PND,
+SUM(Val_prt_30_1pmt) AS Val_prt_30_1pmt,
+SUM(QtdTC) AS QtdTC
+
+FROM INFOS_PRODUCAO
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23;
+
+QUIT;
+
+DATA SOLITMP.FUNIL_PRICING_MOTOS;
+SET FUNIL_PPR PRODUCAO_PPR;
+RUN;
+
+/*PROC SQL;*/
+/*   CREATE TABLE ANALITICO_MOTOS AS */
+/*   SELECT */
+/**/
+/*'Analitico' as TpDados,*/
+/*A.Safra,*/
+/*A.DtEntradaProposta,*/
+/*A.DtContrato,*/
+/*COALESCE(E.FG_PUBLICO,'SEM PPR') AS FG_PUBLICO,*/
+/*COALESCE(E.FG_PUBLICO_CRED,'SEM PPR') AS FG_PUBLICO_CRED,*/
+/*COALESCE(E.FG_PUBLICO_PA,'SEM PPR') AS FG_PUBLICO_PA,*/
+/*/*COALESCE(E.FX_ENTRADA_MIN,'Desconhecido') AS FX_ENTRADA_MIN,*/*/
+/**/
+/*E.PcProbabilidadeAprovacao,*/
+/*COALESCE(E.AGRUPAMENTO_RTG,'SEM PPR') AS AGRUPAMENTO_RTG,*/
+/*COALESCE(E.Mensageria,'SEM PPR') AS Mensageria,*/
+/*A.DsTipoCanalProducao as Canal,*/
+/*A.DsFilial as Filial,*/
+/*A.NuProposta,*/
+/*A.NuContrato,*/
+/*A.NuCpfCnpj,*/
+/**/
+/**/
+/*E.FxCilindrada,*/
+/**/
+/*CASE WHEN A.Regional = 'Canal Rodas e EGV I - Regional I' then 'C1R1'*/
+/*     WHEN A.Regional = 'Canal Rodas e EGV I - Regional II' then 'C1R2'*/
+/*	 WHEN A.Regional = 'Canal Rodas e EGV II - Regional I' then 'C2R1'*/
+/*	 WHEN A.Regional = 'Canal Rodas e EGV II - Regional II' then 'C2R2'*/
+/*	 WHEN A.Regional = 'Canal Rodas e EGV III - Regional I' then 'C3R1'*/
+/*	 WHEN A.Regional = 'Canal Rodas e EGV III - Regional II' then 'C3R2'*/
+/*	 ELSE 'ERRO' END AS Regional,*/
+/**/
+/*CASE WHEN A.Regional in ('Canal Rodas e EGV I - Regional I','Canal Rodas e EGV I - Regional II') then 'C1'*/
+/*     WHEN A.Regional in ('Canal Rodas e EGV II - Regional I','Canal Rodas e EGV II - Regional II') then 'C2'*/
+/*     WHEN A.Regional in ('Canal Rodas e EGV III - Regional I','Canal Rodas e EGV III - Regional II') then 'C3'*/
+/*	 ELSE 'ERRO' END AS Canal,*/
+/**/
+/*CASE WHEN A.FxIdade = 'ZeroKM' then 'ZeroKM'*/
+/*     WHEN A.FxIdade = '0 a 2 anos' then '0 a 2 anos'*/
+/*     WHEN A.FxIdade = '3 a 7 anos' then '3 a 7 anos'*/
+/*     WHEN A.FxIdade = '8 a 10 anos' then '8 a 10 anos'*/
+/*     WHEN A.FxIdade in ('Acima 10 anos','Acima de 10 anos') then 'Acima 10 anos'*/
+/*	 ELSE 'ERRO' END AS FxIdade,*/
+/**/
+/*E.AGRUPAMENTO_MSG,*/
+/**/
+/*CASE WHEN A.FlTxAlterada = 0 THEN 'SEM PA'*/
+/*ELSE 'COM PA'*/
+/*END AS FLAG_PA,*/
+/**/
+/*SUM(A.VrProducao) as VrProducao,*/
+/*SUM(A.VrMargem) AS VrMargem,*/
+/*SUM(A.RUPE*A.VrFinanciamento) AS PE_PND,*/
+/*SUM(A.VpSpread) as SPREAD_PND,*/
+/*SUM(A.VpTxGerencial) as TAXA_PND,*/
+/*SUM(A.VrFinanciamento) as VrFinanciamento,*/
+/*SUM(C.FlBVMais) as SPF_TT,*/
+/*SUM(C.FlCompleto) as COMPLETO_TT,*/
+/*SUM(C.FlBVMaisEleg) as ELEGIVEIS_SPF,*/
+/*SUM(C.FlDemaisEleg) as ELEGIVEIS_COMPLETO,*/
+/*SUM(A.FlTxAlterada) as PA_TT,*/
+/*SUM(A.FlPropostaEfetivada) as QtdContratos,*/
+/*SUM(CASE WHEN A.FlTxAlterada = 1 then VarTaxaAlterada/100*A.VrProducao else 0 end) as TamanhoPA_PND,*/
+/*SUM(A.PcProbabilidadeAprovacao*A.VrProducao) as Rating_Medio_Prod,*/
+/*SUM(A.VpTirContabil) as TIR_PND,*/
+/*SUM(A.TaxaTabela/100*A.VrProducao) as TaxaTabela_PND,*/
+/*SUM(B.Inad_30_1pmt) AS INAD30_PND,*/
+/*SUM(B.Val_prt_30_1pmt) AS Val_prt_30_1pmt,*/
+/*SUM(F.ROEp_Seguros_Inad_Pond) AS ROEp_Seguros_Inad_Pond,*/
+/*SUM(F.ROEp_Seguros_Target_Pond) AS ROEp_Seguros_Target_Pond,*/
+/*SUM(F.ROEp_Seguros_Sistema_Pond) AS ROEp_Seguros_Sistema_Pond,*/
+/*SUM(PL_POND) AS PL_Ajustado,*/
+/*COALESCE(SUM(CASE WHEN C.VrTarifaCadastro > 0 THEN 1 END),0) AS QtdTC*/
+/**/
+/*FROM BASE_LEVES as A*/
+/*LEFT JOIN SHMESA.baseunicarodas_2023 AS B ON A.NuProposta=B.NuProposta*/
+/*LEFT JOIN PROJETOS.TBPRODUCAO AS C ON A.NuProposta=C.NuProposta*/
+/*LEFT JOIN PUBLICO_PPR_FINAL_SIMU AS E on A.NuProposta=E.NuProposta*/
+/*LEFT JOIN CRM.RENTABILIDADE_ANALITICO_FINANCAS AS F ON A.NuContrato=F.NuContrato*/
+/**/
+/**/
+/*WHERE A.DtEntradaProposta >= '28Dec2023'd AND A.VrProducao > 0 */
+/*/*AND A.DsTipoCanalProducao = 'MULTIMARCAS' */*/
+/*/*AND A.TpPessoa = 'F' */*/
+/*AND A.Produto = 'Motos'*/
+/**/
+/*GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;*/
+/*QUIT;*/

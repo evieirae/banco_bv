@@ -1,0 +1,382 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__1172 - Projeto
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:34 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -5
+ODS_OUTPUTS_DETECTED: xlsx
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 281
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASES = /riscosbv/juridico/bases_full; DBEP = /riscosbv/juridico/yribeiro/DB_ExyonProjuris/; DBRPTTBL = /riscosbv/juridico/yribeiro/DB_ReportTable; DBTEMP = /riscosbv/juridico/yribeiro/DB_Temporary; MIS_JUR = /riscosbv/juridico/MIS_JUR; YBR = /riscosbv/juridico/yribeiro
+DETECTED_MACROS_DEFINED: dir
+DETECTED_MACROS_USED: AnoMesDia, dir
+MACRO_SCOPE_GLOBALS: ANOMESDIA
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBV/JURIDICO/YRIBEIRO/RISCO_BCO_DBBVF_LOG.SAS [SAS/Local], DBEP.VWTBLCAUSACONS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DBEP
+EXPORTED_LIBNAMES: DBRPTTBL
+IMPORTED FILES (Requires Ingestion): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.ENCERRAMENTOS, WORK.QUERY_FOR_ENCERRADAS_CIVEL_S_PRO
+TABLE_READ_PROVENANCE (Flow): DBEP.VWTBLCAUSACONS [PROC SQL - FROM], WORK.ENCERRAMENTOS [PROC SQL - FROM], WORK.QUERY_FOR_ENCERRADAS_CIVEL_S_PRO [PROC EXPORT - DATA=; PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): /riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): DBRPTTBL.TBL1172BASEMOTIVOSRECUPERACAO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir./1172-Base_Motivos_Recuperacao_&AnoMesDia..xlsx
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: HONORARIOS, INDENIZACOES, WORK.EMOLUMENTOS, WORK.ENCERRAMENTOS, WORK.QUERY_FOR_ENCERRADAS_CIVEL_S_PRO
+DYNAMIC REFS (Ambiguous): {ANOMESDIA}.XLSX
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET fileIn=\\bvnet\mor\DEPTO\Transfer\MOR-BER\MIS_JUR\CONTROLE_QUALIDADE\Base_Motivos_Recuperacao.xls;
+%LET dir=%sysfunc(getoption(work));
+
+[[ FILE_REFS_MACRO ]]
+OUT|&dir./1172-Base_Motivos_Recuperacao_&AnoMesDia..xlsx|%SYSFUNC(GETOPTION(WORK))|1172-BASE_MOTIVOS_RECUPERACAO_#.XLSX|ANOMESDIA,DIR|ok
+IN|/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas|/RISCOSBV/JURIDICO/YRIBEIRO|RISCO_BCO_DBBVF_LOG.SAS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01 - Libs */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01 - Libs */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ZXtlm1YvvYmgInws/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname bases		'/riscosbv/juridico/bases_full';
+libname ybr			'/riscosbv/juridico/yribeiro';
+libname mis_jur		'/riscosbv/juridico/MIS_JUR' ;
+libname DbTemp		'/riscosbv/juridico/yribeiro/DB_Temporary';
+libname dbep        '/riscosbv/juridico/yribeiro/DB_ExyonProjuris/';
+libname dbrpttbl    '/riscosbv/juridico/yribeiro/DB_ReportTable';
+
+%GLOBAL AnoMesDia;
+DATA _NULL_;
+AnoMesDia=YEAR(TODAY())*10000+MONTH(TODAY())*100+DAY(TODAY());
+CALL SYMPUT('AnoMesDia',STRIP(AnoMesDia));
+;run;
+
+
+%include '/riscosbv/juridico/yribeiro/RISCO_BCO_DBBVF_LOG.sas';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01 - Libs */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02 - Indenizações from tblCausa */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02 - Indenizações from tblCausa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5vUTw9QgGPuRlwxh/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+CREATE TABLE INDENIZACOES AS
+
+SELECT
+ t1.CdCausa 					as CD_CAUSA
+,t1.nmPagamentoTipoDesfecho 	as TipoLcto
+,t1.cdPagamentoTipoDesfecho 	as CdLcto   
+,t1.DtEncerramento	 			as DtOcorrencia
+,sum(t1.VrIndenizacao) as 		Vlr_Indenizacao
+
+FROM dbep.vwtblcausacons t1
+
+WHERE 1=1
+and t1.cdSistema                        ='p'
+and t1.fllegadojudicialadmnistrativo    ='J'
+and t1.CdUnidadeExyon ='VAC'
+
+
+group by 1
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02 - Indenizações from tblCausa */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03 - Emolumentos from tblCausa */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03 - Emolumentos from tblCausa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-AxMcQ1bKKT2egSdE/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+CREATE TABLE work.EMOLUMENTOS (COMPRESS=YES) AS
+
+SELECT
+
+t1.CdCausa 						as CD_CAUSA
+,sum(t1.VrEmolumentos) 			as Vlr_Emolumento
+
+FROM dbep.vwtblcausacons t1
+
+WHERE 1=1
+and t1.cdSistema                        ='p'
+and t1.fllegadojudicialadmnistrativo    ='J'
+and t1.CdUnidadeExyon ='VAC'
+
+group by 1;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03 - Emolumentos from tblCausa */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 04 - Honorarios from tblCausa */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 04 - Honorarios from tblCausa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-SguJNmiVIDAJfKuF/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE HONORARIOS AS
+
+SELECT
+
+t1.CdCausa AS CD_CAUSA
+,sum(t1.VrHonorarios) as vlr_honorarios
+
+FROM dbep.vwtblcausacons t1
+
+WHERE 1=1
+and t1.cdSistema                        ='p'
+and t1.fllegadojudicialadmnistrativo    ='J'
+and t1.CdUnidadeExyon ='VAC'
+group by 1
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 04 - Honorarios from tblCausa */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 05 - Encerramento */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 05 - Encerramento */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-yetD4HRaP6YhzmyM/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE WORK.encerramentos AS
+SELECT
+ B.*
+FROM dbep.vwtblcausacons B
+WHERE  DtEncerramento <>.
+and B.cdSistema                     ='p'
+and B.fllegadojudicialadmnistrativo ='J'
+and B.CdUnidadeExyon ='VAC'
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 05 - Encerramento */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 06 - Consolidação */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 06 - Consolidação */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5in5nqaGd5UIVnKP/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ENCERRADAS_CIVEL_S_PRO AS
+   SELECT
+		 t1.CdCausa as CD_CAUSA
+        ,t1.DtCadastramento as DT_CADASTRAMENTO
+		,t1.CdAcaoJudicialCategoria as ACAO_JUDICIAL
+		,t1.DtEncerramento as DT_ENCERRAMENTO
+		,t1.NmMotivo as MOTIVO
+		,t1.NmSubMotivo as SUBMOTIVO
+		,t1.NmMotivoRRO as MOTIVO_RRO
+		,t1.NmMotivoEncerramento as MOTIVO_ENCERRAMENTO
+		,t1.NmTipoEncerramento as TIPO_ENCERRAMENTO
+		,t1.NmMunicipio as MUNICIPIO
+		,t1.CdUF as UF
+		,t1.NmOrgaoJudicial as DENOMINACAO
+		,t1.NmCarteira as CARTEIRA
+		,0 as VLR_PLEITO
+		,t1.FlBaixaContabil as DT_BAIXA_CONTABIL
+		,0 as VLR_DISCUTIDO
+		,t1.NomeParte as AUTOR
+		,t1.CPFCNPJ as CPFCNPJ
+		,t1.NmProcurador as PROCURADOR
+		,t1.Empresa as EMPRESA
+		,t1.NuContrato1DeN as NO_CONTRATO
+		,t1.NmRecurso as Recurso
+		,0 as DT_INICIO_CTO
+		,t1.NmProduto as PRODUTO
+		,b.TipoLcto
+		,b.CdLcto
+		,b.DtOcorrencia
+		,b.Vlr_Indenizacao * -1 as Vlr_Indenizacao
+		,d.Vlr_Emolumento * -1 as Vlr_Emolumento
+		,c.vlr_honorarios
+		,t1.CdProcesso
+		,t1.NuContrato1DeN
+
+		FROM work.ENCERRAMENTOS t1
+		left join INDENIZACOES 	b ON t1.CdCausa = b.CD_CAUSA
+		left join HONORARIOS 	c ON t1.CdCausa = c.CD_CAUSA
+		left join EMOLUMENTOS 	d ON t1.CdCausa = d.CD_CAUSA
+      WHERE UPPER (t1.NmSubMotivo) IN (
+ 'AUSÊNCIA/DEMORA NA BAIXA DO PROTESTO'
+,'DEMORA NA BAIXA DO PROTESTO'
+,'AUSÊNCIA/DEMORA NA BAIXA DO PROTESTO/PROTESTO INDEVIDO'
+,'COBRANÇA VEXATÓRIA'
+,'DESCUMPRIMENTO DE ACORDO EM AÇÃO ANTERIOR'
+,'DESCUMPRIMENTO DE LIMINAR/SENTENÇA'
+,'DESCUMPRIMENTO DE LIMINAR PELO JURÍDICO'
+,'AUSÊNCIA/DEMORA NA REABILITAÇÃO DO AUTOR NOS ÓRGÃOS DE PROTEÇÃO AO CRÉDITO'
+,'INEXISTÊNCIA / EXCESSO DO VALOR COBRADO'
+,'AUSÊNCIA DE NOTIFICAÇÃO SOBRE SALDO DEVEDOR'
+,'SOLICITAÇÃO DE DOCUMENTOS/ESCLARECIMENTOS NÃO FORNECIDOS'
+,'PEDIDO DE RENEGOCIAÇÃO/DEVOLUÇÃO DO BEM'
+,'DIFICULDADE BOLETO ATUALIZAÇÃO DE CONTRATO'
+,'PAGAMENTO NÃO CONTABILIZADO'
+,'INVERSÃO DE PARCELA'
+,'PURGAÇÃO DA MORA NÃO IDENTIFICADA'
+,'BOLETOS FRAUDADOS'
+,'COBRANÇA DE HOMÔNIMO'
+,'DESCUMPRIMENTO DE LIMINAR/SENTENÇA'
+,'DEVOLUÇÃO DE VEÍCULO APREENDIDO'
+,'DESCUMPRIMENTO DE ACORDO EM AÇÃO ANTERIOR'
+,'PAGAMENTO NÃO CONTABILIZADO DE CARTÃO DE CRÉDITO'
+,'AÇÃO AJUIZADA INDEVIDAMENTE / APREENSÃO INDEVIDA'
+,'PROBLEMAS DE REPASSE - ASSESSORIA'
+,'AUSÊNCIA/DEMORA NA BAIXA DA RESTRIÇÃO JUDICIAL'
+
+           					)
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 06 - Consolidação */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 07 - Fixar Base */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 07 - Fixar Base */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-bZAPmrVZNdggZQy2/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let dir = %sysfunc(getoption(work));
+
+proc export
+DATA            = work.QUERY_FOR_ENCERRADAS_CIVEL_S_PRO
+OUTFILE            = "&dir./1172-Base_Motivos_Recuperacao_&AnoMesDia..xlsx"
+DBMS            = xlsx replace ;
+sheet	="1172-Base_Motivos_Recuperacao"
+;run;
+
+proc sql;
+
+create table dbrpttbl.TBL1172BaseMotivosRecuperacao (compress=yes) as
+
+select
+
+CD_CAUSA										as CdCausa
+,DT_CADASTRAMENTO								as DtCadastramento
+,ACAO_JUDICIAL									as AcaoJudicial
+,DT_ENCERRAMENTO								as DtEncerramento
+,MOTIVO											as Motivo
+,SUBMOTIVO										as Submotivo
+,MOTIVO_RRO										as MotivoRro
+,MOTIVO_ENCERRAMENTO							as MotivoEncerramento
+,TIPO_ENCERRAMENTO								as TipoEncerramento
+,MUNICIPIO										as Municipio
+,UF												as Uf
+,DENOMINACAO									as Denominacao
+,CARTEIRA										as Carteira
+,VLR_PLEITO										as VlrPleito
+,DT_BAIXA_CONTABIL								as DtBaixaContabil
+,VLR_DISCUTIDO									as VlrDiscutido
+,AUTOR											as Autor
+,CPFCNPJ										as Cpfcnpj
+,PROCURADOR										as Procurador
+,EMPRESA										as Empresa
+,NO_CONTRATO									as NoContrato
+,Recurso										as Recurso
+,DT_INICIO_CTO									as DtInicioCto
+,PRODUTO										as Produto
+,TipoLcto										as Tipolcto
+,CdLcto											as Cdlcto
+,DtOcorrencia									as Dtocorrencia
+,Vlr_Indenizacao								as VlrIndenizacao
+,Vlr_Emolumento									as VlrEmolumento
+,vlr_honorarios									as VlrHonorarios
+,intnx('day' , DT_CADASTRAMENTO, 21916 ) 		as DtCadastramento2C
+,intnx('day' , DT_ENCERRAMENTO, 21916 ) 		as DtEncerramento2C
+,intnx('day' , DT_INICIO_CTO, 21916 ) 			as DtInicioCto2C
+,intnx('day' , DtOcorrencia, 21916 ) 			as DtOcorrencia2C
+,intnx('day' , Today(), 21916 ) 				as DtAtualizacao
+
+from work.QUERY_FOR_ENCERRADAS_CIVEL_S_PRO
+
+;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 07 - Fixar Base */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 14 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1000 - Fixar Log */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-QyXU1GhmK4BB5zET/code.sas */
+/* =========================INÍCIO TASK========================= */
+%log_errors;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1000 - Fixar Log */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

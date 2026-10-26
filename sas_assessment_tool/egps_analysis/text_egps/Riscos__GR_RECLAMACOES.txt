@@ -1,0 +1,255 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__GR_RECLAMACOES
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:39 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 188
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASES = /projetos/MISV/data/bases; OUV = /ouvidoria
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPRODUCAO [SAS/Local], OUV.RECL_CONSOLIDADO_2023 [SAS/Local], OUV.RECL_CONSOLIDADO_2024_NEW [SAS/Local], OUV.RECL_CONSOLIDADO_2025_NEW [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.OUVIDORIA_AJUSTADO, WORK.RECLAMACOES_OUVIDORIA, WORK.TBPRODUCAO
+IMPORTED_LIBNAMES: BASES, OUV
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.OUVIDORIA_AJUSTADO, WORK.OUVIDORIA_COM_CONTRATO, WORK.RECLAMACOES_OUVIDORIA, WORK.TBPRODUCAO
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [DATA Step - SET], OUV.RECL_CONSOLIDADO_2023 [DATA Step - SET], OUV.RECL_CONSOLIDADO_2024_NEW [DATA Step - SET], OUV.RECL_CONSOLIDADO_2025_NEW [DATA Step - SET], WORK.OUVIDORIA_AJUSTADO [PROC SQL - FROM], WORK.OUVIDORIA_COM_CONTRATO [PROC SQL - FROM], WORK.RECLAMACOES_OUVIDORIA [DATA Step - SET], WORK.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: OUVIDORIA_AJUSTADO, RECLAMACOES_OUVIDORIA, TBPRODUCAO, WORK.FILTER_FOR_OUVIDORIA_COM_CONTRAT, WORK.OUVIDORIA_COM_CONTRATO, WORK.QUERY_FOR_OUVIDORIA_AJUSTAD2O
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.OUVIDORIA_AJUSTADO;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-qFPCkblkWFxx8QBu/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname bases '/projetos/MISV/data/bases';
+
+data TbProducao;
+set bases.TbProducao;
+FORMAT DATA_BASE DDMMYY8.;
+DATA_BASE=intnx('month', DtContrato, 0, 'B');
+IF DtContrato >= '01Jan2023'd;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-CNvcfXyqfHnw9oya/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME OUV '/ouvidoria';
+
+data RECLAMACOES_OUVIDORIA;
+SET
+OUV.RECL_CONSOLIDADO_2025_NEW
+OUV.RECL_CONSOLIDADO_2024_NEW
+OUV.RECL_CONSOLIDADO_2023;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (3) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Vo5looj5gVyrllrp/code.sas */
+/* =========================INÍCIO TASK========================= */
+data ouvidoria_ajustado;
+set WORK.RECLAMACOES_OUVIDORIA;
+
+CPF_CNPJ_2 = put(CPF_CNPJ, z11.);
+DATA_ABERTURA_ = INPUT(DATA_ABERTURA, yymmdd10.);
+CONTRATO_ = INPUT(NUCONTRATO, 32.);
+
+format DATA_ABERTURA_ ddmmyy10.
+CONTRATO_ 32.;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (4) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (4) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-WDgAMQyRN1yC7k5l/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.OUVIDORIA_COM_CONTRATO AS
+   SELECT DISTINCT t1.*,
+		  t2.DtContrato,
+          t2.NuContrato as NuContrato2,
+          t2.NuCpfCnpj,
+          t2.CdPessoa,
+          t2.NmPessoa,
+		  t2.CdColaborador,
+t2.NmColaborador,
+t2.NmGrupoCargoColaborador,
+t2.NuCnpjLoja,
+t2.CdParceiroComercial,
+t2.NmParceiroComercial
+
+      FROM WORK.OUVIDORIA_AJUSTADO t1
+           LEFT JOIN WORK.TBPRODUCAO t2 ON (t1.CPF_CNPJ_2 = t2.NuCpfCnpj and DATA_ABERTURA_ >= DtContrato)
+WHERE t1.CLASSIFICACAO in
+('Reclamação',
+'RECLAMAÇÃO',
+'RECLAMACÃO ONLINE',
+'Reclamação Online')
+;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_OUVIDORIA_AJUSTAD2O AS
+   SELECT
+t1.PRODUTO,
+t1.SINTOMA,
+t1.SUBMOTIVO,
+t1.MOTIVO,
+          
+            (COUNT(t1.PRODUTO)) AS COUNT_of_PRODUTO
+      FROM WORK.OUVIDORIA_AJUSTADO t1
+	  WHERE
+	  UPPER(t1.PRODUTO) LIKE '%CONSIGNADO%' AND
+     (UPPER(t1.SINTOMA) LIKE '%CORRESPONDENTE%' or
+      UPPER(t1.MOTIVO) LIKE '%CORRESPONDENTE%' or
+      UPPER(t1.SUBMOTIVO) LIKE '%CORRESPONDENTE%' or
+      UPPER(t1.SINTOMA) LIKE '%LOJISTA%' or
+      UPPER(t1.MOTIVO) LIKE '%LOJISTA%' or
+      UPPER(t1.SUBMOTIVO) LIKE '%LOJISTA%' or
+	  UPPER(t1.SINTOMA) LIKE '%COBAN%' or
+      UPPER(t1.MOTIVO) LIKE '%COBAN%' or
+      UPPER(t1.SUBMOTIVO) LIKE '%COBAN%' or
+      UPPER(t1.SINTOMA) LIKE '%PARCEIRO%' or
+      UPPER(t1.MOTIVO) LIKE '%PARCEIRO%' or
+      UPPER(t1.SUBMOTIVO) LIKE '%PARCEIRO%')
+      GROUP BY 1,2,3,4
+      ORDER BY COUNT_of_PRODUTO DESC;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (4) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_OUVIDORIA_COM_CONTRAT);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_OUVIDORIA_COM_CONTRAT AS
+   SELECT t1.TIPO,
+          t1.ID_RECLAMACAO,
+          t1.DATA_ABERTURA,
+          t1.CPF_CNPJ,
+          t1.SINTOMA,
+          t1.ORIGEM,
+          t1.MOTIVO,
+          t1.SUBMOTIVO,
+          t1.USUARIO,
+          t1.DATA_ENCERRAMENTO,
+          t1.EMISSOR,
+          t1.CD_PRODUTO,
+          t1.PRODUTO,
+          t1.MODALIDADE_PRODUTO,
+          t1.CLASSIFICACAO,
+          t1.AREA,
+          t1.COD_FILA,
+          t1.COD_ESTADO,
+          t1.NUCONTRATO,
+          t1.DATA_CONTRATO,
+          t1.TPSEXO,
+          t1.DT_NASC,
+          t1.IDADE,
+          t1.NMCIDADE,
+          t1.CDUF,
+          t1.CELULA_AREA,
+          t1.CONTA,
+          t1.origem_caso,
+          t1.CASO_REG,
+          t1.CASO_RA,
+          t1.CASO_GOV,
+          t1.CPF_CNPJ_2,
+          t1.DATA_ABERTURA_,
+          t1.CONTRATO_,
+          t1.DtContrato,
+          t1.NuContrato2,
+          t1.NuCpfCnpj,
+          t1.CdPessoa,
+          t1.NmPessoa,
+          t1.CdColaborador,
+          t1.NmColaborador,
+          t1.NmGrupoCargoColaborador,
+          t1.NuCnpjLoja,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial
+      FROM WORK.OUVIDORIA_COM_CONTRATO t1
+      WHERE t1.DATA_ABERTURA >= '20240101' AND t1.NuCnpjLoja NOT = '' AND t1.MODALIDADE_PRODUTO = 'CONSIGNADO PRIVADO';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

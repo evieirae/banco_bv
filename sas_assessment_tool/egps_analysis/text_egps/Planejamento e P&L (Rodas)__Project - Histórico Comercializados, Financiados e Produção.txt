@@ -1,0 +1,414 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - Histórico Comercializados, Financiados e Produção
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 267
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASEGRC = /riscosbvf/BA/bases_gerenciais
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBGRUPOPRODUTOMETA [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], FENAB.TB_FENABRAVE_EMPLACAMENTOS [SAS/Local], FENAB.TB_FENABRAVE_TRANSACOES [SAS/Local], MKTSHARE.TBMARKETSHAREDIARIAABERTA [SAS/Local], MKTSHARE.TBMARKETSHAREHISTORICA_2010_2017 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASEGRC
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.QUERY_FOR_TBGRUPOPRODUTOMETA
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRUPOPRODUTOMETA [PROC SQL - FROM; PROC SQL - JOIN], BASES.TBEXTCONTRATO [PROC SQL - FROM], FENAB.TB_FENABRAVE_EMPLACAMENTOS [PROC SQL - FROM], FENAB.TB_FENABRAVE_TRANSACOES [PROC SQL - FROM], MKTSHARE.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM], MKTSHARE.TBMARKETSHAREHISTORICA_2010_2017 [PROC SQL - FROM], WORK.QUERY_FOR_TBGRUPOPRODUTOMETA [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: FENABRAVE_NOVOS, FENABRAVE_USADOS, WORK.QUERY_FOR_TBEXTCONTRATO, WORK.QUERY_FOR_TBGRUPOPRODUTOMETA, WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE, WORK.QUERY_FOR_TBMARKETSHAREHISTORICA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Q5kISbk2cQGG9SmW/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE FENABRAVE_NOVOS AS
+   SELECT t1.NmArquivo,
+          t1.Segmento,
+
+          
+            (COUNT(t1.Numero_Placa)) AS COUNT_of_Numero_Placa,
+          
+            (COUNT(t1.Numero_Chassis)) AS COUNT_of_Numero_Chassis
+      FROM FENAB.TB_FENABRAVE_EMPLACAMENTOS t1
+
+where t1.NmArquivo in ('Emplacamentos_2025_11.txt')
+
+
+
+
+
+
+
+
+
+
+      GROUP BY t1.NmArquivo,
+               t1.Segmento
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE FENABRAVE_USADOS AS
+   SELECT t1.NmArquivo,
+          t1.Segmento,
+
+
+
+          
+            (COUNT(t1.Numero_Chassis)) AS COUNT_of_Numero_Chassis,
+          
+            (COUNT(t1.Numero_Placa)) AS COUNT_of_Numero_Placa
+      FROM FENAB.TB_FENABRAVE_TRANSACOES t1
+ where t1.nmarquivo in ('Transacoes_2025_11.txt')
+
+
+
+
+
+
+
+
+
+
+group by
+			  1,2;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREHISTORICA AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.NmAgente,
+          
+            (SUM(t1.QtGravames)) FORMAT=BEST5. AS SUM_of_QtGravames
+      FROM MKTSHARE.TBMARKETSHAREHISTORICA_2010_2017 t1
+      GROUP BY t1.NuAnoMes,
+               t1.TpVeiculo,
+               t1.StVeiculo,
+               t1.NmAgente;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.bancos,
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where t1.tparquivo = 'mf' and TpAgenteProdutoMIS <> '3' and t1.NuAnoMes = 202511 and t1.StatusGravame = 'Ativo'
+      GROUP BY t1.NuAnoMes,
+               t1.TpVeiculo,
+               t1.StVeiculo,
+               t1.bancos;
+QUIT;
+
+LIBNAME BASEGRC '/riscosbvf/BA/bases_gerenciais';
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBGRUPOPRODUTOMETA AS
+   SELECT t1.CdGrupoProdutoMeta,
+          t1.NmGrupoProdutoMeta,
+          t1.NmArquivo,
+          t1.CdGrupoSubProduto,
+          t1.CdProduto,
+          t1.NmProduto,
+          t1.CdModalidadeProduto,
+          t1.NmModalidadeProduto,
+          t1.CdTipoBem,
+          t1.NmTipoBem,
+          t1.QtSubProduto,
+          t1.LstSubProduto,
+          t1.FlBVMais,
+          t1.FlCAP,
+          t1.FlDemais,
+          t1.FlAutoCompleto,
+          t1.CdGrupoProduto,
+          t1.NmGrupoProduto,
+          t1.NmGrupoSubProduto
+      FROM BASEGRC.TBGRUPOPRODUTOMETA t1;
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBEXTCONTRATO AS
+   SELECT t1.NuAnoMes,
+          t2.NmGrupoProdutoMeta,
+          t1.CdGrupoSubProduto,
+          t1.FlZeroKm,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+          
+            (SUM(t1.VrContrato)) FORMAT=20.2 AS SUM_of_VrContrato,
+          
+            (SUM(t1.VrEntrada)) FORMAT=20.2 AS SUM_of_VrEntrada,
+          
+            (SUM(t1.VrProducao)) FORMAT=21.2 AS SUM_of_VrProducao
+      FROM BASES.TBEXTCONTRATO t1
+           INNER JOIN WORK.QUERY_FOR_TBGRUPOPRODUTOMETA t2 ON (t1.CdGrupoSubProduto = t2.CdGrupoSubProduto)
+      WHERE t2.NmGrupoProdutoMeta IN
+           (
+           'Leves',
+		   'Leves-BVO',
+           'Motos',
+           'Pesados',
+		   'CVG Leves',
+		   'CVG Pesados'
+           ) AND StProducao = 'S'
+      GROUP BY t1.NuAnoMes,
+               t2.NmGrupoProdutoMeta,
+               t1.CdGrupoSubProduto,
+               t1.FlZeroKm;
+QUIT;
+
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBEXTCONTRATO AS
+   SELECT t1.NuAnoMes,
+          t2.NmGrupoProdutoMeta,
+          t1.FlZeroKm,
+          t1.CdGrupoSubProduto,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+          
+            (SUM(t1.VrContrato)) FORMAT=20.2 AS SUM_of_VrContrato,
+          
+            (SUM(t1.VrEntrada)) FORMAT=20.2 AS SUM_of_VrEntrada,
+          
+            (SUM(t1.VrProducao)) FORMAT=21.2 AS SUM_of_VrProducao
+      FROM BASES.TBEXTCONTRATO t1
+           INNER JOIN BASEGRC.TBGRUPOPRODUTOMETA t2 ON (t1.CdGrupoSubProduto = t2.CdGrupoSubProduto)
+      WHERE t2.NmGrupoProdutoMeta IN
+           (
+           'Leves',
+           'Leves BVO',
+           'Motos',
+           'Pesados',
+           'CVG Leves',
+           'CVG Pesados'
+           ) AND t1.StProducao = 'S' AND t1.NuAnoMes = 202510
+      GROUP BY t1.NuAnoMes,
+               t2.NmGrupoProdutoMeta,
+               t1.FlZeroKm,
+               t1.CdGrupoSubProduto;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Financiados histórico */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Financiados histórico */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-DsgM9U8jL385D2KX/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE FENABRAVE_NOVOS AS
+   SELECT t1.NmArquivo,
+          t1.Segmento,
+
+          
+            (COUNT(t1.Numero_Placa)) AS COUNT_of_Numero_Placa,
+          
+            (COUNT(t1.Numero_Chassis)) AS COUNT_of_Numero_Chassis
+      FROM FENAB.TB_FENABRAVE_EMPLACAMENTOS t1
+
+where t1.NmArquivo in ('Emplacamentos_2025_11.txt')
+
+
+
+
+
+
+
+
+
+
+      GROUP BY t1.NmArquivo,
+               t1.Segmento
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE FENABRAVE_USADOS AS
+   SELECT t1.NmArquivo,
+          t1.Segmento,
+
+
+
+          
+            (COUNT(t1.Numero_Chassis)) AS COUNT_of_Numero_Chassis,
+          
+            (COUNT(t1.Numero_Placa)) AS COUNT_of_Numero_Placa
+      FROM FENAB.TB_FENABRAVE_TRANSACOES t1
+ where t1.nmarquivo in ('Transacoes_2025_11.txt')
+
+
+
+
+
+
+
+
+
+
+group by
+			  1,2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Financiados histórico */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção histórica */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção histórica */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-RSL816zpdPRFAZ4d/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBEXTCONTRATO AS
+   SELECT t1.NuAnoMes,
+          t2.NmGrupoProdutoMeta,
+          t1.FlZeroKm,
+          t1.CdGrupoSubProduto,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+          
+            (SUM(t1.VrContrato)) FORMAT=20.2 AS SUM_of_VrContrato,
+          
+            (SUM(t1.VrEntrada)) FORMAT=20.2 AS SUM_of_VrEntrada,
+          
+            (SUM(t1.VrProducao)) FORMAT=21.2 AS SUM_of_VrProducao
+      FROM BASES.TBEXTCONTRATO t1
+           INNER JOIN BASEGRC.TBGRUPOPRODUTOMETA t2 ON (t1.CdGrupoSubProduto = t2.CdGrupoSubProduto)
+      WHERE t2.NmGrupoProdutoMeta IN
+           (
+           'Leves',
+           'Leves BVO',
+           'Motos',
+           'Pesados',
+           'CVG Leves',
+           'CVG Pesados'
+           ) AND t1.StProducao = 'S' AND t1.NuAnoMes = 202510
+      GROUP BY t1.NuAnoMes,
+               t2.NmGrupoProdutoMeta,
+               t1.FlZeroKm,
+               t1.CdGrupoSubProduto;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção histórica */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Comercializados histórico */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Comercializados histórico */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-RsfPRkc8rLycetZC/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.bancos,
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where t1.tparquivo = 'mf' and TpAgenteProdutoMIS <> '3' and t1.NuAnoMes = 202511 and t1.StatusGravame = 'Ativo'
+      GROUP BY t1.NuAnoMes,
+               t1.TpVeiculo,
+               t1.StVeiculo,
+               t1.bancos;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Comercializados histórico */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.bancos,
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where t1.tparquivo = 'mf' and TpAgenteProdutoMIS <> '3' and t1.NuAnoMes = 202511 and t1.StatusGravame = 'Ativo'
+      GROUP BY t1.NuAnoMes,
+               t1.TpVeiculo,
+               t1.StVeiculo,
+               t1.bancos;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,222 @@
+# CI/CD — deploy automatico do app monitoramento-sas.
+#   PROD  (monitoramento-sas)      -> ao integrar na main.      SP no grupo bv_admins (workspace admin).
+#   DEV   (monitoramento-sas-dev)  -> ao integrar na develop.   SP dedicada no grupo bv_users (NAO admin).
+#
+# So dispara quando algo em egps_analysis/app/** muda (condition.changesets). Auth via OAuth
+# M2M (service principal) por variaveis de ambiente. Detalhe + setup: egps_analysis/app/docs/DEPLOY.md.
+#
+# Variaveis de repositorio necessarias (Repository settings > Repository variables,
+# marcadas como Secured; idealmente scoped ao deployment "production"):
+#   DATABRICKS_HOST           ex.: https://<workspace>.cloud.databricks.com
+#   DATABRICKS_CLIENT_ID      client id do service principal (OAuth M2M)
+#   DATABRICKS_CLIENT_SECRET  secret do service principal
+#   WS_PROD (opcional)        caminho no workspace onde o SP faz sync/deploy do app
+#                             (default no deploy_prod.sh; sobrescreva se o SP nao acessar
+#                             a pasta padrao)
+#
+# Custom (Run pipeline > custom): deploy-{prod,dev}-manual (redeploy), stop-{dev,prod} e
+# start-{dev,prod} (liga/desliga o compute do app sob demanda p/ reduzir custo).
+#
+# AWS (ADR 0005): o mesmo merge também publica a imagem no ECR e reinicia o serviço ECS.
+# Deployments aws-development (Staging) e aws-production (Production), cada uma com
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (Secured; chave da conta monitoramento_sas_deploy,
+#   F4 do plano 1a, que só empurra a imagem e reinicia os dois serviços)
+#   AWS_TAG      dev | prod (tag móvel que a task definition usa)
+#   AWS_SERVICE  monitoramento-sas-dev | monitoramento-sas
+# Só entra na develop/main DEPOIS do apply da F2: antes disso não há ECR nem serviço, e todo
+# merge quebraria no deploy. Custom deploy-aws-{dev,prod}-manual: a condição so-app olha só o
+# último commit (o do merge), então merge que não toca egps_analysis/app/** não publica imagem
+# (foi o caso do PR que trouxe estes steps); estes publicam sem precisar de commit.
+
+image: node:20
+
+definitions:
+  services:
+    # Postgres descartável dos testes do app na AWS (ADR 0005): cada teste cria o seu banco.
+    postgres:
+      image: postgres:17
+      variables:
+        POSTGRES_HOST_AUTH_METHOD: trust
+  caches:
+    npmapp:
+      key:
+        files:
+          - egps_analysis/app/frontend/package-lock.json
+      path: egps_analysis/app/frontend/node_modules
+  steps:
+    - step: &testes
+        # Roda a suite do backend INTEIRA, nao so a de priorizacao: a regra de familia de
+        # safras vive em DUAS formas (Python e SQL) que precisam andar juntas, e sem gate
+        # automatico a divergencia so aparece em quem rodar o script de paridade.
+        # Nenhum teste aqui toca o Databricks (os helpers de banco sao monkeypatchados).
+        name: Testes — backend do app (familia de safras, predicados, priorizacao)
+        image: python:3.11-slim
+        services: [postgres]
+        script:
+          # requirements do app ja traz pytest e httpx (TestClient) alem de fastapi/sdk
+          - pip install --quiet -r egps_analysis/app/requirements.txt
+          # openpyxl NAO e dep do app: e da suite da RAIZ, que le src/RepMap.xlsx (arquivo
+          # versionado) em test_repmap_chameleon_bridge. Instalado a parte, e nao via
+          # egps_analysis/requirements.txt, porque aquele traz pandas + libs de BigQuery e
+          # encareceria todo run do gate por um unico teste. Se faltar, o teste se declara
+          # skip em vez de falhar — mas com ela ele realmente roda.
+          - pip install --quiet openpyxl
+          # Testes do Postgres (ADR 0005) não pulam no CI: sem o banco, falham.
+          - export PG_TEST_DSN=postgresql://postgres@localhost:5432/postgres
+          - export PG_TEST_OBRIGATORIO=1
+          - cd egps_analysis/app/backend && python -m pytest -q
+          # migrações, sincronização, comparador e ensaio da training
+          - cd .. && python -m pytest -q db sync paridade treino && cd backend
+          # Suite da RAIZ (publish/extractor/orchestrator). Antes so 2 destes rodavam,
+          # e a condicao do step nem disparava quando o arquivo coberto mudava — ou seja,
+          # a maior parte do gate existia no repo e nao no CI. app/test_funnel_bars.py
+          # entrou junto: estava vermelho desde 2026-07 (afirmava banda do status
+          # 'Removido', extinto) e foi corrigido na develop.
+          - cd ../../ && python -m pytest test_area_principal.py test_chunks_sem_truncar.py test_egp_decisoes.py test_extractor_recursao_passthrough.py test_fam_metrics.py test_origem_input.py test_path_arquivo.py test_repmap_chameleon_bridge.py test_sas7bdat_nao_some.py app/test_funnel_bars.py -q
+          # Os de baixo sao SCRIPT, nao modulo pytest (nenhum expoe funcao test_*):
+          # rodam pelo __main__ e saem != 0 na falha.
+          - python test_compare_falha_churn.py
+          - python test_compare_vetos.py
+          - python test_descompacta_inputs.py
+          - python test_macro_file_guard.py
+          - python test_passthrough_inputs.py
+          - python test_sas7bdat_como_tabela.py
+          - python test_sql_escape.py
+    - step: &deploy-prod
+        name: Build + deploy prod (monitoramento-sas)
+        deployment: production
+        caches:
+          - npmapp
+        script:
+          # Databricks CLI (a imagem node nao a traz). Anchor reusado pelos demais steps.
+          - &install-cli curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+          - databricks --version
+          # deps do front (cacheadas por package-lock)
+          - cd egps_analysis/app/frontend && npm ci && cd ..
+          # build + sync + deploy + verificacao do artefato (auth M2M vem por env)
+          - bash deploy_prod.sh
+    - step: &deploy-dev
+        name: Build + deploy dev (monitoramento-sas-dev)
+        deployment: development
+        caches:
+          - npmapp
+        script:
+          - *install-cli
+          - databricks --version
+          - cd egps_analysis/app/frontend && npm ci && cd ..
+          # troca app.yaml->dev, build + sync + deploy (auth M2M da SP de dev vem por env)
+          - bash deploy_dev.sh
+    - step: &deploy-aws
+        name: Build + deploy AWS
+        image: atlassian/default-image:4
+        services: [docker]
+        script:
+          - curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+          - unzip -q awscliv2.zip
+          - ./aws/install
+          - export ECR_REPO=835825599161.dkr.ecr.us-east-1.amazonaws.com/monitoramento-sas
+          - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 835825599161.dkr.ecr.us-east-1.amazonaws.com
+          # a imagem leva o commit (rastreio) e a tag móvel do ambiente, que a task definition usa
+          - docker build -t $ECR_REPO:$BITBUCKET_COMMIT -t $ECR_REPO:$AWS_TAG egps_analysis/app
+          - docker push $ECR_REPO:$BITBUCKET_COMMIT
+          - docker push $ECR_REPO:$AWS_TAG
+          # --desired-count 1: o merge na develop é o que LIGA o dev (nasce com 0 tarefas e o
+          # agendador da F2 o desliga às 22h). Na prod não muda nada: ela já fica com 1, 24/7.
+          - aws ecs update-service --region us-east-1 --cluster tf-indicium-ecs --service $AWS_SERVICE --desired-count 1 --force-new-deployment
+          - aws ecs wait services-stable --region us-east-1 --cluster tf-indicium-ecs --services $AWS_SERVICE
+    # Liga/desliga o compute do app sob demanda (reduz custo quando ocioso). Cada step usa o
+    # `deployment:` do seu ambiente (SP correta) — nao da pra generalizar num step so sem
+    # misturar as SPs. So diferem no environment e no nome do app; a instalacao da CLI e o
+    # comando compartilham o mesmo padrao. Requer CAN_MANAGE no app (dev-sp ja tem no dev).
+    - step: &stop-dev
+        name: Stop app dev (monitoramento-sas-dev)
+        deployment: development
+        script:
+          - *install-cli
+          - databricks apps stop monitoramento-sas-dev
+    - step: &start-dev
+        name: Start app dev (monitoramento-sas-dev)
+        deployment: development
+        script:
+          - *install-cli
+          - databricks apps start monitoramento-sas-dev
+    - step: &stop-prod
+        name: Stop app prod (monitoramento-sas)
+        deployment: production
+        script:
+          - *install-cli
+          - databricks apps stop monitoramento-sas
+    - step: &start-prod
+        name: Start app prod (monitoramento-sas)
+        deployment: production
+        script:
+          - *install-cli
+          - databricks apps start monitoramento-sas
+
+pipelines:
+  branches:
+    main:
+      # Condicao dos TESTES e mais larga que a do DEPLOY de proposito: metade do que eles
+      # guardam nao esta em app/** (test_fam_metrics e test_path_arquivo cobrem
+      # publish_to_databricks.py; test_chunks_sem_truncar cobre scripts/ e os publishes),
+      # entao mexer nesses arquivos nao rodava teste nenhum. Rodar teste a mais custa um
+      # container; deployar a mais mexe em producao — por isso so o gate de teste abriu.
+      - step:
+          <<: *testes
+          condition: &testa-egps
+            changesets:
+              includePaths:
+                - "egps_analysis/**"
+      - step:
+          <<: *deploy-prod
+          condition: &so-app
+            changesets:
+              includePaths:
+                - "egps_analysis/app/**"
+      - step:
+          <<: *deploy-aws
+          name: Build + deploy AWS prod
+          deployment: aws-production
+          condition: *so-app
+    develop:
+      - step:
+          <<: *testes
+          condition: *testa-egps
+      - step:
+          <<: *deploy-dev
+          condition: *so-app
+      - step:
+          <<: *deploy-aws
+          name: Build + deploy AWS dev
+          deployment: aws-development
+          condition: *so-app
+
+  # Deploy manual sob demanda (Pipelines > Run pipeline > custom) — util p/ redeploy sem
+  # um novo commit (ex.: re-tentar apos ajustar permissao da SP).
+  custom:
+    deploy-prod-manual:
+      - step: *testes
+      - step: *deploy-prod
+    deploy-dev-manual:
+      - step: *testes
+      - step: *deploy-dev
+    deploy-aws-dev-manual:
+      - step: *testes
+      - step:
+          <<: *deploy-aws
+          name: Build + deploy AWS dev
+          deployment: aws-development
+    deploy-aws-prod-manual:
+      - step: *testes
+      - step:
+          <<: *deploy-aws
+          name: Build + deploy AWS prod
+          deployment: aws-production
+    stop-dev:
+      - step: *stop-dev
+    start-dev:
+      - step: *start-dev
+    stop-prod:
+      - step: *stop-prod
+    start-prod:
+      - step: *start-prod

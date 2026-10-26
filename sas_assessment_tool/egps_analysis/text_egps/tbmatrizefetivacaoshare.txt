@@ -1,0 +1,104 @@
+START_METADATA
+PROJECT: SAS_UC4__tbmatrizefetivacaoshare
+FILE_SAS: tbmatrizefetivacaoshare.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:01 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 44
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMatrizEfetivacaoShare.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMatrizEfetivacaoShare.csv
+TEMP/DISCARDED OUTPUTS: TBMATRIZEFETIVACAOSHARE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMatrizEfetivacaoShare.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+PROC SQL;
+CREATE TABLE TbMatrizEfetivacaoShare AS
+SELECT
+		 PotencialRodas.NuAnoMes
+		,PotencialRodas.DtAtualizacaoCETIP
+		,PotencialRodas.NmColaboradorC
+		,PotencialRodas.DsLoginN1C
+		,PotencialRodas.DsLoginN2C
+		,PotencialRodas.DsLoginN3C
+		,PotencialRodas.LstSubstituicaoC
+		,PotencialRodas.NmAreaEstruturaComercialC
+		,PotencialRodas.NmSubEstruturaComercialC
+		,PotencialRodas.NmLoja
+		,PotencialRodas.FlPorteA
+		,PotencialRodas.NuCnpjLoja
+		,PotencialRodas.FxIdade
+		,0.7 as NuMetaEfetivacao /*Meta Definida por Planejamento*/
+		,0.338 as NuMetaShare 	 /*Meta Definida por Planejamento*/
+
+		,SUM(PotencialRodas.VrProducao) AS VrProducao format 18.2
+		,SUM(PotencialRodas.QtContrato) AS QtContrato format 18.0
+		,SUM(PotencialRodas.VrGravamesMercado) AS VrGravamesMercado format 18.2
+		,SUM(PotencialRodas.QtGravamesMercado) AS QtGravamesMercado format 18.0
+		,SUM(PotencialRodas.QtPropostaOriginada) as QtPropostaOriginada format 18.2
+		,SUM(PotencialRodas.QtPropostaAprovada) as QtPropostaAprovada format 18.2
+		,SUM(PotencialRodas.QtPropostaEfetivada) as QtPropostaEfetivada format 18.2
+
+FROM tmp.TbPotencialRodas PotencialRodas
+
+WHERE PotencialRodas.NuAnoMes >= 202001
+	AND PotencialRodas.NmGrupoProduto = 'Leves'
+	AND PotencialRodas.FlAtivo = 'S'
+	AND PotencialRodas.NmCanalEstruturaComercialC = 'Canal Veiculos'
+	AND PotencialRodas.NmTipoParceiroComercial = 'Loja'
+	AND PotencialRodas.FxIdade not in ('ZeroKM')
+	AND PotencialRodas.FlAtualizacaoMercado = 1
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+;RUN;
+
+proc export
+data=TbMatrizEfetivacaoShare
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMatrizEfetivacaoShare.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMatrizEfetivacaoShare.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";

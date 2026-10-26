@@ -1,0 +1,35 @@
+# Databricks App manifest — Painel de Modernização SAS
+# Deploy:  databricks apps deploy painel-modernizacao-sas --source-code-path <este dir>
+# O app roda como service principal (auth automática). O warehouse vai por env abaixo
+# (ou anexe um recurso de SQL Warehouse e exponha DATABRICKS_WAREHOUSE_ID).
+command:
+  - "python"
+  - "backend/main.py"
+
+env:
+  - name: PUBLISH_CATALOG
+    value: "bv_dev_db"
+  - name: PUBLISH_SCHEMA
+    value: "monitoramento_sas"
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "5922c26f81f1bbdd"
+  # exige o token do usuário (on-behalf-of-user); sem ele NÃO usa o service principal
+  - name: REQUIRE_OBO
+    value: "true"
+  # Família de safras como unidade de input (docs/adr/0002). Ligada em prod a partir de
+  # 17/09/2026: safras datadas da mesma tabela contam como 1 input em todas as superfícies
+  # (escopo Indicium: 2.446 linhas -> 1.404 unidades, 137 famílias). Reversível SEM
+  # republish — nada é materializado: tirar estas duas linhas e redeployar volta ao grão de
+  # safra. O grafo (linhagem/produtor/bloqueio) NÃO muda: segue no grão da safra.
+  - name: FAMILIAS_SAFRA
+    value: "1"
+  # Aba Perguntas: iframe do Genie space "Gargalos e comentários — Migração SAS" (fontes em
+  # genie/). Embed liberado no workspace só para os domínios do app (approved domains).
+  # O app.dev.yaml aponta para o MESMO space (que lê tabelas de PROD).
+  - name: GENIE_EMBED_URL
+    value: "https://dbc-5626df64-1b10.cloud.databricks.com/embed/genie/rooms/01f1c0f81649139385ba0856ebefbfad?o=4394921022945130"
+  # Rotina que grava o que o app calcula em sas_consulta_egp/_input (+ _dia) para o agente
+  # de consulta (ADR 0004). Sonda mudança só com o app em uso, no máximo a cada 15 min, e
+  # roda 1x/dia a partir das 6h. Desligar = tirar estas linhas e redeployar; as tabelas ficam.
+  - name: CONSULTA_SNAPSHOT
+    value: "1"

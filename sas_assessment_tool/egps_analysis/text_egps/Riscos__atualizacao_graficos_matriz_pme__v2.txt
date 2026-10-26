@@ -1,0 +1,452 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__atualizacao_graficos_matriz_pme__v2
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:37 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 319
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (8x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISCRED = /riscosbv/credito/MISCREDITO
+DETECTED_MACROS_DEFINED: anomes, anomes_ant, ultimo_du
+DETECTED_MACROS_USED: anomes, anomes_ant, tp_matriz, ultimo_du
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: TP_MATRIZ
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): MISCRED.BASE_UNICA_ATACADO_202508 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202509 [SAS/Local], MISCRED.DE_PARA_RATING_MTZ [SAS/Local], MISCRED.INFOS_MATRIZ_202509 [SAS/Local], MISCRED.MATRIZ_GRUPOS_202509 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: MISCRED
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_FILE_INPUT: WORK.de_para_rating <- de_para_rating.csv (path not resolved from ImportTask log)
+TABLE_READ_PROVENANCE (Flow): MISCRED.BASE_UNICA_ATACADO_202508 [DATA Step - SET; Resolved dynamic lib.member&macro (%LET)], MISCRED.BASE_UNICA_ATACADO_202509 [DATA Step - SET; Resolved dynamic lib.member&macro (%LET)], MISCRED.DE_PARA_RATING_MTZ [PROC SQL - JOIN], MISCRED.INFOS_MATRIZ_202509 [PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)], MISCRED.MATRIZ_GRUPOS_202509 [PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_UNICA_ATACADO, BASE_UNICA_ATACADO_ANT, BASE_UNICA_ATACADO_CORRIGIDA, BASE_UNICA_ATACADO_MESANT, BASE_UNICA_GPS_&TP_MATRIZ, BU_A_1, BU_A_2, BU_B_1, BU_B_2, CALCULA_PRAZO_OPERACOES, GRUPO_ECONOMICO, GRUPO_ECONOMICO1, GRUPO_ECONOMICO2, GRUPO_ECONOMICO_FIM, JOIN_&TP_MATRIZ, JUNTA_GRUPO_ECONOMICO, MATRIZ_RESILIENCIA, MATRIZ_RESILIENCIA_&TP_MATRIZ, PREVIA_MATRIZ_RESILIENCIA_202509, TABELA_RESUMO_&TP_MATRIZ, TESTE_DUPLICIDADE, VENCIMENTARIO_&TP_MATRIZ, VENCIMENTARIO_FIM_&TP_MATRIZ, VISAO_GRUPO_&TP_MATRIZ, VISAO_GRUPO_VALIDARCREDITO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET anomes=202509;
+%LET anomes_ant=202508;
+%LET ultimo_du='30sep2025'd;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: graficos iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 32 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: graficos iniciais */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-CLOvJG7KX7UALJYL/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname MISCRED BASE "/riscosbv/credito/MISCREDITO";
+
+%let anomes = 202509; 
+%let anomes_ant = 202508;
+%let ultimo_du = '30sep2025'd;
+
+data BASE_UNICA_ATACADO;
+set miscred.base_unica_atacado_&anomes.;
+
+
+
+IF substr(Cluster_Risco, length(Cluster_Risco)-2) = 'PME' then Tp_Matriz='PME'; else Tp_Matriz='CIB';
+
+IF substr(Cluster_Risco, length(Cluster_Risco)-2) = 'PME' then Cluster_Risco = substr(Cluster_Risco, 1, length(Cluster_Risco)-4);
+
+where DsTipoCarteira = 'REGULAR';
+run;
+
+data BASE_UNICA_ATACADO_mesant;
+set miscred.base_unica_atacado_&anomes_ant.;
+
+
+
+IF substr(Cluster_Risco, length(Cluster_Risco)-2) = 'PME' then Tp_Matriz='PME'; else Tp_Matriz='CIB';
+
+IF substr(Cluster_Risco, length(Cluster_Risco)-2) = 'PME' then Cluster_Risco = substr(Cluster_Risco, 1, length(Cluster_Risco)-4);
+
+where DsTipoCarteira = 'REGULAR';
+run;
+
+proc sql;
+create table visao_grupo_validarcredito as
+select distinct
+Tp_Matriz,
+CdGrupo_Economico,
+DsGrupoEconomicoRisco,
+DsSetorClienteRisco_novo,
+Avaliação_Setorial,
+Avaliação_Grupo,
+cluster_risco,
+sum(VrSaldo) as VrSaldo
+from BASE_UNICA_ATACADO (where=(cluster_risco ne 'NA'))
+group by 1,2,3,4,5,6,7;
+quit;
+
+%macro gerar_resumo (tp_matriz);
+
+
+data BASE_UNICA_ATACADO_corrigida;
+set BASE_UNICA_ATACADO;
+where Tp_Matriz = "&tp_matriz.";
+run;
+
+proc sql;
+create table matriz_resiliencia as
+select
+(case when a.Avaliação_Setorial="Fortemente Positivo" then 1 else
+(case when a.Avaliação_Setorial="Levemente Positivo" then 2 else
+(case when a.Avaliação_Setorial="Neutro" then 3 else
+(case when a.Avaliação_Setorial="Levemente Negativo" then 4 else
+(case when a.Avaliação_Setorial="Fortemente Negativo" then 5 else 0 end) end) end) end) end) as n,
+a.Avaliação_Setorial,
+b.Saldo as AtivosEspeciais,
+c.Saldo as Critico,
+d.Saldo as Preocupante,
+e.Saldo as Atencao,
+f.Saldo as Normal
+
+from (select distinct Avaliação_Setorial from BASE_UNICA_ATACADO_corrigida) as a
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Ativos Especiais" group by 1) as b
+on a.Avaliação_Setorial=b.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Critico" group by 1) as c
+on a.Avaliação_Setorial=c.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Preocupante" group by 1) as d
+on a.Avaliação_Setorial=d.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Atenção" group by 1) as e
+on a.Avaliação_Setorial=e.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Normal" group by 1) as f
+on a.Avaliação_Setorial=f.Avaliação_Setorial
+;
+quit;
+
+proc sql;
+create table matriz_resiliencia_&tp_matriz. as 
+select *
+from matriz_resiliencia (where=(Avaliação_Setorial ne "NA"))
+order by n;
+quit;
+
+proc sql;
+create table base_unica_gps_&tp_matriz. as
+select DsGrupoEconomicoRisco, Cluster_Risco, sum (VrSaldo) as Saldo
+from BASE_UNICA_ATACADO_corrigida (where=(cluster_risco ne 'NA'))
+group by 1,2;
+quit;
+
+
+
+proc sql;
+create table calcula_prazo_operacoes as
+select a.*,
+b.pd,
+b.pd*a.VrSaldo as pd_saldo,
+intck('MONTH', &ultimo_du., a.DtVencimentoParcela) as prazo,
+intck('MONTH', &ultimo_du., a.DtVencimentoParcela)*a.VrSaldo as prazo_saldo
+from BASE_UNICA_ATACADO_corrigida (where=(cluster_risco ne 'NA')) as a
+left join miscred.de_para_rating_mtz
+as b
+on a.Flag_Novo_Rating=b.modelo
+and a.DsRatingCliente=b.Rating;
+quit;
+
+proc sql;
+create table visao_grupo_&tp_matriz. as
+select cluster_risco,
+DsGrupoEconomicoRisco,
+sum(VrSaldo) as VrSaldo,
+sum(VrProvisao) as VrProvisao, 
+sum(prazo_saldo) as prazo_pond,
+max(prazo) as prazo,
+sum(pd_saldo) as pd_saldo,
+max(pd) as pd
+from calcula_prazo_operacoes
+group by 1,2;
+quit;
+
+proc sql;
+create table tabela_resumo_&tp_matriz. as 
+select cluster_risco,
+count(*) as Grupos,
+sum(VrSaldo) as Exposicao,
+sum(VrProvisao) as Provisao,
+sum(prazo_pond) as prazo_pond,
+mean(prazo) as prazo,
+sum(pd_saldo) as pd_pond,
+mean(pd) as pd1
+from visao_grupo_&tp_matriz.
+group by 1;
+quit;
+
+proc sql;
+create table vencimentario_&tp_matriz. as
+select cluster_risco,
+(year(DtVencimentoParcela)*100)+month(DtVencimentoParcela) as anomes_vencimento,
+sum(VrSaldo) as VrSaldo
+from BASE_UNICA_ATACADO_corrigida (where=(cluster_risco ne 'NA'))
+group by 1,2;
+quit;
+
+proc sql;
+create table vencimentario_fim_&tp_matriz. as
+select a.*,
+b.VrSaldo as Beneficiado,
+c.VrSaldo as Resiliente,
+d.VrSaldo as Auxilio,
+e.VrSaldo as Saida,
+f.VrSaldo as Saida_AE,
+sum(e.VrSaldo,f.VrSaldo) as Saida_Total
+from (select distinct anomes_vencimento from vencimentario_&tp_matriz.) as a
+left join (select anomes_vencimento, VrSaldo from vencimentario_&tp_matriz. where cluster_risco="Beneficiado") as b
+on a.anomes_vencimento=b.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario_&tp_matriz. where cluster_risco="Resiliente") as c
+on a.anomes_vencimento=c.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario_&tp_matriz. where cluster_risco="Auxilio") as d
+on a.anomes_vencimento=d.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario_&tp_matriz. where cluster_risco="Saida") as e
+on a.anomes_vencimento=e.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario_&tp_matriz. where cluster_risco="AE") as f
+on a.anomes_vencimento=f.anomes_vencimento;
+quit;
+
+proc sql;
+create table Previa_Matriz_Resiliencia_&anomes. as
+select distinct
+		case when d.Cluster_Risco = a.Cluster_Risco then 'Sem alteração'
+		     when d.Cluster_Risco = '' then 'Novo'
+		     when d.Cluster_Risco <> a.Cluster_Risco then 'Alteração de Cluster'
+			 end as Movimentação
+		,c.NmGerenteCredito
+		,c.NmAnalistaCredito
+		,a.DsGrupoEconomicoRisco
+		,d.Avaliação_Grupo as Avaliação_Grupo_Ant
+		,a.Avaliação_Grupo
+		,d.Avaliação_Setorial as Avaliação_Setorial_Ant
+		,a.Avaliação_Setorial
+		,d.Cluster_Risco as Cluster_Risco_Ant
+		,a.Cluster_Risco
+		,b.SegmentoAtuacaoFinal AS SegmentoAtuacaoFinal
+
+from visao_grupo_validarcredito a
+left join miscred.infos_matriz_&anomes. b
+
+on a.DsGrupoEconomicoRisco = b.DsGrupoEconomicoRisco
+left join miscred.matriz_grupos_&anomes. c
+on a.DsGrupoEconomicoRisco = c.NmGrupoEconomico
+left join (select DsGrupoEconomicoRisco, Avaliação_Grupo, Avaliação_Setorial, Cluster_Risco, sum(VrSaldo) as VrSaldo
+from BASE_UNICA_ATACADO_mesant 
+where Cluster_Risco not in ('NA' '') group by 1,2,3,4) d
+on a.DsGrupoEconomicoRisco = d.DsGrupoEconomicoRisco
+;quit;
+
+%mend;
+
+%gerar_resumo(PME);
+%gerar_resumo(CIB);
+
+/* =========================FIM TASK=========================== */
+/* TASK: graficos iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: comparação mes anterior */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 32 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: comparação mes anterior */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-rsBHx4ehWZCawlDg/code.sas */
+/* =========================INÍCIO TASK========================= */
+%macro gerar_resumo2 (tp_matriz);
+
+data base_unica_atacado_ant;
+set miscred.base_unica_atacado_&anomes_ant.;
+CNPJ_RAIZ = SUBSTR(put(NuCpfCnpjClienteRisco, z14.),1,8);
+
+IF substr(Cluster_Risco, length(Cluster_Risco)-2) = 'PME' then Tp_Matriz='PME'; else Tp_Matriz='CIB';
+IF substr(Cluster_Risco, length(Cluster_Risco)-2) = 'PME' then Cluster_Risco = substr(Cluster_Risco, 1, length(Cluster_Risco)-4);
+where DsTipoCarteira = 'REGULAR';
+run;
+
+data base_unica_atacado_ant;
+set base_unica_atacado_ant;
+where Tp_Matriz = "&tp_matriz.";
+run;
+
+data base_unica_atacado_corrigida;
+set base_unica_atacado;
+CNPJ_RAIZ = SUBSTR(put(NuCpfCnpjClienteRisco, z14.),1,8);
+where Tp_Matriz = "&tp_matriz.";
+run;
+
+proc sql; 
+create table Grupo_Economico1 as select distinct DsGrupoEconomicoRisco, CNPJ_RAIZ, NuCpfCnpjClienteRisco, NmGerenteCredito, Login_Analista from base_unica_atacado_ant;
+create table Grupo_Economico2 as select distinct DsGrupoEconomicoRisco, CNPJ_RAIZ, NuCpfCnpjClienteRisco, NmGerenteCredito, Login_Analista  from BASE_UNICA_ATACADO_corrigida;
+quit;
+
+data junta_grupo_economico;
+set Grupo_Economico1 Grupo_Economico2;
+run;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+proc sql;
+create table grupo_economico as select distinct DsGrupoEconomicoRisco, CNPJ_RAIZ, NuCpfCnpjClienteRisco from junta_grupo_economico ;
+quit;
+
+proc sql;
+create table grupo_economico as
+select distinct a.*,
+coalesce(b.NmGerenteCredito,c.NmGerenteCredito) as NmGerenteCredito,
+coalesce(b.Login_Analista,c.Login_Analista) as Login_Analista
+from grupo_economico as a
+left join Grupo_Economico2 as b
+on a.CNPJ_RAIZ = b.CNPJ_RAIZ and a.DsGrupoEconomicoRisco = b.DsGrupoEconomicoRisco and a.NuCpfCnpjClienteRisco = b.NuCpfCnpjClienteRisco
+left join Grupo_Economico1 as c
+on a.CNPJ_RAIZ = c.CNPJ_RAIZ and a.DsGrupoEconomicoRisco = c.DsGrupoEconomicoRisco and a.NuCpfCnpjClienteRisco = c.NuCpfCnpjClienteRisco;
+quit;
+
+proc sql;
+create table teste_duplicidade as
+select *,
+count(*) as n
+from grupo_economico
+group by DsGrupoEconomicoRisco, CNPJ_RAIZ, NuCpfCnpjClienteRisco;
+quit;
+
+data grupo_economico_fim;
+set teste_duplicidade;
+where n =1 or (n>1 and (NmGerenteCredito ne '' or Login_Analista ne ''));
+run;
+
+proc sql;
+create table BU_A_1 as
+select *, (case when ((year(DtInicioOperacao))*100+month(DtInicioOperacao))=&anomes_ant. then VrSaldo else 0 end) as Producao
+from base_unica_atacado_ant
+; 
+quit;
+
+proc sql;
+create table BU_A_2 as
+select distinct
+DsGrupoEconomicoRisco,
+CNPJ_RAIZ,
+DsStatus_Monitoramento,
+NuCpfCnpjClienteRisco,
+Avaliação_Grupo,
+Avaliação_Setorial,
+Cluster_Risco,
+sum(VrSaldo) as VrSaldo,
+sum(Producao) as Producao
+from BU_A_1
+group by 1,2,3,4,5,6,7;
+quit;
+
+proc sql;
+create table BU_B_1 as
+select *, (case when ((year(DtInicioOperacao))*100+month(DtInicioOperacao))=&anomes. then VrSaldo else 0 end) as Producao
+from BASE_UNICA_ATACADO_corrigida;
+quit;
+
+proc sql;
+create table BU_B_2 as
+select distinct
+DsGrupoEconomicoRisco,
+CNPJ_RAIZ,
+DsStatus_Monitoramento,
+NuCpfCnpjClienteRisco,
+Avaliação_Grupo,
+Avaliação_Setorial,
+Cluster_Risco,
+sum(VrSaldo) as VrSaldo,
+sum(Producao) as Producao
+from BU_B_1
+group by 1,2,3,4,5,6,7;
+quit;
+
+proc sql;
+create table join_&tp_matriz. as 
+select distinct
+a.DsGrupoEconomicoRisco,
+a.CNPJ_RAIZ,
+a.NuCpfCnpjClienteRisco format 14.,
+a.NmGerenteCredito,
+a.Login_Analista,
+c.Avaliação_Grupo,
+b.Avaliação_Grupo as Avaliação_Grupo_Ant,
+c.Avaliação_Setorial,
+b.Avaliação_Setorial as Avaliação_Setorial_Ant,
+c.Cluster_Risco,
+b.Cluster_Risco as Cluster_Risco_Ant,
+c.DsStatus_Monitoramento as Status,
+b.DsStatus_Monitoramento as Status_Ant,
+c.Producao as Producao_mes,
+c.VrSaldo as Exposicao,
+b.VrSaldo as Exposicao_Ant,
+coalesce(c.VrSaldo,0)-coalesce(b.VrSaldo,0) as Delta,
+count(a.CNPJ_RAIZ) as qtd
+
+from grupo_economico_fim as a
+left join BU_A_2 as b
+on a.CNPJ_RAIZ = b.CNPJ_RAIZ and a.DsGrupoEconomicoRisco=b.DsGrupoEconomicoRisco and a.NuCpfCnpjClienteRisco = b.NuCpfCnpjClienteRisco
+left join BU_B_2 as c
+on a.CNPJ_RAIZ = c.CNPJ_RAIZ and a.DsGrupoEconomicoRisco=c.DsGrupoEconomicoRisco and a.NuCpfCnpjClienteRisco = c.NuCpfCnpjClienteRisco
+
+
+
+
+
+
+
+where c.Cluster_Risco <> "NA" AND b.Cluster_Risco <> "NA"
+
+group by a.DsGrupoEconomicoRisco, a.CNPJ_Raiz, a.NuCpfCnpjClienteRisco;
+quit;
+
+%mend;
+
+%gerar_resumo2(PME);
+
+/* =========================FIM TASK=========================== */
+/* TASK: comparação mes anterior */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

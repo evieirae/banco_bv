@@ -1,0 +1,167 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 1 - Import csv Leads Full.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 50)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -6
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40), INFILE  (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 111
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/IGE_NEW/EGV/FUNIL_SALES_FORCE_CN/CSV_SALESFORCE/INBOUND_FULL.CSV [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/inbound_full.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/inbound_full.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ACTION, CHANNEL, CLASSIFICATION, CODE, DATE, DISPLAY, ENGAGEMENT, EXTERNAL, ID, KEY, MESSAGE, NAME, NOTES, NUMBERN, OBJECT, PHONE, QUALIFIER, REASON, RECIPIENT, SEND, SENDER, SOURCE, STATUS, TIME, TYPE, WORK.DGT_CTA_LEADS_RAW
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/inbound_full.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Import csv Leads Full.sas														| */
+/* | Descricao: Programa para importar arquivo de leads do salesforce canal de négocios egv.					| */
+/* |		Arquivo extraído manualmente de:						| */
+/* |	 https://bancobv.lightning.force.com/lightning/r/Report/00ODo000002fv0cMAA/view?queryScope=userFoldersCreatedByMe		| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de Leads atualizada=========================*/
+/* ======================================================================================*/
+
+         DATA WORK.DGT_CTA_LEADS_RAW;
+             LENGTH
+                 'Bulk Message'n  $ 1
+                 'Data Source'n   $ 60
+                 'Data Source Object'n $ 51
+                 'Engagement Action Reason'n $ 1
+                 'Engagement Channel Action'n $ 7
+                 'Engagement Channel Type'n $ 8
+                 'Engagement Date Time'n $ 16
+                 'Engagement Notes'n $ 45
+                 'External Source Id'n $ 82
+                 Individual       $ 1
+                 'Key Qualifier Message Engagement'n $ 1
+                 Message          $ 3753
+                 'Message Engagement Id'n $ 36
+                 'Message Recipient Send Status'n $ 1
+                 'Recipient Message Id'n $ 82
+                 'Send Classification'n $ 1
+                 'Sender Code'n     8
+                 'Sender Display Name'n $ 1
+                 'Send Time Phone Number'n $ 20 ;
+             LABEL
+                 'Key Qualifier Message Engagement'n = "Key Qualifier Message Engagement Id" ;
+             FORMAT
+                 'Bulk Message'n  $CHAR1.
+                 'Data Source'n   $CHAR60.
+                 'Data Source Object'n $CHAR51.
+                 'Engagement Action Reason'n $CHAR1.
+                 'Engagement Channel Action'n $CHAR7.
+                 'Engagement Channel Type'n $CHAR8.
+                 'Engagement Date Time'n $CHAR16.
+                 'Engagement Notes'n $CHAR45.
+                 'External Source Id'n $CHAR82.
+                 Individual       $CHAR1.
+                 'Key Qualifier Message Engagement'n $CHAR1.
+                 Message          $CHAR3753.
+                 'Message Engagement Id'n $CHAR36.
+                 'Message Recipient Send Status'n $CHAR1.
+                 'Recipient Message Id'n $CHAR82.
+                 'Send Classification'n $CHAR1.
+                 'Sender Code'n   BEST15.
+                 'Sender Display Name'n $CHAR1.
+                 'Send Time Phone Number'n $CHAR20. ;
+             INFORMAT
+                 'Bulk Message'n  $CHAR1.
+                 'Data Source'n   $CHAR60.
+                 'Data Source Object'n $CHAR51.
+                 'Engagement Action Reason'n $CHAR1.
+                 'Engagement Channel Action'n $CHAR7.
+                 'Engagement Channel Type'n $CHAR8.
+                 'Engagement Date Time'n $CHAR16.
+                 'Engagement Notes'n $CHAR45.
+                 'External Source Id'n $CHAR82.
+                 Individual       $CHAR1.
+                 'Key Qualifier Message Engagement'n $CHAR1.
+                 Message          $CHAR3753.
+                 'Message Engagement Id'n $CHAR36.
+                 'Message Recipient Send Status'n $CHAR1.
+                 'Recipient Message Id'n $CHAR82.
+                 'Send Classification'n $CHAR1.
+                 'Sender Code'n   BEST15.
+                 'Sender Display Name'n $CHAR1.
+                 'Send Time Phone Number'n $CHAR20. ;
+             INFILE '/infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/inbound_full.csv'
+		 FIRSTOBS=2
+                 LRECL=20000
+                 ENCODING="LATIN1"
+                 /*TERMSTR=CRLF*/
+                 DLM=';'
+                 MISSOVER
+                 DSD ;
+             INPUT
+                 'Bulk Message'n  : $CHAR1.
+                 'Data Source'n   : $CHAR60.
+                'Data Source Object'n : $CHAR51.
+                 'Engagement Action Reason'n : $CHAR1.
+                 'Engagement Channel Action'n : $CHAR7.
+                 'Engagement Channel Type'n : $CHAR8.
+                 'Engagement Date Time'n : $CHAR16.
+                 'Engagement Notes'n : $CHAR45.
+               'External Source Id'n : $CHAR82.
+                Individual       : $CHAR1.
+               'Key Qualifier Message Engagement'n : $CHAR1.
+                Message          : $CHAR3753.
+               'Message Engagement Id'n : $CHAR36.
+                'Message Recipient Send Status'n : $CHAR1.
+                'Recipient Message Id'n : $CHAR82.
+              'Send Classification'n : $CHAR1.
+                 'Sender Code'n   : ?? BEST15.
+                 'Sender Display Name'n : $CHAR1.
+                'Send Time Phone Number'n : $CHAR20. ;
+        RUN;

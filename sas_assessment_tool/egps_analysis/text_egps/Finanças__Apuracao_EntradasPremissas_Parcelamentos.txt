@@ -1,0 +1,944 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Apuracao_EntradasPremissas_Parcelamentos
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:35 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), %MACRO (4x | +20)
+----------------------------------------
+LINES_OF_CODE: 722
+CODE_TASKS_COUNT: 9
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (10x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: PG_CYBER = /riscosbv/cobranca/jcarneiro/pagos_cyber
+DETECTED_MACROS_DEFINED: Dt_Ref_Base, Dt_Ref_Final, Dt_Ref_Final2, Dt_Ref_Inicial, Dt_Ref_Inicial2, server
+DETECTED_MACROS_USED: Dt_Ref_Base, Dt_Ref_Final, Dt_Ref_Final2, Dt_Ref_Inicial, Dt_Ref_Inicial2, passBI, server, userBI
+MACRO_SCOPE_GLOBALS: DT_REF_BASE, DT_REF_FINAL, DT_REF_INICIAL, PASSBI, PASSSQL, SAFRAANTERIOR, SAFRAREFERENCIA, USERBI, USERSQL
+MACRO_SCOPE_PARAMS: SERVER
+CONNECTION_LIBS: DBCON, PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DWBI_DIME.TBDIMCONTACARTAO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOFATURA [BIGQUERY], BV-PDBD-PRD.TRUSTED_DWBI_DTWH.TBCONTRATOPARCELAMENTOFATURA [BIGQUERY], CARTAOBV.TBL_CARTOES_ACORDO [SAS/Local], DWBI_DIME.TBDIMCONTACARTAO [SASIOSIQ], DWBI_DMOC.TBFATOFATURA [SAS/Local], DWBI_DTWH.TBCONTRATOPARCELAMENTOFATURA [SASIOSIQ], ESTUDOS2.CARTAO3040_202501 [SAS/Local], ESTUDOS2.CARTAO3040_202502 [SAS/Local], PG_CYBER.PAGOS_CYBER_202411 [SAS/Local], PG_CYBER.PAGOS_CYBER_202508 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: PG_CYBER
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DWBI_DIME.TBDIMCONTACARTAO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOFATURA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DWBI_DTWH.TBCONTRATOPARCELAMENTOFATURA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], CARTAOBV.TBL_CARTOES_ACORDO [PROC SQL - FROM], DWBI_DIME.TBDIMCONTACARTAO [PROC SQL - JOIN; Pass-Through Native (SASIOSIQ) - FROM], DWBI_DMOC.TBFATOFATURA [PROC SQL - FROM], DWBI_DTWH.TBCONTRATOPARCELAMENTOFATURA [Pass-Through Native (SASIOSIQ) - FROM], ESTUDOS2.CARTAO3040_202501 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_202502 [PROC SQL - FROM], PG_CYBER.PAGOS_CYBER_202411 [DATA Step - SET], PG_CYBER.PAGOS_CYBER_202508 [DATA Step - SET; Resolved dynamic lib.member&macro (%LET)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: TBL_CARTOES_ACORDO_CL_2, TBL_CARTOES_ACORDO_CL_3, TBL_EXEMPLO_GCP, TBL_FATURAMENTO_M1, TBL_PARCELADOS_1, TBL_PARCELADOS_2, TBL_PARCELADOS_3, TBL_PROPENSAO_TOTAL, WORK.QUERY_FOR_CARTAO3040_20, WORK.QUERY_FOR_CARTAO3040_20_0000, WORK.TBL_CARTOES_ACORDO_CL_1
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET Dt_Ref_Inicial='2025-08-01';
+%LET Dt_Ref_Final='2025-08-31';
+%LET Dt_Ref_Inicial2='01Aug2025'd;
+%LET Dt_Ref_Final2='31Aug2025'd;
+%LET server=%upcase(&server.);
+%LET Dt_Ref_Base=202508;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: ApuracaoParcelamentos */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: ApuracaoParcelamentos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-45Uc9ay2iAmCyafl/code.sas */
+/* =========================INÍCIO TASK========================= */
+%global SafraReferencia;
+%global SafraAnterior;
+%global Dt_Ref_Inicial;
+%global Dt_Ref_Final;
+
+%let Dt_Ref_Inicial = '20250201';    
+%let Dt_Ref_Final = '20250228';		 
+
+%let Dt_Ref_Inicial2 = '01Feb2025'd; 
+%let Dt_Ref_Final2 = '28Feb2025'd;	 
+
+%put &Dt_Ref_Inicial;
+%put &Dt_Ref_Final;
+
+
+
+
+
+options compress=binary;
+
+%global userBI;
+%global passBI;
+%global userSQL;
+%global passSQL;
+
+data _NULL_;
+	call symputx("userBI","marco_covielo");
+	call symputx("passBI","!@5cCgBg3!gb");
+run;
+
+%macro ConexaoIQ(server);
+	%let server = %upcase(&server.);
+
+	%if &server. eq BI
+	%then %do;
+		connect to sasiosiq as dbcon (host="iqprdbi" server=iqprdbi user=&userBI. password=&passBI.);
+	%end;
+%mend;
+
+%macro IQ;connection to dbcon %mend;
+
+PROC SQL;
+
+%ConexaoIQ(server=BI);
+
+CREATE TABLE TBL_PARCELADOS_1 AS
+
+SELECT * FROM CONNECTION TO DBCON
+(
+	SELECT YEAR(a.DtAdesao)*100 + MONTH(a.DtAdesao) AS SafraRef,
+
+           CASE WHEN CdTipoParcelado= 1 THEN 'Parcelamento Total'
+                WHEN CdTipoParcelado= 2 THEN 'Parcelamento Fatura'
+                WHEN CdTipoParcelado= 3 THEN 'Parcelamento Compulsório'
+                WHEN CdTipoParcelado= 4 THEN 'Saque Parcelado'
+                WHEN CdTipoParcelado= 5 THEN 'Crédito Pessoal'
+                WHEN CdTipoParcelado= 6 THEN 'Crediário'
+                WHEN CdTipoParcelado= 7 THEN 'Pagamento de Contas Parcelado'
+                END AS NmTipoParcelado,
+
+           CASE WHEN CdTipoParcelado= 1 THEN 'prod_ParcTotal'
+                WHEN CdTipoParcelado= 2 THEN 'prod_Conve'
+                WHEN CdTipoParcelado= 3 THEN 'prod_compu'
+                WHEN CdTipoParcelado= 4 THEN 'prod_Conve'
+                WHEN CdTipoParcelado= 5 THEN 'produca_CP'
+                WHEN CdTipoParcelado= 6 THEN 'prod_Conve'
+                WHEN CdTipoParcelado= 7 THEN 'prod_PG_Co'
+                END AS NmInputModelo,
+
+           CASE WHEN CdTipoParcelado= 2 THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 2   THEN '1. 1 a 2'
+                      WHEN NuParcelaAdesao BETWEEN 3 AND 4   THEN '2. 3 a 4'
+                      WHEN NuParcelaAdesao BETWEEN 5 AND 6   THEN '3. 5 a 6'
+                      WHEN NuParcelaAdesao BETWEEN 7 AND 10  THEN '4. 7 a 10'
+                      WHEN NuParcelaAdesao >= 11             THEN '5. > 10'
+                      END)
+                WHEN CdTipoParcelado= 3 THEN '1. 1 a 24'
+				WHEN CdTipoParcelado= 1 THEN '1. 1 a 24'
+                WHEN CdTipoParcelado IN (4,6) THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 2   THEN '1. 1 a 2'
+                      WHEN NuParcelaAdesao BETWEEN 3 AND 4   THEN '2. 3 a 4'
+                      WHEN NuParcelaAdesao BETWEEN 5 AND 6   THEN '3. 5 a 6'
+                      WHEN NuParcelaAdesao BETWEEN 7 AND 10  THEN '4. 7 a 10'
+                      WHEN NuParcelaAdesao >= 11             THEN '5. > 10'
+                      END)
+                WHEN CdTipoParcelado= 5 THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 15    THEN '1. 1 a 15'
+                      WHEN NuParcelaAdesao BETWEEN 16 AND 23   THEN '2. 16 a 23'
+                      WHEN NuParcelaAdesao >= 24               THEN '3. > 23'
+                      END)
+                WHEN CdTipoParcelado= 7 THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 2    THEN '1. 1 a 2'
+                      WHEN NuParcelaAdesao BETWEEN 3 AND 5    THEN '2. 3 a 5'
+                      WHEN NuParcelaAdesao >= 6               THEN '3. > 5'
+                      END)
+                ELSE 'Verificar'
+                END AS FaixasPrazo,
+
+           NuParcelaAdesao AS Prazo,
+
+           SUM((TxRateAdesao/100)*VrContratoAdesao)    AS TaxaPond,
+           SUM((NuParcelaAdesao)*VrContratoAdesao) AS PrazoPond,
+           SUM(VrContratoAdesao) AS Valor
+
+    FROM DWBI_DTWH.TbContratoParcelamentoFatura a
+    WHERE a.DtAdesao BETWEEN &Dt_Ref_Inicial. AND &Dt_Ref_Final.
+
+    GROUP BY YEAR(a.DtAdesao)*100 + MONTH(a.DtAdesao),
+             NmTipoParcelado,
+			 NmInputModelo,
+			 FaixasPrazo,
+			 Prazo
+
+);
+QUIT;
+
+PROC SQL;
+	CREATE TABLE TBL_PARCELADOS_2 AS
+
+	SELECT YEAR(a.DATA_EFET)*100 + MONTH(a.DATA_EFET) AS SafraRef,
+	       'Parcelamento Acordo CA' AS NmTipoParcelado,
+           'prod_Acord'             AS NmInputModelo,
+
+           CASE WHEN QTDE_PARCELAS BETWEEN 0 AND 6   THEN '1. 1 a 6'
+                WHEN QTDE_PARCELAS BETWEEN 7 AND 12  THEN '2. 7 a 12'
+                WHEN QTDE_PARCELAS >= 13             THEN '3. > 12'
+                END AS FaixasPrazo,
+
+            a.QTDE_PARCELAS AS Prazo,
+            SUM((a.TAXA/100)*a.VALOR_PRINC)      AS TaxaPond,
+			SUM((a.QTDE_PARCELAS)*a.VALOR_PRINC) AS PrazoPond,
+            SUM(a.VALOR_PRINC) AS Valor
+
+	FROM CARTAOBV.TBL_CARTOES_ACORDO AS a
+	WHERE a.DATA_EFET BETWEEN &Dt_Ref_Inicial2. AND &Dt_Ref_Final2.
+	GROUP BY 1,2,3,4,5
+;
+QUIT;
+
+LIBNAME PG_CYBER	BASE '/riscosbv/cobranca/jcarneiro/pagos_cyber';
+
+DATA WORK.TBL_CARTOES_ACORDO_CL_1;
+	SET 
+		PG_CYBER.PAGOS_CYBER_202411;
+RUN;
+
+PROC SQL;
+
+CREATE TABLE TBL_CARTOES_ACORDO_CL_2 AS
+
+	SELECT DISTINCT
+           a.DATA_BASE AS SafraRef,
+           YEAR(DATEPART(a.DTACORDO))*100 + MONTH(DATEPART(a.DTACORDO)) AS SafraCtt,
+		   DATEPART(a.DTACORDO) AS Dt_AcordoCL FORMAT DATE9.,
+		   CDACORDO AS CD_Acordo FORMAT BEST13.,
+		   a.CPF_CNPJ AS NuCpfCnpj,
+		   
+		   1000000000*a.PRODUTO + a.NUCONTA AS CdDimContaCartao,
+           a.QTDE_PARCELAS_ACORDO AS PrazoAcordo,
+		   a.PARCELA_PAGA         AS PrazoMob,
+		   a.ST_ACORDO,
+		   DATEPART(a.DTACORDO) AS Dt_AcordoCL,
+		   a.SALDO_NEGOCIACAO
+
+	FROM TBL_CARTOES_ACORDO_CL_1 AS a
+	WHERE PARCELA_PAGA = 1
+	HAVING SafraRef IS NOT MISSING
+;
+QUIT;
+
+PROC SQL;
+
+CREATE TABLE TBL_CARTOES_ACORDO_CL_3 AS
+
+	SELECT DISTINCT b.SafraCtt,
+				    b.Dt_AcordoCL FORMAT DATE9.,
+				    a.Cd_Acordo,
+				    a.NuCpfCnpj,
+				    a.CdDimContaCartao,
+		            a.PrazoAcordo,
+					a.ST_ACORDO,
+				    a.SALDO_NEGOCIACAO AS Vr_EntradasCL,
+					a.SALDO_NEGOCIACAO-MOD(a.SALDO_NEGOCIACAO,1) AS Chave_Saldo
+
+	FROM TBL_CARTOES_ACORDO_CL_2 AS a
+	LEFT JOIN
+	(
+    	SELECT DISTINCT Cd_Acordo,
+		                NuCpfCnpj,
+						MAX(SafraCtt)       AS SafraCtt,
+						MAX(Dt_AcordoCL)    AS Dt_AcordoCL
+		FROM TBL_CARTOES_ACORDO_CL_2
+		GROUP BY 1,2
+	) AS b
+	ON a.Cd_Acordo = b.Cd_Acordo AND
+	   a.NuCpfCnpj = b.NuCpfCnpj
+	WHERE a.SafraRef = b.SafraCtt AND b.SafraCtt IS NOT MISSING
+;
+QUIT;
+
+PROC SQL;
+
+CREATE TABLE TBL_PARCELADOS_3 AS
+
+	SELECT SafraCtt AS SafraRef,
+           'Parcelamento Acordo CL' AS NmTipoParcelado,
+           'prod_AC_CL'             AS NmInputModelo,
+           '1. 1 a 36' AS FaixasPrazo,
+           a.PrazoAcordo AS Prazo,
+
+           0 AS TaxaPond,
+		   SUM(a.PrazoAcordo*a.Vr_EntradasCL) AS PrazoPond,
+           SUM(a.Vr_EntradasCL) AS Valor
+
+	FROM TBL_CARTOES_ACORDO_CL_3 AS a
+	WHERE ST_ACORDO = 'A'
+	GROUP BY 1,2,3,4,5
+	HAVING SafraRef IS NOT MISSING
+;
+QUIT;
+
+PROC SQL;
+
+%ConexaoIQ(server=BI);
+
+CREATE TABLE TBL_FATURAMENTO_M1 AS
+
+SELECT t.*
+FROM %IQ
+(
+		SELECT (year(DATEADD(MONTH,1,a.DtVencimentoFatura))*100 + month(DATEADD(MONTH,1,a.DtVencimentoFatura))) AS SafraRef,
+			   'Faturamento_M1' AS NmTipoParcelado,
+			   'Faturamento_M1' AS NmInputModelo,
+			   'ND' AS FaixasPrazo,
+               0 AS Prazo,
+               0 AS PrazoPond,
+		       SUM(a.VrSaldoFatura) AS Valor
+
+		FROM DWBI_DMOC.TbFatoFatura a
+
+		INNER JOIN DWBI_DIME.TbDimContaCartao b
+		ON a.cddimcontacartaoversao = b.cddimcontacartaoversao
+
+		WHERE (a.DtVencimentoFatura BETWEEN DATEADD(MONTH,-2,&Dt_Ref_Inicial.) AND &Dt_Ref_Final.) AND a.FlFaturaEmitida = 'S' AND a.FlFaturaDesconsiderada='N' AND
+		      b.VrLimiteContaCartaoGeral <> 0
+
+		GROUP BY SafraRef,
+	             NmTipoParcelado,
+				 NmInputModelo,
+				 FaixasPrazo
+
+) AS t
+;
+QUIT;
+
+DATA TBL_PROPENSAO_TOTAL;
+	SET TBL_PARCELADOS_1
+        TBL_PARCELADOS_2
+		TBL_PARCELADOS_3
+		TBL_FATURAMENTO_M1
+;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: ApuracaoParcelamentos */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-TC5dKy1IOjntVuzy/code.sas */
+/* =========================INÍCIO TASK========================= */
+%global SafraReferencia;
+%global SafraAnterior;
+%global Dt_Ref_Inicial;
+%global Dt_Ref_Final;
+
+%let Dt_Ref_Inicial = '20240101';
+%let Dt_Ref_Final = '20240430';
+
+%let Dt_Ref_Inicial2 = '01JAN2024'd;
+%let Dt_Ref_Final2 = '30APR2024'd;
+
+%put &Dt_Ref_Inicial;
+%put &Dt_Ref_Final;
+
+
+
+
+
+options compress=binary;
+
+%global userBI;
+%global passBI;
+%global userSQL;
+%global passSQL;
+
+data _NULL_;
+	call symputx("userBI","marco_covielo");
+	call symputx("passBI","C4FDE37BHF@G");
+run;
+
+%macro ConexaoIQ(server);
+	%let server = %upcase(&server.);
+
+	%if &server. eq BI
+	%then %do;
+		connect to sasiosiq as dbcon (host="iqprdbi" server=iqprdbi user=&userBI. password=&passBI.);
+	%end;
+%mend;
+
+%macro IQ;connection to dbcon %mend;
+
+PROC SQL;
+
+%ConexaoIQ(server=BI);
+
+CREATE TABLE TBL_PARCELADOS_1 AS
+
+SELECT * FROM CONNECTION TO DBCON
+(
+	SELECT YEAR(a.DtAdesao)*100 + MONTH(a.DtAdesao) AS SafraRef,
+
+           CASE WHEN CdTipoParcelado= 1 THEN 'Parcelamento Total'
+                WHEN CdTipoParcelado= 2 THEN 'Parcelamento Fatura'
+                WHEN CdTipoParcelado= 3 THEN 'Parcelamento Compulsório'
+                WHEN CdTipoParcelado= 4 THEN 'Saque Parcelado'
+                WHEN CdTipoParcelado= 5 THEN 'Crédito Pessoal'
+                WHEN CdTipoParcelado= 6 THEN 'Crediário'
+                WHEN CdTipoParcelado= 7 THEN 'Pagamento de Contas Parcelado'
+                END AS NmTipoParcelado,
+
+           CASE WHEN CdTipoParcelado= 1 THEN 'prod_ParcTotal'
+                WHEN CdTipoParcelado= 2 THEN 'prod_Conve'
+                WHEN CdTipoParcelado= 3 THEN 'prod_compu'
+                WHEN CdTipoParcelado= 4 THEN 'prod_Conve'
+                WHEN CdTipoParcelado= 5 THEN 'produca_CP'
+                WHEN CdTipoParcelado= 6 THEN 'prod_Conve'
+                WHEN CdTipoParcelado= 7 THEN 'prod_PG_Co'
+                END AS NmInputModelo,
+
+           CASE WHEN CdTipoParcelado= 2 THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 2   THEN '1. 1 a 2'
+                      WHEN NuParcelaAdesao BETWEEN 3 AND 4   THEN '2. 3 a 4'
+                      WHEN NuParcelaAdesao BETWEEN 5 AND 6   THEN '3. 5 a 6'
+                      WHEN NuParcelaAdesao BETWEEN 7 AND 10  THEN '4. 7 a 10'
+                      WHEN NuParcelaAdesao >= 11             THEN '5. > 10'
+                      END)
+                WHEN CdTipoParcelado= 3 THEN '1. 1 a 24'
+				WHEN CdTipoParcelado= 1 THEN '1. 1 a 24'
+                WHEN CdTipoParcelado IN (4,6) THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 2   THEN '1. 1 a 2'
+                      WHEN NuParcelaAdesao BETWEEN 3 AND 4   THEN '2. 3 a 4'
+                      WHEN NuParcelaAdesao BETWEEN 5 AND 6   THEN '3. 5 a 6'
+                      WHEN NuParcelaAdesao BETWEEN 7 AND 10  THEN '4. 7 a 10'
+                      WHEN NuParcelaAdesao >= 11             THEN '5. > 10'
+                      END)
+                WHEN CdTipoParcelado= 5 THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 15    THEN '1. 1 a 15'
+                      WHEN NuParcelaAdesao BETWEEN 16 AND 23   THEN '2. 16 a 23'
+                      WHEN NuParcelaAdesao >= 24               THEN '3. > 23'
+                      END)
+                WHEN CdTipoParcelado= 7 THEN
+                (CASE WHEN NuParcelaAdesao BETWEEN 0 AND 2    THEN '1. 1 a 2'
+                      WHEN NuParcelaAdesao BETWEEN 3 AND 5    THEN '2. 3 a 5'
+                      WHEN NuParcelaAdesao >= 6               THEN '3. > 5'
+                      END)
+                ELSE 'Verificar'
+                END AS FaixasPrazo,
+
+           NuParcelaAdesao AS Prazo,
+		   b.SgEstadoEnderecoEntregaFatura,
+
+           SUM((TxRateAdesao/100)*VrContratoAdesao)    AS TaxaPond,
+           SUM((NuParcelaAdesao)*VrContratoAdesao) AS PrazoPond,
+           SUM(VrContratoAdesao) AS Valor
+
+    FROM DWBI_DTWH.TbContratoParcelamentoFatura a
+
+	INNER JOIN (SELECT * FROM DWBI_DIME.TbDimContaCartao WHERE FlVersaoVigente = 'S') as b
+	ON a.CdContaCartao = b.CdDimContaCartao
+
+    WHERE a.DtAdesao BETWEEN &Dt_Ref_Inicial. AND &Dt_Ref_Final.
+
+    GROUP BY YEAR(a.DtAdesao)*100 + MONTH(a.DtAdesao),
+             NmTipoParcelado,
+			 NmInputModelo,
+			 FaixasPrazo,
+			 Prazo,
+			 b.SgEstadoEnderecoEntregaFatura
+
+);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Code For Query Builder (2) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Code For Query Builder (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-JcFcDAX5NkUabyHB/code.sas */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTAO3040_20_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20_0000 AS
+   SELECT t1.Mod,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM ESTUDOS2.CARTAO3040_202501 t1
+      WHERE t1.ClassOP NOT = 'HH'
+      GROUP BY t1.Mod;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Code For Query Builder (2) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Code For Query Builder */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Code For Query Builder */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-OAl4JBXxbfgOrWfg/code.sas */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTAO3040_20);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20 AS
+   SELECT t1.Mod,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM ESTUDOS2.CARTAO3040_202502 t1
+      WHERE t1.CLASSOP NOT = 'HH'
+      GROUP BY t1.Mod;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Code For Query Builder */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (3) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-cQNF6pwmACeHUu1f/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage);
+                CREATE TABLE TBL_EXEMPLO_GCP AS
+                               SELECT * FROM CONNECTION TO PERM
+                               (
+                                  SELECT dt_referencia,
+                  cd_modalidade,
+                                                                 cd_sistema_origem,
+                                                                 sum(vr_saldo_carteira) as vr_saldo_carteira,
+                  sum(vr_provisao_limite) as vr_provisao_limite,
+                  sum(vr_provisao) as vr_provisao,
+                  sum(vr_provisao_total) as vr_provisao_total,
+                  sum(vr_limite) as vr_limite
+                                  FROM bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+                                  where cd_sistema_origem in ('113','114','115')
+                                  group by 1,2,3
+                               );
+                               DISCONNECT FROM PERM;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: ApuracaoParcelamentosGCP */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: ApuracaoParcelamentosGCP */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-QfiGoatbU3mtWkbW/code.sas */
+/* =========================INÍCIO TASK========================= */
+%global SafraReferencia;
+%global SafraAnterior;
+%global Dt_Ref_Inicial;
+%global Dt_Ref_Final;
+%global Dt_Ref_Base;
+
+%let Dt_Ref_Inicial = '2025-08-01';    
+%let Dt_Ref_Final = '2025-08-31';		 
+
+%let Dt_Ref_Inicial2 = '01Aug2025'd; 
+%let Dt_Ref_Final2 = '31Aug2025'd;	 
+
+%let Dt_Ref_Base = 202508;	 
+
+%put &Dt_Ref_Inicial;
+%put &Dt_Ref_Final;
+%put &Dt_Ref_Inicial2;
+%put &Dt_Ref_Final2;
+%put &Dt_Ref_Base;
+
+
+
+
+
+options compress=binary;
+
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage);
+
+CREATE TABLE TBL_PARCELADOS_1 AS
+SELECT * FROM CONNECTION TO PERM
+(
+	SELECT
+	    CAST((FORMAT_DATE('%Y%m', a.DtAdesao)) AS String) AS SafraRef,
+
+	    CASE
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 1 THEN 'Parcelamento Total'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 2 THEN 'Parcelamento Fatura'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 3 THEN 'Parcelamento Compulsório'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 4 THEN 'Saque Parcelado'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 5 THEN 'Crédito Pessoal'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 6 THEN 'Crediário'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 7 THEN 'Pagamento de Contas Parcelado'
+	    END AS NmTipoParcelado,
+
+	    CASE
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 1 THEN 'prod_ParcTotal'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 2 THEN 'prod_Conve'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 3 THEN 'prod_compu'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 4 THEN 'prod_Conve'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 5 THEN 'produca_CP'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 6 THEN 'prod_Conve'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 7 THEN 'prod_PG_Co'
+	    END AS NmInputModelo,
+
+	    CASE
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 2 THEN (
+	            CASE
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 0 AND 2 THEN '1. 1 a 2'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 3 AND 4 THEN '2. 3 a 4'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 5 AND 6 THEN '3. 5 a 6'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 7 AND 10 THEN '4. 7 a 10'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) >= 11 THEN '5. > 10'
+	            END)
+	        WHEN CAST(a.CdTipoParcelado AS INT64) IN (1, 3) THEN '1. 1 a 24'
+	        WHEN CAST(a.CdTipoParcelado AS INT64) IN (4, 6) THEN (
+	            CASE
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 0 AND 2 THEN '1. 1 a 2'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 3 AND 4 THEN '2. 3 a 4'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 5 AND 6 THEN '3. 5 a 6'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 7 AND 10 THEN '4. 7 a 10'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) >= 11 THEN '5. > 10'
+	            END)
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 5 THEN (
+	            CASE
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 0 AND 15 THEN '1. 1 a 15'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 16 AND 23 THEN '2. 16 a 23'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) >= 24 THEN '3. > 23'
+	            END)
+	        WHEN CAST(a.CdTipoParcelado AS INT64) = 7 THEN (
+	            CASE
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 0 AND 2 THEN '1. 1 a 2'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) BETWEEN 3 AND 5 THEN '2. 3 a 5'
+	                WHEN CAST(a.NuParcelaAdesao AS INT64) >= 6 THEN '3. > 5'
+	            END)
+	        ELSE 'Verificar'
+	    END AS FaixasPrazo,
+
+	    CAST(a.NuParcelaAdesao AS INT64) AS Prazo,
+
+	    SUM((CAST(a.TxRateAdesao AS FLOAT64)/100) * CAST(a.VrContratoAdesao AS FLOAT64)) AS TaxaPond,
+	    SUM(CAST(a.NuParcelaAdesao AS INT64) * CAST(a.VrContratoAdesao AS FLOAT64)) AS PrazoPond,
+	    SUM(CAST(a.VrContratoAdesao AS FLOAT64)) AS Valor
+
+	FROM `bv-pdbd-prd.trusted_dwbi_dtwh.tbcontratoparcelamentofatura` a
+	WHERE a.DtAdesao BETWEEN &Dt_Ref_Inicial. AND &Dt_Ref_Final.
+	GROUP BY
+	    FORMAT_DATE('%Y%m', a.DtAdesao),
+	    NmTipoParcelado,
+	    NmInputModelo,
+	    FaixasPrazo,
+	    Prazo
+);
+DISCONNECT FROM PERM;
+
+QUIT;
+
+PROC SQL;
+CREATE TABLE TBL_PARCELADOS_2 AS
+
+	SELECT
+		YEAR(a.DATA_EFET)*100 + MONTH(a.DATA_EFET) AS SafraRef,
+		'Parcelamento Acordo CA' AS NmTipoParcelado,
+		'prod_Acord'             AS NmInputModelo,
+
+		CASE WHEN QTDE_PARCELAS BETWEEN 0 AND 6   THEN '1. 1 a 6'
+			WHEN QTDE_PARCELAS BETWEEN 7 AND 12  THEN '2. 7 a 12'
+			WHEN QTDE_PARCELAS >= 13             THEN '3. > 12'
+		END AS FaixasPrazo,
+
+		a.QTDE_PARCELAS AS Prazo,
+		SUM((a.TAXA/100)*a.VALOR_PRINC)      AS TaxaPond,
+		SUM((a.QTDE_PARCELAS)*a.VALOR_PRINC) AS PrazoPond,
+		SUM(a.VALOR_PRINC) AS Valor
+
+	FROM CARTAOBV.TBL_CARTOES_ACORDO AS a
+	WHERE a.DATA_EFET BETWEEN &Dt_Ref_Inicial2. AND &Dt_Ref_Final2.
+	GROUP BY 1,2,3,4,5
+;
+QUIT;
+
+LIBNAME PG_CYBER	BASE '/riscosbv/cobranca/jcarneiro/pagos_cyber';
+
+DATA WORK.TBL_CARTOES_ACORDO_CL_1;
+	SET PG_CYBER.PAGOS_CYBER_&Dt_Ref_Base.;
+RUN;
+
+PROC SQL;
+CREATE TABLE TBL_CARTOES_ACORDO_CL_2 AS
+
+	SELECT DISTINCT
+		a.DATA_BASE AS SafraRef,
+		YEAR(DATEPART(a.DTACORDO))*100 + MONTH(DATEPART(a.DTACORDO)) AS SafraCtt,
+		DATEPART(a.DTACORDO) AS Dt_AcordoCL FORMAT DATE9.,
+		CDACORDO AS CD_Acordo FORMAT BEST13.,
+		a.CPF_CNPJ AS NuCpfCnpj,
+		
+		1000000000*a.PRODUTO + a.NUCONTA AS CdDimContaCartao,
+		a.QTDE_PARCELAS_ACORDO AS PrazoAcordo,
+		a.PARCELA_PAGA         AS PrazoMob,
+		a.ST_ACORDO,
+		DATEPART(a.DTACORDO) AS Dt_AcordoCL,
+		a.SALDO_NEGOCIACAO
+	FROM TBL_CARTOES_ACORDO_CL_1 AS a
+	WHERE PARCELA_PAGA = 1
+	HAVING SafraRef IS NOT MISSING
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE TBL_CARTOES_ACORDO_CL_3 AS
+
+	SELECT DISTINCT
+		b.SafraCtt AS SafraCtt,
+		b.Dt_AcordoCL FORMAT DATE9.,
+		a.Cd_Acordo,
+		a.NuCpfCnpj,
+		a.CdDimContaCartao,
+		a.PrazoAcordo,
+		a.ST_ACORDO,
+		a.SALDO_NEGOCIACAO AS Vr_EntradasCL,
+		a.SALDO_NEGOCIACAO-MOD(a.SALDO_NEGOCIACAO,1) AS Chave_Saldo
+
+	FROM TBL_CARTOES_ACORDO_CL_2 AS a
+	LEFT JOIN
+	(
+		SELECT DISTINCT
+			Cd_Acordo,
+			NuCpfCnpj,
+			MAX(SafraCtt)       AS SafraCtt,
+			MAX(Dt_AcordoCL)    AS Dt_AcordoCL
+		FROM TBL_CARTOES_ACORDO_CL_2
+		GROUP BY 1,2
+	) AS b
+	ON a.Cd_Acordo = b.Cd_Acordo
+		AND a.NuCpfCnpj = b.NuCpfCnpj
+	WHERE a.SafraRef = b.SafraCtt AND b.SafraCtt IS NOT MISSING
+;
+QUIT;
+
+PROC SQL;
+CREATE TABLE TBL_PARCELADOS_3 AS
+
+	SELECT
+		SafraCtt AS SafraRef,
+        'Parcelamento Acordo CL' AS NmTipoParcelado,
+		'prod_AC_CL'             AS NmInputModelo,
+		'1. 1 a 36' AS FaixasPrazo,
+		a.PrazoAcordo AS Prazo,
+
+		0 AS TaxaPond,
+		SUM(a.PrazoAcordo*a.Vr_EntradasCL) AS PrazoPond,
+		SUM(a.Vr_EntradasCL) AS Valor
+
+	FROM TBL_CARTOES_ACORDO_CL_3 AS a
+	WHERE ST_ACORDO = 'A'
+	GROUP BY 1,2,3,4,5
+	HAVING SafraRef IS NOT MISSING
+;
+QUIT;
+
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage);
+
+CREATE TABLE TBL_FATURAMENTO_M1 AS
+SELECT * FROM CONNECTION TO PERM
+(
+    SELECT
+		EXTRACT(YEAR FROM DATE_ADD(a.DtVencimentoFatura, INTERVAL 1 MONTH)) * 100 +
+		     EXTRACT(MONTH FROM DATE_ADD(a.DtVencimentoFatura, INTERVAL 1 MONTH)) AS SafraRef,
+        'Faturamento_M1' AS NmTipoParcelado,
+        'Faturamento_M1' AS NmInputModelo,
+        'ND' AS FaixasPrazo,
+        0 AS Prazo,
+        0 AS PrazoPond,
+        SUM(CAST(a.VrSaldoFatura AS FLOAT64)) AS Valor
+
+    FROM `bv-pdbd-prd.trusted_dwbi_dmoc.tbfatofatura` a
+
+    INNER JOIN `bv-pdbd-prd.trusted_dwbi_dime.tbdimcontacartao` b
+        ON a.cddimcontacartaoversao = b.cddimcontacartaoversao
+
+    WHERE a.DtVencimentoFatura BETWEEN DATE_SUB(&Dt_Ref_Inicial., INTERVAL 2 MONTH)
+                                   AND &Dt_Ref_Final.
+      AND a.FlFaturaEmitida = 'S'
+      AND a.FlFaturaDesconsiderada = 'N'
+      AND CAST(b.VrLimiteContaCartaoGeral AS FLOAT64) <> 0
+
+    GROUP BY SafraRef,
+             NmTipoParcelado,
+             NmInputModelo,
+             FaixasPrazo
+);
+
+DISCONNECT FROM PERM;
+QUIT;
+
+
+
+data TBL_PARCELADOS_1;
+
+    set TBL_PARCELADOS_1;
+    length SafraRef $6;
+run;
+
+data TBL_PARCELADOS_2;
+    set TBL_PARCELADOS_2;
+    SafraRef_char = put(SafraRef, z6.);
+    drop SafraRef;
+    rename SafraRef_char = SafraRef;
+run;
+
+data TBL_PARCELADOS_3;
+    set TBL_PARCELADOS_3;
+    SafraRef_char = put(SafraRef, z6.);
+    drop SafraRef;
+    rename SafraRef_char = SafraRef;
+run;
+
+data TBL_FATURAMENTO_M1;
+    set TBL_FATURAMENTO_M1;
+    SafraRef_char = put(SafraRef, z6.);
+    drop SafraRef;
+    rename SafraRef_char = SafraRef;
+run;
+
+
+data TBL_PROPENSAO_TOTAL;
+    set TBL_PARCELADOS_1
+        TBL_PARCELADOS_2
+        TBL_PARCELADOS_3
+        TBL_FATURAMENTO_M1;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: ApuracaoParcelamentosGCP */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%global SafraReferencia;
+%global SafraAnterior;
+%global Dt_Ref_Inicial;
+%global Dt_Ref_Final;
+
+%let Dt_Ref_Inicial = '20250201';    
+%let Dt_Ref_Final = '20250228';		 
+
+%let Dt_Ref_Inicial2 = '01Feb2025'd; 
+%let Dt_Ref_Final2 = '28Feb2025'd;	 
+
+%put &Dt_Ref_Inicial;
+%put &Dt_Ref_Final;
+
+
+
+
+
+options compress=binary;
+
+%global userBI;
+%global passBI;
+%global userSQL;
+%global passSQL;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTAO3040_20);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20 AS
+   SELECT t1.Mod,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM ESTUDOS2.CARTAO3040_202502 t1
+      WHERE t1.ClassCli NOT = 'HH'
+      GROUP BY t1.Mod;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTAO3040_20_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20_0000 AS
+   SELECT t1.Mod,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM ESTUDOS2.CARTAO3040_202501 t1
+      WHERE t1.ClassCli = 'HH'
+      GROUP BY t1.Mod;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */

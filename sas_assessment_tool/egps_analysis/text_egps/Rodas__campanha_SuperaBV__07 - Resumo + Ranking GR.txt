@@ -1,0 +1,211 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 07 - Resumo + Ranking GR.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 95)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -392
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 123
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, RANK, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes, Max_TbSuperaBV_Resumo
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CSBV.TBSUPERABV [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_SUPERABV_RESUMO, WORK.BASE_SUPERABV_RESUMO_03, WORK.MAX_DATA
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CSBV
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_SUPERABV_RESUMO, WORK.BASE_SUPERABV_RESUMO_00, WORK.BASE_SUPERABV_RESUMO_01, WORK.BASE_SUPERABV_RESUMO_02, WORK.BASE_SUPERABV_RESUMO_03, WORK.MAX_DATA
+TABLE_READ_PROVENANCE (Flow): CSBV.TBSUPERABV [PROC SQL - FROM], CSBV.TBSUPERABV_RESUMO [PROC SQL - FROM], WORK.BASE_SUPERABV_RESUMO [DATA Step - SET], WORK.BASE_SUPERABV_RESUMO_00 [PROC SORT - DATA=], WORK.BASE_SUPERABV_RESUMO_01 [PROC RANK - DATA=], WORK.BASE_SUPERABV_RESUMO_02 [PROC SQL - FROM], WORK.BASE_SUPERABV_RESUMO_03 [PROC APPEND - DATA=], WORK.MAX_DATA [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): CSBV.TBSUPERABV_RESUMO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CSBV.TBSUPERABV_RESUMO
+APPEND_ONLY_OUTPUTS: CSBV.TBSUPERABV_RESUMO
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CSBV.TBSUPERABV_RESUMO
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SUPERABV_RESUMO, BASE_SUPERABV_RESUMO_03, MAX_DATA, PRIMEIRO_RANKING, WORK.BASE_SUPERABV_RESUMO_00, WORK.BASE_SUPERABV_RESUMO_01, WORK.BASE_SUPERABV_RESUMO_02
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*****************************/
+/*SALVA A BASE FINAL - RESUMO*/
+/*****************************/
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO AS
+SELECT
+
+today() as Data format ddmmyy10.,
+A.NUANOMES,
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NmAreaEstruturaComercial,
+A.LstSubstituicao,
+A.LstColaboradorFocal,
+A.DsLoginN3A,
+A.DsLoginN2A,
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+A.NmEstadoColaborador,
+
+SUM(CASE WHEN TpValor = 'VrSPF_VrAP_VrAuto' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_SegurosTotal,
+SUM(CASE WHEN TpValor = 'VrMargemContribuicao' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_McTotal,
+SUM(CASE WHEN TpValor = 'ContaDigital' THEN VrAtingimento ELSE 0 END) AS Perc_Ating_ContaDigital,
+
+SUM(A.VrPontosAtingimento) AS VrPontosAtingimento,
+SUM(A.VrPontosExtra) AS VrPontosExtra,
+CALCULATED VrPontosAtingimento + CALCULATED VrPontosExtra AS VrPontosTotal,
+
+/* VARIÁVEL COMPOSTA PARA RANQUEAMENTO COM MÚLTIPLOS CRITÉRIOS - REGRA DE DESEMPATE ADICIONANDO UM PEQUENO PESO NO FINAL DAS VARIÁVEIS PARA DESEMPATAR*/
+/*CRITÉRIO DE DESEMPATE - 1º SEGUROS // 2º MC // 3º CONTA*/
+
+CALCULATED VrPontosTotal + (CALCULATED Perc_Ating_SegurosTotal * 1e-6) + (CALCULATED Perc_Ating_McTotal * 1e-9) + (CALCULATED Perc_Ating_ContaDigital * 1e-12) AS VrPontosTotalRanking,
+
+CASE
+	WHEN CALCULATED VrPontosTotal >= 200 AND CALCULATED VrPontosTotal < 220 THEN 500
+	WHEN CALCULATED VrPontosTotal >= 220 AND CALCULATED VrPontosTotal < 240 THEN 700
+	WHEN CALCULATED VrPontosTotal >= 240 THEN 1200
+ELSE 0 END AS VrRecompensa
+
+FROM CSBV.TbSuperaBV A
+
+where a.NUANOMES = &Base_Mes.
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13
+
+;RUN;
+
+DATA WORK.BASE_SUPERABV_RESUMO_00;
+SET WORK.BASE_SUPERABV_RESUMO;
+WHERE NmEstadoColaborador in ('Em Atividade Normal', 'Gozando Férias');
+;RUN;
+
+PROC SORT DATA=WORK.BASE_SUPERABV_RESUMO_00 OUT=WORK.BASE_SUPERABV_RESUMO_01;
+BY NuAnoMes NmCanalEstruturaComercial NmSubEstruturaComercialA NmAreaEstruturaComercial DESCENDING VrPontosTotalRanking;
+;RUN;
+
+proc rank data=WORK.BASE_SUPERABV_RESUMO_01 descending out=WORK.BASE_SUPERABV_RESUMO_02 ties=dense;
+    var VrPontosTotalRanking;
+    ranks Ranking_VrPontosTotal;
+    by NuAnoMes NmCanalEstruturaComercial NmSubEstruturaComercialA NmAreaEstruturaComercial;
+run;
+
+/*********************************************/
+/*TABELA COM O PRIMEIRO DO RANKING POR FILIAL*/
+/*********************************************/
+
+PROC SQL;
+CREATE TABLE PRIMEIRO_RANKING AS
+SELECT
+
+NUANOMES,
+NmCanalEstruturaComercial,
+NmSubEstruturaComercialA,
+NmAreaEstruturaComercial,
+DsLoginN2A,
+DsLoginN1,
+Ranking_VrPontosTotal,
+VrPontosTotal
+
+FROM BASE_SUPERABV_RESUMO_02 A
+
+WHERE Ranking_VrPontosTotal = 1 AND NmCanalEstruturaComercial <> ''
+
+ORDER BY 1,2,3,4,5
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_SUPERABV_RESUMO_03 AS
+SELECT
+
+A.Data format ddmmyy10.,
+A.NUANOMES,
+A.NmCanalEstruturaComercial,
+A.NmSubEstruturaComercialA,
+A.NmAreaEstruturaComercial,
+A.LstSubstituicao,
+A.LstColaboradorFocal,
+A.DsLoginN3A,
+A.DsLoginN2A,
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+A.NmEstadoColaborador,
+
+A.Perc_Ating_SegurosTotal,
+A.Perc_Ating_McTotal,
+A.Perc_Ating_ContaDigital,
+
+A.VrPontosAtingimento,
+A.VrPontosExtra,
+A.VrPontosTotal,
+A.VrPontosTotalRanking,
+A.VrRecompensa,
+A.Ranking_VrPontosTotal,
+
+B.VrPontosTotal AS VrPontosPrimeiroRankingFilial,
+A.VrPontosTotal - B.VrPontosTotal as VrGAP_PontosPrimRankingFilial
+
+FROM WORK.BASE_SUPERABV_RESUMO_02 A
+
+LEFT JOIN PRIMEIRO_RANKING B ON
+
+B.NUANOMES = A.NUANOMES
+and B.NmCanalEstruturaComercial = A.NmCanalEstruturaComercial
+and B.NmSubEstruturaComercialA = A.NmSubEstruturaComercialA
+and B.NmAreaEstruturaComercial = A.NmAreaEstruturaComercial
+and B.DsLoginN2A = A.DsLoginN2A
+
+where a.NmCanalEstruturaComercial <> '' and a.NUANOMES = &Base_Mes.
+
+;RUN;
+
+/*DATA CSBV.TbSuperaBV_Resumo;*/
+/*SET work.BASE_SUPERABV_RESUMO_03;*/
+/*;RUN;*/
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+MAX(NuAnoMes) AS Max_TbSuperaBV_Resumo
+FROM CSBV.TbSuperaBV_Resumo
+WHERE NUANOMES = &Base_Mes.
+;run;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+CALL SYMPUT ('Max_TbSuperaBV_Resumo',Max_TbSuperaBV_Resumo);
+;run;
+%PUT &Max_TbSuperaBV_Resumo;
+
+PROC SQL;
+DELETE FROM CSBV.TbSuperaBV_Resumo
+WHERE NUANOMES = &Max_TbSuperaBV_Resumo.;
+;RUN;
+
+PROC APPEND BASE=CSBV.TbSuperaBV_Resumo DATA=WORK.BASE_SUPERABV_RESUMO_03;RUN;

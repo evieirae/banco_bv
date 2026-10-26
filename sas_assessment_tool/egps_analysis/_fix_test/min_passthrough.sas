@@ -1,0 +1,16 @@
+LIBNAME B_GERAL '/riscosbv/cobranca/malmeida';
+PROC SQL;
+CONNECT TO BIGQUERY AS PERM (project='x');
+CREATE TABLE OUT1 AS
+SELECT A.k, DU.DU
+FROM CONNECTION TO PERM (
+    SELECT k FROM bv-pdbd-prd.ds.tab_a WHERE x = 1
+) AS A
+LEFT JOIN CONNECTION TO PERM (
+    SELECT k FROM bv-pdbd-prd.ds.tab_b WHERE y = 2 GROUP BY k
+) AS B
+ON A.k = B.k
+LEFT JOIN B_GERAL.DIAS_UTEIS AS DU
+ON A.k = DU.k
+;
+QUIT;

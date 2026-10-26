@@ -1,0 +1,287 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Gastos_PE
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-07-30 20:14:14 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 210
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_FINANCAS.MYABC_CUSTOSDESPESASMIS_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.GASTOS_BN26, WORK.GASTOS_BN26_TOTAL, WORK.GASTOS_CHECK, WORK.GASTOS_PE26
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_FINANCAS.MYABC_CUSTOSDESPESASMIS_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], WORK.GASTOS_BN26 [PROC SQL - FROM], WORK.GASTOS_BN26_TOTAL [PROC SQL - FROM], WORK.GASTOS_CHECK [PROC SQL - FROM], WORK.GASTOS_PE26 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: GASTOS_BN26, GASTOS_BN26_TOTAL, GASTOS_CHECK, GASTOS_PE26, WORK.GASTOS_BN26, WORK.GASTOS_BN26_TOTAL, WORK.GASTOS_CHECK, WORK.GASTOS_PE26
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export_Gastos_BN */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export_Gastos_BN */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5KjQhTLEenLclHYy/code.sas */
+/* =========================INÍCIO TASK========================= */
+OPTIONS COMPRESS=BINARY REUSE=YES REPLACE SYMBOLGEN;
+
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+Create table GASTOS_BN26 as
+select * from connection to perm
+(
+  select
+      date_trunc(date(dt_periodo), month) as mes_referencia,
+      extract(month from date(dt_periodo)) as mes,
+      extract(year from date(dt_periodo)) as ano,
+      case
+         when nm_conta_contabil = '4993050000001000000000000'
+         then '8181028000000000001000000'
+         else nm_conta_contabil
+      end as conta_contabil,
+      nm_classe_valor as classe_valor,
+      concat(nm_produto, ' | ', nm_canal) as produto_canal,
+      nu_veiculo  as empresa,
+      nm_centro_custo as centro_custo,
+      round(sum(vr_gasto),5) as vr_gasto
+from  bv-pdbd-prd.dvry_corp_financas.myabc_custosdespesasmis_fato
+where ds_modelo = "BN'26"
+group by all
+
+);
+   disconnect from perm
+;
+
+quit;
+
+PROC SQL;
+   CREATE TABLE WORK.GASTOS_BN26 AS
+   SELECT t1.mes,
+          t1.ano,
+          t1.conta_contabil,
+          t1.classe_valor,
+          t1.produto_canal,
+          t1.empresa,
+          t1.centro_custo,
+          
+            (round(t1.vr_gasto, 0.00001)) AS vr_gasto
+      FROM WORK.GASTOS_BN26 t1
+		where t1.ano = 2026
+		and t1.mes> 1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export_Gastos_BN */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export_Gastos_PE */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export_Gastos_PE */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dJuVw5ksgnaekrjK/code.sas */
+/* =========================INÍCIO TASK========================= */
+OPTIONS COMPRESS=BINARY REUSE=YES REPLACE SYMBOLGEN;
+
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+Create table GASTOS_PE26 as
+select * from connection to perm
+(
+  select
+      date_trunc(date(dt_periodo), month) as mes_referencia,
+      extract(month from date(dt_periodo)) as mes,
+      extract(year from date(dt_periodo)) as ano,
+      case
+         when nm_conta_contabil = '4993050000001000000000000'
+         then '8181028000000000001000000'
+         else nm_conta_contabil
+      end as conta_contabil,
+      nm_classe_valor as classe_valor,
+      concat(nm_produto, ' | ', nm_canal) as produto_canal,
+      nu_veiculo  as empresa,
+      nm_centro_custo as centro_custo,
+      round(sum(vr_gasto),5) as vr_gasto
+from  bv-pdbd-prd.dvry_corp_financas.myabc_custosdespesasmis_fato
+where ds_modelo = "PE'26"
+group by all
+
+);
+   disconnect from perm
+;
+
+quit;
+
+PROC SQL;
+   CREATE TABLE WORK.GASTOS_PE26 AS
+   SELECT t1.mes,
+          t1.ano,
+          t1.conta_contabil,
+          t1.classe_valor,
+          t1.produto_canal,
+          t1.empresa,
+          t1.centro_custo,
+          
+            (round(t1.vr_gasto, 0.00001)) AS vr_gasto
+      FROM WORK.GASTOS_PE26 t1
+		where t1.ano = 2026;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export_Gastos_PE */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Validação_Chaves_TM1 */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Validação_Chaves_TM1 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-6KDt4S7Lv1rVllgd/code.sas */
+/* =========================INÍCIO TASK========================= */
+OPTIONS COMPRESS=BINARY REUSE=YES REPLACE SYMBOLGEN;
+
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+Create table GASTOS_check as
+select * from connection to perm
+(
+  select
+      date_trunc(date(dt_periodo), month) as mes_referencia,
+      extract(month from date(dt_periodo)) as mes,
+      extract(year from date(dt_periodo)) as ano,
+      case
+         when nm_conta_contabil = '4993050000001000000000000'
+         then '8181028000000000001000000'
+         else nm_conta_contabil
+      end as conta_contabil,
+      nm_classe_valor as classe_valor,
+      concat(nm_produto, ' | ', nm_canal) as produto_canal,
+      nu_veiculo  as empresa,
+      nm_centro_custo as centro_custo,
+      round(sum(vr_gasto),5) as vr_gasto
+from  bv-pdbd-prd.dvry_corp_financas.myabc_custosdespesasmis_fato
+where ds_modelo = "BN'26"
+group by all
+
+);
+   disconnect from perm
+;
+
+quit;
+
+PROC SQL;
+   CREATE TABLE WORK.GASTOS_check AS
+   SELECT DISTINCT
+
+		  t1.centro_custo
+
+      FROM WORK.GASTOS_check t1
+	where t1.ano = 2026
+		and t1.conta_contabil <> '000000000000000000000-141'
+		and t1.mes> 1 ;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Validação_Chaves_TM1 */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Validação_Total_Gastos */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Validação_Total_Gastos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-RMSXFv12zMKODYND/code.sas */
+/* =========================INÍCIO TASK========================= */
+OPTIONS COMPRESS=BINARY REUSE=YES REPLACE SYMBOLGEN;
+
+proc sql ;
+connect to bigquery as perm (project='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+Create table GASTOS_BN26_Total as
+select * from connection to perm
+(
+  select
+      date_trunc(date(dt_periodo), month) as mes_referencia,
+      extract(month from date(dt_periodo)) as mes,
+      extract(year from date(dt_periodo)) as ano,
+      case
+         when nm_conta_contabil = '4993050000001000000000000'
+         then '8181028000000000001000000'
+         else nm_conta_contabil
+      end as conta_contabil,
+      nm_classe_valor as classe_valor,
+      concat(nm_produto, ' | ', nm_canal) as produto_canal,
+      nu_veiculo  as empresa,
+      nm_centro_custo as centro_custo,
+      round(sum(vr_gasto),5) as vr_gasto
+from  bv-pdbd-prd.dvry_corp_financas.myabc_custosdespesasmis_fato
+where ds_modelo = "BN'26"
+group by all
+
+);
+   disconnect from perm
+;
+
+quit;
+
+PROC SQL;
+   CREATE TABLE WORK.GASTOS_BN26_Total AS
+   SELECT
+sum(round(t1.vr_gasto, 0.00001)) AS vr_gasto
+      FROM WORK.GASTOS_BN26_Total t1
+		where t1.ano = 2026
+		and t1.conta_contabil <> '000000000000000000000-141'
+		and t1.mes> 1
+
+;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Validação_Total_Gastos */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

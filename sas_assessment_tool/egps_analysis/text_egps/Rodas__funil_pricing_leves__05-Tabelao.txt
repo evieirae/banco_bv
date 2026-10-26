@@ -1,0 +1,514 @@
+START_METADATA
+PROJECT: Rodas__funil_pricing_leves
+FILE_SAS: 05-Tabelao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 341
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtCtpSim, LstD0CSm, LstD3CSm, SafraESG
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.BASE_MODELOS_ESG_&SAFRAESG [SAS/Local], AUXL.PROPOSTAS_ESG [SAS/Local], BASEGRC.TBPARCEIROAUTOSHOPPING [SAS/Local], BASEGRC.TBPORTEPDV [SAS/Local], PRICING.MENSAGERIA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: PRICING
+IMPORTED FILES (Requires Ingestion): /riscosbvf/Mazzuca/funil_leves.sas7bdat
+TABLE_READ_PROVENANCE (Flow): AUXL.BASE_MODELOS_ESG_&SAFRAESG [PROC SQL - JOIN], AUXL.PROPOSTAS_ESG [PROC SQL - JOIN], BASEGRC.TBPARCEIROAUTOSHOPPING [PROC SQL - JOIN], BASEGRC.TBPORTEPDV [PROC SQL - FROM], PRICING.MENSAGERIA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/Mazzuca/funil_leves.sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PRICING.FUNIL_LEVES
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: EFEITO_CANCELADAS, MSG, PORTE, SIMU_LEVES_MSG_DIA
+DYNAMIC REFS (Ambiguous): AUXL.BASE_MODELOS_ESG_{SAFRAESG}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/Mazzuca/funil_leves.sas7bdat
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE PORTE AS
+SELECT
+
+CdParceiroComercial,
+FlPorteA as Porte
+
+FROM BASEGRC.TBPORTEPDV
+WHERE NuAno = 2025;
+
+/*AGRUPAMENTO MSG e FAIXA DE ENTRADA MINIMA POR SIMULACAO*/
+PROC SQL;
+CREATE TABLE MSG AS SELECT
+A.CdSimulacaoInicial,
+A.NuProposta,
+A.DtSimulacaoInicial,
+A.Mensageria AS Mensageria,
+CASE WHEN A.ProbabilidadeAprovacao <= 0.5 THEN 'ZERO'
+     WHEN A.ProbabilidadeAprovacao <= 6.0 THEN 'ATÉ 6,0'
+	  WHEN A.ProbabilidadeAprovacao <= 7.3 THEN '6,25-7,25'
+	  WHEN A.ProbabilidadeAprovacao <= 7.9 THEN '7,5-7,75'
+	  WHEN A.ProbabilidadeAprovacao <= 8.5 THEN '8,25-8,5'
+	  WHEN A.ProbabilidadeAprovacao <= 9.8 THEN '8,75-9,75'
+	  WHEN A.ProbabilidadeAprovacao <= 10 THEN '10'
+	  ELSE 'ZERO' END AS AGRUPAMENTO_RTG_SIMPLES,
+
+CASE WHEN A.Mensageria in ('0. Aprovado','0. Aprovado 100%','1. Alta chance','1. Muita chance >85%','2. Grande chance >70%','2. Tem chance','3. Boa chance >50%','4. Tem chance >0%','7. Plano Aprovado')
+and Mensageria2 not in ('3. Recusado', '4. Recusado Reversível') then 'Mensageria Positiva'
+WHEN A.Mensageria  in ('3. Recusado','6. Recusado','6. Plano Recusado') or
+A.Mensageria in ('0. Aprovado','0. Aprovado 100%','1. Alta chance','1. Muita chance >85%','2. Grande chance >70%','2. Tem chance','3. Boa chance >50%','4. Tem chance >0%','7. Plano Aprovado') and Mensageria2 in ('3. Recusado', '4. Recusado Reversível') then 'Recusado'
+else 'Demais Msgs'
+end as AGRUPAMENTO_MSG,
+
+CASE WHEN A.EntradaMinima in ('00% a 4,99%','05% a 9,99%','00% a 9,99%')   THEN 'MÍNIMA ATÉ 10%'
+     WHEN A.EntradaMinima in ('10% a 14,99%','15% a 19,99%','10% a 19,99%') THEN 'MÍNIMA ATÉ 20%'
+	 WHEN A.EntradaMinima in ('20% a 24,99%','25% a 29,99%','20% a 29,99%') THEN 'MÍNIMA ATÉ 30%'
+     WHEN A.EntradaMinima in ('30% a 34,99%','35% a 39,99%','30% a 39,99%') THEN 'MÍNIMA ATÉ 40%'
+	 WHEN A.EntradaMinima in ('40% a 44,99%','45% a 49,99%','40% a 49,99%') THEN 'MÍNIMA ATÉ 50%'
+	 WHEN A.EntradaMinima in ('50% a 54,99%','55% a 59,99%','60% a 64,99%','65% a 69,99%'
+                              '70% a 74,99%','75% a 79,99%','80% a 84,99%'
+                              '85% a 89,99%','90% a 94,99%','95% a 99,99%','50% a 100%') THEN 'MÍNIMA > 50%'
+	 ELSE 'Desconhecido' END AS FAIXA_ENTRADA_MINIMA,
+FlPap,
+CASE WHEN A.CdParceiroComercial = D.CdParceiroComercial then 'AutoShopping' else 'Demais' end as FG_SHOPPING
+
+from PRICING.Mensageria AS A
+LEFT JOIN BASEGRC.TBPARCEIROAUTOSHOPPING AS D ON A.CdParceiroComercial=D.CdParceiroComercial
+group by 1,2,3,4,5,6,7,8,9;
+quit;
+
+PROC SQL;
+CREATE TABLE EFEITO_CANCELADAS AS SELECT
+NuProposta,
+SUM(CASE WHEN A.DtStatusProposta <= D0 and A.DtStatusProposta >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD0CSm. then QtEfetivadas ELSE 0 END) AS EFETIVADASD0_AJUST,
+SUM(CASE WHEN A.DtStatusProposta <= D3 and A.DtStatusProposta >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD3CSm. then QtEfetivadas ELSE 0 END) AS EFETIVADASD3_AJUST,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD3CSm. then QtAprovadas else 0 end) as FlPropostaAprovadaD3_AJUST,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD0CSm. then QtAprovadas else 0 end) as FlPropostaAprovadaD0_AJUST
+
+FROM QTPROPOSTAS AS A
+LEFT JOIN TBD0 AS F ON A.DtEntradaProposta=F.DtTempo
+LEFT JOIN TBD3 AS H ON A.DtEntradaProposta=H.DtTempo
+
+GROUP BY 1;
+QUIT;
+
+/*INFOS DE FUNIL*/
+
+PROC SQL;
+CREATE TABLE SIMU_LEVES_MSG_DIA AS
+SELECT
+'Simu_Leves_Msg' as TpDados,
+A.NuAnoMes as Safra,
+A.CdSimulacaoInicial,
+A.CdSimulacaoFinal,
+A.NuProposta,
+A.NuCpfCnpj,
+A.CdParceiroComercial,
+A.DtSimulacaoInicial as Dia,
+A.Filial,
+E.FAIXA_ENTRADA_MINIMA,
+A.Mensageria,
+CASE WHEN A.Regional  in ('Canal Rodas e EGV - Regional I', ,'Canal Rodas e EGV I - Regional I'   ,'Canal Rodas e EGV III - Regional I') 	THEN 'R1'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional II' ,'Canal Rodas e EGV I - Regional II'  ,'Canal Rodas e EGV II - Regional II') 	THEN 'R2'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional III','Canal Rodas e EGV II - Regional II' ,'Canal Rodas e EGV I - Regional III') 	THEN 'R3'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional IV' ,'Canal Rodas e EGV II - Regional I'  ,'Canal Rodas e EGV II - Regional IV')  	THEN 'R4'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional V'  ,'Canal Rodas e EGV III - Regional I' ,'Canal Rodas e EGV II - Regional V')  	THEN 'R5'
+     WHEN A.Regional  in ('Canal Rodas e EGV - Regional VI' ,'Canal Rodas e EGV III - Regional II','Canal Rodas e EGV II - Regional VI')	THEN 'R6'
+	 ELSE 'DEMAIS' END AS Regional,
+E.AGRUPAMENTO_RTG_SIMPLES,
+A.FxIdade,
+A.FlPap,
+FlConcorrente,
+FG_SHOPPING,
+A.Canal,
+ESG.Combustivel,
+
+CASE WHEN A.ProbabilidadeAprovacao <= 0.5 THEN 'ZERO'
+     WHEN A.ProbabilidadeAprovacao <= 4.5 THEN 'ATÉ 4,5'
+	  WHEN A.ProbabilidadeAprovacao <= 5.5 THEN '4,75-5,5'
+	  WHEN A.ProbabilidadeAprovacao <= 7.5 THEN '5,75-7,5'
+	  WHEN A.ProbabilidadeAprovacao <= 8.5 THEN '7,75-8,5'
+	  WHEN A.ProbabilidadeAprovacao <= 9.8 THEN '9,25-9,75'
+	  WHEN A.ProbabilidadeAprovacao <= 10 THEN '10'
+	  ELSE 'ZERO' END AS AGRUPAMENTO_RTG_SIMPLES_V2,
+
+/*Quantidade de Simulações Total e em D0, D1, D2 e D3*/
+
+COUNT (distinct (A.nucpfcnpj)) as Qtd_PreAnalise,
+COUNT (distinct (CASE WHEN flcard=1 then A.nucpfcnpj END)) as Qtd_Simulacao,
+COUNT (distinct (case when A.DtSimulacaoInicial <= &LstD3CSm. and flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_D3,
+COUNT (distinct (case when A.DtSimulacaoInicial <= &LstD0CSm. and flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_D0,
+COUNT (distinct (CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' AND flcard=1 THEN A.nucpfcnpj END)) as Qtd_Simulacao_P,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD3CSm. AND AGRUPAMENTO_MSG = 'Mensageria Positiva' and flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_P_D3,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD0CSm. AND AGRUPAMENTO_MSG = 'Mensageria Positiva' and flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_P_D0,
+COUNT (distinct (CASE WHEN AGRUPAMENTO_MSG = 'Recusado' AND flcard=1 THEN A.nucpfcnpj END)) as Qtd_Simulacao_R,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD3CSm. AND AGRUPAMENTO_MSG = 'Recusado' AND flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_R_D3,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD0CSm. AND AGRUPAMENTO_MSG = 'Recusado' AND flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_R_D0,
+COUNT (distinct (CASE WHEN AGRUPAMENTO_MSG = 'Demais Msgs' AND flcard=1 THEN A.nucpfcnpj END)) as Qtd_Simulacao_D,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD3CSm. and AGRUPAMENTO_MSG = 'Demais Msgs' and flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_D_D3,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD0CSm. and AGRUPAMENTO_MSG = 'Demais Msgs' and flcard=1 then A.nucpfcnpj end)) as Qtd_Simulacao_D_D0,
+
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Neg_D3,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Neg_D0,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_APNP_D3,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_APNP_D0,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD3CSm. AND AGRUPAMENTO_MSG = 'Mensageria Positiva' and flcard=1 and COALESCE(FlPropostaOriginada,0) = 0 then A.nucpfcnpj end)) as Qtd_Simulacao_P_D3_SP,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD0CSm. AND AGRUPAMENTO_MSG = 'Mensageria Positiva' and flcard=1 and COALESCE(FlPropostaOriginada,0) = 0 then A.nucpfcnpj end)) as Qtd_Simulacao_P_D0_SP,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD3CSm. AND AGRUPAMENTO_MSG = 'Recusado' AND flcard=1 and COALESCE(FlPropostaOriginada,0) = 0 then A.nucpfcnpj end)) as Qtd_Simulacao_R_D3_SP,
+COUNT (distinct (CASE WHEN A.DtSimulacaoInicial <= &LstD0CSm. AND AGRUPAMENTO_MSG = 'Recusado' AND flcard=1 and COALESCE(FlPropostaOriginada,0) = 0 then A.nucpfcnpj end)) as Qtd_Simulacao_R_D0_SP,
+
+/*Indicadores de Entrada, Taxa, Rating, Aprovação e Efetivação Total e em D0, D1, D2 e D3*/
+
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN A.VrVeiculoSimulacao ELSE 0 END) as VrVeiculoSimulacao_P,
+
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN A.PcEntradaMinima*A.VrProposta ELSE 0 END) as ENTRADA_MINIMA_POND_P,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN A.VrProposta ELSE 0 END) as VrProposta_P,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN COALESCE(A.VrEntradaOri,A.VrEntrada) ELSE 0 END) as VpEntrada_P,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN COALESCE(A.VrProposta,A.VrProposta) ELSE 0 END) as VrLiberadoHierarquia_P,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN A.ProbabilidadeAprovacao*A.VrProposta ELSE 0 END) as Rating_Sim_PND_P,
+SUM(A.ProbabilidadeAprovacao*A.VrProposta) as Rating_Sim_PND,
+SUM(A.VrProposta) as VrProposta_Simu,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN A.TxInicioFinanciamento*A.VrProposta ELSE 0 END) as TAXA_PND_P,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN A.TxTirContabil*A.VrProposta ELSE 0 END) as TIR_PND_P,
+SUM(A.FlPropostaOriginada) as FlPropostaOriginada,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN FlPropostaOriginada ELSE 0 END) as FlPropostaOriginada_P,
+SUM(CASE WHEN FlPropostaOriginada > 0 THEN A.ProbabilidadeAprovacao*A.VrProposta ELSE 0 END) as Rating_Prop_PND,
+SUM(CASE WHEN FlPropostaOriginada > 0 THEN A.VrProposta ELSE 0 END) as VrProposta,
+SUM(A.FlPropostaAprovada) as FlPropostaAprovada,
+SUM(A.FlPropostaEfetivada) as FlPropostaEfetivada,
+SUM(EFETIVADASD0_AJUST) AS EFETIVADASD0_AJUST,
+SUM(EFETIVADASD3_AJUST) AS EFETIVADASD3_AJUST,
+SUM(FlPropostaAprovadaD3_AJUST) as FlPropostaAprovadaD3_AJUST,
+SUM(FlPropostaAprovadaD0_AJUST) as FlPropostaAprovadaD0_AJUST,
+SUM(CASE WHEN A.DtContrato <= D0 and A.DtContrato >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaEfetivada ELSE 0 END) AS EFETIVADASD0,
+SUM(CASE WHEN A.DtContrato <= D3 and A.DtContrato >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaEfetivada ELSE 0 END) AS EFETIVADASD3,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaAprovada else 0 end) as FlPropostaAprovadaD3,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaAprovada else 0 end) as FlPropostaAprovadaD0,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaOriginada else 0 end) as FlPropostaOriginadaD3,
+SUM(CASE WHEN A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaOriginada else 0 end) as FlPropostaOriginadaD0,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' and A.DtContrato <= D0 and A.DtContrato >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaEfetivada ELSE 0 END) AS EFETIVADASD0_P,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' and A.DtContrato <= D3 and A.DtContrato >= A.DtEntradaProposta and A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaEfetivada ELSE 0 END) AS EFETIVADASD3_P,
+SUM(CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' THEN FlPropostaEfetivada ELSE 0 END) as FlPropostaEfetivada_P,
+
+SUM(CASE WHEN StatusSimulacao = 'Proposta APNP' and AGRUPAMENTO_MSG = 'Mensageria Positiva' and A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaAprovada else 0 end) as FlProposta_P_APNPD3,
+SUM(CASE WHEN StatusSimulacao = 'Proposta APNP' and AGRUPAMENTO_MSG = 'Mensageria Positiva' and A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaAprovada else 0 end) as FlProposta_P_APNPD0,
+
+SUM(CASE WHEN StatusSimulacao = 'Proposta negada' and A.DtEntradaProposta <= &LstD3CSm. then A.FlPropostaOriginada else 0 end) as FlPropostaNegadaD3,
+SUM(CASE WHEN StatusSimulacao = 'Proposta negada' and A.DtEntradaProposta <= &LstD0CSm. then A.FlPropostaOriginada else 0 end) as FlPropostaNegadaD0,
+
+/*Quantidade de Convertidas Totais e em D0, D1, D2 e D3*/
+
+COUNT(DISTINCT (CASE WHEN A.DtInclusaoGravame >= A.DtSimulacaoInicial AND COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Convertidas,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP,
+
+COUNT(DISTINCT (CASE WHEN A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_D3,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_D3,
+
+COUNT(DISTINCT (CASE WHEN A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_D0,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_APNP_D0,
+
+/*Quantidade de Convertidas Positivas e APNP Totais e em D0, D1, D2 e D3*/
+
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_P,
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_P_APNP,
+
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_P_D3,
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_P_APNP_D3,
+
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_P_D0,
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_P_APNP_D0,
+
+/*Quantidade de Convertidas Recusadas Totais e em D0, D1, D2 e D3*/
+
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_R,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg,
+
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_R_D3,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_D3,
+
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_R_D0,
+COUNT(DISTINCT (CASE WHEN StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_Neg_D0,
+
+/*Quantidade de Convertidas Demais Msgs Totais e em D0, D1, D2 e D3*/
+
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Convertidas_D,
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_D_D3,
+COUNT(DISTINCT (CASE WHEN AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Convertidas_D_D0,
+
+/*Quantidade de Convertidas Totais e em D0, D1, D2 e D3 ITAU*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial AND COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_ITAU,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D3_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D3_ITAU,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D0_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D0_ITAU,
+
+/*Quantidade de Convertidas Positivas e APNP Totais e em D0, D1, D2 e D3 ITAU*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_ITAU,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D3_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D3_ITAU,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D0_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D0_ITAU,
+
+/*Quantidade de Convertidas Recusadas Totais e em D0, D1, D2 e D3 ITAU*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_R_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_ITAU,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D3_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D3_ITAU,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D0_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D0_ITAU,
+
+/*Quantidade de Convertidas Demais Msgs Totais e em D0, D1, D2 e D3 ITAU*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_D_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D3_ITAU,
+COUNT(DISTINCT (CASE WHEN Banco = 'Itau' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D0_ITAU,
+
+/*Quantidade de Convertidas Totais e em D0, D1, D2 e D3 STD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial AND COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_STD,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D3_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D3_STD,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D0_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D0_STD,
+
+/*Quantidade de Convertidas Positivas e APNP Totais e em D0, D1, D2 e D3 STD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_STD,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D3_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D3_STD,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D0_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D0_STD,
+
+/*Quantidade de Convertidas Recusadas Totais e em D0, D1, D2 e D3 STD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_R_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_STD,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D3_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D3_STD,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D0_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D0_STD,
+
+/*Quantidade de Convertidas Demais Msgs Totais e em D0, D1, D2 e D3 STD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_D_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D3_STD,
+COUNT(DISTINCT (CASE WHEN Banco = 'Santander' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D0_STD,
+
+/*Quantidade de Convertidas Totais e em D0, D1, D2 e D3 BRAD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial AND COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_BRA,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D3_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D3_BRA,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D0_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D0_BRA,
+
+/*Quantidade de Convertidas Positivas e APNP Totais e em D0, D1, D2 e D3 BRAD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_BRA,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D3_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D3_BRA,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D0_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D0_BRA,
+
+/*Quantidade de Convertidas Recusadas Totais e em D0, D1, D2 e D3 BRAD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_R_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_BRA,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D3_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D3_BRA,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D0_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D0_BRA,
+
+/*Quantidade de Convertidas Demais Msgs Totais e em D0, D1, D2 e D3 BRAD*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_D_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D3_BRA,
+COUNT(DISTINCT (CASE WHEN Banco = 'Bradesco' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D0_BRA,
+
+/*Quantidade de Convertidas Totais e em D0, D1, D2 e D3 PANAMERICANO*/
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND A.DtInclusaoGravame >= A.DtSimulacaoInicial AND COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_PANAMERICANO,
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D3_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D3_PANAMERICANO,
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D0_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D0_PANAMERICANO,
+
+/*Quantidade de Convertidas Positivas e APNP Totais e em D0, D1, D2 e D3 PANAMERICANO*/
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_PANAMERICANO,
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D3_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D3_PANAMERICANO,
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D0_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D0_PANAMERICANO,
+
+/*Quantidade de Convertidas Recusadas Totais e em D0, D1, D2 e D3 PANAMERICANO*/
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_R_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_PANAMERICANO,
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D3_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D3_PANAMERICANO,
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D0_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D0_PANAMERICANO,
+
+/*Quantidade de Convertidas Demais Msgs Totais e em D0, D1, D2 e D3 PANAMERICANO*/
+
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_D_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D3_PANAMERICANO,
+COUNT(DISTINCT (CASE WHEN Banco IN ('PANAMERICANO','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D0_PANAMERICANO,
+
+/*Quantidade de Convertidas Totais e em D0, D1, D2 e D3 C6*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial AND COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_C6,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D3_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D3_C6,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D0_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D0_C6,
+
+/*Quantidade de Convertidas Positivas e APNP Totais e em D0, D1, D2 e D3 C6*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_C6,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D3_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D3_C6,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D0_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D0_C6,
+
+/*Quantidade de Convertidas Recusadas Totais e em D0, D1, D2 e D3 C6*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_R_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_C6,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D3_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D3_C6,
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D0_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D0_C6,
+
+/*Quantidade de Convertidas Demais Msgs Totais e em D0, D1, D2 e D3 C6*/
+
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_D_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D3_C6,
+COUNT(DISTINCT (CASE WHEN Banco = 'C6' AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D0_C6,
+
+/*Quantidade de Convertidas Totais e em D0, D1, D2 e D3 Demais Bancos*/
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND A.DtInclusaoGravame >= A.DtSimulacaoInicial AND COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) as Qtd_Conv_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_DB,
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D3_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D3_DB,
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D0_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_APNP_D0_DB,
+
+/*Quantidade de Convertidas Positivas e APNP Totais e em D0, D1, D2 e D3 Demais Bancos*/
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_DB,
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D3_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D3_DB,
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_D0_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Mensageria Positiva' AND StatusSimulacao = 'Proposta APNP' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_P_APNP_D0_DB,
+
+/*Quantidade de Convertidas Recusadas Totais e em D0, D1, D2 e D3 Demais Bancos*/
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_R_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND StatusSimulacao = 'Proposta negada' and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_DB,
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D3_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D3_DB,
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Recusado' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_R_D0_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND StatusSimulacao = 'Proposta negada' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtEntradaProposta and FlConcorrente = 1 and A.DtEntradaProposta <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_Neg_D0_DB,
+
+/*Quantidade de Convertidas Demais Msgs Totais e em D0, D1, D2 e D3 Demais Bancos*/
+
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 then A.NuCpfCnpj END)) AS Qtd_Conv_D_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D3 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD3CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D3_DB,
+COUNT(DISTINCT (CASE WHEN Banco not in ('Itau','Santander','Bradesco','PANAMERICANO','C6','Pan','Panamericano') AND AGRUPAMENTO_MSG = 'Demais Msgs' AND A.DtInclusaoGravame <= D0 and A.DtInclusaoGravame >= A.DtSimulacaoInicial and COALESCE(FlPropostaOriginada,0) = 0 AND FlConcorrente = 1 and A.DtSimulacaoInicial <= &LstD0CSm. then A.NuCpfCnpj END)) AS Qtd_Conv_D_D0_DB
+
+from PRICING.MENSAGERIA AS A
+LEFT JOIN MSG as E ON A.CdSimulacaoInicial=E.CdSimulacaoInicial
+LEFT JOIN TBD0 AS F ON A.DtSimulacaoInicial=F.DtTempo
+LEFT JOIN TBD3 AS H ON A.DtSimulacaoInicial=H.DtTempo
+LEFT JOIN EFEITO_CANCELADAS AS M ON A.NuProposta=M.NuProposta
+LEFT JOIN AUXL.PROPOSTAS_ESG as PropESG on A.NuProposta=PropESG.NuProposta
+LEFT JOIN AUXL.BASE_MODELOS_ESG_&SafraESG. as ESG on ESG.CdMolicar = input(PropESG.CdMolicar,9.)
+
+WHERE A.NuAnoMes >=202401
+and A.DtSimulacaoInicial <= &DtCtpSim.
+AND A.FxIdade not in ('ZeroKM')
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+quit;
+
+%if %sysfunc(exist(SIMU_LEVES_MSG_DIA)) %then %do;
+  X 'rm /riscosbvf/Mazzuca/funil_leves.sas7bdat';
+
+DATA PRICING.funil_leves;
+SET SIMU_LEVES_MSG_DIA;
+RUN;
+%end;

@@ -1,0 +1,227 @@
+START_METADATA
+PROJECT: Rodas__GestaoRotinaApp
+FILE_SAS: Foco_PDV.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 147
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SafraM0, SafraM1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBRITOFINAL [SAS/Local], BASES.TBMETANI_ATINGMETAS_DASH [SAS/Local], BV-PDBD-PRD.TRUSTED_NEGC_RODAS.TBVISITAPDVFOCOOUTPUT [BIGQUERY], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBFOCO_PDV [DATA Step - MERGE; PROC SORT - DATA=; PROC SQL - FROM], BASEGRC.TBRITOFINAL [PROC SQL - FROM], BASES.TBMETANI_ATINGMETAS_DASH [PROC SQL - FROM; PROC SQL - JOIN], BV-PDBD-PRD.TRUSTED_NEGC_RODAS.TBVISITAPDVFOCOOUTPUT [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): BASEGRC.TBFOCO_PDV
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBFOCO_PDV
+APPEND_ONLY_OUTPUTS: BASEGRC.TBFOCO_PDV
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): BASEGRC.TBFOCO_PDV
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/tbvisitapdvfocoinput.csv
+TEMP/DISCARDED OUTPUTS: COMPARACAO, DIVERGENCIAS, TBFOCOALTERADO, TBFOCOPDV, TBPARCEIROALTERADOSEXPORT, TBPARCEIRO_V01, TBPDVFOCO, TBRITO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+options validvarname=any;
+%include '/infogrc/utils/all-includes.sas';
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*GERA FOCO PDV*/
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*Gera base de virou BV e Part no Jogo*/
+
+proc sql;
+create table TbRito as
+select
+ CdParceiroComercial
+,(Sum (coalesce(Part_APNP,0))+
+ 		Sum (coalesce(Part_Cancelada,0))+
+		Sum (coalesce(Part_Card,0))+
+		Sum (coalesce(Part_SemCard,0))+
+		Sum (coalesce(Part_ContratosBV,0))+
+		Sum (coalesce(Part_Negada,0))) /  Sum(coalesce(Part_Mercado,0)) as PartJogo
+
+, Sum(Part_ContratosBV) /  ( Sum(Part_ContratosBV)+
+								Sum(Part_Card)+
+								Sum(Part_APNP)) as VirouBV
+
+from basegrc.TbRitoFinal
+where  1=1
+and nuanomes = &SafraM1.
+group by 1
+having calculated PartJogo < 0.50 and calculated VirouBV < 0.25
+;run;
+
+/*Carteira do MES ATUAL*/
+
+proc sql;
+create table TbFocoPDV as
+select distinct
+
+ &SafraM0. as Safra
+,input(substr(dashM0.NmParceiroComercial,1,6),6.) as CdParceiroComercial
+,Case 	when dashM0.FlPorteA = 'GG' then 1
+		when dashM0.FlPorteA = 'G' then 2
+		when dashM0.FlPorteA = 'M' then 3
+		when dashM0.FlPorteA = 'P' then 4
+		else 5 end as PesoPorte
+,Case when TbRito.CdParceiroComercial is null then 1 else 2 end as PesoRito
+,dashM0.DsLoginN1
+,sum(dashM1.VrProducao) as Meta
+,sum(dashM1.VrProducaoRealizado) as Producao
+,sum(dashM1.VrProducaoRealizado)/sum(dashM1.VrProducao) as Atingmento
+,sum(dashM1.VrProducao)-coalesce(sum(dashM1.VrProducaoRealizado),0) as Saldo
+
+from bases.tbmetani_atingmetas_Dash dashM0
+
+	Left join TbRito as TbRito
+		on TbRito.CdParceiroComercial = input(substr(dashM0.NmParceiroComercial,1,6),6.)
+
+	Left join bases.tbmetani_atingmetas_Dash dashM1
+		on dashM1.NmParceiroComercial = dashM0.NmParceiroComercial
+
+where 1=1
+and dashM0.NuAnoMes =&SafraM0.
+/*and dashM0.FlPorteA in ('M','G','GG')*/
+and dashM1.NuAnoMes =&SafraM1.
+and dashM1.produto ='Leves'
+/*and dashM0.dsloginn1 = 'bruno.dias'*/
+/*and NmParceiroComercial='103 - SAVOL VEICULOS'*/
+group by 1,2,3,4
+having  sum(dashM1.VrProducaoRealizado)/sum(dashM1.VrProducao)<0.7
+;run;
+
+proc sort data=TbFocoPDV  ;by descending saldo ;run;
+proc sort data=TbFocoPDV  ;by PesoPorte ;run;
+proc sort data=TbFocoPDV  ;by PesoRito ;run;
+proc sort data=TbFocoPDV  ;by DsLoginN1 ;run;
+
+data TBPdvFoco;
+    set TbFocoPDV ;
+    by  DsLoginN1  ;
+    retain Top 0;
+    if first.DsLoginN1  then Top = 0;
+    Top + 1;
+   if Top <=5
+;run;
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd'
+READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100
+);
+create table TbFocoAlterado as
+select
+* /*Script em SAS */
+from connection to perm(
+	select
+	cast(cdparceirocomercial as int64) as cdparceirocomercial,
+	cast(indicado as int64) as indicado,
+	cast(confirmado as int64) as confirmado
+
+	from bv-pdbd-prd.trusted_negc_rodas.tbvisitapdvfocooutput
+Where Just <> ''  and confirmado = '1'
+);
+disconnect from perm;
+quit;
+
+PROC SQL;
+CREATE TABLE TbParceiro_V01 AS
+  SELECT
+  		&SafraM0. as NuAnomes
+  		,A.CdParceiroComercial
+/*		,Coalesce(confirmado,case when catx(' - ', A.CdParceiroComercial,A.NmParceiroComercial) = b.NmParceiroComercial then 1 else 0 end) as Indicado*/
+		,case when  A.CdParceiroComercial = b.CdParceiroComercial then 1 else 0 end as IndicadoNovo
+		,case when A.CdParceiroComercial = b.CdParceiroComercial then 1 else 0 end as ConfirmadoNovo
+FROM tmp.TBPARCEIROCOMERCIAL AS A
+
+		left join TBPdvFoco as b
+			on  A.CdParceiroComercial = b.CdParceiroComercial
+
+		left join TbFocoAlterado as C
+			on A.CdParceiroComercial = C.CdParceiroComercial
+
+Where 1=1
+And A.DsLoginN1C <> ''
+And A.DsLoginN2C <> ''
+and A.flativo= 'S'
+and A.NmCanalEstruturaComercialC = 'Canal Veiculos'
+/*and DsLoginN1C = 'aarao.souza'*/
+order by A.DsLoginN1C,A.CdParceiroComercial
+ ;RUN;
+
+ proc sort data=Basegrc.TbFoco_PDV; by CdParceiroComercial; run;
+  proc sort data=TbParceiro_V01; by CdParceiroComercial; run;
+
+/* Etapa 2: Juntar as bases lado a lado */
+data Comparacao;
+    merge TbParceiro_V01(in=app) Basegrc.TbFoco_PDV(in=com);
+    by cdparceirocomercial;
+    if app and com;
+run;
+
+/* Etapa 3: Identificar divergências */
+data Divergencias;
+    set Comparacao;
+
+    /* Exemplo: comparar campos nome, status e tipo */
+    if IndicadoNovo ne Indicado or
+       ConfirmadoNovo ne Confirmado
+
+then output;
+run;
+
+proc sql;
+delete from Basegrc.TbFoco_PDV
+where cdparceirocomercial in (select cdparceirocomercial from Divergencias)
+;run;
+
+PROC SQL;
+CREATE TABLE TbParceiroAlteradosExport AS
+  SELECT
+  		&SafraM0. as NuAnomes
+  		,A.CdParceiroComercial
+		,a.IndicadoNovo as Indicado
+		,a.ConfirmadoNovo as Confirmado
+FROM Divergencias AS A
+;RUN;
+
+proc sql;
+	insert into Basegrc.TbFoco_PDV
+	select * from TbParceiroAlteradosExport;
+quit;
+
+proc export
+data=TbParceiroAlteradosExport
+file="/riscosbvf/BA/processos/output/tbvisitapdvfocoinput.csv" replace
+dbms=dlm;
+delimiter=';';
+run;

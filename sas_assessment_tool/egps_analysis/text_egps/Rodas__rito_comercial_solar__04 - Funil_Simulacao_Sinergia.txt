@@ -1,0 +1,514 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 04 - Funil_Simulacao_Sinergia.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 436
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5, DataBase
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBFUNILSIMULACAO_SOLAR [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBFUNILSIMULACAO_SOLAR [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_FUNIL_SINERGIA_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_FUNIL_SINERGIA_CANAL_SEM, BASE_FUNIL_SINERGIA_CANAL_TOTAL, BASE_FUNIL_SINERGIA_FILIAL_SEM, BASE_FUNIL_SINERGIA_FILIAL_TOTAL, BASE_FUNIL_SINERGIA_GRS_SEM, BASE_FUNIL_SINERGIA_GRS_TOTAL, BASE_FUNIL_SINERGIA_PDVS_SEM, BASE_FUNIL_SINERGIA_PDVS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+Proc Sql;
+Create Table Base_Funil_Sinergia_Canal_Total as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"Canal" as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,Funil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,"Canal Solar" as Dimensao2
+,"Canal Solar" as Dimensao3
+,"Mês Fechado" as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and NmCanalEstruturaComercialC = 'Canal Solar'
+		Group by 1) as MSGPOS
+		  On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Funil_Sinergia_Canal_Sem as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"Canal" as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,Funil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,"Canal Solar" as Dimensao2
+,"Canal Solar" as Dimensao3
+,Case
+	When Day(DtSimulacaoAux) <=07 Then '01 á 07 dias'
+	When Day(DtSimulacaoAux) <=14 Then '08 á 14 dias'
+	When Day(DtSimulacaoAux) <=21 Then '15 á 21 dias'
+	When Day(DtSimulacaoAux) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and NmCanalEstruturaComercialC = 'Canal Solar'
+		Group by 1) as MSGPOS
+		  On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Funil_Sinergia_Filial_Total as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"Filial" as Visao
+,"" as DsLoginN1C
+,Funil.DsLoginN2C
+,Funil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Funil.NmAreaEstruturaComercialC as Dimensao2
+,Funil.NmAreaEstruturaComercialC as Dimensao3
+,"Mês Fechado" as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and NmCanalEstruturaComercialC = 'Canal Solar'
+		Group by 1) as MSGPOS
+		  On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Funil_Sinergia_Filial_Sem as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"Filial" as Visao
+,"" as DsLoginN1C
+,Funil.DsLoginN2C
+,Funil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Funil.NmAreaEstruturaComercialC as Dimensao2
+,Funil.NmAreaEstruturaComercialC as Dimensao3
+,Case
+	When Day(DtSimulacaoAux) <=07 Then '01 á 07 dias'
+	When Day(DtSimulacaoAux) <=14 Then '08 á 14 dias'
+	When Day(DtSimulacaoAux) <=21 Then '15 á 21 dias'
+	When Day(DtSimulacaoAux) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  				  NmAreaEstruturaComercialC in
+					(
+						'Canal Solar CO e NO',
+						'Canal Solar MG, BA, AL e SE',
+						'Canal Solar NE',
+						'Canal Solar SP Interior',
+						'Canal Solar SP, RJ e ES',
+						'Canal Solar Sul'
+					) and NmCanalEstruturaComercialC = 'Canal Solar'
+					Group by 1) as MSGPOS
+		On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+/*Grs*/
+Proc Sql;
+Create Table Base_Funil_Sinergia_Grs_Total as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"GRs" as Visao
+,Funil.DsLoginN1C
+,Funil.DsLoginN2C
+,Funil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Funil.NmAreaEstruturaComercialC as Dimensao2
+,Funil.NmColaboradorC as Dimensao3
+,"Mês Fechado" as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and NmCanalEstruturaComercialC = 'Canal Solar'
+		Group by 1) as MSGPOS
+		  On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Funil_Sinergia_Grs_Sem as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"GRs" as Visao
+,Funil.DsLoginN1C
+,Funil.DsLoginN2C
+,Funil.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Funil.NmAreaEstruturaComercialC as Dimensao2
+,Funil.NmColaboradorC as Dimensao3
+,Case
+	When Day(DtSimulacaoAux) <=07 Then '01 á 07 dias'
+	When Day(DtSimulacaoAux) <=14 Then '08 á 14 dias'
+	When Day(DtSimulacaoAux) <=21 Then '15 á 21 dias'
+	When Day(DtSimulacaoAux) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  				  NmAreaEstruturaComercialC in
+					(
+						'Canal Solar CO e NO',
+						'Canal Solar MG, BA, AL e SE',
+						'Canal Solar NE',
+						'Canal Solar SP Interior',
+						'Canal Solar SP, RJ e ES',
+						'Canal Solar Sul'
+					) and NmCanalEstruturaComercialC = 'Canal Solar'
+					Group by 1) as MSGPOS
+		On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+/*PDVs*/
+Proc Sql;
+Create Table Base_Funil_Sinergia_PDVs_Total as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"Cobans" as Visao
+,Funil.DsLoginN1C
+,Funil.DsLoginN2C
+,Funil.DsLoginN3C
+,Funil.NmAreaEstruturaComercialC as Dimensao1
+,Funil.NmColaboradorC as Dimensao2
+,put(Funil.CdParceiroComercial, 8.) || '-' || Funil.NmParceiroComercial as Dimensao3
+,"Mês Fechado" as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Porte.DtCadastro Format ddmmyy10.
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and NmCanalEstruturaComercialC = 'Canal Solar'
+		Group by 1) as MSGPOS
+		  On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Funil_Sinergia_PDVs_Sem as
+Select Distinct
+'Funil Sinergia' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,&DataBase. as DataBase Format DDMMYY10.
+,"Cobans" as Visao
+,Funil.DsLoginN1C
+,Funil.DsLoginN2C
+,Funil.DsLoginN3C
+,Funil.NmAreaEstruturaComercialC as Dimensao1
+,Funil.NmColaboradorC as Dimensao2
+,put(Funil.CdParceiroComercial, 8.) || '-' || Funil.NmParceiroComercial as Dimensao3
+,Case
+	When Day(DtSimulacaoAux) <=07 Then '01 á 07 dias'
+	When Day(DtSimulacaoAux) <=14 Then '08 á 14 dias'
+	When Day(DtSimulacaoAux) <=21 Then '15 á 21 dias'
+	When Day(DtSimulacaoAux) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Porte.DtCadastro Format ddmmyy10.
+,Count (Distinct Funil.NuCpfCNPJSimu) as  QtdSimulação
+,Count (Distinct MSGPOS.NuCpfCNPJSimu) as FlMSGPositiva
+,Sum (Funil.FlPropostaOriginada) as FlPropostaOriginada
+,Sum (Funil.FlPropostaAprovada) as FlPropostaAprovada
+,Sum (Funil.FlPropostaEfetivada) as FlPropostaEfetivada
+
+From Bases.TbFunilSimulacao_Solar as Funil
+	Left join Base_Porte_Cobans as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Funil.NuAnoMesAux = Porte.NuANomes
+	Left Join
+			(Select CodSimu, NuCpfCNPJSimu
+				From Bases.TbFunilSimulacao_Solar
+				Where NuAnoMesAux >= &Base_m5. and FlMSGPositiva = 1 And
+	  				  NmAreaEstruturaComercialC in
+					(
+						'Canal Solar CO e NO',
+						'Canal Solar MG, BA, AL e SE',
+						'Canal Solar NE',
+						'Canal Solar SP Interior',
+						'Canal Solar SP, RJ e ES',
+						'Canal Solar Sul'
+					) and NmCanalEstruturaComercialC = 'Canal Solar'
+					Group by 1) as MSGPOS
+		On Funil.CodSimu = MSGPOS.CodSimu
+
+Where Funil.NuAnoMesAux >= &Base_m5. and Funil.CdParceiroComercial = 418254 and
+	  Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Data ritosol.Base_Funil_Sinergia_Solar;
+Set
+	Base_Funil_Sinergia_PDVs_Total
+/*	Base_Funil_Sinergia_PDVs_Sem*/
+
+	Base_Funil_Sinergia_Grs_Total
+/*	Base_Funil_Sinergia_Grs_Sem*/
+
+	Base_Funil_Sinergia_Filial_Total
+/*	Base_Funil_Sinergia_Filial_Sem*/
+
+	Base_Funil_Sinergia_Canal_Total
+/*	Base_Funil_Sinergia_Canal_Sem*/
+;Run;

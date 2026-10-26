@@ -1,0 +1,106 @@
+START_METADATA
+PROJECT: Rodas__GestaoRotinaApp
+FILE_SAS: recuperashare_iniciodia_impulsionamento.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 9
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 45
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: dtgcp, dtmax, hoje
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBSHAREMISSAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBSHAREMISSAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: MENSAGEM1, MENSAGEM2, MENSAGEM3, TB_MISSAO_ANALITICA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+/*ajuste nos cupons de Guarulhos*/
+
+proc sql; select max(dt_atualizacao) format date9. into:dtmax from basegrc.tbsharemissao; run;
+data _null_;
+	hoje = input(today(), yymmddn8.);
+	dtgcp = "'"||put(year("&dtmax."d),4.)||"-"||put(month("&dtmax."d),z2.)||"-"||put(day("&dtmax."d),z2.)||"'";
+
+	call symputx('hoje', put(hoje, yymmddn8.));
+	call symputx('dtgcp', dtgcp);
+;run;
+%put &hoje; %put &dtmax; %put &dtgcp;
+
+proc sql;
+create table tb_missao_analitica as
+select distinct
+NmAreaEstruturaComercialC,
+catx("@", dsloginn1c,"bv.com.br") as emailN1,
+catx("@", dsloginn2c,"bv.com.br") as emailN2,
+Propcase(scan(dsloginn1c, 1, '.')) as gr,
+propcase(trim(strip(scan(dsloginn2c, 1, '.')))) as gf
+from basegrc.tbsharemissao
+where dt_atualizacao = "&dtmax."d
+;run;
+
+data mensagem1; set tb_missao_analitica;
+User = emailN1;
+Mensagem = "Excelente notícia, "||trim(gr)||"! Devido ao sucesso de engajamento, a campanha #RecuperaShare foi renovada e o cupom ESPECIALBV ficará disponível até a próxima segunda, 16/02, nas mesmas lojas. Conto com você! - GF "||gf;
+Categoria = "Impulsionamento";
+
+keep user mensagem categoria;
+;run;
+
+proc sql; create table mensagem2 as
+select distinct
+	a.emailN2 as user,
+	"Excelente notícia (GR)! Devido ao sucesso de engajamento, a campanha #RecuperaShare foi renovada e o cupom ESPECIALBV ficará disponível até a próxima segunda, 16/02, nas mesmas lojas. Conto com você! - GF " as mensagem,
+/*	"Bom Dia (GR)! O cupom ESPECIALBV ainda está disponível, aproveite para fortalecer a #ParceriaBV com os lojistas da missão #RecuperaShare. Conto com você! - (GF)" as mensagem,*/
+/*	"Bom Dia (GR)! Vamos fortalecer nossa parceria BV com os lojistas da missão #RecuperaShare. Conto com você! - (GF)" as mensagem,*/
+	"Gestão - GF" as categoria
+from tb_missao_analitica a
+inner join tb_missao_analitica b on a.emailN1 = b.emailN1
+;run;
+
+data mensagem3; set mensagem1 mensagem2; run;
+
+proc sql;
+	insert into mensagem3 (user, mensagem, categoria)
+	values("luis.santos@bv.com.br", "Excelente notícia (GR)! Devido ao sucesso de engajamento, a campanha #RecuperaShare foi renovada e o cupom ESPECIALBV ficará disponível até a próxima segunda, 16/02, nas mesmas lojas. Conto com você! - GF ","Gestão - MIS")
+	values("valter.morais@bv.com.br","Excelente notícia (GR)! Devido ao sucesso de engajamento, a campanha #RecuperaShare foi renovada e o cupom ESPECIALBV ficará disponível até a próxima segunda, 16/02, nas mesmas lojas. Conto com você! - GF ","Gestão - MIS")
+	values("ramon.sales@bv.com.br", "Excelente notícia (GR)! Devido ao sucesso de engajamento, a campanha #RecuperaShare foi renovada e o cupom ESPECIALBV ficará disponível até a próxima segunda, 16/02, nas mesmas lojas. Conto com você! - GF ","Gestão - MIS")
+
+/*	values("valter.morais@bv.com.br","Bom Dia (GR)! O cupom ESPECIALBV ainda está disponível, aproveite para fortalecer a #ParceriaBV com os lojistas da missão #RecuperaShare. Conto com você! - (GF)","Gestão - MIS")*/
+;run;

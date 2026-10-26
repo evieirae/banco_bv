@@ -1,0 +1,366 @@
+START_METADATA
+PROJECT: Rodas__cockpit-seguros
+FILE_SAS: run-cockpit.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 291
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM13
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBCOCKPITSEGUROS, TBCOCKPITSEGUROSFINAL, TBCOCKPITSEGUROSFINAL1, TBCOCKPITSEGUROSFINAL2, TBCOCKPITSEGUROSV2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+options validvarname=any;
+/*options fmtsearch=(fmt.formats64);*/
+%include '/infogrc/utils/all-includes.sas';
+
+/* ======================================================== */
+/* =================== Cockpit Seguros  =================== */
+/* ======================================================== */
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tbproducao.sas7bdat,12,300);
+
+proc sql;
+create table TbCockpitSeguros as
+select
+	 Producao.NuAnoMes
+	,Producao.DtContrato
+	,Producao.CdColaborador
+	,Producao.NmColaborador
+	,Producao.DsLoginN1
+	,Producao.DsLoginN1CartPDV
+	,Producao.CdFilial
+	,Producao.DsTipoSubCanalProducao
+	,Producao.NmCanalEstruturaComercial
+	,Producao.NmAreaEstruturaComercial
+	,(STRIP(PUT(Producao.CdParceiroComercial,8.)) || ' - ' || Producao.NmParceiroComercial) AS NmParceiroComercial
+	,Producao.DsLoginN2A
+	,Producao.NmSubEstruturaComercialA
+	,Producao.DsLoginN3A
+	,Producao.LstSubstituicao
+	,ColaboradorFocal.LstColaboradorFocal
+	,Producao.NmGrupoProdutoMeta
+	,Producao.FxIdade
+	,Producao.FxParcela
+	,Producao.FxScoreFim
+	,case
+		when Producao.VrProducao >= 100000 then '> 100k'
+		when Producao.VrProducao >=  80000 then '80k - 99k'
+		when Producao.VrProducao >=  60000 then '60k - 79k'
+		when Producao.VrProducao >=  40000 then '40k - 59k'
+		when Producao.VrProducao >=  20000 then '20k - 39k'
+		when Producao.VrProducao <   20000 then '< 20k'
+	end as FxValor
+	,Producao.TpPessoa
+	,Producao.DtAtualizacao
+	,count(*) as QtContratos
+	,sum(Producao.VrProducao) as VrProducao
+	,sum(Producao.QtSeguros) as QtSeguros
+	,sum(Producao.FlBVMais) as FlBVMais
+	,sum(Producao.FlCap) as FlCap
+	,sum(Producao.FlDemais) as FlDemais
+/*	,sum(Producao.FlCap12) as FlCap12*/
+/*	,sum(Producao.FlCap07) as FlCap07*/
+/*	,sum(Producao.FlCap10) as FlCap10*/
+	,sum(Producao.FlCompleto) as FlCompleto
+/*	,sum(Producao.FlGarantiaMecanica) as FlGarantiaMecanica*/
+/*	,sum(Producao.FlRCF) as FlRCF*/
+/*	,sum(Producao.FlCasco) as FlCasco*/
+/*	,sum(Producao.FlGap) as FlGap*/
+/*	,sum(Producao.FlDFI) as FlDFI*/
+	,sum(Producao.VrSeguros) as VrSeguros
+	,sum(Producao.VrBVMais) as VrBVMais
+	,sum(Producao.VrBVMaisProjetado) as VrBVMaisProjetado
+	,sum(Producao.VrCap) as VrCap
+	,sum(Producao.VrCapProjetado) as VrCapProjetado
+	,sum(Producao.VrDemais) as VrDemais
+	,sum(Producao.VrDemaisProjetado) as VrDemaisProjetado
+/*	,sum(Producao.VrCap12) as VrCap12*/
+/*	,sum(Producao.VrCap07) as VrCap07*/
+/*	,sum(Producao.VrCap10) as VrCap10*/
+	,sum(Producao.VrCompleto) as VrCompleto
+	,sum(Producao.VrCompletoProjetado) as VrCompletoProjetado
+	,SUM(Producao.VrGarantiaMecanica) + sum(Producao.VrRCF) + sum(Producao.VrCasco) + sum(Producao.VrGap) + sum(Producao.VrCompleto) AS VrAutoTotal
+/*	,sum(Producao.VrGarantiaMecanica) as VrGarantiaMecanica*/
+/*	,sum(Producao.VrRCF) as VrRCF*/
+/*	,sum(Producao.VrCasco) as VrCasco*/
+/*	,sum(Producao.VrGap) as VrGap*/
+/*	,sum(Producao.VrDFI) as VrDFI*/
+	,sum(Producao.FlBVMaisEleg) as FlBVMaisEleg
+	,sum(Producao.FlCapEleg) as FlCapEleg
+	,sum(Producao.FlDemaisEleg) as FlDemaisEleg
+	,sum(Producao.FlCompletoEleg) as FlCompletoEleg
+
+from tmp.TbProducao Producao
+
+	left join basegrc.TbColaboradorFocal ColaboradorFocal
+		on Producao.CdFilial =  ColaboradorFocal.CdFilial
+		and ColaboradorFocal.NmGrupoProdutoMeta = 'Seguros'
+
+where Producao.NuAnoMes >= &safraM13.
+
+  and Producao.NmGrupoProdutoMeta in ('CVG Leves','CVG Pesados','Leves','Pesados','Motos')
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23
+order by calculated VrCompleto DESC
+;run;
+
+%ExportaCSV(TbCockpitSeguros,TbCockpitSeguros);
+
+PROC SORT DATA=TbCockpitSeguros;
+  BY NuAnoMes
+	DtContrato
+	CdColaborador
+	NmColaborador
+	DsLoginN1
+	DsLoginN1CartPDV
+	CdFilial
+	DsTipoSubCanalProducao
+	NmCanalEstruturaComercial
+	NmAreaEstruturaComercial
+	NmParceiroComercial
+	DsLoginN2A
+	NmSubEstruturaComercialA
+	DsLoginN3A
+	LstSubstituicao
+	LstColaboradorFocal
+	NmGrupoProdutoMeta
+	FxIdade
+	FxParcela
+	FxScoreFim
+    FxValor
+	DtAtualizacao;
+	run;
+
+/* Transpor Base */
+PROC TRANSPOSE DATA=TbCockpitSeguros OUT=TbCockpitSegurosV2 NAME=Variavel PREFIX=Valor;
+  BY NuAnoMes
+	DtContrato
+	CdColaborador
+	NmColaborador
+	DsLoginN1
+	DsLoginN1CartPDV
+	CdFilial
+	DsTipoSubCanalProducao
+	NmCanalEstruturaComercial
+	NmAreaEstruturaComercial
+	NmParceiroComercial
+	DsLoginN2A
+	NmSubEstruturaComercialA
+	DsLoginN3A
+	LstSubstituicao
+	LstColaboradorFocal
+	NmGrupoProdutoMeta
+	FxIdade
+	FxParcela
+	FxScoreFim
+    FxValor
+	DtAtualizacao;
+ VAR QtContratos
+	VrProducao
+	QtSeguros
+	FlBVMais
+	FlCap
+	FlDemais
+	FlCompleto
+	VrSeguros
+	VrBVMais
+	VrBVMaisProjetado
+	VrCap
+	VrCapProjetado
+	VrDemais
+	VrDemaisProjetado
+	VrCompleto
+	VrCompletoProjetado
+	FlBVMaisEleg
+	FlCapEleg
+	FlDemaisEleg
+	FlCompletoEleg;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbCockpitSegurosFinal1 AS
+SELECT
+	 CdColaborador
+	,CdFilial
+	,DsLoginN1
+	,DsLoginN1CartPDV
+	,DsLoginN2A
+	,DsLoginN3A
+	,DsTipoSubCanalProducao
+	,DtAtualizacao
+	,DtContrato
+	,FxIdade
+	,FxParcela
+	,FxScoreFim
+	,FxValor
+	,LstColaboradorFocal
+	,LstSubstituicao
+	,NmAreaEstruturaComercial
+	,NmCanalEstruturaComercial
+	,NmColaborador
+	,NmGrupoProdutoMeta
+	,NmParceiroComercial
+	,NmSubEstruturaComercialA
+	,NuAnoMes
+	,CASE
+		   WHEN UPPER(Variavel)   LIKE '%BVMAIS%' 	THEN 'BVMais'
+           WHEN UPPER(Variavel)   LIKE '%CAP%' 		THEN 'Cap'
+           WHEN UPPER(Variavel)   LIKE '%COMPLETO%' THEN 'Completo'
+           WHEN UPPER(Variavel)   LIKE '%DEMAIS%' 	THEN 'Demais'
+		   ELSE 'Não Encontrado '
+	END AS TpSeguro
+
+		,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vr%' AND LOWER(Variavel) NOT LIKE '%projetado%' THEN Valor1 END),0)   AS VrPremio
+		,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vr%' AND LOWER(Variavel) LIKE '%projetado%' THEN Valor1 END),0)  AS VrProjetado
+		,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%fl%' AND LOWER(Variavel) NOT LIKE '%eleg%' THEN Valor1 END),0)  AS QtSeguros
+		,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%fl%' AND LOWER(Variavel) LIKE '%eleg%' THEN Valor1 END),0) AS QtSegurosEleg
+
+FROM TbCockpitSegurosV2
+WHERE Variavel NOT IN ('VrProducao','VrSeguros','QtContratos','QtSeguros')
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23
+
+;run;
+
+PROC SQL;
+CREATE TABLE TbCockpitSegurosFinal2 AS
+SELECT
+	 CdColaborador
+	,CdFilial
+	,DsLoginN1
+	,DsLoginN1CartPDV
+	,DsLoginN2A
+	,DsLoginN3A
+	,DsTipoSubCanalProducao
+	,DtAtualizacao
+	,DtContrato
+	,FxIdade
+	,FxParcela
+	,FxScoreFim
+	,FxValor
+	,LstColaboradorFocal
+	,LstSubstituicao
+	,NmAreaEstruturaComercial
+	,NmCanalEstruturaComercial
+	,NmColaborador
+	,NmGrupoProdutoMeta
+	,NmParceiroComercial
+	,NmSubEstruturaComercialA
+	,NuAnoMes
+
+,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%qtseguros%' THEN Valor1 END),0) AS QtSeguros
+,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%qtcontratos%' THEN Valor1 END),0)  AS QtContratos
+,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vrproducao%' THEN Valor1 END),0)  AS VrProducao
+,COALESCE(SUM(CASE WHEN LOWER(Variavel) LIKE '%vrseguros%' THEN Valor1 END),0) AS VrSeguros
+
+FROM TbCockpitSegurosV2
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22
+;run;
+
+PROC SQL;
+CREATE TABLE TbCockpitSegurosFinal AS
+SELECT
+	 TbCockpitSegurosFinal1.NuAnoMes
+	,TbCockpitSegurosFinal1.DtContrato
+	,TbCockpitSegurosFinal1.CdColaborador
+	,TbCockpitSegurosFinal1.NmColaborador
+	,TbCockpitSegurosFinal1.DsLoginN1
+	,TbCockpitSegurosFinal1.DsLoginN1CartPDV
+	,TbCockpitSegurosFinal1.CdFilial
+	,TbCockpitSegurosFinal1.DsTipoSubCanalProducao
+	,TbCockpitSegurosFinal1.NmCanalEstruturaComercial
+
+	,TbCockpitSegurosFinal1.NmAreaEstruturaComercial
+	,TbCockpitSegurosFinal1.NmParceiroComercial
+	,TbCockpitSegurosFinal1.DsLoginN2A
+	,TbCockpitSegurosFinal1.NmSubEstruturaComercialA
+	,TbCockpitSegurosFinal1.DsLoginN3A
+	,TbCockpitSegurosFinal1.LstSubstituicao
+	,TbCockpitSegurosFinal1.LstColaboradorFocal
+	,TbCockpitSegurosFinal1.NmGrupoProdutoMeta
+	,TbCockpitSegurosFinal1.FxIdade
+	,TbCockpitSegurosFinal1.DtAtualizacao
+	,TbCockpitSegurosFinal1.FxParcela
+	,TbCockpitSegurosFinal1.FxScoreFim
+	,TbCockpitSegurosFinal1.FxValor
+	,TbCockpitSegurosFinal1.TpSeguro
+	,TbCockpitSegurosFinal1.VrPremio
+	,TbCockpitSegurosFinal1.VrProjetado
+	,TbCockpitSegurosFinal1.QtSeguros
+	,TbCockpitSegurosFinal1.QtSegurosEleg
+
+	,TbCockpitSegurosFinal2.QtSeguros AS QtSegurosTotal
+	,TbCockpitSegurosFinal2.QtContratos AS QtContratosTotal
+	,TbCockpitSegurosFinal2.VrProducao
+	,TbCockpitSegurosFinal2.VrSeguros
+
+FROM TbCockpitSegurosFinal1
+	INNER JOIN TbCockpitSegurosFinal2
+		ON TbCockpitSegurosFinal1.CdColaborador 			= TbCockpitSegurosFinal2.CdColaborador
+		AND TbCockpitSegurosFinal1.CdFilial					= TbCockpitSegurosFinal2.CdFilial
+		AND TbCockpitSegurosFinal1.DsLoginN1 				= TbCockpitSegurosFinal2.DsLoginN1
+		AND TbCockpitSegurosFinal1.DsLoginN2A				= TbCockpitSegurosFinal2.DsLoginN2A
+		AND TbCockpitSegurosFinal1.DsLoginN3A				= TbCockpitSegurosFinal2.DsLoginN3A
+		AND TbCockpitSegurosFinal1.DsTipoSubCanalProducao 	= TbCockpitSegurosFinal2.DsTipoSubCanalProducao
+		AND TbCockpitSegurosFinal1.DtAtualizacao 			= TbCockpitSegurosFinal2.DtAtualizacao
+		AND TbCockpitSegurosFinal1.DtContrato 				= TbCockpitSegurosFinal2.DtContrato
+		AND TbCockpitSegurosFinal1.FxIdade 					= TbCockpitSegurosFinal2.FxIdade
+		AND TbCockpitSegurosFinal1.FxParcela 				= TbCockpitSegurosFinal2.FxParcela
+		AND TbCockpitSegurosFinal1.FxScoreFim 				= TbCockpitSegurosFinal2.FxScoreFim
+		AND TbCockpitSegurosFinal1.FxValor 					= TbCockpitSegurosFinal2.FxValor
+		AND TbCockpitSegurosFinal1.LstColaboradorFocal 		= TbCockpitSegurosFinal2.LstColaboradorFocal
+		AND TbCockpitSegurosFinal1.LstSubstituicao 			= TbCockpitSegurosFinal2.LstSubstituicao
+		AND TbCockpitSegurosFinal1.NmAreaEstruturaComercial = TbCockpitSegurosFinal2.NmAreaEstruturaComercial
+		AND TbCockpitSegurosFinal1.NmCanalEstruturaComercial= TbCockpitSegurosFinal2.NmCanalEstruturaComercial
+		AND TbCockpitSegurosFinal1.NmColaborador 			= TbCockpitSegurosFinal2.NmColaborador
+		AND TbCockpitSegurosFinal1.NmGrupoProdutoMeta 		= TbCockpitSegurosFinal2.NmGrupoProdutoMeta
+		AND TbCockpitSegurosFinal1.NmParceiroComercial 		= TbCockpitSegurosFinal2.NmParceiroComercial
+		AND TbCockpitSegurosFinal1.NmSubEstruturaComercialA = TbCockpitSegurosFinal2.NmSubEstruturaComercialA
+		AND TbCockpitSegurosFinal1.NuAnoMes 				= TbCockpitSegurosFinal2.NuAnoMes
+;run;
+
+%ExportaCSV(TbCockpitSegurosFinal,TbCockpitSegurosFinal);

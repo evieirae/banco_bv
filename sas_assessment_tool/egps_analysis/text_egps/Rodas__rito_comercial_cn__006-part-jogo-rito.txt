@@ -1,0 +1,157 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 006-part-jogo-rito.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 95
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAtCetip, m6, safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.GRUPO_MENSAGERIA [SAS/Local], CONVPROP.BASEAPNP [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.GRUPO_MENSAGERIA [PROC SQL - JOIN], CONVPROP.BASEAPNP [PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CARD_SIMULACOES, PROPOSTASAPNP, TBRITOPDV_C001
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* --------------------------- Propostas --------------------------- */
+PROC SQL;
+CREATE TABLE PropostasAPNP AS
+  SELECT
+	year(A.DtRetornoCetip)*100+month(A.DtRetornoCetip)AS NuAnoMes,
+    A.CdParceiroComercial,
+        CASE
+		WHEN A.FxIdade = 'ZeroKM' THEN 'Novos'
+		WHEN A.FxIdade is not null THEN 'Usados'
+		ELSE A.FxIdade
+	END AS StatusVeiculo,
+    A.FxIdade,
+	SUM(CASE WHEN StatusProposta = 'Negada'  THEN QtdPropostas END) AS Part_Negada,
+    SUM(CASE WHEN StatusProposta = 'Cancelada'  THEN QtdPropostas END) AS Part_Cancelada,
+    SUM(CASE WHEN StatusProposta = 'APNP'  THEN QtdPropostas END) AS Part_APNP
+  FROM
+    CONVPROP.BASEAPNP A
+
+  Left join auxl.Grupo_Mensageria as M
+		on M.Mensageria = A.Mensageria
+
+ LEFT JOIN tmp.tbparceirocomercial C
+		ON A.CDPARCEIROCOMERCIAL = C.CDPARCEIROCOMERCIAL
+  WHERE 1=1
+   	And calculated StatusVeiculo = 'Usados'
+    AND A.ProdutoAjuste IN ('Leves')
+    AND A.Banco <> 'NÃO CONVERTIDO'
+    AND A.FlPropostaValidaPDV = 1
+    AND A.PgtoLoja = 'S'
+	AND C.FlAtivo = 'S'
+	AND A.DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS')
+    AND A.StatusProposta IN ('Negada','Cancelada','APNP')
+    AND A.DtRetornoCetip >= "&m6."d
+    AND A.DtRetornoCetip <= &DtAtCetip.
+	AND C.NmSubEstruturaComercialC = 'Canal de Negócios'
+  GROUP BY
+    1,2,3,4
+;RUN;
+
+PROC SQL;
+CREATE TABLE Card_Simulacoes AS
+  SELECT
+    year(DtInclusaoGravame)*100+month(DtInclusaoGravame)  AS  NuAnoMes,
+    CdParceiroComercial,
+    FxIdade,
+    COUNT(DISTINCT CASE WHEN  StatusSimulacao ='Card sem proposta originada'
+								AND Banco NOT IN ('N/A','BV')
+								AND StPagoLoja = 'S'
+								AND DtInclusaoGravame <= &DtAtCetip. THEN NuCpfCnpj END) AS Part_Card,
+
+	COUNT(DISTINCT CASE WHEN  StatusSimulacao ='Simulação sem card'
+								AND Banco NOT IN ('N/A','BV')
+								AND StPagoLoja = 'S'
+								AND DtInclusaoGravame <= &DtAtCetip. THEN NuCpfCnpj END) AS Part_SemCard,
+
+	COUNT(DISTINCT CASE WHEN StatusSimulacao= 'Card sem proposta originada'
+							 AND DtSimulacaoInicial <= &DtAtCetip. 			THEN NuCpfCnpj End) AS EstoqueTotal,
+    COUNT(DISTINCT CASE WHEN StatusSimulacao= 'Simulação sem card'
+							 AND DtSimulacaoInicial <= &DtAtCetip. 			THEN NuCpfCnpj End) AS EstoqueSemCardTotal
+
+   ,COUNT(DISTINCT CASE WHEN  StatusSimulacao ='Card sem proposta originada'
+								AND Banco NOT IN ('N/A','BV')
+								AND StPagoLoja = 'S'
+								AND GrupoMsg= 'R'
+								AND DtInclusaoGravame <= &DtAtCetip. THEN NuCpfCnpj END) AS Part_CardRec
+
+FROM SimulacoesRito
+
+	where 1=1
+	and StatusSimulacao in ('Simulação sem card', 'Card sem proposta originada')
+	AND FxIdade <>'ZeroKM'
+	AND year(DtInclusaoGravame)*100+month(DtInclusaoGravame) >= &safraM6.
+	AND FlAtivo = 'S'
+  GROUP BY
+    1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbRitoPDV_C001 AS
+  SELECT distinct
+	a.NuAnoMes,
+	a.CdParceiroComercial,
+	a.Fxidade,
+	coalesce(Sum(B.Part_APNP,0)) as Part_APNP,
+	coalesce(Sum(b.Part_Cancelada,0)) as Part_Cancelada,
+	coalesce(Sum(b.Part_Negada,0)) as Part_Negada,
+	coalesce(Sum(C.Part_Card,0)) as Part_Card,
+	coalesce(Sum(C.Part_SemCard,0)) as Part_SemCard,
+	coalesce(Sum(C.EstoqueTotal,0)) as EstoqueTotal,
+	coalesce(Sum(C.EstoqueSemCardTotal,0)) as EstoqueSemCardTotal,
+	coalesce(Sum(C.Part_CardRec,0)) as Part_CardRec
+
+FROM TbRitoPDV_A001 as A
+	left join PropostasAPNP as B
+	on  A.NuAnoMes = b.NuAnoMes
+    and A.CdParceiroComercial = b.CdParceiroComercial
+    and A.FxIdade  = b.FxIdade
+
+	left join Card_Simulacoes as C
+	on  A.NuAnoMes = C.NuAnoMes
+    and A.CdParceiroComercial = C.CdParceiroComercial
+    and A.FxIdade  = C.FxIdade
+/*where a.CdParceiroComercial = 9695 and a.nuanomes = 202407*/
+  GROUP BY
+    1,2,3;
+RUN;

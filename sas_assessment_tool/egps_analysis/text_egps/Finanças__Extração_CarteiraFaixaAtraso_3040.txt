@@ -1,0 +1,412 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Finanças__Extração_CarteiraFaixaAtraso_3040
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:28 UTC
+BUSINESS_AREA: Finanças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 316
+CODE_TASKS_COUNT: 7
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): ESTUDOS2.CARTAO3040_202502 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202501 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202502 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202503 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202504 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202505 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202506 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202507 [SAS/Local], ESTUDOS2.CARTAO3040_DARWIN_202509 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ATRASO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.ATRASO
+TABLE_READ_PROVENANCE (Flow): ESTUDOS2.CARTAO3040_202502 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202501 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202502 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202503 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202504 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202505 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202506 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202507 [PROC SQL - FROM], ESTUDOS2.CARTAO3040_DARWIN_202509 [PROC SQL - FROM], WORK.ATRASO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ATRASO, WORK.QUERY_FOR_ATRASO, WORK.QUERY_FOR_CARTAO3040_20, WORK.QUERY_FOR_CARTAO3040_20_0000
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Code For Query Builder */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Code For Query Builder */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-eMU73CjXdsPkYYtW/code.sas */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTAO3040_20);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20 AS
+   SELECT t1.cdproduto,
+
+      SUM(t1.Saldo),
+	  DiaAtraso
+      FROM ESTUDOS2.CARTAO3040_DARWIN_202501 t1
+      GROUP BY t1.cdproduto;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Code For Query Builder */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: CarteiraFx540 */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: CarteiraFx540 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-UKLoHExgvt8pVa1S/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20_0000 AS
+   SELECT t1.cd,
+          t1.cdproduto,
+          
+            (MAX(t1.DiaAtraso)) FORMAT=BEST8. AS MAX_of_DiaAtraso
+      FROM ESTUDOS2.CARTAO3040_DARWIN_202509 t1
+
+      GROUP BY t1.cd,
+               t1.cdproduto;
+QUIT;
+
+proc sql;
+create table atraso as (
+select *
+from ESTUDOS2.CARTAO3040_DARWIN_202509 as a
+left join QUERY_FOR_CARTAO3040_20_0000 as b
+on a.cd=b.cd and a.cdproduto=b.cdproduto
+where mod ne '1904' and classop ne 'HH');
+
+quit;
+
+data atraso;
+set atraso;
+if MAX_of_DiaAtraso <=   0 then fxAtraso= '000 a 000'; else
+if MAX_of_DiaAtraso <=  14 then fxAtraso= '001 a 014'; else
+if MAX_of_DiaAtraso <=  30 then fxAtraso= '015 a 030'; else
+if MAX_of_DiaAtraso <=  60 then fxAtraso= '031 a 060'; else
+if MAX_of_DiaAtraso <=  90 then fxAtraso= '061 a 090'; else
+if MAX_of_DiaAtraso <= 120 then fxAtraso= '091 a 120'; else
+if MAX_of_DiaAtraso <= 150 then fxAtraso= '121 a 150'; else
+if MAX_of_DiaAtraso <= 180 then fxAtraso= '151 a 180'; else
+if MAX_of_DiaAtraso <= 210 then fxAtraso= '181 a 210'; else
+if MAX_of_DiaAtraso <= 240 then fxAtraso= '211 a 240'; else
+if MAX_of_DiaAtraso <= 270 then fxAtraso= '241 a 270'; else
+if MAX_of_DiaAtraso <= 300 then fxAtraso= '271 a 300'; else
+if MAX_of_DiaAtraso <= 330 then fxAtraso= '301 a 330'; else
+if MAX_of_DiaAtraso <= 360 then fxAtraso= '331 a 360'; else
+if MAX_of_DiaAtraso <= 390 then fxAtraso= '361 a 390'; else
+if MAX_of_DiaAtraso <= 420 then fxAtraso= '391 a 420'; else
+if MAX_of_DiaAtraso <= 450 then fxAtraso= '421 a 450'; else
+if MAX_of_DiaAtraso <= 480 then fxAtraso= '451 a 480'; else
+if MAX_of_DiaAtraso <= 510 then fxAtraso= '481 a 510'; else
+if MAX_of_DiaAtraso <= 540 then fxAtraso= '511 a 540';
+
+run;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATRASO AS
+   SELECT t1.data_base,
+		  t1.fxAtraso,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM WORK.ATRASO t1
+      GROUP BY t1.data_base, t1.fxAtraso;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: CarteiraFx540 */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: CarteiraFx360 */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: CarteiraFx360 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-eP1w9xoA1qnvg3dA/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20_0000 AS
+   SELECT t1.data_base,
+		  t1.cd,
+          t1.cdproduto,
+          
+            (MAX(t1.DiaAtraso)) FORMAT=BEST8. AS MAX_of_DiaAtraso
+      FROM (
+
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202501
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202502
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202503
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202504
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202505
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202506
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202507
+
+	  ) t1
+where mod ne '1904' and classop ne 'HH'
+      GROUP BY t1.data_base,
+			   t1.cd,
+               t1.cdproduto;
+QUIT;
+
+proc sql;
+create table atraso as
+select *
+FROM (
+
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202501
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202502
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202503
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202504
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202505
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202506
+		UNION ALL
+		select data_base, classop, mod, cd, cdproduto, diaatraso, saldo
+		FROM ESTUDOS2.CARTAO3040_DARWIN_202507
+
+	  ) as a
+left join QUERY_FOR_CARTAO3040_20_0000 as b
+on a.data_base=b.data_base and a.cd=b.cd and a.cdproduto=b.cdproduto
+where mod ne '1904' and classop ne 'HH';
+
+quit;
+
+data atraso;
+set atraso;
+if MAX_of_DiaAtraso <=   0 then fxAtraso= '000 a 000'; else
+if MAX_of_DiaAtraso <=  14 then fxAtraso= '001 a 014'; else
+if MAX_of_DiaAtraso <=  30 then fxAtraso= '015 a 030'; else
+if MAX_of_DiaAtraso <=  60 then fxAtraso= '031 a 060'; else
+if MAX_of_DiaAtraso <=  90 then fxAtraso= '061 a 090'; else
+if MAX_of_DiaAtraso <= 120 then fxAtraso= '091 a 120'; else
+if MAX_of_DiaAtraso <= 150 then fxAtraso= '121 a 150'; else
+if MAX_of_DiaAtraso <= 180 then fxAtraso= '151 a 180'; else
+if MAX_of_DiaAtraso <= 210 then fxAtraso= '181 a 210'; else
+if MAX_of_DiaAtraso <= 240 then fxAtraso= '211 a 240'; else
+if MAX_of_DiaAtraso <= 270 then fxAtraso= '241 a 270'; else
+if MAX_of_DiaAtraso <= 300 then fxAtraso= '271 a 300'; else
+if MAX_of_DiaAtraso <= 330 then fxAtraso= '301 a 330'; else
+if MAX_of_DiaAtraso <= 360 then fxAtraso= '331 a 360'; else
+ fxAtraso='Acima 360';
+
+run;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATRASO AS
+   SELECT t1.data_base,
+			t1.fxAtraso,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM WORK.ATRASO t1
+      GROUP BY t1.data_base, t1.fxAtraso;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: CarteiraFx360 */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTAO3040_20);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20 AS
+   SELECT t1.cdproduto,
+          
+            (MAX(t1.DiaAtraso)) FORMAT=BEST8. AS MAX_of_DiaAtraso,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM ESTUDOS2.CARTAO3040_202502 t1
+      GROUP BY t1.cdproduto;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTAO3040_20_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20_0000 AS
+   SELECT t1.cd,
+          t1.cdproduto,
+          
+            (MAX(t1.DiaAtraso)) FORMAT=BEST8. AS MAX_of_DiaAtraso
+      FROM ESTUDOS2.CARTAO3040_202502 t1
+      GROUP BY t1.cd,
+               t1.cdproduto;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTAO3040_20_0000 AS
+   SELECT t1.cd,
+          t1.cdproduto,
+          
+            (MAX(t1.DiaAtraso)) FORMAT=BEST8. AS MAX_of_DiaAtraso
+      FROM ESTUDOS2.CARTAO3040_DARWIN_202509 t1
+
+      GROUP BY t1.cd,
+               t1.cdproduto;
+QUIT;
+
+proc sql;
+create table atraso as (
+select *
+from ESTUDOS2.CARTAO3040_DARWIN_202509 as a
+left join QUERY_FOR_CARTAO3040_20_0000 as b
+on a.cd=b.cd and a.cdproduto=b.cdproduto
+where mod ne '1904' and classop ne 'HH');
+
+quit;
+
+data atraso;
+set atraso;
+if MAX_of_DiaAtraso <=   0 then fxAtraso= '000 a 000'; else
+if MAX_of_DiaAtraso <=  14 then fxAtraso= '001 a 014'; else
+if MAX_of_DiaAtraso <=  30 then fxAtraso= '015 a 030'; else
+if MAX_of_DiaAtraso <=  60 then fxAtraso= '031 a 060'; else
+if MAX_of_DiaAtraso <=  90 then fxAtraso= '061 a 090'; else
+if MAX_of_DiaAtraso <= 120 then fxAtraso= '091 a 120'; else
+if MAX_of_DiaAtraso <= 150 then fxAtraso= '121 a 150'; else
+if MAX_of_DiaAtraso <= 180 then fxAtraso= '151 a 180'; else
+if MAX_of_DiaAtraso <= 210 then fxAtraso= '181 a 210'; else
+if MAX_of_DiaAtraso <= 240 then fxAtraso= '211 a 240'; else
+if MAX_of_DiaAtraso <= 270 then fxAtraso= '241 a 270'; else
+if MAX_of_DiaAtraso <= 300 then fxAtraso= '271 a 300'; else
+if MAX_of_DiaAtraso <= 330 then fxAtraso= '301 a 330'; else
+if MAX_of_DiaAtraso <= 360 then fxAtraso= '331 a 360'; else
+if MAX_of_DiaAtraso <= 390 then fxAtraso= '331 a 390'; else
+if MAX_of_DiaAtraso <= 420 then fxAtraso= '391 a 420'; else
+if MAX_of_DiaAtraso <= 450 then fxAtraso= '421 a 450'; else
+if MAX_of_DiaAtraso <= 480 then fxAtraso= '451 a 480'; else
+if MAX_of_DiaAtraso <= 510 then fxAtraso= '481 a 510'; else
+if MAX_of_DiaAtraso <= 540 then fxAtraso= '511 a 540'; else
+ fxAtraso='Acima 540';
+
+run;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATRASO AS
+   SELECT t1.data_base,
+		  t1.fxAtraso,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM WORK.ATRASO t1
+      GROUP BY t1.data_base, t1.fxAtraso;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ATRASO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ATRASO AS
+   SELECT t1.fxAtraso,
+          
+            (SUM(t1.Saldo)) AS SUM_of_Saldo
+      FROM WORK.ATRASO t1
+      GROUP BY t1.fxAtraso;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,1140 @@
+START_METADATA
+PROJECT: Rodas__marketshare
+FILE_SAS: run-mktsh201801a202407.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -46
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 958
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: SafraA2, chassis, iqM13
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /infogrc/utils/chassis.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /INFOGRC/UTILS/CHASSIS.SAS [SAS/Local], BASEGRC.TBMODELOCOMBUSTIVEL [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPRODUCAO [SAS/Local], DWBI_DIME.TBDIMTEMPODATA [DBCON], DWBI_DTWH.TBAGENTEMIS [DBCON], DWBI_DTWH.TBMUNICIPIO [DBCON], QTDMES [DBCON], QTDSEMANA [DBCON], TBARQUIVO [DBCON], TBATUALIZACAO [DBCON], TBGRAVAME [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: OUTTMP, RELEXC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /infogrc/utils/chassis.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMODELOCOMBUSTIVEL [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBPRODUCAO [DATA Step - SET], DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], DWBI_DTWH.TBAGENTEMIS [Pass-Through Native (DBCON) - JOIN], DWBI_DTWH.TBMUNICIPIO [Pass-Through Native (DBCON) - JOIN], QTDMES [Pass-Through Native (DBCON) - FROM], QTDSEMANA [Pass-Through Native (DBCON) - JOIN], TBARQUIVO [Pass-Through Native (DBCON) - JOIN], TBATUALIZACAO [Pass-Through Native (DBCON) - JOIN], TBGRAVAME [Pass-Through Native (DBCON) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /infogrc/utils/chassis.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): OUTTMP.TBMARKETSHAREDIARIAABERTA, RELEXC.MARKETSHAREFENABRAVE, RELEXC.TBMARKETSHAREDIARIAABERTA, RELEXC.TBMARKETSHAREOUTROS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LISTADU, TBDIASUTEIS, TBGRAVAMESHIST, TBGRAVAMESOUTROSHIST, TBPRODUCAO, TBRESULTADOMARKETSHAREHIST, TBRESULTADOMARKETSHAREOUTROSHIST
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /infogrc/utils/chassis.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_resultadomarketshare.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |    Atualizacao:    24/09/2024                                                      | */
+/* |    Responsavel:     Gustavo Domingues -  MIS IGE             						| */
+/* |    Objetivo: Recalcular o share de 201801 a 202407 para adequar municipios     	| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/infogrc/utils/all-includes.sas';
+%include '/infogrc/utils/chassis.sas';
+/*%include '/infogrc/utils/verifica/verifica-tbgravames.sas';*/
+
+PROC SQL;
+  %CONECTADB(server=BI);
+create table TbGravamesHist as
+select * from connection to dbcon
+(
+WITH
+
+     TbGravame_01 AS /* Dados da tabela DWBI_DTWH.TbGravame */
+        (SELECT
+             CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2) AS INTEGER)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6) AS INTEGER)
+             END NuAnoMes
+
+            ,Gravame.NmArquivo
+            ,Gravame.CdMunicipio
+            ,Gravame.CdMarcaModelo
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN Gravame.Dsuflicenciamentoveiculo ELSE Gravame.Dsufplacaveiculo END AS UF
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END AS TipoUF
+            ,CASE
+                WHEN Gravame.TpVeiculo = 1 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 2 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 3 THEN 'Motos'
+                WHEN Gravame.TpVeiculo = 4 THEN 'Pesados'
+                WHEN Gravame.TpVeiculo = 5 THEN 'Pesados'
+             END TpVeiculo
+
+            ,CASE WHEN Gravame.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END StVeiculo
+
+            ,CAST(substr(Gravame.NmArquivo,CASE WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN 19 WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN 17 END,4) AS INTEGER)
+             -    Gravame.AaModeloVeiculo QtAnosIdade
+            ,CAST(Gravame.NuMesesContrato AS INTEGER) QtParcelas
+            ,Gravame.NuCnpjAgente
+            ,Gravame.Dtinclusaogravame
+            ,CASE WHEN Gravame.NuChassi IN (&chassis.) AND Gravame.DtInclusaoGravame BETWEEN '20211201' AND '20220131' THEN 'S' ELSE 'N' END AS AjusteManual
+			,Gravame.NuContrato
+			,count(*) AS QtGravames
+        FROM DWBI_DTWH.TbGravame Gravame
+
+        WHERE Gravame.NmStatusGravame IN (1,2)
+          AND Gravame.TpVeiculo IN (1,2,3,4,5)
+          AND CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6)||'01' AS DATE)
+              END >= '20180101'
+		  AND CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6)||'01' AS DATE)
+              END <= '20240731'
+
+        AND LEN(Gravame.NmArquivo) <= 33
+
+        GROUP BY
+
+             CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2) AS INTEGER)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6) AS INTEGER)
+             END
+            ,Gravame.NmArquivo
+            ,Gravame.CdMunicipio
+            ,Gravame.CdMarcaModelo
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN Gravame.Dsuflicenciamentoveiculo ELSE Gravame.Dsufplacaveiculo END
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END
+            ,CASE
+                WHEN Gravame.TpVeiculo = 1 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 2 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 3 THEN 'Motos'
+                WHEN Gravame.TpVeiculo = 4 THEN 'Pesados'
+                WHEN Gravame.TpVeiculo = 5 THEN 'Pesados'
+             END
+
+            ,CASE WHEN Gravame.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END
+
+            ,CAST(substr(Gravame.NmArquivo,CASE WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN 19 WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN 17 END,4) AS INTEGER)
+             -    Gravame.AaModeloVeiculo
+            ,CAST(Gravame.NuMesesContrato AS INTEGER)
+            ,Gravame.NuCnpjAgente
+            ,Gravame.Dtinclusaogravame
+            ,CASE WHEN Gravame.NuChassi IN (&chassis.) AND Gravame.DtInclusaoGravame BETWEEN '20211201' AND '20220131' THEN 'S' ELSE 'N' END
+            ,Gravame.NuContrato
+    )
+
+    ,TbGravame_02 AS /* Dados do mês incompleto */
+
+    (
+
+        SELECT
+             CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) AS INTEGER) NuAnoMes
+            ,'C4774.SR131.BV_D'||substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'99A99999999' NmArquivo
+            ,GravameMes.CdMunicipio
+            ,GravameMes.CdMarcaModelo
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN GravameMes.Dsuflicenciamentoveiculo ELSE GravameMes.Dsufplacaveiculo END AS UF
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END AS TipoUF
+            ,CASE
+                WHEN GravameMes.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameMes.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameMes.TpVeiculo = 5 THEN 'Pesados'
+             END TpVeiculo
+
+            ,CASE WHEN GravameMes.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END StVeiculo
+
+            ,CAST(substr(GravameMes.NmArquivo,19,4) AS INTEGER)
+             -    GravameMes.AaModeloVeiculo QtAnosIdade
+            ,CAST(GravameMes.NuMesesContrato AS INTEGER) QtParcelas
+            ,GravameMes.NuCnpjAgente
+            ,GravameMes.Dtinclusaogravame
+            ,CASE WHEN GravameMes.NuChassi IN (&chassis.) AND GravameMes.DtInclusaoGravame BETWEEN '20211201' AND '20220131' THEN 'S' ELSE 'N' END AS AjusteManual
+			,GravameMes.NuContrato
+			,count(*) AS QtGravames
+        FROM DWBI_DTWH.TbGravame GravameMes
+
+            LEFT JOIN DWBI_DTWH.TbGravame GravameSemana
+                ON  substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) = substr(GravameSemana.NmArquivo,17,6)
+                AND GravameMes.NuChassi = GravameSemana.NuChassi
+                AND substr(GravameSemana.NmArquivo,16,1) = 'D'
+
+        WHERE substr(GravameMes.NmArquivo,16,1) = 'M'
+          AND GravameSemana.NuChassi IS NULL
+          AND GravameMes.NmStatusGravame IN (1,2)
+          AND GravameMes.TpVeiculo IN (1,2,3,4,5)
+          AND CASE
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameMes.NmArquivo,17,6)||'01' AS DATE)
+              END >= '20180101' /*dateadd(month,-36,(today()-day(today())))*/
+		  AND CASE
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameMes.NmArquivo,17,6)||'01' AS DATE)
+              END <= '20240731'
+         AND LEN(GravameMes.NmArquivo) <= 33
+
+        GROUP BY
+
+             CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) AS INTEGER)
+            ,'C4774.SR131.BV_D'||substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'99A99999999'
+            ,GravameMes.CdMunicipio
+            ,GravameMes.CdMarcaModelo
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN GravameMes.Dsuflicenciamentoveiculo ELSE GravameMes.Dsufplacaveiculo END
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END
+            ,CASE
+                WHEN GravameMes.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameMes.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameMes.TpVeiculo = 5 THEN 'Pesados'
+             END
+
+            ,CASE WHEN GravameMes.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END
+
+            ,CAST(substr(GravameMes.NmArquivo,19,4) AS INTEGER)
+             -    GravameMes.AaModeloVeiculo
+            ,CAST(GravameMes.NuMesesContrato AS INTEGER)
+            ,GravameMes.NuCnpjAgente
+            ,GravameMes.Dtinclusaogravame
+            ,CASE WHEN GravameMes.NuChassi IN (&chassis.) AND GravameMes.DtInclusaoGravame BETWEEN '20211201' AND '20220131' THEN 'S' ELSE 'N' END
+    		,GravameMes.NuContrato
+    )
+
+    ,TbGravame_03 AS /* Dados da última semana */
+
+    (
+
+        SELECT
+
+             CAST(substr(GravameSemana.NmArquivo,17,6) AS INTEGER) NuAnoMes
+            ,'C4774.SR131.BV_M'||substr(GravameSemana.NmArquivo,21,2)||substr(GravameSemana.NmArquivo,17,4) NmArquivo
+            ,GravameSemana.CdMunicipio
+            ,GravameSemana.CdMarcaModelo
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN GravameSemana.Dsuflicenciamentoveiculo ELSE GravameSemana.Dsufplacaveiculo END AS UF
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END AS TipoUF
+            ,CASE
+                WHEN GravameSemana.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameSemana.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameSemana.TpVeiculo = 5 THEN 'Pesados'
+             END TpVeiculo
+
+            ,CASE WHEN GravameSemana.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END StVeiculo
+
+            ,CAST(substr(GravameSemana.NmArquivo,17,4) AS INTEGER)
+             -    GravameSemana.AaModeloVeiculo QtAnosIdade
+            ,CAST(GravameSemana.NuMesesContrato AS INTEGER) QtParcelas
+            ,GravameSemana.NuCnpjAgente
+            ,GravameSemana.Dtinclusaogravame
+            ,CASE WHEN GravameSemana.NuChassi IN (&chassis.) AND GravameSemana.DtInclusaoGravame BETWEEN '20211201' AND '20220131' THEN 'S' ELSE 'N' END AS AjusteManual
+			,GravameSemana.NuContrato
+			,count(*) AS QtGravames
+
+        FROM DWBI_DTWH.TbGravame GravameSemana
+
+            LEFT JOIN
+            (
+
+                SELECT DISTINCT
+                    substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) NuAnoMes
+                FROM DWBI_DTWH.TbGravame GravameMes
+                WHERE substr(GravameMes.NmArquivo,16,1) = 'M'
+
+            ) GravameMes
+
+                ON  substr(GravameSemana.NmArquivo,17,6) = GravameMes.NuAnoMes
+
+        WHERE substr(GravameSemana.NmArquivo,16,1) = 'D'
+          AND GravameSemana.NmStatusGravame IN (1,2)
+          AND GravameSemana.TpVeiculo IN (1,2,3,4,5)
+          AND GravameMes.NuAnoMes IS NULL
+          AND CASE
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameSemana.NmArquivo,19,4)||substr(GravameSemana.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameSemana.NmArquivo,17,6)||'01' AS DATE)
+              END >= '20180101' /*dateadd(month,-36,(today()-day(today())))*/
+		  AND CASE
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameSemana.NmArquivo,19,4)||substr(GravameSemana.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameSemana.NmArquivo,17,6)||'01' AS DATE)
+              END <= '20240731'
+         AND LEN(GravameSemana.NmArquivo) <= 33
+
+        GROUP BY
+
+             CAST(substr(GravameSemana.NmArquivo,17,6) AS INTEGER)
+            ,'C4774.SR131.BV_M'||substr(GravameSemana.NmArquivo,21,2)||substr(GravameSemana.NmArquivo,17,4)
+            ,GravameSemana.CdMunicipio
+            ,GravameSemana.CdMarcaModelo
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN GravameSemana.Dsuflicenciamentoveiculo ELSE GravameSemana.Dsufplacaveiculo END
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END
+            ,CASE
+                WHEN GravameSemana.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameSemana.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameSemana.TpVeiculo = 5 THEN 'Pesados'
+             END
+
+            ,CASE WHEN GravameSemana.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END
+
+            ,CAST(substr(GravameSemana.NmArquivo,17,4) AS INTEGER)
+             -    GravameSemana.AaModeloVeiculo
+            ,CAST(GravameSemana.NuMesesContrato AS INTEGER)
+            ,GravameSemana.NuCnpjAgente
+            ,GravameSemana.Dtinclusaogravame
+            ,CASE WHEN GravameSemana.NuChassi IN (&chassis.) AND GravameSemana.DtInclusaoGravame BETWEEN '20211201' AND '20220131' THEN 'S' ELSE 'N' END
+    		,GravameSemana.NuContrato
+    )
+
+    ,TbGravame AS
+
+    (
+        SELECT * FROM TbGravame_01 UNION ALL
+        SELECT * FROM TbGravame_02 UNION ALL
+        SELECT * FROM TbGravame_03
+    )
+
+    ,TbArquivo AS
+     (
+        SELECT
+             NmArquivo
+            ,LEFT(TpArquivo||rank() over (partition BY substr(NmArquivo,17,6) ORDER BY NmArquivo),2) TpArquivo
+            ,NuAnoMes
+        FROM
+
+        (
+            SELECT DISTINCT
+
+                 NmArquivo
+                ,CASE WHEN substr(NmArquivo,16,1) = 'M' THEN 'mf' ELSE 's' END TpArquivo
+                ,CASE
+                    WHEN substr(NmArquivo,16,1) = 'M' THEN CAST(substr(NmArquivo,19,4)||substr(NmArquivo,17,2) AS INTEGER)
+                    WHEN substr(NmArquivo,16,1) = 'D' THEN CAST(substr(NmArquivo,17,6) AS INTEGER)
+                 END AS NuAnoMes
+
+            FROM TbGravame
+            ORDER BY 1
+        ) NmArquivo
+    )
+
+    ,TbAtualizacao AS (
+        SELECT
+            MAX(CASE
+                WHEN substr(NmArquivo,16,1) = 'M' THEN  DATEADD(month,1,CAST(substr(nmArquivo,19,4)||substr(nmArquivo,17,2)||'01' AS DATE))-1
+                WHEN substr(NmArquivo,16,1) = 'D' THEN  CAST(substr(NmArquivo,26,8) AS DATE) END) AS dtAtualizacao
+        FROM DWBI_DTWH.TbGravame
+        ORDER BY 1 DESC
+    )
+
+    SELECT
+         Gravame.NuAnoMes
+        ,Arquivo.NmArquivo
+        ,Arquivo.TpArquivo
+        ,Gravame.TpVeiculo
+        ,Gravame.StVeiculo
+        ,Gravame.CdMarcaModelo
+        ,CASE
+            WHEN Gravame.QtAnosIdade > 19 THEN '20 anos e acima'
+            WHEN Gravame.QtAnosIdade > 14 THEN '15 a 19 anos'
+            WHEN Gravame.QtAnosIdade > 10 THEN '11 a 14 anos'
+            WHEN Gravame.QtAnosIdade >  7 THEN '8 a 10 anos'
+            WHEN Gravame.QtAnosIdade >  2 THEN '3 a 7 anos'
+         ELSE '0 a 2 anos' END FxIdade
+		,Gravame.QtAnosIdade
+        ,CASE WHEN Gravame.QtParcelas <= 12 THEN '12'
+              WHEN Gravame.QtParcelas <= 24 THEN '24'
+              WHEN Gravame.QtParcelas <= 36 THEN '36'
+              WHEN Gravame.QtParcelas <= 48 THEN '48'
+              WHEN Gravame.QtParcelas <= 60 THEN '60'
+              WHEN Gravame.QtParcelas > 60 THEN '60 +'
+         END AS FxPrazo
+        ,Gravame.NuCnpjAgente
+        ,CASE WHEN CAST(Gravame.Dtinclusaogravame AS INTEGER) >= CAST(CONVERT(CHAR(8), DATEADD(DAY, -90, TODAY()), 112) AS INTEGER) AND Gravame.NuAnoMes >= CAST(LEFT(CONVERT(CHAR(8), DATEADD(DAY, -90, TODAY()), 112),6) AS INTEGER)
+              THEN CAST(Gravame.Dtinclusaogravame AS INTEGER)
+              ELSE (Gravame.NuAnoMes * 100) + 1
+         END AS DtGravame
+        ,Atualizacao.DtAtualizacao
+        ,CASE WHEN MIS.NmGrupoAgenteMIS = 'MONTADORAS' THEN 'MONTADORAS'
+             WHEN MIS.NmGrupoAgenteMIS = 'BANCOS' THEN NmSubgrupoAgenteMis
+         ELSE NmSubgrupoAgenteMis end as NmAgrupamentoAgente
+         ,Gravame.UF
+         ,Gravame.TipoUF
+         ,Municipio.CdUf as UF2
+         ,Municipio.NmMunicipio
+         ,Municipio.CdFilial
+         ,mis.TpAgenteProdutoMIS
+         ,Gravame.AjusteManual
+		 ,Case when NmSubgrupoAgenteMis = 'BV' then Gravame.nucontrato end as nucontrato
+         ,sum(Gravame.QtGravames) AS QtGravames
+    FROM TbGravame Gravame
+
+        LEFT JOIN TbArquivo Arquivo
+            ON Gravame.NmArquivo = Arquivo.NmArquivo
+
+        LEFT JOIN TbAtualizacao Atualizacao
+            ON 1=1
+        LEFT JOIN DWBI_DTWH.TbAgenteMIS Mis
+            ON Gravame.nucnpjagente = MIS.NuCNPJAgente
+        LEFT JOIN DWBI_DTWH.TbMunicipio Municipio
+            ON Gravame.CdMunicipio = Municipio.CdMunicipio
+    GROUP BY
+
+         Gravame.NuAnoMes
+        ,Arquivo.NmArquivo
+        ,Arquivo.TpArquivo
+        ,Gravame.TpVeiculo
+        ,Gravame.StVeiculo
+        ,Gravame.CdMarcaModelo
+        ,CASE
+            WHEN Gravame.QtAnosIdade > 19 THEN '20 anos e acima'
+            WHEN Gravame.QtAnosIdade > 14 THEN '15 a 19 anos'
+            WHEN Gravame.QtAnosIdade > 10 THEN '11 a 14 anos'
+            WHEN Gravame.QtAnosIdade >  7 THEN '8 a 10 anos'
+            WHEN Gravame.QtAnosIdade >  2 THEN '3 a 7 anos'
+         ELSE '0 a 2 anos' END
+		,Gravame.QtAnosIdade
+        ,CASE WHEN Gravame.QtParcelas <= 12 THEN '12'
+              WHEN Gravame.QtParcelas <= 24 THEN '24'
+              WHEN Gravame.QtParcelas <= 36 THEN '36'
+              WHEN Gravame.QtParcelas <= 48 THEN '48'
+              WHEN Gravame.QtParcelas <= 60 THEN '60'
+              WHEN Gravame.QtParcelas > 60 THEN '60 +'
+         END
+        ,Gravame.NuCnpjAgente
+        ,DtGravame
+        ,Atualizacao.DtAtualizacao
+        ,NmAgrupamentoAgente
+        ,Gravame.UF
+        ,Gravame.TipoUF
+        ,Municipio.CdUf
+        ,Municipio.NmMunicipio
+        ,Municipio.CdFilial
+        ,mis.TpAgenteProdutoMIS
+        ,Gravame.AjusteManual
+		,Case when NmSubgrupoAgenteMis = 'BV' then Gravame.nucontrato end
+
+)
+;run;
+
+proc sql;delete from TbGravamesHist where TpArquivo <> 'mf' and NuAnoMes < (year(intnx('year',today(),-1))*100)+1;run;
+proc sql;create index NuCnpjAgente on TbGravamesHist;run;
+
+PROC SQL;
+  SELECT "'" ||PUT(MAX(DtGravame),8.)||"'" INTO :LstGrav FROM TbGravamesHist;
+RUN;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDiasUteis AS SELECT * FROM connection to dbcon
+(
+WITH
+TbTempoData AS (
+  SELECT
+    NuAnoMes,
+    CASE WHEN DtTempo BETWEEN '20211227' AND '20211230' THEN NuDiaUtilMes - 1
+         WHEN DtTempo IN ('20211224','20211231') THEN -3
+         ELSE NuDiaUtilMes END AS NuDiaUtilMes,
+    NuSemanaAno,
+    DtTempo,
+	DdData,
+	NuDiaSemana
+  FROM DWBI_DIME.TbDimTempoData
+),
+QtdMes AS (
+  SELECT
+    NuAnoMes,
+    MAX(NuDiaUtilMes) AS NuDiaUtilMes
+  FROM TbTempoData
+  WHERE
+    NuAnoMes >= 201801
+  GROUP BY NuAnoMes
+),
+SemanaInicial AS (
+  SELECT DISTINCT
+    NuAnoMes,
+    MIN(NuSemanaAno) AS PrimeiraSemanaMes,
+	MAX(CASE WHEN DdData = 1 AND NuDiaSemana = 1 THEN 1 ELSE 0 END) AS InicioDomingo
+  FROM TbTempoData
+  WHERE
+    NuAnoMes >= 201801
+  GROUP BY NuAnoMes
+),
+CalculoSemana AS (
+  SELECT
+    (((CASE WHEN DATEPART(weekday, A.DtTempo) <> 1 THEN A.NuSemanaAno ELSE A.NuSemanaAno - 1 END) - B.PrimeiraSemanaMes) +  1) + (CASE WHEN InicioDomingo = 1 THEN 1 ELSE 0 END) AS NuSemana,
+    DtTempo
+  FROM TbTempoData A
+  LEFT JOIN SemanaInicial B
+    ON A.NuAnoMes = B.NuAnoMes
+  WHERE
+    A.NuAnoMes >= 201801
+),
+QtdSemana AS(
+  SELECT
+    A.NuAnoMes,
+    B.NuSemana,
+    COUNT(DISTINCT CASE WHEN A.NuDiaUtilMes > 0 THEN A.NuDiaUtilMes END) AS NuDiaUtilSemana
+  FROM TbTempoData A
+  LEFT JOIN CalculoSemana B
+    ON A.DtTempo = B.DtTempo
+  WHERE
+    A.NuAnoMes >= 201801
+  GROUP BY A.NuAnoMes,B.NuSemana
+)
+SELECT DISTINCT
+  A.NuAnoMes,
+  A.NuDiaUtilMes,
+  's' + TRIM(STR(B.NuSemana)) AS NuSemanaMes,
+  B.NuDiaUtilSemana
+  FROM QtdMes A
+  LEFT JOIN QtdSemana B ON
+    A.NuAnoMes = B.NuAnoMes
+UNION
+SELECT DISTINCT
+  A.NuAnoMes,
+  A.NuDiaUtilMes,
+  'mf' AS NuSemanaMes,
+  0 AS NuDiaUtilSemana
+  FROM QtdMes A
+);
+RUN;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE ListaDU AS SELECT * FROM connection to dbcon (
+  SELECT DtTempo
+  FROM DWBI_DIME.TbDimTempoData
+  WHERE DtTempo BETWEEN &iqM13. AND TODAY()
+    AND FlFeriadoNacional = 'S'
+);
+RUN;
+
+data Tbproducao (KEEP=NuAnoMes nuproposta nmgrupoprodutometa NmSubEstruturaComercialA DsTipoCanalProducao);
+set bases.Tbproducao(Where=(nuproposta <> .
+							and nmgrupoprodutometa IN ('Leves','Motos','Pesados','CVG Leves','CVG Pesados')))
+;run;
+
+proc sql;
+create table TbResultadoMarketShareHist as
+select
+     cetip.NuAnoMes
+    ,NuDiaUtilMes
+    ,NuDiaUtilSemana AS QtTotalDiaUtilMes
+    ,cetip.TpArquivo
+    ,CASE
+        WHEN cetip.NmMunicipio = 'FORTALEZA' AND cetip.Uf = 'CE' THEN 'Canal Rodas e EGV I - Regional II'
+        WHEN cetip.NmMunicipio = 'SAO PAULO' AND cetip.Uf = 'SP' THEN 'Canal Rodas e EGV I - Regional I'
+        WHEN cetip.NmMunicipio = 'RIO DE JANEIRO' AND cetip.Uf = 'RJ' THEN 'Canal Rodas e EGV I - Regional II'
+    ELSE EstruturaComercial.NmSubEstruturaComercialA END as Regional
+/*    ,COALESCE(propcase(ESG.combustivel),'Combustão') as Fl_ESG*/
+	,CASE
+		WHEN ESG.Combustivel_Codigo IN (7,6) THEN 'Elétrico'
+		WHEN ESG.Combustivel_Codigo IN (18,19,21,23) THEN 'Híbrido'
+			ELSE 'Combustão' end  as Fl_ESG
+
+	,case when cetip.NmMunicipio ='BRASILIA' then 'Brasilia'
+	else propcase(EstruturaComercial.NmAreaEstruturaComercial) end as Filial
+    ,cetip.UF
+    ,cetip.TipoUF
+    ,cetip.UF2
+    ,propcase(cetip.NmMunicipio) as Municipio
+    ,cetip.StVeiculo
+    ,cetip.TpVeiculo
+	,'                             ' as SubTpVeiculo
+    ,cetip.FxIdade
+	,MAX(cetip.QtAnosIdade,0) AS IdadeBem
+    ,cetip.FxPrazo
+    ,cetip.DtAtualizacao
+    ,cetip.DtGravame
+	,CASE WHEN LDU.DtTempo IS NOT NULL THEN 1 ELSE 0 END AS FlFeriado
+    ,cetip.NmAgrupamentoAgente AS bancos
+/*    ,COALESCE(suv.agrupamento,'Não SUV') as DSSUV*/
+	,'Campo em manutenção' as DSSUV
+    ,cetip.AjusteManual
+	,cetip.TpAgenteProdutoMIS
+	,'N' as FlCvg
+	,Case when cetip.NmMunicipio <> '' then 'Licenciamento e Placa'
+		  else 'Sem Municipio Cadastrado na B3' end as MunicipioOrigem
+	,CASE WHEN 	pro.DsTipoCanalProducao = 'TELEMARKETING' THEN 'Canal Telemarketing'
+		Else pro.NmSubEstruturaComercialA END as RegionalCetip
+    ,sum(cetip.QtGravames) as GravTotal
+from TbGravamesHist cetip
+    left join bases.TbEstruturaComercial EstruturaComercial
+            on  cetip.CdFilial = EstruturaComercial.CdFilial
+            and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+            and EstruturaComercial.NmNivel = 'N2'
+            and EstruturaComercial.CdFilial is not null
+
+			/*    left join BASE_ESG as ESG*/
+/*           on ESG.modelob3 = cetip.Dsmarcamodelo*/
+
+	left join basegrc.tbModeloCombustivel ESG
+		on cetip.CdMarcaModelo = ESG.modelo_codigo
+
+/*    left join auxl.TbModeloSUV as SUV*/
+/*           on SUV.CdMarcaModelo = cetip.CdMarcaModelo*/
+    left join TbDiasUteis DU
+           on DU.NuAnoMes = cetip.NuAnoMes
+          and DU.NuSemanaMes = cetip.TpArquivo
+	left join ListaDU LDU
+	       on input(put(cetip.DtGravame,8.),yymmdd8.) = LDU.DtTempo
+	Left join Tbproducao as pro
+		on input(compress(Cetip.NuContrato, '.'),9.) = pro.nuproposta
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27
+;run;
+
+proc sql;
+create table OUTTMP.tbmarketsharediariaaberta as
+/*create table tbmarketsharediariaaberta as*/
+select
+     cetip.NuAnoMes
+    ,NuDiaUtilMes
+    ,NuDiaUtilSemana AS QtTotalDiaUtilMes
+    ,cetip.TpArquivo
+    ,CASE
+        WHEN cetip.NmMunicipio = 'FORTALEZA' AND cetip.Uf = 'CE' THEN 'Canal Rodas e EGV I - Regional II'
+        WHEN cetip.NmMunicipio = 'SAO PAULO' AND cetip.Uf = 'SP' THEN 'Canal Rodas e EGV I - Regional I'
+        WHEN cetip.NmMunicipio = 'RIO DE JANEIRO' AND cetip.Uf = 'RJ' THEN 'Canal Rodas e EGV I - Regional II'
+    ELSE EstruturaComercial.NmSubEstruturaComercialA END as Regional
+/*    ,COALESCE(propcase(ESG.combustivel),'Combustão') as Fl_ESG*/
+	,CASE
+		WHEN ESG.Combustivel_Codigo IN (7,6) THEN 'Elétrico'
+		WHEN ESG.Combustivel_Codigo IN (18,19,21,23) THEN 'Híbrido'
+			ELSE 'Combustão' end  as Fl_ESG
+
+	,case when cetip.NmMunicipio ='BRASILIA' then 'Brasilia'
+	else propcase(EstruturaComercial.NmAreaEstruturaComercial) end as Filial
+    ,cetip.UF
+    ,cetip.TipoUF
+    ,cetip.UF2
+    ,propcase(cetip.NmMunicipio) as Municipio
+    ,cetip.StVeiculo
+    ,cetip.TpVeiculo
+	,'                          ' as SubTpVeiculo
+    ,cetip.FxIdade
+	,MAX(cetip.QtAnosIdade,0) AS IdadeBem
+    ,cetip.FxPrazo
+    ,cetip.DtAtualizacao
+    ,cetip.DtGravame
+	,CASE WHEN LDU.DtTempo IS NOT NULL THEN 1 ELSE 0 END AS FlFeriado
+    ,cetip.NmAgrupamentoAgente AS bancos
+/*    ,COALESCE(suv.agrupamento,'Não SUV') as DSSUV*/
+	,'Campo em manutenção' as DSSUV
+    ,cetip.AjusteManual
+	,cetip.TpAgenteProdutoMIS
+	,'N' as FlCvg
+	,Case when cetip.NmMunicipio <> '' then 'Licenciamento e Placa'
+		  else 'Sem Municipio Cadastrado na B3' end as MunicipioOrigem
+	,CASE WHEN 	pro.DsTipoCanalProducao = 'TELEMARKETING' THEN 'Canal Telemarketing'
+		Else pro.NmSubEstruturaComercialA END as RegionalCetip
+    ,sum(cetip.QtGravames) as GravTotal
+from TbGravamesHist cetip
+    left join bases.TbEstruturaComercial EstruturaComercial
+            on  cetip.CdFilial = EstruturaComercial.CdFilial
+            and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+            and EstruturaComercial.NmNivel = 'N2'
+            and EstruturaComercial.CdFilial is not null
+
+			/*    left join BASE_ESG as ESG*/
+/*           on ESG.modelob3 = cetip.Dsmarcamodelo*/
+
+	left join basegrc.tbModeloCombustivel ESG
+		on cetip.CdMarcaModelo = ESG.modelo_codigo
+
+/*    left join auxl.TbModeloSUV as SUV*/
+/*           on SUV.CdMarcaModelo = cetip.CdMarcaModelo*/
+    left join TbDiasUteis DU
+           on DU.NuAnoMes = cetip.NuAnoMes
+          and DU.NuSemanaMes = cetip.TpArquivo
+	left join ListaDU LDU
+	       on input(put(cetip.DtGravame,8.),yymmdd8.) = LDU.DtTempo
+
+	Left join Tbproducao as pro
+		on input(compress(Cetip.NuContrato, '.'),9.) = pro.nuproposta
+
+WHERE Cetip.NuAnoMes >= &SafraA2.
+  AND Cetip.TpAgenteProdutoMIS <> '3'
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27
+;run;
+
+DATA RELEXC.tbmarketsharediariaaberta;
+SET TbResultadoMarketShareHist;
+RUN;
+
+proc sql;
+create table RELEXC.MarketShareFenabrave as
+select
+     cetip.NuAnoMes AS base
+    ,cetip.UF
+    ,cetip.TpVeiculo
+    ,CASE WHEN cetip.StVeiculo = 'Usados' THEN 'Usado'
+          WHEN cetip.StVeiculo = 'Novos' THEN 'Novo'
+     END AS StVeiculo
+    ,CASE WHEN cetip.FxIdade = '0 a 2 anos' THEN 'ATÉ 2 ANOS'
+          WHEN cetip.FxIdade = '3 a 7 anos' THEN 'DE 3 A 7 ANOS'
+          WHEN cetip.FxIdade = '8 a 10 anos' THEN 'DE 8 A 10 ANOS'
+          WHEN cetip.FxIdade = '11 a 14 anos' THEN 'DE 11 A 14 ANOS'
+		  WHEN cetip.FxIdade = '15 a 19 anos' THEN 'DE 15 A 19 ANOS'
+		  WHEN cetip.FxIdade = '20 anos e acima' THEN '20 ANOS E ACIMA'
+     END AS fxIdade
+    ,cetip.TpAgenteProdutoMIS AS TpAgenteProduto
+    ,cetip.NmAgrupamentoAgente AS grupo
+    ,cetip.NmAgrupamentoAgente AS subgrupo
+    ,cetip.AjusteManual
+	,'N' as FlCvg
+    ,sum(cetip.QtGravames) as qtGravames
+from TbGravamesHist cetip
+    left join bases.TbEstruturaComercial EstruturaComercial
+            on  cetip.CdFilial = EstruturaComercial.CdFilial
+            and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+            and EstruturaComercial.NmNivel = 'N2'
+/*    left join BASE_ESG as ESG*/
+/*           on ESG.modelob3 = cetip.Dsmarcamodelo*/
+
+	left join basegrc.tbModeloCombustivel ESG
+		on cetip.CdMarcaModelo = ESG.modelo_codigo
+
+/*    left join auxl.TbModeloSUV as SUV*/
+/*           on SUV.CdMarcaModelo = cetip.CdMarcaModelo*/
+    left join TbDiasUteis DU
+           on DU.NuAnoMes = cetip.NuAnoMes
+          and DU.NuSemanaMes = cetip.TpArquivo
+WHERE TpArquivo = 'mf'
+group by 1,2,3,4,5,6,7,8,9,10
+;run;
+
+/* Abertura por OUTROS */
+PROC SQL;
+  %CONECTADB(server=BI);
+create table TbGravamesOutrosHist as
+select * from connection to dbcon
+(
+WITH
+
+     TbGravame_01 AS /* Dados da tabela DWBI_DTWH.TbGravame */
+        (SELECT
+             CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2) AS INTEGER)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6) AS INTEGER)
+             END NuAnoMes
+
+            ,Gravame.NmArquivo
+            ,Gravame.CdMunicipio
+            ,Gravame.CdMarcaModelo
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN Gravame.Dsuflicenciamentoveiculo ELSE Gravame.Dsufplacaveiculo END AS UF
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END AS TipoUF
+            ,CASE
+                WHEN Gravame.TpVeiculo = 1 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 2 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 3 THEN 'Motos'
+                WHEN Gravame.TpVeiculo = 4 THEN 'Pesados'
+                WHEN Gravame.TpVeiculo = 5 THEN 'Pesados'
+             END TpVeiculo
+
+            ,CASE WHEN Gravame.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END StVeiculo
+
+            ,CAST(substr(Gravame.NmArquivo,CASE WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN 19 WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN 17 END,4) AS INTEGER)
+             -    Gravame.AaModeloVeiculo QtAnosIdade
+            ,CAST(Gravame.NuMesesContrato AS INTEGER) QtParcelas
+            ,Gravame.NuCnpjAgente
+            ,Gravame.NmAgente
+            ,count(*) AS QtGravames
+        FROM DWBI_DTWH.TbGravame Gravame
+
+        WHERE Gravame.NmStatusGravame IN (1,2)
+          AND Gravame.TpVeiculo IN (1,2,3,4,5)
+          AND CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6)||'01' AS DATE)
+              END > dateadd(month,-36,(today()-day(today())))
+		  AND CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6)||'01' AS DATE)
+              END <= '20240731'
+
+        AND LEN(Gravame.NmArquivo) <= 33
+
+        GROUP BY
+
+             CASE
+                WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN CAST(substr(Gravame.NmArquivo,19,4)||substr(Gravame.NmArquivo,17,2) AS INTEGER)
+                WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN CAST(substr(Gravame.NmArquivo,17,6) AS INTEGER)
+             END
+            ,Gravame.NmArquivo
+            ,Gravame.CdMunicipio
+            ,Gravame.CdMarcaModelo
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN Gravame.Dsuflicenciamentoveiculo ELSE Gravame.Dsufplacaveiculo END
+            ,CASE WHEN Gravame.Dsufplacaveiculo = '' OR Gravame.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END
+            ,CASE
+                WHEN Gravame.TpVeiculo = 1 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 2 THEN 'Leves'
+                WHEN Gravame.TpVeiculo = 3 THEN 'Motos'
+                WHEN Gravame.TpVeiculo = 4 THEN 'Pesados'
+                WHEN Gravame.TpVeiculo = 5 THEN 'Pesados'
+             END
+
+            ,CASE WHEN Gravame.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END
+
+            ,CAST(substr(Gravame.NmArquivo,CASE WHEN substr(Gravame.NmArquivo,16,1) = 'M' THEN 19 WHEN substr(Gravame.NmArquivo,16,1) = 'D' THEN 17 END,4) AS INTEGER)
+             -    Gravame.AaModeloVeiculo
+            ,CAST(Gravame.NuMesesContrato AS INTEGER)
+            ,Gravame.NuCnpjAgente
+            ,Gravame.NmAgente
+
+    )
+
+    ,TbGravame_02 AS /* Dados do mês incompleto */
+
+    (
+
+        SELECT
+             CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) AS INTEGER) NuAnoMes
+            ,'C4774.SR131.BV_D'||substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'99A99999999' NmArquivo
+            ,GravameMes.CdMunicipio
+            ,GravameMes.CdMarcaModelo
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN GravameMes.Dsuflicenciamentoveiculo ELSE GravameMes.Dsufplacaveiculo END AS UF
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END AS TipoUF
+            ,CASE
+                WHEN GravameMes.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameMes.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameMes.TpVeiculo = 5 THEN 'Pesados'
+             END TpVeiculo
+
+            ,CASE WHEN GravameMes.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END StVeiculo
+
+            ,CAST(substr(GravameMes.NmArquivo,19,4) AS INTEGER)
+             -    GravameMes.AaModeloVeiculo QtAnosIdade
+            ,CAST(GravameMes.NuMesesContrato AS INTEGER) QtParcelas
+            ,GravameMes.NuCnpjAgente
+            ,GravameMes.NmAgente
+            ,count(*) AS QtGravames
+        FROM DWBI_DTWH.TbGravame GravameMes
+
+            LEFT JOIN DWBI_DTWH.TbGravame GravameSemana
+                ON  substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) = substr(GravameSemana.NmArquivo,17,6)
+                AND GravameMes.NuChassi = GravameSemana.NuChassi
+                AND substr(GravameSemana.NmArquivo,16,1) = 'D'
+
+        WHERE substr(GravameMes.NmArquivo,16,1) = 'M'
+          AND GravameSemana.NuChassi IS NULL
+          AND GravameMes.NmStatusGravame IN (1,2)
+          AND GravameMes.TpVeiculo IN (1,2,3,4,5)
+          AND CASE
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameMes.NmArquivo,17,6)||'01' AS DATE)
+              END > dateadd(month,-36,(today()-day(today())))
+         AND LEN(GravameMes.NmArquivo) <= 33
+		 AND CASE
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameMes.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameMes.NmArquivo,17,6)||'01' AS DATE)
+              END <= '20240731'
+
+        GROUP BY
+
+             CAST(substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) AS INTEGER)
+            ,'C4774.SR131.BV_D'||substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2)||'99A99999999'
+            ,GravameMes.CdMunicipio
+            ,GravameMes.CdMarcaModelo
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN GravameMes.Dsuflicenciamentoveiculo ELSE GravameMes.Dsufplacaveiculo END
+            ,CASE WHEN GravameMes.Dsufplacaveiculo = '' OR GravameMes.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END
+            ,CASE
+                WHEN GravameMes.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameMes.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameMes.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameMes.TpVeiculo = 5 THEN 'Pesados'
+             END
+
+            ,CASE WHEN GravameMes.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END
+
+            ,CAST(substr(GravameMes.NmArquivo,19,4) AS INTEGER)
+             -    GravameMes.AaModeloVeiculo
+            ,CAST(GravameMes.NuMesesContrato AS INTEGER)
+            ,GravameMes.NuCnpjAgente
+            ,GravameMes.NmAgente
+
+    )
+
+    ,TbGravame_03 AS /* Dados da última semana */
+
+    (
+
+        SELECT
+
+             CAST(substr(GravameSemana.NmArquivo,17,6) AS INTEGER) NuAnoMes
+            ,'C4774.SR131.BV_M'||substr(GravameSemana.NmArquivo,21,2)||substr(GravameSemana.NmArquivo,17,4) NmArquivo
+            ,GravameSemana.CdMunicipio
+            ,GravameSemana.CdMarcaModelo
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN GravameSemana.Dsuflicenciamentoveiculo ELSE GravameSemana.Dsufplacaveiculo END AS UF
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END AS TipoUF
+            ,CASE
+                WHEN GravameSemana.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameSemana.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameSemana.TpVeiculo = 5 THEN 'Pesados'
+             END TpVeiculo
+
+            ,CASE WHEN GravameSemana.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END StVeiculo
+
+            ,CAST(substr(GravameSemana.NmArquivo,17,4) AS INTEGER)
+             -    GravameSemana.AaModeloVeiculo QtAnosIdade
+            ,CAST(GravameSemana.NuMesesContrato AS INTEGER) QtParcelas
+            ,GravameSemana.NuCnpjAgente
+            ,GravameSemana.NmAgente
+            ,count(*) AS QtGravames
+
+        FROM DWBI_DTWH.TbGravame GravameSemana
+
+            LEFT JOIN
+            (
+
+                SELECT DISTINCT
+                    substr(GravameMes.NmArquivo,19,4)||substr(GravameMes.NmArquivo,17,2) NuAnoMes
+                FROM DWBI_DTWH.TbGravame GravameMes
+                WHERE substr(GravameMes.NmArquivo,16,1) = 'M'
+
+            ) GravameMes
+
+                ON  substr(GravameSemana.NmArquivo,17,6) = GravameMes.NuAnoMes
+
+        WHERE substr(GravameSemana.NmArquivo,16,1) = 'D'
+          AND GravameSemana.NmStatusGravame IN (1,2)
+          AND GravameSemana.TpVeiculo IN (1,2,3,4,5)
+          AND GravameMes.NuAnoMes IS NULL
+          AND CASE
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameSemana.NmArquivo,19,4)||substr(GravameSemana.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameSemana.NmArquivo,17,6)||'01' AS DATE)
+              END > dateadd(month,-36,(today()-day(today())))
+         AND LEN(GravameSemana.NmArquivo) <= 33
+		 AND CASE
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'M' THEN CAST(substr(GravameSemana.NmArquivo,19,4)||substr(GravameSemana.NmArquivo,17,2)||'01' AS DATE)
+                WHEN substr(GravameSemana.NmArquivo,16,1) = 'D' THEN CAST(substr(GravameSemana.NmArquivo,17,6)||'01' AS DATE)
+              END <= '20240731'
+
+        GROUP BY
+
+             CAST(substr(GravameSemana.NmArquivo,17,6) AS INTEGER)
+            ,'C4774.SR131.BV_M'||substr(GravameSemana.NmArquivo,21,2)||substr(GravameSemana.NmArquivo,17,4)
+            ,GravameSemana.CdMunicipio
+            ,GravameSemana.CdMarcaModelo
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN GravameSemana.Dsuflicenciamentoveiculo ELSE GravameSemana.Dsufplacaveiculo END
+            ,CASE WHEN GravameSemana.Dsufplacaveiculo = '' OR GravameSemana.Dsufplacaveiculo IS NULL THEN 'Licenciamento' ELSE 'Placa do veículo' END
+            ,CASE
+                WHEN GravameSemana.TpVeiculo = 1 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 2 THEN 'Leves'
+                WHEN GravameSemana.TpVeiculo = 3 THEN 'Motos'
+                WHEN GravameSemana.TpVeiculo = 4 THEN 'Pesados'
+                WHEN GravameSemana.TpVeiculo = 5 THEN 'Pesados'
+             END
+
+            ,CASE WHEN GravameSemana.DsStatusVeiculo = 1 THEN 'Novos' ELSE 'Usados' END
+
+            ,CAST(substr(GravameSemana.NmArquivo,17,4) AS INTEGER)
+             -    GravameSemana.AaModeloVeiculo
+            ,CAST(GravameSemana.NuMesesContrato AS INTEGER)
+            ,GravameSemana.NuCnpjAgente
+            ,GravameSemana.NmAgente
+
+    )
+
+    ,TbGravame AS
+
+    (
+        SELECT * FROM TbGravame_01 UNION ALL
+        SELECT * FROM TbGravame_02 UNION ALL
+        SELECT * FROM TbGravame_03
+    )
+
+    ,TbArquivo AS
+     (
+        SELECT
+             NmArquivo
+            ,LEFT(TpArquivo||rank() over (partition BY substr(NmArquivo,17,6) ORDER BY NmArquivo),2) TpArquivo
+            ,NuAnoMes
+        FROM
+
+        (
+            SELECT DISTINCT
+
+                 NmArquivo
+                ,CASE WHEN substr(NmArquivo,16,1) = 'M' THEN 'mf' ELSE 's' END TpArquivo
+                ,CASE
+                    WHEN substr(NmArquivo,16,1) = 'M' THEN CAST(substr(NmArquivo,19,4)||substr(NmArquivo,17,2) AS INTEGER)
+                    WHEN substr(NmArquivo,16,1) = 'D' THEN CAST(substr(NmArquivo,17,6) AS INTEGER)
+                 END AS NuAnoMes
+
+            FROM TbGravame
+            ORDER BY 1
+        ) NmArquivo
+    )
+
+    ,TbAtualizacao AS (
+        SELECT
+            MAX(CASE
+                WHEN substr(NmArquivo,16,1) = 'M' THEN  DATEADD(month,1,CAST(substr(nmArquivo,19,4)||substr(nmArquivo,17,2)||'01' AS DATE))-1
+                WHEN substr(NmArquivo,16,1) = 'D' THEN  CAST(substr(NmArquivo,26,8) AS DATE) END) AS dtAtualizacao
+        FROM DWBI_DTWH.TbGravame
+        ORDER BY 1 DESC
+    )
+
+    SELECT
+         Gravame.NuAnoMes
+        ,Arquivo.NmArquivo
+        ,Arquivo.TpArquivo
+        ,Gravame.TpVeiculo
+        ,Gravame.StVeiculo
+        ,Gravame.CdMarcaModelo
+        ,CASE
+            WHEN Gravame.QtAnosIdade > 19 THEN '20 anos e acima'
+            WHEN Gravame.QtAnosIdade > 14 THEN '15 a 19 anos'
+            WHEN Gravame.QtAnosIdade > 10 THEN '11 a 14 anos'
+            WHEN Gravame.QtAnosIdade >  7 THEN '8 a 10 anos'
+            WHEN Gravame.QtAnosIdade >  2 THEN '3 a 7 anos'
+         ELSE '0 a 2 anos' END FxIdade
+        ,CASE WHEN Gravame.QtParcelas <= 12 THEN '12'
+              WHEN Gravame.QtParcelas <= 24 THEN '24'
+              WHEN Gravame.QtParcelas <= 36 THEN '36'
+              WHEN Gravame.QtParcelas <= 48 THEN '48'
+              WHEN Gravame.QtParcelas <= 60 THEN '60'
+              WHEN Gravame.QtParcelas > 60 THEN '60 +'
+         END AS FxPrazo
+        ,Gravame.NuCnpjAgente
+        ,Atualizacao.DtAtualizacao
+        ,CASE WHEN MIS.NmGrupoAgenteMIS = 'MONTADORAS' THEN 'MONTADORAS'
+             WHEN MIS.NmGrupoAgenteMIS = 'BANCOS' THEN NmSubgrupoAgenteMis
+         ELSE NmSubgrupoAgenteMis end as NmAgrupamentoAgente
+         ,Gravame.NmAgente
+         ,Gravame.UF
+         ,Gravame.TipoUF
+         ,Municipio.CdUf as UF2
+         ,Municipio.NmMunicipio
+         ,Municipio.CdFilial
+         ,mis.TpAgenteProdutoMIS
+         ,sum(Gravame.QtGravames) AS QtGravames
+    FROM TbGravame Gravame
+
+        LEFT JOIN TbArquivo Arquivo
+            ON Gravame.NmArquivo = Arquivo.NmArquivo
+
+        LEFT JOIN TbAtualizacao Atualizacao
+            ON 1=1
+        LEFT JOIN DWBI_DTWH.TbAgenteMIS Mis
+            ON Gravame.nucnpjagente = MIS.NuCNPJAgente
+        LEFT JOIN DWBI_DTWH.TbMunicipio Municipio
+            ON Gravame.CdMunicipio = Municipio.CdMunicipio
+    WHERE NmAgrupamentoAgente = 'OUTROS'
+    GROUP BY
+
+         Gravame.NuAnoMes
+        ,Arquivo.NmArquivo
+        ,Arquivo.TpArquivo
+        ,Gravame.TpVeiculo
+        ,Gravame.StVeiculo
+        ,Gravame.CdMarcaModelo
+        ,CASE
+            WHEN Gravame.QtAnosIdade > 19 THEN '20 anos e acima'
+            WHEN Gravame.QtAnosIdade > 14 THEN '15 a 19 anos'
+            WHEN Gravame.QtAnosIdade > 10 THEN '11 a 14 anos'
+            WHEN Gravame.QtAnosIdade >  7 THEN '8 a 10 anos'
+            WHEN Gravame.QtAnosIdade >  2 THEN '3 a 7 anos'
+         ELSE '0 a 2 anos' END
+        ,CASE WHEN Gravame.QtParcelas <= 12 THEN '12'
+              WHEN Gravame.QtParcelas <= 24 THEN '24'
+              WHEN Gravame.QtParcelas <= 36 THEN '36'
+              WHEN Gravame.QtParcelas <= 48 THEN '48'
+              WHEN Gravame.QtParcelas <= 60 THEN '60'
+              WHEN Gravame.QtParcelas > 60 THEN '60 +'
+         END
+        ,Gravame.NuCnpjAgente
+        ,Atualizacao.DtAtualizacao
+        ,NmAgrupamentoAgente
+        ,Gravame.NmAgente
+        ,Gravame.UF
+        ,Gravame.TipoUF
+        ,Municipio.CdUf
+        ,Municipio.NmMunicipio
+        ,Municipio.CdFilial
+        ,mis.TpAgenteProdutoMIS
+
+)
+;run;
+
+proc sql;delete from TbGravamesOutrosHist where TpArquivo <> 'mf' and NuAnoMes < year(intnx('month',today()-1,-12))*100+month(intnx('month',today()-1,-12));run;
+proc sql;create index NuCnpjAgente on TbGravamesOutrosHist;run;
+
+proc sql;
+create table TbResultadoMarketShareOutrosHist as
+select
+     cetip.NuAnoMes
+    ,cetip.TpArquivo
+    ,CASE
+        WHEN cetip.NmMunicipio = 'FORTALEZA' AND cetip.Uf = 'CE' THEN 'Canal Rodas e CVG III'
+        WHEN cetip.NmMunicipio = 'SAO PAULO' AND cetip.Uf = 'SP' THEN 'Canal Rodas e CVG I'
+        WHEN cetip.NmMunicipio = 'RIO DE JANEIRO' AND cetip.Uf = 'RJ' THEN 'Canal Rodas e CVG I'
+    ELSE EstruturaComercial.NmSubEstruturaComercialA END as Regional
+    ,propcase(EstruturaComercial.NmAreaEstruturaComercial) as Filial
+/*    ,COALESCE(propcase(ESG.combustivel),'Combustão') as Fl_ESG*/
+	,CASE
+		WHEN ESG.Combustivel_Codigo IN (7,6) THEN 'Elétrico'
+		WHEN ESG.Combustivel_Codigo IN (18,19,21,23) THEN 'Híbrido'
+			ELSE 'Combustão' end as Fl_ESG
+    ,cetip.UF
+    ,cetip.TipoUF
+    ,cetip.UF2
+    ,propcase(cetip.NmMunicipio) as Municipio
+    ,cetip.StVeiculo
+    ,cetip.TpVeiculo
+    ,cetip.FxIdade
+    ,cetip.FxPrazo
+    ,cetip.DtAtualizacao
+    ,cetip.NmAgente AS bancos
+	,'N' as FlCvg
+    ,sum(cetip.QtGravames) as GravTotal
+from TbGravamesOutrosHist cetip
+    left join bases.TbEstruturaComercial EstruturaComercial
+            on  cetip.CdFilial = EstruturaComercial.CdFilial
+            and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+            and EstruturaComercial.NmNivel = 'N2'
+            and EstruturaComercial.CdFilial is not null
+/*    left join BASE_ESG as ESG*/
+/*           on ESG.modelob3 = cetip.Dsmarcamodelo*/
+		   	left join basegrc.tbModeloCombustivel ESG
+		on cetip.CdMarcaModelo = ESG.modelo_codigo
+WHERE cetip.TpAgenteProdutoMIS <> '3'
+and cetip.NuAnoMes >= year(intnx('month',today()-1,-13))*100+month(intnx('month',today()-1,-13))
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+;run;
+
+DATA RELEXC.tbmarketshareoutros;
+SET TbResultadoMarketShareOutrosHist;
+RUN;

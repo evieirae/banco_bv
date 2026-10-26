@@ -1,0 +1,404 @@
+START_METADATA
+PROJECT: Rodas__tbcontadigital
+FILE_SAS: 01 - tbcontadigital.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 75)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -24
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (3x | +60), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 291
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBTEMPODATA [SAS/Local], BV-PDBD-PRD.DVRY_NEGC_CONTA.CONTADIGITAL_CONTASCOMERCIAL_FATO [BIGQUERY], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBABERTURACONTADARODAS [PROC SORT - DATA=; PROC SQL - FROM], BASES.TBTEMPODATA [PROC SQL - FROM], BV-PDBD-PRD.DVRY_NEGC_CONTA.CONTADIGITAL_CONTASCOMERCIAL_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], TMP.TBORIGINACAO [DATA Step - SET], TMP.TBPRODUCAO [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASEGRC.TBABERTURACONTADARODAS
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBABERTURACONTADARODAS, BASEGRC.TBCONTADIGITAL60
+APPEND_ONLY_OUTPUTS: BASEGRC.TBABERTURACONTADARODAS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): BASEGRC.TBABERTURACONTADARODAS
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEFINAL_SAFRA, ORIGINACAO, PRODUCAO, TBCONTASNEW, TB_CONTAS, TEMPO, TEMPO2, TEMPO3
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 5 paths (sas: 3, sas7bdat: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat
+[CODE REF] /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+options compress=yes;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd'
+READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100
+);
+create table BaseFinal_safra as
+select
+	'GCP' 								as NmArquivo
+ 	,cd_cpf_cnpj						as NuCpfCnpj
+	,cd_conta_corrente					as NuConta
+	,dt_abertura_cc						as DtAbertuaCC
+	,dt_proposta_cc						as DtPropostaCc
+	,case when dt_encerramento_cc is null then '01JAN2099'd else dt_encerramento_cc end as DtEncerramentoCc format date9.
+	,dt_ativacao						as DtAtivacao
+	,fl_conta_aberta					as FlContaAberta
+	,fl_habilitado_da_veiculos			as FlHabilitadoDAVeiculos
+	,dt_primeiro_debito_automatico		as DtPrimeiroDARodas
+	,dt_safra_primeiro_debito_automat	as DtSafraPrimeiroDARodas
+	,fl_debito_automatico_efetivado		as FlDebitoAutomaticoEfetivado
+	,fl_elegivel_bonus					as FlElegivelBonus
+	,cd_contrato						as Nucontrato
+	,Year (dt_abertura_cc)*100 +
+	 month(dt_abertura_cc) 				as SafraConta
+	,'Case Oferta Integrada de conta D'	as TpOferta
+
+from connection to perm(
+	select
+	*
+	from bv-pdbd-prd.dvry_negc_conta.contadigital_contascomercial_fato
+Where 1=1
+and dt_abertura_cc >= '2024-01-01'
+and (cast(dt_abertura_cc as date) < CURRENT_DATE
+Or (cast(dt_ativacao as date) < CURRENT_DATE or dt_ativacao is null))
+/*and (cast(dt_ativacao as date) < CURRENT_DATE or cast(dt_abertura_cc as date) < CURRENT_DATE)*/
+
+);
+disconnect from perm;
+quit;
+
+/*Deleta base >=202401 da base historica*/
+proc sql;delete from BASEGRC.TBABERTURACONTADARODAS where SafraConta >= 202401 ;run;
+
+/*Apenda base de 202501 na base historica*/
+
+	proc append data=BaseFinal_safra
+			base=BASEGRC.TBABERTURACONTADARODAS force;
+		run;
+
+PROC SORT DATA=BASEGRC.TBABERTURACONTADARODAS ;
+BY descending DtAbertuaCC
+;RUN;
+
+PROC SORT DATA=BASEGRC.TBABERTURACONTADARODAS NODUPKEY;
+BY NuCpfCnpj
+;RUN;
+
+/* ======================================================== */
+/* =================  Tabela Gerencial  =================== */
+/* ======================================================== */
+
+proc sql;
+create table Tb_Contas as
+select distinct
+
+     A.DtPropostaCc as DtPropostaComHora FORMAT DATE9.
+   	,A.DtAbertuaCC as DtConta FORMAT DATE9.
+  	,coalesce(A.DtEncerramentoCc,'01JAN2099'd) as DtEncerramentoConta FORMAT DATE9.
+	,A.DtAtivacao FORMAT DATE9. as DtAtivacao /*Qtd tiover a coluna na base GCP substituir*/
+ 	,A.NuCpfCnpj
+	,A.NuConta
+	,A.FlContaAberta
+	,A.FlHabilitadoDAVeiculos
+	,A.DtPrimeiroDARodas
+	,A.DtSafraPrimeiroDARodas
+	,A.FlDebitoAutomaticoEfetivado
+	,A.FlElegivelBonus
+	,A.TpOferta
+/*from DVRYBD.tbtelesenaaquisicaohistorico*/
+from BASEGRC.TBABERTURACONTADARODAS as A
+where 1=1
+and DtAbertuaCC <> .
+order by DtPropostaCc desc
+;run;
+
+proc sort data=Tb_Contas;
+	by DtConta;
+run;
+
+/*proc sort data=Tb_Contas out=basegrc.TbContas nodupkey ;
+	by NuCpfCnpj;
+run;*/
+
+proc sort data=Tb_Contas out=TbContasNew nodupkey ;
+	by NuCpfCnpj;
+run;
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tbproducao.sas7bdat,60,150);
+
+data Producao;
+set Tmp.tbproducao (Keep=NuAnomes NmGrupoProdutoMeta TpPessoa nucontrato NuCpfCnpj DtContrato NmCanalEstruturaComercial nuproposta DtAtualizacao
+					where=(upcase(NmGrupoProdutoMeta) NOT like ('%MULTIBANCO%')
+/*					and nuanomes >= 202301*/
+					and TpPessoa = 'F'))
+/*					and NmCanalEstruturaComercial in('Canal Veiculos')))*/
+;run;
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat,60,150);
+
+data Originacao;
+set Tmp.Tboriginacao (Keep=NuAnomes NmGrupoProdutoMeta TpPessoa Dtentradaproposta nuproposta
+					where=(upcase(NmGrupoProdutoMeta) NOT like ('%MULTIBANCO%')
+/*					and nuanomes >= 202301*/
+					and TpPessoa = 'F'))
+/*					and NmCanalEstruturaComercial in('Canal Veiculos')))*/
+;run;
+
+proc sql;
+create table Tempo as
+select distinct
+DtTempo,
+INTNX('DAY', DtTempo, 60) as limite format date9.
+from bases.TBTEMPODATA
+where 1=1
+and NuAnoMes >=202101
+order by DtTempo
+;run;
+
+data Tempo2;
+set Tempo; /* Substitua 'sua_tabela' pelo nome real da sua tabela */
+ format DtTempo DtTempoNovo date9.;
+do i = 0 to 60;
+DtTempoNovo = DtTempo + i;
+output;
+ end;
+drop i;
+run;
+
+proc sql;
+create table Tempo3 as
+select distinct
+DtTempo,
+INTNX('DAY', DtTempo, 60) as DtLimite format date9.,
+year(DtTempoNovo)*100+month(DtTempoNovo) as NuAnoMes
+from Tempo2
+where 1=1
+and year(DtTempo)*100+month(DtTempo) <> year(DtTempoNovo)*100+month(DtTempoNovo)
+order by DtTempo
+;run;
+
+proc sql;
+create table basegrc.TbContaDigital60 as
+/*create table TbContaDigital60 as */
+
+select
+pro.nuanomes as SafraProposta,
+year(cli.DtConta)*100+month(cli.DtConta) as SafraConta,
+year(cli.DtAtivacao)*100+month(cli.DtAtivacao) as SafraAtivacao,
+pro.nucontrato,
+ori.Dtentradaproposta,
+/*Pro.Nuproposta,*/
+pro.NuCpfCnpj,
+pro.DtContrato,
+pro.NmCanalEstruturaComercial,
+cli.DtPropostaComHora,
+cli.DtConta,
+cli.DtEncerramentoConta,
+cli.DtAtivacao,
+cli.NuConta,
+
+	cli.FlContaAberta
+	,cli.FlHabilitadoDAVeiculos
+	,cli.DtPrimeiroDARodas
+	,cli.DtSafraPrimeiroDARodas
+	,cli.FlDebitoAutomaticoEfetivado
+	,cli.FlElegivelBonus
+	,cli.TpOferta
+/*INTNX('DAY', cli.DtConta, 30) as DtContratacao30  format date9.,*/
+/*INTCK ('day',pro.DtContrato,cli.DtConta) as TempoContratacao,*/
+
+,case when
+			case when pro.nuanomes >= 202402 then
+			(input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.)
+			and cli.Dtconta < coalesce(ori.Dtentradaproposta,pro.DtContrato) and DtEncerramentoConta = '01JAN2099'd) or cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60)
+			and year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)
+			Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato) and DtEncerramentoConta <> '01JAN2099'd)
+
+			else
+			(input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60) and
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)
+			Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato) and DtEncerramentoConta <> '01JAN2099'd) or
+
+			input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) and
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)
+			Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato)and DtEncerramentoConta <> '01JAN2099'd)) end
+			Or (cli.DtConta <> . and pro.nuanomes >= 202402 and cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) and year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato) Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato)and  DtEncerramentoConta <> '01JAN2099'd)
+
+															or cli.Dtconta between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60) and year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato) and  DtEncerramentoConta <> '01JAN2099'd)
+)
+then 0
+else 1 end as FlElegContaDigital,
+
+case when  (input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60)  And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato) or
+
+			input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato))
+
+			then 1
+		else 0 end as FlContaDigital,
+
+case when  (input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.DtAtivacao between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60)  And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato) or
+
+			input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.DtAtivacao between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato))
+
+			then 1
+		else 0 end as FlAtivacaoContaDigital,
+
+case when  today ()  between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60)
+			 and DtEncerramentoConta <> '01JAN2099'd
+			then 1  else 0 end as FlElegContaDigitalComissao,
+pro.DtAtualizacao as DtAtualizacao format date9.
+/*today() as DtAtualizacao format date9.*/
+
+from Producao as Pro
+
+	Left join originacao as Ori
+		on ori.nuproposta = pro.nuproposta
+
+	left join /*basegrc.TbContas*/ TbContasNew as cli
+		on input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.)
+
+where 1=1
+and (pro.nuanomes >= 202501 or year(cli.DtConta)*100+month(cli.DtConta) >=202501)
+
+Union all
+
+select
+/*CASE WHEN pro.nuanomes in (202504) then 202505 end as SafraProposta,*/
+tempo.NuAnoMes as SafraProposta,
+year(cli.DtConta)*100+month(cli.DtConta) as SafraConta,
+year(cli.DtAtivacao)*100+month(cli.DtAtivacao) as SafraAtivacao,
+pro.nucontrato,
+ori.Dtentradaproposta,
+/*Pro.Nuproposta,*/
+pro.NuCpfCnpj,
+pro.DtContrato,
+pro.NmCanalEstruturaComercial,
+cli.DtPropostaComHora,
+cli.DtConta,
+cli.DtEncerramentoConta,
+cli.DtAtivacao,
+cli.NuConta,
+
+	cli.FlContaAberta
+	,cli.FlHabilitadoDAVeiculos
+	,cli.DtPrimeiroDARodas
+	,cli.DtSafraPrimeiroDARodas
+	,cli.FlDebitoAutomaticoEfetivado
+	,cli.FlElegivelBonus
+	,cli.TpOferta
+/*INTNX('DAY', cli.DtConta, 30) as DtContratacao30  format date9.,*/
+/*INTCK ('day',pro.DtContrato,cli.DtConta) as TempoContratacao,*/
+
+,case when
+			case when pro.nuanomes >= 202402 then
+			(input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.)
+			and cli.Dtconta < coalesce(ori.Dtentradaproposta,pro.DtContrato) and DtEncerramentoConta = '01JAN2099'd) or cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60)
+			and year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)
+			Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato) and DtEncerramentoConta <> '01JAN2099'd)
+
+			else
+			(input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60) and
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)
+			Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato) and DtEncerramentoConta <> '01JAN2099'd) or
+
+			input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) and
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)
+			Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato)and DtEncerramentoConta <> '01JAN2099'd)) end
+			Or (cli.DtConta <> . and pro.nuanomes >= 202402 and cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) and year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato) Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato)and  DtEncerramentoConta <> '01JAN2099'd)
+
+															or cli.Dtconta between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60) and year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato)Or (year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)> year(pro.DtContrato)*100+month(pro.DtContrato) and  DtEncerramentoConta <> '01JAN2099'd)
+)
+then 0
+else 1 end as FlElegContaDigital,
+
+case when  (input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60)  And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato) or
+
+			input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.Dtconta between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato))
+
+			then 1
+		else 0 end as FlContaDigital,
+
+case when  (input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.DtAtivacao between coalesce(ori.Dtentradaproposta,pro.DtContrato) and INTNX('DAY', coalesce(ori.Dtentradaproposta,pro.DtContrato), 60)  And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato) or
+
+			input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.) and
+			cli.DtAtivacao between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60) And
+			year(cli.DtEncerramentoConta)*100+month(cli.DtEncerramentoConta)<> year(pro.DtContrato)*100+month(pro.DtContrato))
+
+			then 1
+		else 0 end as FlAtivacaoContaDigital,
+
+case when  today ()  between pro.DtContrato and INTNX('DAY', pro.DtContrato, 60)
+			 and DtEncerramentoConta <> '01JAN2099'd
+			then 1  else 0 end as FlElegContaDigitalComissao,
+pro.DtAtualizacao as DtAtualizacao format date9.
+/*today() as DtAtualizacao format date9.*/
+
+from Producao as Pro
+
+	Left join originacao as Ori
+		on ori.nuproposta = pro.nuproposta
+
+	left join /*basegrc.TbContas*/ TbContasNew as cli
+		on input(cli.NuCpfCnpj,14.) = input(pro.NuCpfCnpj,14.)
+
+	left join Tempo3 as Tempo
+		on tempo.dttempo =  pro.dtcontrato
+
+where 1=1
+and (pro.nuanomes >= 202501 or year(cli.DtConta)*100+month(cli.DtConta) >=202501)
+Or calculated SafraAtivacao = .
+/*and calculated FlContaDigital = 0*/
+/*and calculated SafraAtivacao >= tempo.NuAnoMes */
+order by 4
+;run;

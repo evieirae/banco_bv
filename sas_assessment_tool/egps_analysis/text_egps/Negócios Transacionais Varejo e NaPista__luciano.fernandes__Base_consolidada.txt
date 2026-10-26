@@ -1,0 +1,171 @@
+START_METADATA
+PROJECT: Negócios Transacionais Varejo e NaPista__luciano.fernandes
+FILE_SAS: Base_consolidada.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:38:11 UTC
+BUSINESS_AREA: Negócios Transacionais Varejo e NaPista
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 108
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEFASE_1, BASEFASE_2, BASEFASE_3, BASEFASE_TRATADA3, BASE_COMPAR_TOT, BASE_COMPAR_TOT2, BASE_COMPAR_TOT3, BASE_TOTAL, BASE_TRATADA32
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+data basefase_1;
+set base_fase2;
+keep NuProposta StProposta DtPrimeiroVencimento;
+run;
+
+proc sql;
+create table basefase_2 as
+select NuProposta
+		,max(StProposta) as StProposta
+		,max(DtPrimeiroVencimento) as DtPrimeiroVencimento /*format date9.*/
+from basefase_1
+where NuProposta>0
+group by NuProposta
+
+;
+quit;
+
+data basefase_3;
+set base_fase2;
+drop StProposta DtPrimeiroVencimento ;
+run;
+
+proc sort data=basefase_3(where=(NuProposta>0)) nodupkey; by NuProposta; run;
+
+proc sql;
+create table basefase_tratada3 as
+select a.*
+		,b.*
+from basefase_3 as a
+left join basefase_2 as b
+on a.NuProposta=b.NuProposta
+where StProposta = "Aprovada e Paga"
+;
+quit;
+
+proc sql;
+create table base_total as
+select a.*
+		,b.CD_PRPT_FNTO_EXNO
+		,case
+		when b.CD_PRPT_FNTO_EXNO>0 then 1
+		else 0
+		end as ind_bb
+
+from basefase_tratada3 as a
+full join BASE_CONS as b
+on a.NuProposta=b.CD_PRPT_FNTO_EXNO
+;
+quit;
+
+proc sql;
+create table base_tratada32 as
+select a.*
+		,case
+		when b.NuProposta>0 then 2
+		else 1
+		end as fase
+from base_tratada3 as a
+left join basefase_tratada3 as b
+on a.NuProposta=b.NuProposta
+;
+quit;
+
+proc sql;
+create table base_compar_tot as
+select TpDados,
+		NuProposta,
+DtEntradaProposta,
+DtPrimeiroVencimento,
+Parcela,
+StProposta,
+NuCpfCnpj,
+FxEntrada,
+FxIdade,
+AaModelo,
+CdMarca,
+CdModelo,
+CdMolicar,
+NmGrupoConcessionaria,
+VrDoBem,
+VrEntrada,
+VrPerdaEsperada,
+VrParcela,
+'(%) PE'n,
+VrLiberado,
+VrFinanciamento,
+'(%) TxPactuada'n,
+'(%) Tir'n,
+'(%) SpreadPactuado'n,
+VrComissaoTotal,
+VrAcordoComercial,
+VrRetornoPlus,
+'(%) Comissao'n,
+'(%) Acordo'n,
+'(%) TotalComissao'n,
+fase
+
+from base_tratada32
+where StProposta="Aprovada e Paga"
+;
+quit;
+
+PROC SQL;
+CREATE TABLE base_compar_tot2 AS
+SELECT A.*
+		,B.IND_CORRENTISTAS
+FROM base_compar_tot AS A
+LEFT JOIN  BASE_COR_NCOR_TOT AS B
+ON A.NuCpfCnpj=B.CPF and a.NuProposta=b.NuProposta
+;
+QUIT;
+
+proc sort data=base_compar_tot2 nodupkey ; by NuProposta; run;
+
+proc sql;
+create table base_compar_tot3 as
+select *
+from base_compar_tot2
+where NuProposta not in (select NuProposta from Base_zero_KM)
+;
+quit;

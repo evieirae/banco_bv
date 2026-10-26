@@ -1,0 +1,458 @@
+START_METADATA
+PROJECT: Rodas__tbpropostas-hh
+FILE_SAS: 01-taxamercado_18_11_24.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 55)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), INFILE  (1x | +10), ARRAY (1x | +15), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 370
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASES = /projetos/MISV/data/bases
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BASES.TBDIMTAXAMERCADO [SAS/Local], TBDATACORTE [DBCON], TBPARCELAS [DBCON], TBTAXAMERCADO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASES
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /riscosbvf/CRM/SAS/DM_MIS/Bases_TXT/tir*
+TABLE_READ_PROVENANCE (Flow): BASES.TBDIMTAXAMERCADO [PROC SQL - JOIN], TBDATACORTE [Pass-Through Native (DBCON) - FROM], TBPARCELAS [Pass-Through Native (DBCON) - FROM], TBTAXAMERCADO [Pass-Through Native (DBCON) - FROM; Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /riscosbvf/CRM/SAS/DM_MIS/Bases_TXT/tir*
+INTERNAL READS (Temp/Local): /RISCOSBVF/CRM/SAS/DM_MIS/BASES_TXT/TIR*
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): BASES.TBDIMTAXAMERCADO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBDATAPRAZO, TBDIMTAXAMERCADO, TBEXTTAXAMERCADO, TBTAXAMERCADOPOS, TBTIRCONTABILPOS, TBTIRCONTABILPOSDATAPRAZO, TBTIRCONTABILPOSMAX, TBTIRCONTABILPOSTXT, TBTIRCONTABILPOSUNPIVOT
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (no_ext: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /riscosbvf/CRM/SAS/DM_MIS/Bases_TXT/tir*
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_taxamercado.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	ext_taxamercado.sas						| */
+/* |	Descricao: 	Programa para extrair informacoes de TIR.			| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableua utilizados pela	| */
+/* |				area comercial.						| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de BA				| */
+/* |	Criador: 	Carlos Makoto - BA						| */
+/* |	Data:		01/04/2020							| */
+/* ====================================================================================== */
+/* |	Atualizacao:	08/04/2020							| */
+/* |	Responsavel: 	Paulo Oliveira - Squad MIS Comercial				| */
+/* |	Alt. Realizada:	- Inclusao de cabecalho						| */
+/* |					- Testes iniciais				| */
+/* ====================================================================================== */
+/* |	Atualizacao:	24/04/2020							| */
+/* |	Responsavel: 	Nome - Squad MIS Comercial					| */
+/* |	Alt. Realizada:	- Utilizacao do usuario sistemico				| */
+/* |					- 						| */
+/* ====================================================================================== */
+/* |	Atualizacao:	11/12/2020							| */
+/* |	Responsavel: 	Ana Lazarini - Infomacoes gerenciais estrategicas    		| */
+/* |	Alt. Realizada:	- Ajuste manual na TIRContabil para os dias 09,10 e 11 de       | */
+/* |                      dezembro de 2020 e tivemos que fazer por que foi importando   | */
+/* |			  no sistema o subsidio errado                                  | */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+/*%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';*/
+libname Bases '/projetos/MISV/data/bases';
+
+/* ======================================================== */
+/* ================= Extracao IQPRDBI  ==================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table TbExtTaxaMercado as
+select * from connection to dbcon
+(
+WITH
+	TbDataCorte AS
+(
+	SELECT
+		DATE(DtTempo) AS DtReferencia
+	FROM DWBI_DIME.TbDimTempoData
+	WHERE 1 = 1
+		AND DtTempo >= today()-30
+		AND DtTempo  <= today()
+)
+
+,TbParcelas AS
+(
+	SELECT
+		row_number() over (ORDER BY DtTempo) AS QtParcelas
+	FROM DWBI_DIME.TbDimTempoData
+	WHERE DtTempo BETWEEN '20170101' AND '20170828'
+)
+,TbTipoTaxaMercadoOrigem AS
+(
+	SELECT
+		NuDiaSemana AS CdTipoTaxaMercadoOrigem
+	FROM DWBI_DIME.TbDimTempoData
+	WHERE DtTempo BETWEEN '20170101' AND '20170106'
+		AND NuDiaSemana IN (1,5,6)
+)
+
+,TbTaxaMercadoDia AS
+(
+	SELECT
+		 TipoTaxaMercadoOrigem.CdTipoTaxaMercadoOrigem
+		,DataCorte.DtReferencia
+		,Parcelas.QtParcelas
+		,TaxaMercado.PcPresente
+	FROM TbDataCorte DataCorte
+
+		INNER JOIN TbParcelas Parcelas
+			ON 1=1
+
+		INNER JOIN TbTipoTaxaMercadoOrigem TipoTaxaMercadoOrigem
+			ON 1=1
+
+		LEFT JOIN DWBI_DTWH.TbTaxaMercado TaxaMercado
+			ON  DataCorte.DtReferencia BETWEEN TaxaMercado.DtInicioVigencia AND coalesce(TaxaMercado.DtFimVigencia,today())
+			AND Parcelas.QtParcelas BETWEEN TaxaMercado.PzContratoInicio AND TaxaMercado.PzContratoFim
+			AND TipoTaxaMercadoOrigem.CdTipoTaxaMercadoOrigem = TaxaMercado.CdTipoTaxaMercadoOrigem
+
+	WHERE TipoTaxaMercadoOrigem.CdTipoTaxaMercadoOrigem in (1,5,6)
+)
+,TbTaxaMercadoMax AS
+(
+	SELECT
+		 CdTipoTaxaMercadoOrigem
+		,DtReferencia
+		,max(QtParcelas) AS QtParcelas
+	FROM TbTaxaMercadoDia
+	WHERE PcPresente IS NOT NULL
+	GROUP BY
+		 CdTipoTaxaMercadoOrigem
+		,DtReferencia
+)
+
+,TbTaxaMercadoMaxPresente AS
+(
+	SELECT
+		 Dia.CdTipoTaxaMercadoOrigem
+		,Dia.DtReferencia
+		,Dia.QtParcelas
+		,Dia.PcPresente
+	FROM TbTaxaMercadoDia Dia
+
+		INNER JOIN TbTaxaMercadoMax Max
+			ON  Dia.CdTipoTaxaMercadoOrigem = Max.CdTipoTaxaMercadoOrigem
+			AND Dia.DtReferencia = Max.DtReferencia
+			AND Dia.QtParcelas = Max.QtParcelas
+)
+
+,TbTaxaMercado AS
+(
+SELECT
+	 Dia.CdTipoTaxaMercadoOrigem
+	,Dia.DtReferencia
+	,Dia.QtParcelas
+	,CASE
+		WHEN Dia.QtParcelas >= 49 AND Dia.DtReferencia <= '20200313' AND Dia.CdTipoTaxaMercadoOrigem <> 6 THEN 0.06675
+		WHEN Dia.QtParcelas >= 37 AND Dia.DtReferencia <= '20200313' AND Dia.CdTipoTaxaMercadoOrigem <> 6 THEN 0.06094
+		WHEN Dia.QtParcelas >= 25 AND Dia.DtReferencia <= '20200313' AND Dia.CdTipoTaxaMercadoOrigem <> 6 THEN 0.05982
+		WHEN Dia.QtParcelas >= 13 AND Dia.DtReferencia <= '20200313' AND Dia.CdTipoTaxaMercadoOrigem <> 6 THEN 0.06401
+	 ELSE 0 END AS TxTirAgravamentoLA
+	,coalesce(Dia.PcPresente,Max.PcPresente) AS PcPresente
+FROM TbTaxaMercadoDia Dia
+	LEFT JOIN TbTaxaMercadoMaxPresente Max
+		ON  Dia.CdTipoTaxaMercadoOrigem = Max.CdTipoTaxaMercadoOrigem
+		AND Dia.DtReferencia = Max.DtReferencia
+		AND Dia.PcPresente IS NULL
+ORDER BY
+	 Dia.CdTipoTaxaMercadoOrigem
+	,Dia.DtReferencia
+	,Dia.QtParcelas
+)
+
+SELECT
+	 TaxaMercado.CdTipoTaxaMercadoOrigem
+	,TaxaMercado.DtReferencia
+	,TaxaMercado.QtParcelas
+	,max(TaxaMercado.PcPresente) AS TxTirDivulgada
+	,max(Subsidio.PcPresente) AS Subsidio
+	,max(TaxaMercado.TxTirAgravamentoLA) AS TxTirAgravamentoLA
+
+	,max(TaxaMercado.PcPresente)-
+	 max(Subsidio.PcPresente)+
+	 max(TaxaMercado.TxTirAgravamentoLA) as TxTirContabil
+
+FROM TbTaxaMercado TaxaMercado
+	left join TbTaxaMercado Subsidio
+		on  TaxaMercado.DtReferencia = Subsidio.DtReferencia
+		and TaxaMercado.QtParcelas = Subsidio.QtParcelas
+		and Subsidio.CdTipoTaxaMercadoOrigem = 5
+where TaxaMercado.CdTipoTaxaMercadoOrigem in (1,6)
+GROUP BY
+	 TaxaMercado.CdTipoTaxaMercadoOrigem
+	,TaxaMercado.DtReferencia
+	,TaxaMercado.QtParcelas
+)
+;run;
+
+data TbDimTaxaMercado;
+set TbExtTaxaMercado;
+run;
+
+proc sql;
+%CONECTADB(server=BI);
+create table TbDataPrazo as
+select * from connection to dbcon
+(
+WITH
+	TbDataCorte AS
+(
+	SELECT
+		DATE(DtTempo) AS DtReferencia
+	FROM DWBI_DIME.TbDimTempoData
+	WHERE 1 = 1
+		AND DtTempo >= '20191201'
+		AND DtTempo  <= today()
+)
+
+,TbParcelas AS
+(
+	SELECT
+		row_number() over (ORDER BY DtTempo) AS QtParcelas
+	FROM DWBI_DIME.TbDimTempoData
+	WHERE DtTempo BETWEEN '20170101' AND '20170828'
+)
+
+select * from TbDataCorte,TbParcelas
+)
+;run;
+
+data TbTirContabilPosTxt;
+infile "/riscosbvf/CRM/SAS/DM_MIS/Bases_TXT/tir*"
+missover lrecl=9999 delimiter=";";
+input
+DataTir			:$20.
+T1				:$20.
+T2				:$20.
+T3				:$20.
+T4				:$20.
+T5				:$20.
+T6				:$20.
+T7				:$20.
+T8				:$20.
+T9				:$20.
+T10				:$20.
+T11				:$20.
+T12				:$20.
+T13				:$20.
+T14				:$20.
+T15				:$20.;
+
+DtTir = input(compress(DataTir,'" ',''),ddmmyy10.);
+format DtTir ddmmyy10.;
+
+ARRAY CAMPOS _CHARACTER_;
+DO OVER CAMPOS;
+	CAMPOS = translate(CAMPOS,'.',',');
+END;
+
+if DtTir < '15mar2018'd then do;
+Tir120 = input(compress(T1,'" ',''),10.5);
+Tir180 = input(compress(T2,'" ',''),10.5);
+Tir240 = input(compress(T3,'" ',''),10.5);
+end;
+else if DtTir >= '15mar2018'd then do;
+Tir6  = input(compress(T1,'" ',''),10.5);
+Tir12 = input(compress(T2,'" ',''),10.5);
+Tir18 = input(compress(T3,'" ',''),10.5);
+Tir24 = input(compress(T4,'" ',''),10.5);
+Tir30 = input(compress(T5,'" ',''),10.5);
+Tir36 = input(compress(T6,'" ',''),10.5);
+Tir42 = input(compress(T7,'" ',''),10.5);
+Tir48 = input(compress(T8,'" ',''),10.5);
+Tir60 = input(compress(T9,'" ',''),10.5);
+Tir72 = input(compress(T10,'" ',''),10.5);
+Tir84 = input(compress(T11,'" ',''),10.5);
+Tir96 = input(compress(T12,'" ',''),10.5);
+Tir120 = input(compress(T13,'" ',''),10.5);
+Tir180 = input(compress(T14,'" ',''),10.5);
+Tir240 = input(compress(T15,'" ',''),10.5);
+end;
+
+format Tir: commax20.10;
+drop T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15	DataTir;
+run;
+
+proc sort data=TbTirContabilPosTxt nodupkey; by DtTir;run;
+
+proc transpose data=TbTirContabilPosTxt out=TbTirContabilPosUnpivot
+(drop=_LABEL_ rename=_NAME_=TpValor rename=COL1=PcPresente);
+by DtTir
+;run;
+
+proc sql;
+create table TbTirContabilPosMax as
+select
+max(DtTir) as DtTirMax format date9.
+from TbTirContabilPosUnpivot
+;run;
+
+proc sql;
+create table TbTirContabilPos as
+select
+	UnPivot.DtTir as DtInicio format date9.
+,case when Max.DtTirMax is null then UnPivot.DtTir else today() end as DtFim format date9.
+,case
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	6	then	 1
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	12	then	 7
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	18	then	13
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	24	then	19
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	30	then	25
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	36	then	31
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	42	then	37
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	48	then	43
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	60	then	49
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	72	then	61
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	84	then	73
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =   	96	then	85
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =     120	then	97
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =     180	then   121
+	when input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) =     240	then   181
+	end as PzInicio
+,input(compress(tranwrd(UnPivot.TpValor,'Tir',''),'" ',''),10.0) as PzFim
+,coalesce(UnPivot.PcPresente,0)*10 as TxTirContabil format 18.4
+from TbTirContabilPosUnpivot UnPivot
+left join TbTirContabilPosMax Max
+	on UnPivot.DtTir = Max.DtTirMax
+order by 1,2,3,4
+;run;
+
+proc sql;
+create table TbTirContabilPosDataPrazo as
+select
+	DataPrazo.DtReferencia
+,DataPrazo.QtParcelas
+,TirContabilPos.TxTirContabil
+from TbDataPrazo DataPrazo
+left join TbTirContabilPos TirContabilPos
+	on  DataPrazo.DtReferencia between TirContabilPos.DtInicio and TirContabilPos.DtFim
+	and DataPrazo.QtParcelas between TirContabilPos.PzInicio and TirContabilPos.PzFim
+where TirContabilPos.TxTirContabil > 0
+;run;
+
+proc sql;
+create table TbTaxaMercadoPos as
+select
+	 DimTaxaMercado.CdTipoTaxaMercadoOrigem
+	,DimTaxaMercado.DtReferencia
+	,DimTaxaMercado.QtParcelas
+	,DimTaxaMercado.TxTirDivulgada
+	,DimTaxaMercado.Subsidio
+	,DimTaxaMercado.TxTirAgravamentoLA
+	,coalesce(TirContabilPosDataPrazo.TxTirContabil,DimTaxaMercado.TxTirContabil) as TxTirContabil
+from TbTirContabilPosDataPrazo TirContabilPosDataPrazo
+left join bases.TbDimTaxaMercado DimTaxaMercado
+	on  TirContabilPosDataPrazo.DtReferencia = DimTaxaMercado.DtReferencia
+	and TirContabilPosDataPrazo.QtParcelas = DimTaxaMercado.QtParcelas
+	and DimTaxaMercado.CdTipoTaxaMercadoOrigem = 6
+;run;
+
+data TbDimTaxaMercado;
+set TbDimTaxaMercado
+	TbTaxaMercadoPos;
+run;
+
+/*Alteração adicionada em 11-12-2020 por ana.lazarini*/
+PROC SQL;
+  CREATE TABLE TbDimTaxaMercado AS
+    SELECT
+	  CdTipoTaxaMercadoOrigem,
+	  DtReferencia,
+	  QtParcelas,
+	  TxTirDivulgada,
+	  Subsidio,
+	  TxTirAgravamentoLA,
+	  CASE WHEN CdTipoTaxaMercadoOrigem = 1
+	       THEN CASE WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN  1 AND   6 THEN 0.2099
+		             WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN  7 AND  12 THEN 0.2633
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 13 AND  18 THEN 0.3286
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 19 AND  24 THEN 0.3891
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 25 AND  30 THEN 0.4399
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 31 AND  36 THEN 0.4852
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 37 AND  42 THEN 0.5239
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 43 AND  48 THEN 0.5570
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 49 AND  60 THEN 0.6089
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 61 AND  72 THEN 0.6501
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 73 AND  84 THEN 0.6887
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 85 AND  96 THEN 0.7166
+					 WHEN DtReferencia = '09DEC2020'd AND QtParcelas BETWEEN 97 AND 120 THEN 0.7583
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN  1 AND   6 THEN 0.2099
+		             WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN  7 AND  12 THEN 0.2664
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 13 AND  18 THEN 0.3309
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 19 AND  24 THEN 0.3916
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 25 AND  30 THEN 0.4422
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 31 AND  36 THEN 0.4868
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 37 AND  42 THEN 0.5244
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 43 AND  48 THEN 0.5568
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 49 AND  60 THEN 0.6083
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 61 AND  72 THEN 0.6491
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 73 AND  84 THEN 0.6875
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 85 AND  96 THEN 0.7154
+					 WHEN DtReferencia = '10DEC2020'd AND QtParcelas BETWEEN 97 AND 120 THEN 0.7571
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN  1 AND   6 THEN 0.2098
+		             WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN  7 AND  12 THEN 0.2652
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 13 AND  18 THEN 0.3289
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 19 AND  24 THEN 0.3899
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 25 AND  30 THEN 0.4420
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 31 AND  36 THEN 0.4880
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 37 AND  42 THEN 0.5265
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 43 AND  48 THEN 0.5594
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 49 AND  60 THEN 0.6120
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 61 AND  72 THEN 0.6538
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 73 AND  84 THEN 0.6930
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 85 AND  96 THEN 0.7214
+					 WHEN DtReferencia = '11DEC2020'd AND QtParcelas BETWEEN 97 AND 120 THEN 0.7639
+					 ELSE TxTirContabil
+					 END
+           ELSE TxTirContabil
+		   END AS TxTirContabil
+    FROM TbDimTaxaMercado;
+RUN;
+
+proc sql;create index chave on TbDimTaxaMercado (CdTipoTaxaMercadoOrigem,DtReferencia,QtParcelas);run;
+
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* ====================================================================================== */
+%PUT #!# FIM ext_taxamercado.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%PUT #!# TEMPO PROCESSAMENTO:   %SYSFUNC(intck(SECOND, &W_ini, %SYSFUNC(datetime())), tod8.);

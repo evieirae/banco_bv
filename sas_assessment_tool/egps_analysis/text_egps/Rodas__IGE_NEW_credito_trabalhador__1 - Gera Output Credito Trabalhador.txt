@@ -1,0 +1,470 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_credito_trabalhador
+FILE_SAS: 1 - Gera Output Credito Trabalhador.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:29 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -2
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 368
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: CONSIG = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: dir_csv, max_dt_bq, mxdtsimu
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.FUNIL_CREDITO_TRAB01, WORK.FUNIL_CREDITO_TRAB03
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TRIBO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.FUNIL_CREDITO_TRAB01, WORK.FUNIL_CREDITO_TRAB03
+TABLE_READ_PROVENANCE (Flow): TRIBO.TBFUNILCREDITOTRAB [DATA Step - SET; PROC EXPORT - DATA=; PROC SQL - FROM], WORK.FUNIL_CREDITO_TRAB01 [DATA Step - SET], WORK.FUNIL_CREDITO_TRAB03 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): TRIBO.TBFUNILCREDITOTRAB
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TRIBO.TBFUNILCREDITOTRAB
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TRIBO.TBFUNILCREDITOTRAB
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./BASE_FUNIL_CREDITO_TRABALHADOR.csv
+TEMP/DISCARDED OUTPUTS: FUNIL_CREDITO_TRAB01, FUNIL_CREDITO_TRAB03, FUNIL_CREDITO_TRAB04, TBLEADTIME, WORK.BASE_FUNIL_CT, WORK.FUNIL_CREDITO_TRAB02
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Gera Output Credadito Trabalhador.sas														| */
+/* | Descricao: Programa para gerar Output Credadito Trabalhador.					| */
+/* | Objetivo: 	Dash Funil Crédito Trabalhador				| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+libname tribo "/riscosbvf/coaching/tribo_veiculos/SAS";
+libname consig "/riscosbv/consignado";
+
+/* ======================================================================================*/
+/* =====================Gera Output Credito Trabalhador=========================*/
+/* ======================================================================================*/
+
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 NOERRORABEND ;
+OPTIONS COMPRESS=BINARY REUSE=YES ;
+
+proc sql print;
+
+select max(dtinclusao_simu)-2 format date9. into :mxdtsimu
+from tribo.TBFUNILCREDITOTRAB;quit;
+
+/*%put &=mxdtsimu;*/
+
+/*%LET mxdtsimu = 01OCT2025;*/
+
+data _null_;
+  length max_dt_bq $19 mxdtsimu $32;
+
+  if symexist('mxdtsimu') then mxdtsimu = symget('mxdtsimu');
+  else mxdtsimu = '';
+
+  if missing(mxdtsimu) then do;
+    max_dt_bq = '2026-02-01 00:00:00';
+  end;
+  else do;
+    d = input(mxdtsimu, date9.);          /* lê como DATE */
+    dt = dhms(d,0,0,0);                   /* converte para DATETIME (00:00:00) */
+    max_dt_bq = tranwrd(put(dt, e8601dt19.), 'T', ' '); /* yyyy-mm-dd hh:mm:ss */
+  end;
+
+  call symputx('max_dt_bq', max_dt_bq, 'G');
+run;
+/*%put &=max_dt_bq;*/
+
+proc sql;
+
+	connect to bigquery as perm
+		(project='bv-saem-dtm'
+		credfile='/projetos/acessos/bq/em/saem-dtm.json'
+		schema='bv-pdbd-prd'
+/*		READ_MODE=off */
+		ALLOW_LARGE_RESULTS=off
+		MAX_CHAR_LEN=100);
+	create table work.base_Funil_CT as
+		select * from
+	connection to perm
+			(
+
+with
+
+  a as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbcontrolestatusjornada`
+        where dtinclusao >=  datetime("&max_dt_bq.")),
+
+  b as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbstatusjornadacreditotrblhdr`),
+
+  c as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbjornadacreditotrabalhador`
+        where dtinclusao >=  datetime("&max_dt_bq.")),
+
+  d as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbdadoproponente`
+        where dtinclusao >=  datetime("&max_dt_bq.")),
+
+  e as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbvinculoempregaticioprpnnte`
+        where dtinclusao >=  datetime("&max_dt_bq.")),
+
+  f as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbdadoempregador`
+        where dtinclusao >=  datetime("&max_dt_bq.")),
+
+  g as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbdadotelefone`
+        where dtinclusao >=  datetime("&max_dt_bq.")),
+
+  h as (
+        select * from `bv-pdbd-prd.trusted_apro3.tbpropostacreditotrabalhador`
+        where dtinclusao >=  datetime("&max_dt_bq.")),
+
+  i as (
+        select * from `bv-pdbd-prd.trusted_negc_rodas.tbparceirocomercial`
+
+        )
+
+            select distinct
+			cast(a.dtinclusao as date) AS dtinclusao_simu,
+			a.dtinclusao AS dticlusao_simu_datetime,
+			cast(a.dtinclusao as string) AS dtinclusao_simu2,
+			c.dtstatusjornada,
+			a.cdjornadacreditotrabalhador,
+			a.cdcontrolestatusjornada,
+			a.cdstatusjornadacreditotrblhdr,
+			c.Pcscoreassinatura,
+			b.sgstatusjornadacreditotrblhdr,
+			case when
+				b.sgstatusjornadacreditotrblhdr = "PROCAD"
+					then 1
+					else 0
+				end
+			as PropostaCadastrada,
+			case when
+				b.sgstatusjornadacreditotrblhdr = "ASSELEREA"
+					then 1
+					else 0
+				end
+			as PropostaCadastradaLegado,
+			case when
+				b.sgstatusjornadacreditotrblhdr = "PAG"
+					then 1
+					else 0
+				end
+			as PropostaPaga,
+			b.dsstatusjornadacreditotrblhdr,
+			c.cdsimulacaoproposta,
+			c.cdparceirocomercial,
+			i.nmsubestruturacomercialc,
+			i.nmareaestruturacomercialc,
+			i.nmparceirocomercial,
+			d.nucpfproponente,
+            e.vrmargemconsignaveldisponivel,
+            e.qtemprestimo,
+			f.nmempregador,
+			f.nucpfcnpjempregador,
+			f.dtinicioatividadeempregador,
+			f.dtinclusao as dtinclusaoempregador,
+			f.dtalteracao as dtalteracoaempregador,
+			f.dslogin as dsloginempregador,
+			f.flativo as flativoempregador,
+			f.cdcnaeempregador,
+			f.tppessoaempregador,
+     		g.nutelefone,
+			h.dtalteracao,
+			h.dtefetivacaoproposta,
+			cast(h.nupropostacreditotrabalhador as string) as nupropostacreditotrabalhador,
+			h.nupropostalegado,
+			CAST(h.nucontrato as string) as nucontrato,
+			h.txcet,
+			h.pciofexcedente,
+			h.txfinanciamento,
+			h.qtparcelaproposta,
+			h.vrperdaestimadaproposta,
+			h.pctir,
+			h.pccomissaooriginacao,
+			h.dtvencimentoultimaparcela,
+			h.vriofdiario,
+			h.vrcomissaototal,
+			h.pcmargemliquida,
+			h.vrmargemliquida,
+			h.txnet,
+			h.vrparcelaproposta,
+			h.cdcondicaofinanciamento,
+			h.qtdiacarencia,
+			h.cdclassificacaoempregador,
+			h.pccomissaototal,
+			h.pcspread,
+			h.vriofexcedente,
+			h.pcjuroremuneratorio,
+			h.cdjornadacreditotrabalhador,
+			h.flativo,
+			h.txpactuadaanualizada,
+			h.vrmargembruta,
+			h.pciofdiario,
+			h.pcpdd,
+			h.vrfinanciamentocreditotrblhdr,
+			h.cdpropostacreditotrabalhador,
+			h.pciof,
+			h.vriof,
+			h.txfinanciamentooriginal,
+			h.txcetanualizada,
+			h.qtmesduracao,
+			h.dtvencimentoprimeiraparcela,
+			h.dslogin,
+			h.pcmulta,
+			h.nupropostalegado,
+			h.dtingestao,
+			h.txpactuadadiaria,
+			h.cdcomissaofinanciamento,
+			h.txpactuada,
+			h.txcetdiaria,
+			h.pccoeficienteaplicado,
+			h.pcperdaestimadaproposta,
+			h.vrpropostacreditotrabalhador,
+			h.pcjuromoratorio,
+			h.vrcomissaooriginacao,
+			h.dtinclusaoanalitico,
+			h.dtalteracaoanalitico,
+			h.dsloginanalitico
+
+                  from a
+
+		      left join b
+			on a.CdStatusJornadaCreditoTrblhdr = b.CdStatusJornadaCreditoTrblhdr
+
+		      left join c
+
+			on a.cdjornadacreditotrabalhador = c.cdjornadacreditotrabalhador
+
+		      left join d
+			on d.cddadoproponente = c.cddadoproponente
+
+		      left join e
+			on e.CdVinculoEmpregaticioPrpnnte = c.CdVinculoEmpregaticioPrpnnte and
+                  e.cddadoproponente = c.cddadoproponente
+
+		      left join f
+			on f.cddadoempregador = e.cddadoempregador
+
+          	  left join g
+			on g.cddadotelefone = c.cddadoproponente
+
+		      left join h
+			on h.cdjornadacreditotrabalhador = CAST(a.cdjornadacreditotrabalhador AS INT64)
+
+		      left join i
+		      on i.cdparceirocomercial = c.cdparceirocomercial);
+	disconnect from perm;
+quit;
+
+PROC SORT DATA=base_Funil_CT
+	OUT=funil_credito_trab01;
+	BY cdjornadacreditotrabalhador  dticlusao_simu_datetime ;
+RUN;
+
+data work.funil_credito_trab02;
+	set work.funil_credito_trab01;
+	by cdjornadacreditotrabalhador dticlusao_simu_datetime ;
+
+	if first.cdjornadacreditotrabalhador then
+		n=1;
+	else n+1;
+run;
+
+data funil_credito_trab03;
+    length status_final $20 cd_status_final $20;
+    set funil_credito_trab02;
+    by cdjornadacreditotrabalhador dticlusao_simu_datetime;
+
+    retain status_final cd_status_final;
+
+    if first.cdjornadacreditotrabalhador then status_final = sgstatusjornadacreditotrblhdr;
+    else do;
+        if sgstatusjornadacreditotrblhdr = "CAN" then
+            status_final = catx("-", status_final, "CAN");
+        else
+            status_final = sgstatusjornadacreditotrblhdr;
+    end;
+
+    if first.cdjornadacreditotrabalhador then cd_status_final = cdstatusjornadacreditotrblhdr;
+    else do;
+        if sgstatusjornadacreditotrblhdr = "CAN" then
+            cd_status_final = catx(".",cd_status_final, cdstatusjornadacreditotrblhdr);
+        else
+            cd_status_final = cdstatusjornadacreditotrblhdr;
+    end;
+run;
+
+proc sql;
+  create table TbLeadtime as
+  select
+  	  dt_penele format datetime25.6,
+      cdjornadacreditotrabalhador,
+      intck('second', dt_penele, dt_procad) as Leadtime_Penele_Procad,
+	  intck('second', dt_procad, dt_pag) as Leadtime_Procad_Pag
+  from
+  (
+    select
+	    cdjornadacreditotrabalhador,
+        min(case when sgstatusjornadacreditotrblhdr='PENELE'
+                 then dticlusao_simu_datetime end) as dt_penele,
+        min(case when sgstatusjornadacreditotrblhdr='PROCAD'
+                 then dticlusao_simu_datetime end) as dt_procad,
+	   	min(case when sgstatusjornadacreditotrblhdr='PAG'
+     			 then dticlusao_simu_datetime end) as dt_pag
+    from work.funil_credito_trab03
+    group by cdjornadacreditotrabalhador
+  );
+quit;
+
+proc sql;
+
+create table funil_credito_trab04 as
+		Select
+			a.status_final,
+			a.cd_status_final,
+			a.dtinclusao_simu,
+			a.dticlusao_simu_datetime,
+			input(a.dtinclusao_simu2, anydttme32.) as dtinclusao_simu2 format=TIME8. ,
+			a.dtstatusjornada,
+			a.cdjornadacreditotrabalhador,
+			a.cdcontrolestatusjornada,
+			a.cdstatusjornadacreditotrblhdr,
+			a.Pcscoreassinatura,
+			a.sgstatusjornadacreditotrblhdr,
+			a.PropostaCadastrada,
+			a.PropostaCadastradaLegado,
+			a.PropostaPaga,
+			a.dsstatusjornadacreditotrblhdr,
+			a.cdsimulacaoproposta,
+			a.cdparceirocomercial,
+			a.nmsubestruturacomercialc,
+			a.nmareaestruturacomercialc,
+			a.nmparceirocomercial,
+			a.nucpfproponente,
+			a.vrmargemconsignaveldisponivel,
+			a.qtemprestimo,
+			a.nmempregador,
+			a.nucpfcnpjempregador,
+			a.dtinicioatividadeempregador,
+			a.dtinclusaoempregador,
+			a.dtalteracoaempregador,
+			a.dsloginempregador,
+			a.flativoempregador,
+			a.cdcnaeempregador,
+			a.tppessoaempregador,
+			a.nutelefone,
+			a.dtalteracao,
+			a.dtefetivacaoproposta,
+			a.nupropostacreditotrabalhador,
+			a.nupropostalegado,
+			a.nucontrato,
+			a.txcet,
+			a.pciofexcedente,
+			a.txfinanciamento,
+			a.qtparcelaproposta,
+			a.vrperdaestimadaproposta,
+			a.pctir,
+			a.pccomissaooriginacao,
+			a.dtvencimentoultimaparcela,
+			a.vriofdiario,
+			a.vrcomissaototal,
+			a.pcmargemliquida,
+			a.vrmargemliquida,
+			a.txnet,
+			a.vrparcelaproposta,
+			a.cdcondicaofinanciamento,
+			a.qtdiacarencia,
+			a.cdclassificacaoempregador,
+			a.pccomissaototal,
+			a.pcspread,
+			a.vriofexcedente,
+			a.pcjuroremuneratorio,
+			a.cdjornadacreditotrabalhador_1,
+			a.flativo,
+			a.txpactuadaanualizada,
+			a.vrmargembruta,
+			a.pciofdiario,
+			a.pcpdd,
+			a.vrfinanciamentocreditotrblhdr,
+			a.cdpropostacreditotrabalhador,
+			a.pciof,
+			a.vriof,
+			a.txfinanciamentooriginal,
+			a.txcetanualizada,
+			a.qtmesduracao,
+			a.dtvencimentoprimeiraparcela,
+			a.dslogin,
+			a.pcmulta,
+			a.nupropostalegado_1,
+			a.dtingestao,
+			a.txpactuadadiaria,
+			a.cdcomissaofinanciamento,
+			a.txpactuada,
+			a.txcetdiaria,
+			a.pccoeficienteaplicado,
+			a.pcperdaestimadaproposta,
+			a.vrpropostacreditotrabalhador FORMAT COMMAX12.2,
+			a.pcjuromoratorio,
+			a.vrcomissaooriginacao,
+			a.dtinclusaoanalitico,
+			a.dtalteracaoanalitico,
+			b.Leadtime_Penele_Procad,
+			b.Leadtime_Procad_Pag,
+			a.dsloginanalitico,
+			n
+		  	from funil_credito_trab03 a
+			left join TbLeadtime b
+			on a.dticlusao_simu_datetime = b.dt_penele and
+			a.cdjornadacreditotrabalhador = b.cdjornadacreditotrabalhador and
+			a.cdstatusjornadacreditotrblhdr ="1";
+quit;
+
+PROC SQL;
+/*create table temp as */
+delete  * FROM TRIBO.TbFunilCreditoTrab
+WHERE dtinclusao_simu >= "&mxdtsimu."d;quit;
+
+data TRIBO.TbFunilCreditoTrab (COMPRESS=yes);
+set
+	TRIBO.TbFunilCreditoTrab
+	funil_credito_trab04;RUN;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= TRIBO.TbFunilCreditoTrab
+		OUTFILE="&dir_csv./BASE_FUNIL_CREDITO_TRABALHADOR.csv" REPLACE
+		DBMS=DLM;
+	DELIMITER=';';
+RUN;

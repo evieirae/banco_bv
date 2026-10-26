@@ -1,0 +1,245 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__06. Rolagens_3040_Darwin
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:31 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -28
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 161
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: DELETE, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: B_GERAL = /riscosbv/cobranca/malmeida; ESTUDOS2 = /riscosbvf/indicadores/Estudos_2; SATIE = /riscosbv/cobranca/satie
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SAFRA, SAFRA_M1, SAFRA_M2
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: SAFRA, SAFRA_M1, SAFRA_M2
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): ESTUDOS2.CARTAO3040_DARWIN_&SAFRA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: ESTUDOS2
+EXPORTED_LIBNAMES: TOTAL_&SAFRA
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): ESTUDOS2.CARTAO3040_DARWIN_&SAFRA [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TOTAL_&SAFRA._3
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CART_BANKLY_F2_&SAFRA, CART_BANKLY_F_&SAFRA, CART_TOTAL_2025, CART_TOTAL_2025_2, CART_TOTAL_2025_3, CART_TOTAL_2025_4, CUBO_2025, TOTAL_&SAFRA
+DYNAMIC REFS (Ambiguous): ESTUDOS2.CARTAO3040_DARWIN_{SAFRA}
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Rolagens_3040 */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 43 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Rolagens_3040 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ujP6z15qNdALnDju/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME ESTUDOS2 	BASE '/riscosbvf/indicadores/Estudos_2';
+LIBNAME B_GERAL 	BASE '/riscosbv/cobranca/malmeida';
+LIBNAME SATIE	 	BASE '/riscosbv/cobranca/satie';
+
+
+
+
+
+%MACRO BANKLY(SAFRA);
+
+DATA CART_BANKLY_F2_&SAFRA. 			(KEEP = cd2 DiaAtraso ClassOp mod saldo Contrt);
+SET ESTUDOS2.CARTAO3040_DARWIN_&SAFRA.	(KEEP = cd DiaAtraso ClassOp mod saldo Contrt);
+cd2 = INPUT(cd,best15.);
+
+WHERE ClassOp NE 'HH' AND mod NE '1904'
+
+;RUN;
+
+DATA CART_BANKLY_F_&SAFRA. 				(KEEP = cd DiaAtraso ClassOp mod saldo Contrt);
+SET CART_BANKLY_F2_&SAFRA.;
+cd = cd2
+
+;RUN;
+
+%MEND;
+%BANKLY(202501);
+%BANKLY(202502);
+%BANKLY(202503);
+%BANKLY(202504);
+%BANKLY(202505);
+%BANKLY(202506);
+%BANKLY(202507);
+%BANKLY(202508);
+%BANKLY(202509);
+%BANKLY(202510);
+%BANKLY(202511);
+%BANKLY(202512);
+
+
+
+
+
+%MACRO BANKLY(SAFRA,SAFRA_M1,SAFRA_M2);
+
+DATA TOTAL_&SAFRA.;
+SET CART_BANKLY_F_&SAFRA.
+;RUN;
+
+DATA TOTAL_&SAFRA._3;
+SET TOTAL_&SAFRA.;
+
+SAFRA = &SAFRA.;
+SAFRA_M1 = &SAFRA_M1.;
+SAFRA_M2 = &SAFRA_M2.;
+
+RUN;
+
+PROC DELETE DATA=TOTAL_&SAFRA.;
+
+%MEND;
+%BANKLY(202501,202502,202503);
+%BANKLY(202502,202503,202504);
+%BANKLY(202503,202504,202505);
+%BANKLY(202504,202505,202506);
+%BANKLY(202505,202506,202507);
+%BANKLY(202506,202507,202508);
+%BANKLY(202507,202508,202509);
+%BANKLY(202508,202509,202510);
+%BANKLY(202509,202510,202511);
+%BANKLY(202510,202511,202512);
+%BANKLY(202511,202512,202601);
+%BANKLY(202512,202601,202602);
+
+DATA CART_TOTAL_2025;
+SET TOTAL_202:
+;RUN;
+
+PROC SQL;
+CREATE TABLE CART_TOTAL_2025_2 AS
+
+SELECT DISTINCT  Safra
+				,Safra_M1
+				,Safra_M2
+				,Cd
+				,MAX (DiaAtraso) AS atraso
+				,SUM (Saldo) AS saldo
+
+FROM CART_TOTAL_2025
+GROUP BY 1,2,3,4
+;QUIT;
+
+DATA CART_TOTAL_2025_3;
+SET CART_TOTAL_2025_2;
+
+LENGTH fx_atraso_cont    $20.;
+LENGTH fx_atraso_cont2 	 $20.;
+
+IF atraso <=   0  OR atraso = . THEN fx_atraso_cont= '01 - EM DIA'; ELSE
+IF atraso <=  14                THEN fx_atraso_cont= '02 - 0001 A 0014'; ELSE
+IF atraso <=  30                THEN fx_atraso_cont= '03 - 0015 A 0030'; ELSE
+IF atraso <=  60                THEN fx_atraso_cont= '04 - 0031 A 0060'; ELSE
+IF atraso <=  90                THEN fx_atraso_cont= '05 - 0061 A 0090'; ELSE
+IF atraso <= 120                THEN fx_atraso_cont= '06 - 0091 A 0120'; ELSE
+IF atraso <= 150                THEN fx_atraso_cont= '07 - 0121 A 0150'; ELSE
+IF atraso <= 180                THEN fx_atraso_cont= '08 - 0151 A 0180'; ELSE
+IF atraso <= 210                THEN fx_atraso_cont= '09 - 0181 A 0210'; ELSE
+IF atraso <= 240                THEN fx_atraso_cont= '10 - 0211 A 0240'; ELSE
+IF atraso <= 270                THEN fx_atraso_cont= '11 - 0241 A 0270'; ELSE
+IF atraso <= 300                THEN fx_atraso_cont= '12 - 0271 A 0300'; ELSE
+IF atraso <= 330                THEN fx_atraso_cont= '13 - 0301 A 0330'; ELSE
+IF atraso <= 360                THEN fx_atraso_cont= '14 - 0331 A 0360'; ELSE
+IF atraso <= 390                THEN fx_atraso_cont= '15 - 0361 A 0390'; ELSE
+IF atraso <= 420                THEN fx_atraso_cont= '16 - 0391 A 0420'; ELSE
+IF atraso <= 450                THEN fx_atraso_cont= '17 - 0421 A 0450'; ELSE
+IF atraso <= 480                THEN fx_atraso_cont= '18 - 0451 A 0480'; ELSE
+IF atraso <= 510                THEN fx_atraso_cont= '19 - 0481 A 0510'; ELSE
+IF atraso <= 540                THEN fx_atraso_cont= '20 - 0511 A 0540'; ELSE
+                                     fx_atraso_cont= '21 - WO';
+
+IF atraso <=   0  OR atraso = . THEN fx_atraso_cont2= '01 - EM DIA'; ELSE
+IF atraso <=  30                THEN fx_atraso_cont2= '02 - 0001 A 0030'; ELSE
+IF atraso <=  60                THEN fx_atraso_cont2= '03 - 0031 A 0060'; ELSE
+IF atraso <=  90                THEN fx_atraso_cont2= '04 - 0061 A 0090'; ELSE
+IF atraso <= 120                THEN fx_atraso_cont2= '05 - 0091 A 0120'; ELSE
+IF atraso <= 150                THEN fx_atraso_cont2= '06 - 0121 A 0150'; ELSE
+IF atraso <= 180                THEN fx_atraso_cont2= '07 - 0151 A 0180'; ELSE
+IF atraso <= 210                THEN fx_atraso_cont2= '08 - 0181 A 0210'; ELSE
+IF atraso <= 240                THEN fx_atraso_cont2= '09 - 0211 A 0240'; ELSE
+IF atraso <= 270                THEN fx_atraso_cont2= '10 - 0241 A 0270'; ELSE
+IF atraso <= 300                THEN fx_atraso_cont2= '11 - 0271 A 0300'; ELSE
+IF atraso <= 330                THEN fx_atraso_cont2= '12 - 0301 A 0330'; ELSE
+IF atraso <= 360                THEN fx_atraso_cont2= '13 - 0331 A 0360'; ELSE
+IF atraso <= 390                THEN fx_atraso_cont2= '14 - 0361 A 0390'; ELSE
+IF atraso <= 420                THEN fx_atraso_cont2= '15 - 0391 A 0420'; ELSE
+IF atraso <= 450                THEN fx_atraso_cont2= '16 - 0421 A 0450'; ELSE
+IF atraso <= 480                THEN fx_atraso_cont2= '17 - 0451 A 0480'; ELSE
+IF atraso <= 510                THEN fx_atraso_cont2= '18 - 0481 A 0510'; ELSE
+IF atraso <= 540                THEN fx_atraso_cont2= '19 - 0511 A 0540'; ELSE
+                                     fx_atraso_cont2= '20 - WO';
+
+IF atraso >  30 AND atraso <= 360 THEN saldo_over30 = saldo; ELSE saldo_over30 = 0;
+IF atraso >  90 AND atraso <= 360 THEN saldo_over90 = saldo; ELSE saldo_over90 = 0;
+IF atraso <= 360 OR atraso = .    THEN saldo_ativo  = saldo; ELSE saldo_ativo  = 0;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE CART_TOTAL_2025_4 AS
+SELECT DISTINCT
+A.*
+,B.Atraso AS AtrasoAnterior
+,CASE WHEN B.fx_atraso_cont  IN ('') THEN '01 - EM DIA' ELSE B.fx_atraso_cont  END AS fx_atraso_anterior
+,CASE WHEN B.fx_atraso_cont2 IN ('') THEN '01 - EM DIA' ELSE B.fx_atraso_cont2 END AS fx_atraso_anterior2
+
+,CASE WHEN A.fx_atraso_cont =  B.fx_atraso_cont THEN 'Manutenção'
+	  WHEN A.fx_atraso_cont <> B.fx_atraso_cont AND A.Atraso < B.Atraso THEN 'Retrocesso'
+	  WHEN A.fx_atraso_cont <> B.fx_atraso_cont AND A.Atraso > B.Atraso THEN 'Rolagem Pura'
+	  ELSE 'Rolagem Pura' END AS StatusRolagem
+
+,CASE WHEN A.fx_atraso_cont2 =  B.fx_atraso_cont2 THEN 'Manutenção'
+	  WHEN A.fx_atraso_cont2 <> B.fx_atraso_cont2 AND A.Atraso < B.Atraso THEN 'Retrocesso'
+	  WHEN A.fx_atraso_cont2 <> B.fx_atraso_cont2 AND A.Atraso > B.Atraso THEN 'Rolagem Pura'
+	  ELSE 'Rolagem Pura' END AS StatusRolagem2
+
+FROM CART_TOTAL_2025_3 AS A
+LEFT JOIN CART_TOTAL_2025_3 AS B ON A.Cd = B.Cd AND A.Safra = B.Safra_M1
+;QUIT;
+
+PROC SQL;
+CREATE TABLE CUBO_2025 AS
+SELECT DISTINCT SAFRA
+				,fx_atraso_cont
+				,fx_atraso_cont2
+				,fx_atraso_anterior
+				,fx_atraso_anterior2
+				,StatusRolagem
+				,StatusRolagem2
+				,COUNT(DISTINCT(cd)) 	AS COUNT_DISTINCT_of_cd
+				,SUM(saldo) 			AS SUM_of_saldo
+ 				,SUM(saldo_over30) 		AS SUM_of_saldo_over30
+				,SUM(saldo_over90) 		AS SUM_of_saldo_over90
+				,SUM(saldo_ativo) 		AS SUM_of_saldo_ativo
+FROM CART_TOTAL_2025_4
+GROUP BY 1,2,3,4,5,6,7
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Rolagens_3040 */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

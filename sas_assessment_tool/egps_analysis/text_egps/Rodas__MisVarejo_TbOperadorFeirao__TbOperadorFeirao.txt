@@ -1,0 +1,147 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_TbOperadorFeirao
+FILE_SAS: TbOperadorFeirao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 76
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: base
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBEXTCONTRATO [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBEXTCONTRATO [PROC SQL - JOIN], BASES.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/output/contratos_operadorfeirao.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/contratos_operadorfeirao.csv
+TEMP/DISCARDED OUTPUTS: EMAIL, TBCONTRATOSOPERADORFEIRAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/output/contratos_operadorfeirao.csv
+
+END_METADATA
+================================================================================
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+data _null_;
+
+dtmesant = intnx('month',today(),-1);
+
+base = year(intnx('month',today(),-1))*100+month(intnx('month',today(),-1));
+
+call symput('base',compress(base));
+
+select;
+	when (month(dtmesant) = 1) call symput('mes','Janeiro');
+	when (month(dtmesant) = 2) call symput('mes','Fevereiro');
+	when (month(dtmesant) = 3) call symput('mes','Março');
+	when (month(dtmesant) = 4) call symput('mes','Abril');
+	when (month(dtmesant) = 5) call symput('mes','Maio');
+	when (month(dtmesant) = 6) call symput('mes','Junho');
+	when (month(dtmesant) = 7) call symput('mes','Julho');
+	when (month(dtmesant) = 8) call symput('mes','Agosto');
+	when (month(dtmesant) = 9) call symput('mes','Setembro');
+	when (month(dtmesant) = 10) call symput('mes','Outubro');
+	when (month(dtmesant) = 11) call symput('mes','Novembro');
+	otherwise call symput('mes','Dezembro');
+end;
+
+run;
+
+%put &base ;run;
+
+PROC SQL;
+CREATE TABLE TbContratosOperadorFeirao AS
+SELECT Producao.NuContrato
+	,Contratos.NuContratoLegado
+	,Producao.DtContrato
+	,Producao.DsTipoCanalProducao
+	,Producao.NmColaborador
+	,Producao.VrProducao format commax18.0
+	,Case when Producao.FlBVMais ge 1 then 'Sim' else 'Não' end as FlBvMais
+	,Case when Producao.FlCap ge 1 then 'Sim' else 'Não' end as FlCap
+	,Case when Producao.FlDemais ge 1 then 'Sim' else 'Não' end as FlDemais
+
+FROM BASES.TbProducao Producao
+	LEFT JOIN bases.TbExtContrato Contratos
+		ON Producao.NuContrato = Contratos.NuContrato
+WHERE Producao.CdFilial = 276
+	AND Producao.NuAnoMes = &base.
+ORDER BY DtContrato
+;RUN;
+
+/*EXPORTA RESULTADO*/
+
+PROC EXPORT
+		DATA=TbContratosOperadorFeirao
+		OUTFILE="/riscosbvf/BA/processos/output/contratos_operadorfeirao.csv"
+		DBMS=DLM
+		REPLACE;
+		DELIMITER=";";
+		PUTNAMES=YES;
+RUN;
+
+data email;
+
+OPTIONS
+	EMAILHOST=smtprelay.bvnet.bv
+	EMAILPORT=25
+	EMAILAUTHPROTOCOL=NONE
+	EMAILID="MISVarejo@bv.com.br";
+
+FILENAME MAIL EMAIL
+CONTENT_TYPE="text/html"
+attach=('/riscosbvf/BA/processos/output/contratos_operadorfeirao.csv' ct = 'binary/application')
+TO=("rafael.marino@bv.com.br")
+CC=("MISVarejo@bv.com.br")
+
+SUBJECT="Contratos Operador Feirão";
+
+ods html3
+body=MAIL
+style=HTMLBlue
+rs=none;
+
+ods text="Olá!";
+ods text=' ';
+ods text="Segue a base com os contratos com códigos do operador feirão.";
+ods text=' ';
+ods text='Esta é uma mensagem automática. Em caso de dúvidas e problemas entre em contato com o grupo MISVarejo.';
+ods text=' ';
+ods text='Att,';
+ods text=' ';
+ods text='MIS Varejo';
+ods text='Email: MISVarejo@bv.com.br';
+
+ods html3 close;
+
+run;

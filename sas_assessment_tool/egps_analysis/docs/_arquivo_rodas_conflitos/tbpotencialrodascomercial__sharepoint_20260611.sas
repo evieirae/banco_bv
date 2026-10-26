@@ -1,0 +1,1159 @@
+/* ====================================================================================== 	| */
+/* |	Atualizacao:	08/11/2022  														| */
+/* |	Responsavel: Gustavo Domingues (MIS IGE)                      					 	| */
+/* |	Alt. Realizada:	Incluido nova clausula "OR" no where da TbClassificacaoRiscosPDVs	| */
+/* ====================================================================================== 	| */
+/* |	AlteraÃƒÂ§ÃƒÂ£o:	Alteradao lib do step 'TbConversaoSimulacoes' DE 'Funil' para 'CRM'		| */
+/* |	Resp: 		Gustavo Domingues - MIS IGE												| */
+/* |	Data:		02/03/2023																| */
+/* ====================================================================================== 	| */
+/* |	AlteraÃƒÂ§ÃƒÂ£o:	Tratamento de encarteiramento do C2C DRYVE                       		| */
+/* |	Resp: 		Bruno Neves - MIS Varejo												| */
+/* |	Data:		19/09/2023																| */
+/* ====================================================================================== 	| */
+/* |	AlteraÃƒÂ§ÃƒÂ£o:	inluido coluna de locadoras					                      		| */
+/* |	Resp: 		Gustavo Domingues - MIS IGE													| */
+/* |	Data:		09/09/2024																| */
+/* ====================================================================================== 	| */
+/* |	AlteraÃƒÂ§ÃƒÂ£o:	Alterar critÃƒÂ©rio de 'Apto a Descadastramento' de 4 para 6 meses				                      		| */
+/* |	Resp: 		FlÃƒÂ¡vio Pereira - MIS IGE													| */
+/* |	Data:		27/08/2025																| */
+/* ====================================================================================== 	| */
+
+
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+libname crm '/riscosbvf/CRM/comp_total';
+%include '/infogrc/utils/all-includes.sas';
+
+
+PROC SQL;
+CREATE TABLE TbClassificacaoRiscosPDVs AS 
+SELECT 
+
+	NmArquivo	
+	,NuAnoMes	
+	,CdLoja	
+	,CdFilialC	
+	,CASE WHEN ClassFinal = '' then 'IntermediÃƒÂ¡rio' else ClassFinal end	AS DsClassificacaoRiscos
+	,DtAtualizacao
+
+FROM basegrc.TbClassificacaoRiscosPDVs
+;Run;
+
+proc sort data=TbClassificacaoRiscosPDVs nodupkey; by CdLoja;run;
+
+
+proc sql;
+create table TbMetaCartParceiro as
+select distinct NuAnoMes
+,CdParceiroComercial
+,produto
+,DsLoginN1
+,DsLoginN2A
+,DsLoginN3A
+from Basegrc.TBMETANAOISONOMICA
+where nuanomes >=202304
+AND CdParceiroComercial <> 414921
+;run;
+
+PROC SQL;
+CREATE TABLE TbMetaCartParceiroDryve AS
+select distinct NuAnoMes
+		,CdParceiroComercial
+		,produto
+		,DsLoginN1
+		,DsLoginN2A
+		,DsLoginN3A
+  FROM
+    BASEGRC.TbMetaNaoisonomica
+  WHERE
+  	nuanomes >=202304
+    AND DsLoginN1 IS NOT NULL
+  	AND CdParceiroComercial = 414921 
+;RUN;
+
+
+/* MaracaÃƒÂ§ÃƒÂ£o da falta de produÃƒÂ§ÃƒÂ£o para inativaÃƒÂ§ÃƒÂ£o do PDV*/
+/* Guta 11/01/2024*/
+
+proc sql;
+CREATE TABLE TbFlag AS
+SELECT
+		 CdParceiroComercial
+		,CASE 
+			WHEN SUM(PotencialRodas.QtContrato)>=1 THEN 'Com contrato BV' 
+				ELSE 'Sem Contrato BV' END AS flagContratoBV
+		,CASE
+			WHEN SUM(PotencialRodas.QtGravamesMercado)>=1 THEN 'Com Gravame Mercado'
+				ELSE 'Sem Gravame Mercado' END AS FlagGravameMerc
+
+
+FROM tmp.TbPotencialRodas PotencialRodas
+
+WHERE NuAnoMes >= &safraM6.
+
+AND CdParceiroComercial <> .
+
+GROUP BY CdParceiroComercial
+
+;run;
+
+/* ======================================================== */
+/* ================ ParceiroComercial ================== */
+/* ======================================================== */
+
+PROC SQL;
+CREATE TABLE ParceiroComercial AS 
+SELECT 
+	TbParceiroComercial.CdParceiroComercial
+	,TbParceiroComercial.NmParceiroComercial
+	,TbParceiroComercial.NmGrupoConcessionaria
+	,TbParceiroComercial.NmBandeiraGrupoConcessionaria
+
+	,TbRenave.Renave
+
+	,CASE WHEN TbParceiroComercial.PredominanciaProduto = 'Motos' THEN  FlPorteNovoMotos ELSE FlPorteA END as FlPorteA
+	,TbParceiroComercial.PredominanciaProduto
+	,TbParceiroComercial.DsGrupoParceiroLocadoras
+	,TbParceiroComercial.NmAutoShopping
+	,NmCidade
+	,CdUF
+	,NmBairro
+	,NmLogradouro
+	,NuEndereco
+	,CdCep
+	,FlSeguradora
+FROM tmp.TbParceiroComercial TbParceiroComercial
+	left join basegrc.TbPortepdv PortePDV
+		on TbParceiroComercial.NuCnpjLoja = PortePDV.NuCnpjLoja
+		AND PortePDV.NuAno = year(today()) 
+
+	LEFT JOIN basegrc.TbRenave TbRenave
+		ON TbParceiroComercial.CdParceiroComercial = TbRenave.CdParceiroComercial
+/*WHERE FlAtivo = 'S'*/
+;run;
+
+
+PROC SQL;
+CREATE TABLE TbLevesNovosBVO AS 
+SELECT 
+	CdParceiroComercial	
+	,NuAnoMes
+	,'SIM' AS FlagBVO
+FROM BASEGRC.TbLevesNovosBVO
+;run;
+
+
+PROC SQL;
+CREATE TABLE BASE_PDV_DEDICADO_ZERO AS
+SELECT
+
+a.NuCnpjLoja,
+
+sum(CASE WHEN FxIdade = 'ZeroKM' then A.QtGravamesMercado ELSE 0 END) AS QtGravames_Zero format commax20.2,
+
+sum(QtGravamesMercado) as QtGravames_Total format commax20.2,
+
+calculated QtGravames_Zero / calculated QtGravames_Total as Perc_Zero format percent9.2,
+
+ CASE WHEN CALCULATED Perc_Zero >= 0.3 THEN 1 ELSE 0 
+	 END AS PDV_ZERO
+
+FROM TMP.TBPOTENCIALRODAS A
+
+WHERE 1=1
+AND NUANOMES BETWEEN &safraM6. AND &safraM0.
+GROUP BY a.NuCnpjLoja
+order by 2 desc
+;RUN;
+
+proc sort data=BASE_PDV_DEDICADO_ZERO nodupkey dupout=dup_ out=BASE_PDV_DEDICADO_ZERO; 
+by NuCnpjLoja
+;run;
+
+/* ======================================================== */
+/* ================ Dash Cetip Potencial ================== */
+/* ======================================================== */
+
+proc sql;
+CREATE TABLE TbPotencialComercial AS 
+	SELECT
+		 PotencialRodas.NuAnoMes
+		,PotencialRodas.NmGrupoProduto
+		,PotencialRodas.FlRefin
+		,PotencialRodas.FxIdade
+		,PotencialRodas.NuCnpjLoja
+		,PotencialRodas.CdParceiroComercial
+		,case 
+			when PotencialRodas.CdParceiroComercial is not null then CATS(PotencialRodas.CdParceiroComercial,' - ',PotencialRodas.NmLoja)
+			else PotencialRodas.NmLoja 
+		end as NmLoja
+		,case 
+			when PotencialRodas.FlAtivo = 'S' then 'ATIVO'
+			when PotencialRodas.FlAtivo = 'N' then 'INATIVO'
+		end as FlAtivo
+
+		,datepart(PotencialRodas.DtCadastro) AS DtCadastro FORMAT DDMMYY10.
+		,datepart(PotencialRodas.DtUltimaAtualizacao) AS DtUltimaAtualizacao FORMAT DDMMYY10.
+
+		,COALESCE(PotencialRodas.NmCidade,ParceiroComercial.NmCidade) AS NmCidade
+		,COALESCE(PotencialRodas.CdUf,ParceiroComercial.CdUF) AS CdUf
+
+		,ParceiroComercial.NmBairro
+		,ParceiroComercial.NmLogradouro
+		,ParceiroComercial.NuEndereco
+		,ParceiroComercial.CdCep
+		,ParceiroComercial.FlSeguradora
+
+
+
+		,PotencialRodas.NmTipoParceiroComercial
+
+		,ParceiroComercial.FlPorteA
+		,COALESCE(PotencialRodas.DsClassificacaoA, 'Classificacao NÃƒÂ£o informada') AS DsClassificacaoA
+/*		,ClassificacaoRiscosPDVs.DsClassificacaoRiscos*/
+		,CASE WHEN ClassificacaoRiscosPDVs.DsClassificacaoRiscos = '' then 'C' else DsClassificacaoRiscos end	AS DsClassificacaoRiscos
+
+		,PotencialRodas.DsCategoriaVeiculo
+
+		,PotencialRodas.TpCnae
+		,PotencialRodas.DsLoginN1C
+		,PotencialRodas.DsLoginN2C
+		,PotencialRodas.DsLoginN3C
+		,PotencialRodas.NmColaboradorC
+		,PotencialRodas.NmAreaEstruturaComercialC
+		,PotencialRodas.NmSubEstruturaComercialC
+		,PotencialRodas.NmCanalEstruturaComercialC
+		,ParceiroComercial.NmGrupoConcessionaria
+		,PotencialRodas.PredominanciaProduto
+		,ParceiroComercial.DsGrupoParceiroLocadoras as Locadora
+		,ParceiroComercial.NmAutoShopping
+
+		,ParceiroComercial.Renave
+
+		,TbLevesNovosBVO.FlagBVO
+		,ColaboradorFocal.LstColaboradorFocal
+		,PotencialRodas.LstSubstituicaoC
+		,PotencialRodas.QtBancos
+		,PotencialRodas.RankingCliente
+		,PotencialRodas.QtCorridosDiaUtilCetip
+		,PotencialRodas.DtAtualizacao
+		,PotencialRodas.DtAtualizacaoCetip 
+		,case 
+			when PotencialRodas.DsTendenciaMktShare = 'queda' and PotencialRodas.DsGrupoControle = 'controle' then PotencialRodas.DsTendenciaMktShare 
+		end as DsTendenciaMktShare
+		,coalesce(cartniDryve.DsLoginN1,TbMetaCartParceiro.DsLoginN1) as DsLoginN1Cart
+        ,coalesce(cartniDryve.DsLoginN2A,TbMetaCartParceiro.DsLoginN2A) as DsLoginN2ACart
+        ,coalesce(cartniDryve.DsLoginN3A,TbMetaCartParceiro.DsLoginN3A) as DsLoginN3ACart
+		,flagContratoBV
+		,FlagGravameMerc
+		,case when PdvZero.PDV_ZERO 	= 1 then 'ZeroKM' else 'Demais' end as PredominanciaParceiro
+		,sum(PotencialRodas.QtPropostaOriginada) AS QtPropostaOriginada format 18.
+		,sum(PotencialRodas.VrPropostaOriginada) AS VrPropostaOriginada format 18.2
+		,sum(PotencialRodas.QtPropostaAprovada) AS QtPropostaAprovada format 18.
+		,sum(PotencialRodas.VrPropostaAprovada) AS VrPropostaAprovada format 18.2
+		,sum(PotencialRodas.QtPropostaEfetivada) AS QtPropostaEfetivada format 18.
+		,sum(PotencialRodas.QtPropostaAPNP) AS QtPropostaAPNP format 18.
+		,sum(PotencialRodas.VrPropostaAPNP) AS VrPropostaAPNP format 18.2
+		,sum(PotencialRodas.QtContrato) AS QtContratoBV format  18.
+		,sum(PotencialRodas.VrProducao) AS VrProducaoBV format  18.2
+		,sum(PotencialRodas.QtGravamesMercado) AS QtGravamesMercado format  18.
+		,sum(PotencialRodas.VrGravamesMercado) AS VrGravamesMercado format 18.2
+		,sum(PotencialRodas.VrMargem) AS VrMargem format 18.2
+		,sum(PotencialRodas.VrComissaoTotal) AS VrComissaoTotal format 18.2
+		,sum(PotencialRodas.VpRoe) AS VrRoePonderado format 18.2
+		,sum(PotencialRodas.VpTxGerencialProducao) AS VpTxGerencialProducao format 18.2
+	
+	FROM tmp.TbPotencialRodas PotencialRodas
+		
+		LEFT JOIN basegrc.TbColaboradorFocal ColaboradorFocal
+			ON  PotencialRodas.CdFilialC = ColaboradorFocal.CdFilial
+		    AND PotencialRodas.NmGrupoProduto = ColaboradorFocal.NmGrupoProdutoMeta
+
+		LEFT JOIN TbClassificacaoRiscosPDVs ClassificacaoRiscosPDVs
+			ON PotencialRodas.CdParceiroComercial = ClassificacaoRiscosPDVs.CdLoja
+
+		left join TbMetaCartParceiro TbMetaCartParceiro
+		on TbMetaCartParceiro.nuanomes = PotencialRodas.nuanomes
+		and TbMetaCartParceiro.cdparceirocomercial = PotencialRodas.cdparceirocomercial
+		and TbMetaCartParceiro.produto=PotencialRodas.NmGrupoProduto
+
+		LEFT JOIN TbMetaCartParceiroDryve cartniDryve
+		on cartniDryve.nuanomes = PotencialRodas.nuanomes
+		and cartniDryve.cdparceirocomercial = PotencialRodas.cdparceirocomercial
+		and cartniDryve.produto=PotencialRodas.NmGrupoProduto
+
+		Left join TbFlag FL on FL.cdparceirocomercial=PotencialRodas.CdParceiroComercial
+
+		
+		LEFT JOIN ParceiroComercial ParceiroComercial
+			ON PotencialRodas.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+		LEFT JOIN TbLevesNovosBVO TbLevesNovosBVO
+			ON PotencialRodas.CdParceiroComercial = TbLevesNovosBVO.CdParceiroComercial
+			AND PotencialRodas.NuAnoMes = TbLevesNovosBVO.NuAnoMes
+
+		LEFT JOIN BASE_PDV_DEDICADO_ZERO PdvZero
+			ON 	PotencialRodas.NuCnpjLoja = PdvZero.NuCnpjLoja
+			
+	WHERE PotencialRodas.NuAnoMes >= &SafraM13.
+		AND FlAtualizacaoMercado = 1
+
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
+			 26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50
+;quit;
+
+PROC SQL;
+CREATE TABLE TbPotencial1 AS
+SELECT 1 AS TpBase, * FROM TbPotencialComercial ;RUN;
+
+PROC SQL;
+CREATE TABLE TbPotencial2 AS
+SELECT 2 AS TpBase, * FROM TbPotencialComercial ;RUN;
+
+DATA tmp.TbPotencialComercial; 
+SET TbPotencial1 TbPotencial2;RUN;
+
+proc export 
+data=tmp.TbPotencialComercial
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbPotencialComercial.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+/**/
+/*proc export */
+/*data=TbPotencialComercial*/
+/*file='/riscosbvf/BA/processos/output/TbPotencialComercial.csv' replace*/
+/*dbms=dlm;*/
+/*delimiter=';';*/
+/*run;*/
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbPotencialComercial.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";
+
+
+/* ======================================================== */
+/* =================== Mapa Cetip ====================== */
+/* ======================================================== */
+
+
+PROC SQL;
+CREATE TABLE TbMapaPotencial AS 
+SELECT 
+	 PotencialRodas.NuAnoMes
+	,PotencialRodas.CdParceiroComercial
+	,PotencialRodas.NmLoja
+	,PotencialRodas.FlAtivo
+	,PotencialRodas.NmCidade
+	,PotencialRodas.CdUf
+	,PotencialRodas.NmBairro
+	,PotencialRodas.NmLogradouro
+	,PotencialRodas.NuEndereco
+	,PotencialRodas.CdCep
+	,PotencialRodas.FlPorteA
+	,PotencialRodas.DsLoginN1C
+	,PotencialRodas.DsLoginN2C
+	,PotencialRodas.DsLoginN3C
+	,PotencialRodas.NmColaboradorC
+	,PotencialRodas.NmAreaEstruturaComercialC
+	,PotencialRodas.NmSubEstruturaComercialC
+	,PotencialRodas.NmCanalEstruturaComercialC
+
+	,PotencialRodas.NmTipoParceiroComercial
+	,PotencialRodas.DsClassificacaoRiscos
+	,PotencialRodas.NmGrupoConcessionaria
+	,PotencialRodas.PredominanciaProduto
+	,PotencialRodas.Locadora
+	,PotencialRodas.NmAutoShopping
+	,PotencialRodas.FlagBVO
+	,PotencialRodas.FlSeguradora
+
+
+	,SUM(QtContratoBV) AS QtContratoBV  format 18.
+	,SUM(VrProducaoBV) AS VrProducaoBV format 18.2
+	,SUM(QtGravamesMercado) AS QtGravamesMercado format 18.
+	,SUM(VrGravamesMercado) AS VrGravamesMercado format 18.2
+
+
+
+FROM TbPotencial1 PotencialRodas
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26
+	ORDER BY NuAnoMes Desc
+	;Run;
+
+
+proc sort data=TbMapaPotencial out=TbMapaPotencialFinal nodupkey;by descending NmLoja;run;
+
+
+PROC SQL;
+CREATE TABLE MapaCetipLevesTotal as 
+SELECT DISTINCT
+	NuAnoMes
+	,DsLoginN1
+	,SUM(VrProducao) AS VrProducaoTotal format 18.2
+
+FROM basegrc.MetaNaoIsonomicaMapaCetip
+WHERE Produto = 'Leves'
+GROUP BY 1,2
+ORDER BY NuAnoMes DESC
+;Run;
+
+
+proc sort data=MapaCetipLevesTotal out=MapaCetipLevesTotal nodupkey;by descending DsLoginN1;run;
+
+
+PROC SQL;
+CREATE TABLE MapaCetipLeves as 
+SELECT DISTINCT
+	
+	MetaNaoIsonomicaMapaCetip.NuAnoMes
+	,MetaNaoIsonomicaMapaCetip.Produto
+	,MetaNaoIsonomicaMapaCetip.DsLoginN1
+	,MetaNaoIsonomicaMapaCetip.CdParceiroComercial
+	,MetaNaoIsonomicaMapaCetip.NmParceiroComercial
+	,MetaNaoIsonomicaMapaCetip.NmParceiroComercial1
+	,MetaNaoIsonomicaMapaCetip.VrProducao AS VrProducao format 18.2
+	,MapaCetipLevesTotal.VrProducaoTotal AS VrProducaoTotal format 18.2
+
+FROM basegrc.MetaNaoIsonomicaMapaCetip MetaNaoIsonomicaMapaCetip
+	LEFT JOIN MapaCetipLevesTotal MapaCetipLevesTotal
+		ON MetaNaoIsonomicaMapaCetip.DsLoginN1 = MapaCetipLevesTotal.DsLoginN1
+		AND MetaNaoIsonomicaMapaCetip.NuAnoMes = MapaCetipLevesTotal.NuAnoMes
+
+WHERE MetaNaoIsonomicaMapaCetip.Produto = 'Leves'
+	ORDER BY NuAnoMes Desc
+
+;Run;
+
+proc sort data=MapaCetipLeves out=MapaCetipLeves nodupkey;by descending DsLoginN1 NmParceiroComercial;run;
+
+
+PROC SQL;
+CREATE TABLE MapaCetipLevesFinal AS 
+SELECT 
+	
+     MapaCetipLeves.NuAnoMes	
+	,MapaCetipLeves.Produto	
+	,MapaCetipLeves.DsLoginN1	
+	,MapaCetipLeves.CdParceiroComercial	
+	,MapaCetipLeves.NmParceiroComercial	
+	,MapaCetipLeves.NmParceiroComercial1	
+	,MapaCetipLeves.VrProducao	AS VrProducao	 FORMAT 18.2
+	,(VrProducao / VrProducaoTotal) * 100 as PesoCalc FORMAT 18.2
+
+FROM MapaCetipLeves MapaCetipLeves
+;run;
+
+
+PROC SQL;
+CREATE TABLE MapaCetipMotosTotal as 
+SELECT DISTINCT
+
+	NuAnoMes
+	,DsLoginN1
+	,SUM(VrProducao) AS VrProducaoTotal format 18.2
+
+FROM basegrc.MetaNaoIsonomicaMapaCetip
+WHERE Produto = 'Motos'
+GROUP BY 1,2
+ORDER BY NuAnoMes DESC
+;Run;
+
+proc sort data=MapaCetipMotosTotal out=MapaCetipMotosTotal nodupkey;by descending DsLoginN1;run;
+
+
+PROC SQL;
+CREATE TABLE MapaCetipMotos as 
+SELECT DISTINCT
+	MetaNaoIsonomicaMapaCetip.NuAnoMes
+	,MetaNaoIsonomicaMapaCetip.Produto
+	,MetaNaoIsonomicaMapaCetip.DsLoginN1
+	,MetaNaoIsonomicaMapaCetip.CdParceiroComercial
+	,MetaNaoIsonomicaMapaCetip.NmParceiroComercial
+	,MetaNaoIsonomicaMapaCetip.NmParceiroComercial1
+	,MetaNaoIsonomicaMapaCetip.VrProducao AS VrProducao format 18.2
+	,MapaCetipMotosTotal.VrProducaoTotal AS VrProducaoTotal format 18.2
+
+
+
+FROM basegrc.MetaNaoIsonomicaMapaCetip MetaNaoIsonomicaMapaCetip
+
+	LEFT JOIN MapaCetipMotosTotal MapaCetipMotosTotal
+		ON MetaNaoIsonomicaMapaCetip.DsLoginN1 = MapaCetipMotosTotal.DsLoginN1
+		AND MetaNaoIsonomicaMapaCetip.NuAnoMes = MapaCetipMotosTotal.NuAnoMes
+
+WHERE MetaNaoIsonomicaMapaCetip.Produto = 'Motos'
+Order by NuAnoMes DESC 
+
+;Run;
+
+
+proc sort data=MapaCetipMotos out=MapaCetipMotos nodupkey;by descending DsLoginN1 NmParceiroComercial;run;
+
+
+PROC SQL;
+CREATE TABLE MapaCetipMotosFinal AS 
+SELECT 
+	MapaCetipLeves.NuAnoMes	
+	,MapaCetipLeves.Produto	
+	,MapaCetipLeves.DsLoginN1	
+	,MapaCetipLeves.CdParceiroComercial	
+	,MapaCetipLeves.NmParceiroComercial	
+	,MapaCetipLeves.NmParceiroComercial1	
+	,MapaCetipLeves.VrProducao	AS VrProducao	 FORMAT 18.2
+	,(VrProducao / VrProducaoTotal) * 100 as PesoCalc FORMAT 18.2
+
+FROM MapaCetipMotos MapaCetipLeves
+;run;
+
+
+PROC SQL;
+CREATE TABLE TbRitoFinalCetip AS 
+SELECT 
+	 CdParceiroComercial
+	,SUM(Part_APNP) AS Part_APNP
+    ,SUM(Part_Cancelada) AS Part_Cancelada
+    ,SUM(Part_Card) AS Part_Card
+    ,SUM(Part_ContratosBV) AS Part_ContratosBV
+    ,SUM(Part_Negada) AS Part_Negada
+    ,SUM(Part_Mercado) AS Part_Mercado
+FROM basegrc.TbRitoFinal
+WHERE NmParceiroComercial <> ''
+AND NuAnoMes BETWEEN &safraM3. and &safraM1.
+GROUP BY 1
+;RUN;
+
+
+%CRIAVARDB;
+
+proc sql; 
+%CONECTADB(server=BI);
+create table TmpData as 
+select * from connection to dbcon
+(
+
+	SELECT
+		DtTempo
+		,NuAnoMes
+	FROM DWBI_DIME.TbDimTempoData
+)
+;run;
+
+PROC SQL;
+CREATE TABLE TmpDataTratada AS 
+SELECT DISTINCT
+	 INTNX('MONTH',DtTempo,0,'BEG') format DATE9. as DtIniMes
+	,NuAnoMes
+FROM TmpData
+   
+;run;
+
+
+PROC SQL;
+CREATE TABLE MapaCetip AS 
+SELECT 
+	 TmpDataTratada.DtIniMes
+	,PotencialRodas.CdParceiroComercial
+	,PotencialRodas.NmLoja
+	,PotencialRodas.FlAtivo
+	,PotencialRodas.NmCidade
+	,PotencialRodas.CdUf
+	,PotencialRodas.NmBairro
+	,PotencialRodas.NmLogradouro
+	,PotencialRodas.NuEndereco
+	,PotencialRodas.CdCep
+	,PotencialRodas.FlPorteA
+	,COALESCE(MapaCetipLeves.DsLoginN1,MapaCetipMotos.DsLoginN1,PotencialRodas.DsLoginN1C) AS DsLoginN1C
+	,PotencialRodas.DsLoginN2C
+	,PotencialRodas.DsLoginN3C
+/*	,PotencialRodas.NmColaboradorC*/
+	,PotencialRodas.NmAreaEstruturaComercialC
+	,PotencialRodas.NmSubEstruturaComercialC
+	,PotencialRodas.NmCanalEstruturaComercialC
+
+	,PotencialRodas.NmTipoParceiroComercial
+	,PotencialRodas.DsClassificacaoRiscos
+	,PotencialRodas.NmGrupoConcessionaria
+	,PotencialRodas.PredominanciaProduto
+	,PotencialRodas.Locadora
+	,PotencialRodas.NmAutoShopping
+	,PotencialRodas.FlagBVO
+	,PotencialRodas.FlSeguradora
+
+
+	,SUM(QtContratoBV) AS QtContratoBV  format 18.
+	,SUM(VrProducaoBV) AS VrProducaoBV format 18.2
+	,SUM(QtGravamesMercado) AS QtGravamesMercado format 18.
+	,SUM(VrGravamesMercado) AS VrGravamesMercado format 18.2
+
+	,COALESCE(SUM(MapaCetipLeves.VrProducao),SUM(MapaCetipMotos.VrProducao)) AS PesoMetaProducao format 18.2
+
+	,COALESCE(SUM(MapaCetipLevesFinal.PesoCalc),SUM(MapaCetipMotosFinal.PesoCalc)) AS PesoCalc format 18.2
+
+	,SUM(TbRitoFinalCetip.Part_APNP) AS Part_APNP
+    ,SUM(TbRitoFinalCetip.Part_Cancelada) AS Part_Cancelada
+    ,SUM(TbRitoFinalCetip.Part_Card) AS Part_Card
+    ,SUM(TbRitoFinalCetip.Part_ContratosBV) AS Part_ContratosBV
+    ,SUM(TbRitoFinalCetip.Part_Negada) AS Part_Negada
+    ,SUM(TbRitoFinalCetip.Part_Mercado) AS Part_Mercado
+/*	,SUM(TbRitoFinalCetip.Part_APNP) + SUM(TbRitoFinalCetip.Part_Cancelada) + SUM(TbRitoFinalCetip.Part_Card) + SUM(TbRitoFinalCetip.Part_ContratosBV) + SUM(TbRitoFinalCetip.Part_Negada) as PartJogoRange*/
+/*	,(calculated PartJogoRange / calculated Part_Mercado) as range FORMAT 18.2*/
+
+FROM TbMapaPotencialFinal PotencialRodas
+
+	LEFT JOIN MapaCetipLevesFinal MapaCetipLeves
+		ON PotencialRodas.CdParceiroComercial = MapaCetipLeves.CdParceiroComercial 
+		AND PotencialRodas.NuAnoMes = MapaCetipLeves.NuAnoMes
+
+	LEFT JOIN MapaCetipMotosFinal MapaCetipMotos
+		ON PotencialRodas.CdParceiroComercial = MapaCetipMotos.CdParceiroComercial 
+		AND PotencialRodas.NuAnoMes = MapaCetipMotos.NuAnoMes
+
+	LEFT JOIN TbRitoFinalCetip TbRitoFinalCetip
+		ON  PotencialRodas.CdParceiroComercial = TbRitoFinalCetip.CdParceiroComercial 
+/*		AND PotencialRodas.NuAnoMes = TbRitoFinalCetip.NuAnoMes*/
+
+	LEFT JOIN TmpDataTratada TmpDataTratada
+		ON PotencialRodas.NuAnoMes = TmpDataTratada.NuAnoMes 
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25
+	;Run;
+
+
+proc export 
+data=MapaCetip
+file='/riscosbvf/BA/processos/output/MapaCetip.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /riscosbvf/BA/processos/tmp/MapaCetip.csv  /riscosbvf/BA/processos/output/ ";
+
+
+/* ======================================================== */
+/* =================== Cockpit Rodas ====================== */
+/* ======================================================== */
+
+/*Atualiza somente quando a Cetip ÃƒÂ© atualizada, pedido do comercial para congelar a produÃƒÂ§ÃƒÂ£o na mesma safra*/
+proc sql;
+select 
+	max(DtAtualizacaoCetip) into :dayCetipUpdate
+from tmp.TbPotencialRodas
+;run;
+
+proc sql;
+select 
+	max(DtAtualizacao) into :dayLastUpdate
+from bases.TbParticipacaoParceiros
+;run;
+
+%macro DefineDtProcessamento(dayCetipUpdate,dayLastUpdate);
+   %if &dayCetipUpdate ne &dayLastUpdate %then
+      %do;
+ 
+
+proc sql;
+create table TbPotencial as 
+select 
+	 Potencial.NuAnoMes
+	,Potencial.NmGrupoProduto 
+	,Potencial.CdColaboradorC	
+	,Potencial.NmColaboradorC
+	,Potencial.CdParceiroComercial
+	,Potencial.NmLoja 
+	,Potencial.NmTipoParceiroComercial
+	,Potencial.FlPorteA
+	,case 
+		when Potencial.DsTendenciaMktShare = 'queda' and Potencial.DsGrupoControle = 'controle' then Potencial.DsTendenciaMktShare 
+	end as DsTendenciaMktShare
+	,ColaboradorFocal.LstColaboradorFocal
+	,max(DtAtualizacaoCetip) as DtAtualizacao  format date9.
+	,sum(QtContrato) as QtContrato	
+	,sum(QtGravamesMercado) as QtGravamesMercado	
+	,sum(QtPropostaOriginada) as QtPropostaOriginada
+	,sum(QtPropostaEfetivada) as QtPropostaEfetivada
+	,sum(QtTxAlteradaProducao) as QtTxAlteradaProducao
+	,sum(VrProducao) as VrProducao
+	,sum(VpTxGerencialProducao) as VpTxGerencialProducao
+
+
+from tmp.TbPotencialRodas Potencial
+
+	left join basegrc.TbColaboradorFocal ColaboradorFocal
+		 on Potencial.CdFilialC = ColaboradorFocal.CdFilial
+		and Potencial.NmGrupoProduto = ColaboradorFocal.NmGrupoProdutoMeta
+
+where NuAnoMes >= 202101
+  and FlAtualizacaoMercado = 1
+  and FlAtivo = 'S'
+
+group by 1,2,3,4,5,6,7,8,9,10
+;run;
+
+proc sql;
+create table TbConversaoPropostas as 
+select 
+	 NuAnoMes
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,compress(tranwrd(NmGrupoProdutoMeta,'CVG ','')) as NmGrupoProdutoMeta 
+	,sum(FlPropostaOriginada) as QtPropostaOriginada
+	,sum(FlPropostaNegada) as QtPropostaNegada
+	,sum(FlPropostaAprovada) as QtPropostaAprovada
+	,sum(FlPropostaEfetivada) as QtPropostaEfetivada
+	,sum(case when pgto_loja = 'S' then FlConcorrente else 0 end) as FlConcorrente
+	,sum(case when pgto_loja = 'S' and StProposta in ('A','PA','CA') then FlConcorrente else 0 end) as FlConcorrenteApProp
+	,sum(case when pgto_loja = 'S' and StProposta = ('N') then FlConcorrente else 0 end) as FlConcorrenteNegProp
+
+from tmp.TbOriginacao
+where NuAnoMes >= 202101
+  and NmGrupoProdutoMeta in ('Leves','Motos','Pesados','CVG Leves','CVG Pesados')
+group by 1,2,3,4
+;run;
+
+proc sql;
+create table TbConversaoSimulacoes as 
+select 
+	 year(Simulacoes.Dt_Simulacao)*100+month(Simulacoes.Dt_Simulacao) AS NuAnoMes
+	,Simulacoes.Cod_Convenio AS CdParceiroComercial
+	,substr(Simulacoes.Categoria_Veiculo,6,7) as NmGrupoProduto
+	,sum(coalesce(Simulacoes.Qtd_Cards_Mes,0)) as QtSimulacaoCardsMes
+	,sum(case when SimulacoesConversao.StPagoLoja = 'S' then SimulacoesConversao.FlConcorrente else 0 end) as FlConcorrenteSimu 
+	,sum(case when Simulacoes.Msg_Dash = '1. Muita chance >85%' then SimulacoesConversao.FlConcorrente else 0 end) as QtMuitaChance
+	,sum(case when Simulacoes.Msg_Dash = '2. Grande chance >70%' then SimulacoesConversao.FlConcorrente else 0 end) as QtGrandeChance
+
+from CRM.simu_prop_aquisicao Simulacoes
+
+	left join bases.TbCetipSimulacoesConversao SimulacoesConversao
+		on Simulacoes.Cod_Simulacao = SimulacoesConversao.CdSimulacaoProposta
+		and Simulacoes.Dt_Simulacao >= '01MAY2021'd
+
+where year(Simulacoes.Dt_Simulacao)*100+month(Simulacoes.Dt_Simulacao) >= 202101
+group by 1,2,3
+;run;
+
+
+proc sql;
+create table TbRodas as 
+select 
+	 Potencial.NuAnoMes
+	,Potencial.NmGrupoProduto 
+	,Potencial.CdColaboradorC	
+	,Potencial.NmColaboradorC
+	,Potencial.CdParceiroComercial
+	,Potencial.NmLoja 
+	,Potencial.NmTipoParceiroComercial
+	,Potencial.DsTendenciaMktShare
+	,Potencial.FlPorteA
+	,EstruturaComercial.CdFilial
+	,EstruturaComercial.NmAreaEstruturaComercial	
+	,EstruturaComercial.NmSubEstruturaComercialA	
+	,EstruturaComercial.NmCanalEstruturaComercial
+	,EstruturaComercial.DsLoginN1	
+	,EstruturaComercial.DsLoginN2A	
+	,EstruturaComercial.DsLoginN3A	
+	,EstruturaComercial.LstSubstituicao 
+	,ColaboradorFocal.LstColaboradorFocal
+	,max(Potencial.DtAtualizacao) as DtAtualizacao format date9.
+	,sum(coalesce(Potencial.QtContrato,0)) as QtContrato
+	,sum(coalesce(VrProducao,0)) as VrProducao	
+	,sum(coalesce(Potencial.QtGravamesMercado,0)) as QtGravamesMercado	
+	,sum(coalesce(ConversaoPropostas.QtPropostaOriginada,0)) as QtPropostaOriginada
+	,sum(coalesce(ConversaoPropostas.QtPropostaNegada,0)) as QtPropostaNegada
+	,sum(coalesce(ConversaoPropostas.QtPropostaAprovada,0)) as QtPropostaAprovada
+	,sum(coalesce(ConversaoPropostas.QtPropostaEfetivada,0)) as QtPropostaEfetivada
+	,sum(coalesce(ConversaoSimulacoes.QtSimulacaoCardsMes,0)) as QtSimulacaoCardsMes
+	,sum(coalesce(ConversaoSimulacoes.FlConcorrenteSimu,0)) as FlConcorrenteSimu 
+	,sum(coalesce(ConversaoSimulacoes.QtMuitaChance,0)) as QtMuitaChance 
+	,sum(coalesce(ConversaoSimulacoes.QtGrandeChance,0)) as QtGrandeChance 
+	,sum(coalesce(ConversaoPropostas.FlConcorrenteNegProp,0)) as FlConcorrenteNegProp 
+	,sum(coalesce(ConversaoPropostas.FlConcorrenteApProp,0)) as FlConcorrenteApProp
+	,sum(coalesce(Potencial.QtTxAlteradaProducao,0)) as QtTxAlteradaProducao
+	,sum(coalesce(Potencial.VpTxGerencialProducao,0)) as VpTxGerencialProducao
+
+from TbPotencial Potencial
+
+	left join TbConversaoPropostas ConversaoPropostas
+		on Potencial.CdParceiroComercial = ConversaoPropostas.CdParceiroComercial
+	   and Potencial.NuAnoMes = ConversaoPropostas.NuAnoMes
+	   and Potencial.NmGrupoProduto = ConversaoPropostas.NmGrupoProdutoMeta
+
+	left join TbConversaoSimulacoes ConversaoSimulacoes
+		on Potencial.CdParceiroComercial = ConversaoSimulacoes.CdParceiroComercial
+	   and Potencial.NuAnoMes = ConversaoSimulacoes.NuAnoMes
+	   and Potencial.NmGrupoProduto = ConversaoSimulacoes.NmGrupoProduto
+
+	left join bases.TbEstruturaComercial EstruturaComercial
+		 on Potencial.CdColaboradorC = EstruturaComercial.CdColaboradorAtivo
+/*		and Potencial.NuAnoMes = EstruturaComercial.NuAnoMes*/
+		and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+		and NmNivel = 'N1'
+		and EstruturaComercial.CdColaboradorAtivo is not null 
+
+		left join basegrc.TbColaboradorFocal ColaboradorFocal
+			 on EstruturaComercial.CdFilial = ColaboradorFocal.CdFilial
+			and Potencial.NmGrupoProduto = ColaboradorFocal.NmGrupoProdutoMeta
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17
+;run;
+
+
+proc sql;
+create table bases.TbParticipacaoParceiros as 
+select 
+	 NuAnoMes
+	,NmGrupoProduto
+	,CdColaboradorC
+	,NmColaboradorC
+	,CdParceiroComercial
+	,NmLoja as NmParceiroComercial
+	,CdFilial
+	,NmTipoParceiroComercial
+	,DsTendenciaMktShare
+	,FlPorteA
+	,NmAreaEstruturaComercial
+	,NmSubEstruturaComercialA
+	,NmCanalEstruturaComercial
+	,DsLoginN1
+	,DsLoginN2A
+	,DsLoginN3A
+	,LstSubstituicao
+	,LstColaboradorFocal
+	,DtAtualizacao
+	,QtContrato
+	,VrProducao
+	,QtGravamesMercado
+	,QtPropostaOriginada
+	,QtPropostaNegada
+	,QtPropostaAprovada
+	,QtPropostaEfetivada
+	,QtSimulacaoCardsMes
+	,FlConcorrenteSimu
+	,FlConcorrenteNegProp
+	,FlConcorrenteApProp
+	,QtTxAlteradaProducao
+	,VpTxGerencialProducao
+	,QtGrandeChance
+	,QtMuitaChance
+	,case 
+		when QtGravamesMercado < (QtContrato + FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu) then QtGravamesMercado 
+		else QtContrato + FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu 
+	end as QtParticipacao
+
+	,case 
+		when QtGravamesMercado - calculated QtParticipacao < 0 then 0 
+		else QtGravamesMercado - calculated QtParticipacao 
+	end as QtNaoParticipacao
+
+	,calculated QtNaoParticipacao/QtGravamesMercado as PcNaoParticipacao
+
+	,case
+		when calculated PcNaoParticipacao is null then 'Sem ProduÃƒÂ§ÃƒÂ£o no Mercado'
+		when calculated QtNaoParticipacao = 0 then 'ParticipaÃƒÂ§ÃƒÂ£o Excelente'
+		when calculated PcNaoParticipacao = 1 then 'NÃƒÂ£o Participamos'
+		when calculated PcNaoParticipacao >= 0.6 then 'Pouca participaÃƒÂ§ÃƒÂ£o'
+		when calculated PcNaoParticipacao >= 0.4 then 'MÃƒÂ©dia participaÃƒÂ§ÃƒÂ£o'
+		when calculated PcNaoParticipacao > 0.0 then 'Boa participaÃƒÂ§ÃƒÂ£o'
+	end as CtNaoParticipacaoParc
+
+from TbRodas
+where NmCanalEstruturaComercial = 'Canal Veiculos'
+;run;
+
+
+proc export 
+data=bases.TbParticipacaoParceiros
+file=' /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCockpitRodasGR.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCockpitRodasGR.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";
+
+
+proc sql;
+create table TbRodas as 
+select 
+	 Potencial.NuAnoMes
+	,Potencial.NmGrupoProduto 
+	,Potencial.NmTipoParceiroComercial
+	,Potencial.CdColaboradorC	
+	,Potencial.NmColaboradorC
+	,Potencial.CdFilial
+	,Potencial.NmAreaEstruturaComercial	
+	,Potencial.NmSubEstruturaComercialA	
+	,Potencial.NmCanalEstruturaComercial
+	,Potencial.DsLoginN1	
+	,Potencial.DsLoginN2A	
+	,Potencial.DsLoginN3A	
+	,Potencial.LstSubstituicao 
+	,Potencial.LstColaboradorFocal
+	,max(Potencial.DtAtualizacao) as DtAtualizacao format date9.
+	,sum(coalesce(Potencial.QtContrato,0)) as QtContrato
+	,sum(coalesce(Potencial.VrProducao,0)) as VrProducao	
+	,sum(coalesce(Potencial.QtGravamesMercado,0)) as QtGravamesMercado	
+	,sum(coalesce(Potencial.QtPropostaOriginada,0)) as QtPropostaOriginada
+	,sum(coalesce(Potencial.QtPropostaNegada,0)) as QtPropostaNegada
+	,sum(coalesce(Potencial.QtPropostaAprovada,0)) as QtPropostaAprovada
+	,sum(coalesce(Potencial.QtPropostaEfetivada,0)) as QtPropostaEfetivada
+	,sum(coalesce(Potencial.QtSimulacaoCardsMes,0)) as QtSimulacaoCardsMes
+	,sum(coalesce(Potencial.FlConcorrenteSimu,0)) as FlConcorrenteSimu 
+	,sum(coalesce(Potencial.FlConcorrenteNegProp,0)) as FlConcorrenteNegProp 
+	,sum(coalesce(Potencial.FlConcorrenteApProp,0)) as FlConcorrenteApProp 
+	,sum(Potencial.QtTxAlteradaProducao) as QtTxAlteradaProducao
+	,sum(Potencial.VpTxGerencialProducao) as VpTxGerencialProducao
+	,sum(coalesce(Potencial.QtMuitaChance,0)) as QtMuitaChance 
+	,sum(coalesce(Potencial.QtGrandeChance,0)) as QtGrandeChance 
+
+	,sum(coalesce(Potencial.QtParticipacao,0)) as QtParticipacao
+	,sum(coalesce(Potencial.QtNaoParticipacao,0)) as QtNaoParticipacao
+
+from bases.TbParticipacaoParceiros Potencial
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;run;
+
+proc sql;
+create table TbClusters as 
+select 
+	 NuAnoMes
+	,NmGrupoProduto
+	,NmTipoParceiroComercial
+	,CdColaboradorC
+	,NmColaboradorC
+	,CdFilial
+	,NmAreaEstruturaComercial
+	,NmSubEstruturaComercialA
+	,NmCanalEstruturaComercial
+	,DsLoginN1
+	,DsLoginN2A
+	,DsLoginN3A
+	,LstSubstituicao
+	,LstColaboradorFocal
+	,DtAtualizacao
+	,QtContrato
+	,VrProducao
+	,QtGravamesMercado
+	,QtPropostaOriginada
+	,QtPropostaNegada
+	,QtPropostaAprovada
+	,QtPropostaEfetivada
+	,QtSimulacaoCardsMes
+	,FlConcorrenteSimu
+	,FlConcorrenteNegProp
+	,FlConcorrenteApProp
+	,QtTxAlteradaProducao
+	,VpTxGerencialProducao
+	,QtGrandeChance
+	,QtMuitaChance
+	,QtNaoParticipacao
+	,QtParticipacao
+	,QtContrato/QtGravamesMercado as PcMarketShare
+	,case
+		when (FlConcorrenteNegProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) > (FlConcorrenteSimu/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) 
+			and (FlConcorrenteNegProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) > (FlConcorrenteApProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu))
+			then 'Negadas'
+		when (FlConcorrenteSimu/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) > (FlConcorrenteNegProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) 
+			and (FlConcorrenteSimu/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) > (FlConcorrenteApProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu))
+			then 'SimulaÃƒÂ§ÃƒÂµes'
+		when (FlConcorrenteApProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) > (FlConcorrenteNegProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) 
+			and (FlConcorrenteApProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) > (FlConcorrenteSimu/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu))
+			then 'Aprovadas'
+	end as CtMapeamentoDeAtaque
+
+	,QtNaoParticipacao/QtGravamesMercado as PcNaoParticipacao
+	,QtParticipacao/QtGravamesMercado as PcParticipacao
+
+	,case	
+		when (FlConcorrenteNegProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) >= 0.5 then 'Engajamento Bom - ConcorrÃƒÂªncia aprova nossas negadas'
+		when (FlConcorrenteApProp/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) >= 0.5 then 'Engajamento Ruim - ConcorrÃƒÂªncia aprova nossas aprovadas'
+		when (FlConcorrenteSimu/(FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu)) >= 0.5 then 'Engajamento Ruim - ConcorrÃƒÂªncia aprova das nossas simulaÃƒÂ§ÃƒÂµes'
+		when (FlConcorrenteApProp + FlConcorrenteNegProp + FlConcorrenteSimu) = 0 then'Sem aprovaÃƒÂ§ÃƒÂµes na concorrÃƒÂªncia'
+		else 'Engajamento MÃƒÂ©dio - Ãƒâ€° equilibrado a aprovaÃƒÂ§ÃƒÂ£o na concorrÃƒÂªncia entre simulaÃƒÂ§ÃƒÂµes, aprovadas e negadas'
+	end as CtEngajamento
+
+	,case
+		when QtNaoParticipacao = 0 then 'ParticipaÃƒÂ§ÃƒÂ£o Excelente'
+		when calculated PcNaoParticipacao >= 0.6 then 'Pouca participaÃƒÂ§ÃƒÂ£o'
+		when calculated PcNaoParticipacao >= 0.4 then 'MÃƒÂ©dia participaÃƒÂ§ÃƒÂ£o'
+		when calculated PcNaoParticipacao >= 0.0 then 'Boa participaÃƒÂ§ÃƒÂ£o'
+	end as CtNaoParticipacao
+	,case 
+		when calculated PcMarketShare/calculated PcParticipacao >= 1 then 'EficiÃƒÂªncia Excelente'
+		when calculated PcMarketShare/calculated PcParticipacao >= 0.8 then 'EficiÃƒÂªncia Alta'
+		when calculated PcMarketShare/calculated PcParticipacao >= 0.5 then 'EficiÃƒÂªncia MÃƒÂ©dia'
+		when calculated PcMarketShare/calculated PcParticipacao < 0.5 then 'EficiÃƒÂªncia Baixa'
+	end as CtEficiencia
+
+
+from TbRodas
+
+;run;
+
+proc sql;
+create table TbMetaProducao as 
+select
+	 NuAnoMes	
+	,CdColaborador	
+	,NmColaborador		
+	,NmGrupoProdutoMeta	
+	,CdFilial	
+	,TpValor	
+	,DsLoginN1
+	,sum(VrMetaN1) as VrMetaN1	
+	,sum(VrMetaN2) as VrMetaN2		
+	,sum(VrMedidaProj) as VrMedida
+
+from bases.TbMetaProducaoFinal
+where nuanomes >= 202101
+  and TpValor	= 'VrProducao'
+  and VrMetaN1 is not null
+  and DsLoginN1 is not null
+  and NmGrupoProdutoMeta in ('Leves','Pesados','Motos')
+group by 1,2,3,4,5,6,7
+;run;
+
+proc sql;
+create table TbMediaCanal as 
+select 
+	 NuAnoMes
+	,NmGrupoProduto
+	,NmCanalEstruturaComercial
+	,NmTipoParceiroComercial
+	,sum(QtNaoParticipacao) as QtNaoPartCanal
+	,sum(QtGravamesMercado) as QtGravCanal
+	,sum(QtNaoParticipacao)/sum(QtGravamesMercado) as PcNaoPartCanal
+
+from TbClusters
+group by 1,2,3,4
+;run;
+
+
+proc sql;
+create table TbMediaRegional as 
+select 
+	 NuAnoMes
+	,NmGrupoProduto
+	,NmSubEstruturaComercialA
+	,NmTipoParceiroComercial
+	,sum(QtNaoParticipacao) as QtNaoPartRegional
+	,sum(QtGravamesMercado) as QtGravRegional
+	,sum(QtNaoParticipacao)/sum(QtGravamesMercado) as PcNaoPartRegional
+
+from TbClusters
+group by 1,2,3,4
+;run;
+
+
+proc sql;
+create table TbMediaFilial as 
+select 
+	 NuAnoMes
+	,NmGrupoProduto
+	,CdFilial
+	,NmTipoParceiroComercial
+/*	,NmSubEstruturaComerialA*/
+	,sum(QtNaoParticipacao) as QtNaoPartFilial
+	,sum(QtGravamesMercado) as QtGravFilial
+	,sum(QtNaoParticipacao)/sum(QtGravamesMercado) as PcNaoPartFilial
+
+from TbClusters
+group by 1,2,3,4
+;run;
+
+proc sql;
+create table TbCockpitRodas as 
+select
+	 Cluster.NuAnoMes
+	,Cluster.NmGrupoProduto
+	,Cluster.NmTipoParceiroComercial
+	,Cluster.CdColaboradorC
+	,Cluster.NmColaboradorC
+	,Cluster.CdFilial
+	,Cluster.NmAreaEstruturaComercial
+	,Cluster.NmSubEstruturaComercialA
+	,Cluster.NmCanalEstruturaComercial
+	,Cluster.DsLoginN1
+	,Cluster.DsLoginN2A
+	,Cluster.DsLoginN3A
+	,Cluster.LstSubstituicao
+	,Cluster.LstColaboradorFocal
+	,Cluster.DtAtualizacao
+	,Cluster.QtContrato
+	,Cluster.VrProducao
+	,Cluster.QtGravamesMercado
+	,Cluster.QtPropostaOriginada
+	,Cluster.QtPropostaNegada
+	,Cluster.QtPropostaAprovada
+	,Cluster.QtPropostaEfetivada
+	,Cluster.QtSimulacaoCardsMes
+	,Cluster.FlConcorrenteSimu
+	,Cluster.FlConcorrenteNegProp
+	,Cluster.FlConcorrenteApProp
+	,Cluster.QtTxAlteradaProducao
+	,Cluster.VpTxGerencialProducao
+	,Cluster.QtGrandeChance
+	,Cluster.QtMuitaChance
+	,Cluster.CtMapeamentoDeAtaque
+	,Cluster.QtParticipacao
+	,Cluster.QtNaoParticipacao
+	,Cluster.PcNaoParticipacao
+	,Cluster.CtEngajamento
+	,Cluster.CtNaoParticipacao
+	,Cluster.CtEficiencia
+	,MedFilial.QtNaoPartFilial
+	,MedFilial.QtGravFilial
+	,MedRegional.QtNaoPartRegional
+	,MedRegional.QtGravRegional
+	,MedCanal.QtNaoPartCanal
+	,MedCanal.QtGravCanal
+	,MetaProducao.VrMetaN1
+	,MetaProducao.VrMedida
+
+from TbClusters Cluster
+	
+	left join TbMediaFilial MedFilial
+		 on Cluster.CdFilial = MedFilial.CdFilial
+		and Cluster.NuAnoMes = MedFilial.NuAnoMes
+		and Cluster.NmGrupoProduto = MedFilial.NmGrupoProduto
+		and Cluster.NmTipoParceiroComercial = MedFilial.NmTipoParceiroComercial
+
+	left join TbMediaRegional MedRegional
+		 on Cluster.NmSubEstruturaComercialA = MedRegional.NmSubEstruturaComercialA
+		and Cluster.NuAnoMes = MedRegional.NuAnoMes
+		and Cluster.NmGrupoProduto = MedRegional.NmGrupoProduto
+		and Cluster.NmTipoParceiroComercial = MedRegional.NmTipoParceiroComercial
+
+	left join TbMediaCanal MedCanal
+		 on Cluster.NmCanalEstruturaComercial = MedCanal.NmCanalEstruturaComercial
+		and Cluster.NuAnoMes = MedCanal.NuAnoMes
+		and Cluster.NmGrupoProduto = MedCanal.NmGrupoProduto
+		and Cluster.NmTipoParceiroComercial = MedCanal.NmTipoParceiroComercial
+
+	left join TbMetaProducao MetaProducao
+		 on Cluster.DsLoginN1 = MetaProducao.DsLoginN1
+		and Cluster.NuAnoMes = MetaProducao.NuAnoMes
+		and Cluster.NmGrupoProduto = MetaProducao.NmGrupoProdutoMeta
+;run;
+
+
+proc export 
+data=TbCockpitRodas
+file=' /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCockpitRodas.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbCockpitRodas.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";
+
+      %end;
+%mend DefineDtProcessamento;
+
+%DefineDtProcessamento(&dayCetipUpdate,&dayLastUpdate)

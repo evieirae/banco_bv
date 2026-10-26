@@ -1,0 +1,640 @@
+START_METADATA
+PROJECT: SAS_UC4__tbmargemdescontos
+FILE_SAS: tbmargemdescontos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:49 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 60)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -18
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 538
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: INTGR = /riscosbvf/mis_varejo/integracao
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM0, safraM1, safraM13, safraM7
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPRODUCAO [SAS/Local], DBA.TBPROPOSTA [DBCON], DBA.VWTBCONTRATO [DBCON], GESTAOCONTABIL.TBLANCAMENTOCONTABIL [DBCON], GESTAOCONTABIL.TBROTEIROCONTABIL [DBCON], STGTXT_FLEX.TBLANCAMENTOCONTABILFLEXCUBE [DBCON], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASEGRC, BASES
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMARGEMDESCONTOSANALITICO [DATA Step - SET; PROC SQL - FROM], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBPRODUCAO [PROC SQL - FROM], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - JOIN], DBA.VWTBCONTRATO [Pass-Through Native (DBCON) - JOIN], GESTAOCONTABIL.TBLANCAMENTOCONTABIL [Pass-Through Native (DBCON) - FROM], GESTAOCONTABIL.TBROTEIROCONTABIL [Pass-Through Native (DBCON) - JOIN], STGTXT_FLEX.TBLANCAMENTOCONTABILFLEXCUBE [Pass-Through Native (DBCON) - FROM], TMP.TBPRODUCAO [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMargemDescontosAnalitico.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASEGRC.TBMARGEMDESCONTOSANALITICO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASEGRC.TBMARGEMDESCONTOSANALITICO, BASES.TBMARGEMDESCONTOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMargemDescontosAnalitico.csv
+TEMP/DISCARDED OUTPUTS: TBCONTRATOSFRAUDADOS, TBCONTRATOSFRAUDADOS2, TBCONTRATOSFRAUDADOSFINAL, TBCONTRATOSFRAUDADOSFINAL2, TBCONTRATOSFRAUDADOSNOVA, TBCONTRATOSFRAUDADOSNOVA2, TBDESCONTO, TBDESCONTOFINAL, TBDESCONTOFINAL2, TBDESCONTOFRAUDE, TBMARGEMDESCONTOSANALITICO, TBPRODUCAO, TBPRODUCAOCANC, TBPRODUCAOCANCRESUMO, TBPRODUCAOFRAUDE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 1, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMargemDescontosAnalitico.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+Libname intgr '/riscosbvf/mis_varejo/integracao';
+
+/* ======================================================== */
+/* ================ DescontoMargem ================== */
+/* ======================================================== */
+
+/* ======================================================== */
+/* ================ Cancelamentos Por Fraude ================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+	CREATE TABLE TbContratosFraudados AS
+	SELECT * FROM connection to dbcon
+	(
+		/*Base de contratos Gestão de Contratos*/
+		select distinct
+			a.NuContrato as NuContratoGestao
+			,c.DtContrato
+			,CONVERT(VARCHAR, a.dtProcessamento - DAY(a.dtProcessamento) + 1, 103) AS dtProcessamento
+			,LEFT(CONVERT(VARCHAR, a.dtProcessamento,112),6) AS NuAnoMes
+			,a.CdAgenteRecebedor
+			,b.NuContaDebito
+			,CASE WHEN A.CdAgenteRecebedor = 198 THEN 'FRAUDE CONFIRMADA'
+				WHEN A.CdAgenteRecebedor = 218 THEN 'FRAUDE ERRO OPERACIONAL'
+		 		WHEN A.CdAgenteRecebedor = 219 THEN 'FRAUDE CONDENATORIA'
+		 		WHEN A.CdAgenteRecebedor = 248 THEN 'FRAUDE ELETRONICA'
+			END AS DsTipoFraude
+			,sum(a.VrLancamentoContabil) AS VrLancamentoContabil
+			,CASE WHEN C.CdProduto = 10 THEN 'CRÉDITO PESSOAL'
+				WHEN C.CdProduto = 11 THEN 'CONSIGNADO'
+		 		WHEN C.CdProduto = 12 THEN 'CDC - Crédito Direto'
+		 		WHEN C.CdProduto = 13 THEN 'CDC - Crédito Direto'
+		 		WHEN C.CdProduto = 14 THEN 'CDC - Crédito Direto'
+			END AS Produto
+			,'FRAUDE CONFIRMADA' as NmMotivoEvento
+		from
+			gestaocontabil.TbLancamentoContabil AS a
+    		LEFT JOIN gestaocontabil.TbRoteiroContabil AS b ON a.CdRoteiroContabil = b.CdRoteiroContabil
+			LEFT JOIN DBA.VwTbContrato AS c on a.Nucontrato = c.Nucontrato
+			LEFT JOIN DBA.TbProposta AS e ON a.Nucontrato = e.Nucontratogestao and e.Stproposta = 'AP'
+		where
+			a.CdAgenteRecebedor IN (198,219,218)
+			and not a.Nucontrato in (12035000320728,12040000154450,12053000231655,12065000181678,12078000141055,12085000107639
+				,12116000006624,12258000049153,12272000029540,12272000040389,12272000054659,12272000066425)
+    		and b.NuContaDebito IN (81999008405008,81999008400243,81999008400251,81999008400260,81999008403005,81952100100009)
+			and LEFT(CONVERT(VARCHAR, a.dtProcessamento,112),6) >= '202306'
+			/*Alterei between  &mes_cancelados_char. and &mes_apuracao_char.*/
+		group by
+			a.nucontrato,
+			a.dtProcessamento,
+			A.CdAgenteRecebedor,
+			b.NuContaDebito,
+			c.DtContrato,
+			c.CdProduto
+			,c.DtContrato
+
+		union
+
+		/*Base de contratos FLEX*/
+		select distinct
+			a.NuContrato as NuContratoGestao
+			,c.DtContrato
+			,CONVERT(VARCHAR, a.DtMovimento - DAY(a.DtMovimento) + 1, 103) AS dtProcessamento
+			,LEFT(CONVERT(VARCHAR, a.DtMovimento,112),6) AS NuAnoMes
+			,a.NuContaContabil AS CdAgenteRecebedor
+			,a.NuContaContabilFlexCube AS NuContaDebito
+			,CASE WHEN A.NuContaContabil = 198 THEN 'FRAUDE CONFIRMADA'
+		 		WHEN A.NuContaContabil = 218 THEN 'FRAUDE ERRO OPERACIONAL'
+		 		WHEN A.NuContaContabil = 219 THEN 'FRAUDE CONDENATORIA'
+			END AS DsTipoFraude
+			,sum(a.VrLancamentoContabil) AS VrLancamentoContabil
+			,CASE WHEN A.CdProduto = 10 THEN 'CRÉDITO PESSOAL'
+		 		WHEN A.CdProduto = 11 THEN 'CONSIGNADO'
+		 		WHEN A.CdProduto = 12 THEN 'CDC - Crédito Direto'
+		 		WHEN A.CdProduto = 13 THEN 'CDC - Crédito Direto'
+		 		WHEN A.CdProduto = 14 THEN 'CDC - Crédito Direto'
+			END AS Produto
+			,'FRAUDE CONFIRMADA' as NmMotivoEvento
+		from
+    		STGTXT_FLEX.TbLancamentoContabilFlexCube AS a
+			LEFT JOIN DBA.VwTbContrato AS c on a.Nucontrato = c.Nucontrato
+    	where
+     		a.NuContaContabil IN (198,219,218)
+     		AND a.NuContaContabilFlexCube IN (81999008405008,81999008400243,81999008400251,81999008400260,81999008403005,81952100100009)
+			AND a.DtMovimento =
+				(
+					SELECT MAX(aa.DtMovimento)
+    				FROM STGTXT_FLEX.TbLancamentoContabilFlexCube AS aa
+    				WHERE aa.Nucontrato = a.Nucontrato AND aa.DtMovimento = a.DtMovimento
+				)
+			and LEFT(CONVERT(VARCHAR, a.DtMovimento,112),6) >= '202306'
+			/*Alterei between  &mes_cancelados_char. and &mes_apuracao_char.*/
+		group by
+			a.nucontrato,
+			a.DtMovimento,
+			a.NuContaContabil,
+			a.NuContaContabilFlexCube,
+			a.CdProduto
+			,c.DtContrato
+		order by 2
+	)
+;QUIT;
+
+PROC SQL;
+CREATE TABLE TbContratosFraudados2 AS
+SELECT
+	NuContratoGestao AS NuContrato
+	,DtContrato
+	,dtProcessamento
+	,INPUT(NuAnoMes,BEST12.) AS NuAnoMes
+	,CdAgenteRecebedor
+	,NuContaDebito
+	,DsTipoFraude
+	,VrLancamentoContabil
+	,Produto
+	,NmMotivoEvento
+
+FROM TbContratosFraudados
+where NuAnoMes <= '202412'
+;RUN;
+
+/* ================ Nova Query Fraudes ================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+	CREATE TABLE TbContratosFraudadosNova AS
+	SELECT * FROM connection to dbcon
+	(
+
+SELECT DISTINCT
+    a.NuContrato,
+	/* ================ Incluido na nova query 28/05/2025 ================== */
+	c.DtContrato,
+    CONVERT(VARCHAR, a.dtProcessamento - DAY(a.dtProcessamento) + 1, 103) AS dtProcessamento,
+	/* ================ Incluido na nova query 28/05/2025 ================== */
+	LEFT(CONVERT(VARCHAR, a.dtProcessamento,112),6) AS NuAnoMes,
+    a.CdAgenteRecebedor,
+    b.NuContaDebito,
+    CASE WHEN A.CdAgenteRecebedor = 198 THEN 'FRAUDE CONFIRMADA'
+         WHEN A.CdAgenteRecebedor = 218 THEN 'FRAUDE ERRO OPERACIONAL'
+         WHEN A.CdAgenteRecebedor = 219 THEN 'FRAUDE CONDENATORIA'
+         WHEN A.CdAgenteRecebedor = 248 THEN 'FRAUDE ELETRONICA'
+	END AS DsTipoFraude,
+        sum(a.VrLancamentoContabil) AS VrLancamentoContabil
+		/* ================ Incluido na nova query 28/05/2025 ================== */
+	,CASE WHEN C.CdProduto = 10 THEN 'CRÉDITO PESSOAL'
+				WHEN C.CdProduto = 11 THEN 'CONSIGNADO'
+		 		WHEN C.CdProduto = 12 THEN 'CDC - Crédito Direto'
+		 		WHEN C.CdProduto = 13 THEN 'CDC - Crédito Direto'
+		 		WHEN C.CdProduto = 14 THEN 'CDC - Crédito Direto'
+	END AS Produto
+	/* ================ Incluido na nova query 28/05/2025 ================== */
+			,'FRAUDE CONFIRMADA' as NmMotivoEvento
+FROM
+    gestaocontabil.TbLancamentoContabil AS a
+    LEFT JOIN gestaocontabil.TbRoteiroContabil AS b ON a.CdRoteiroContabil = b.CdRoteiroContabil
+    LEFT JOIN DBA.VwTbContrato AS c on a.Nucontrato = c.Nucontrato
+    LEFT JOIN DBA.TbProposta AS e ON a.Nucontrato = e.Nucontratogestao and e.Stproposta = 'AP'
+
+WHERE
+     a.CdAgenteRecebedor IN (198,219,218)
+    and not a.Nucontrato in (12035000320728,
+12040000154450,
+12053000231655,
+12065000181678,
+12078000141055,
+12085000107639,
+12116000006624,
+12258000049153,
+12272000029540,
+12272000040389,
+12272000054659,
+12272000066425)
+     AND b.NuContaDebito IN (81999008405008,
+                             81999008400243,
+                             81999008400251,
+                             81999008400260,
+                             81999008403005,
+                             81952100100009,
+                             8195210000000000002000000,
+                             8199900000006020004000000,
+                             8199900000008000011000000,
+                             8199900000006020005000000,
+                             8199900000006020030000000,
+                             8199900000006020032000000)
+    AND a.dtProcessamento>= DATEADD(month, -48, CAST(getdate() AS DATE))
+GROUP BY
+    a.nucontrato,
+	c.DtContrato,
+    a.dtProcessamento,
+    A.CdAgenteRecebedor,
+    b.NuContaDebito,
+	C.CdProduto
+
+UNION
+
+SELECT DISTINCT
+    a.NuContrato,
+	/* ================ Incluido na nova query 28/05/2025 ================== */
+	c.DtContrato,
+    CONVERT(VARCHAR, a.DtMovimento - DAY(a.DtMovimento) + 1, 103) AS dtProcessamento,
+	/* ================ Incluido na nova query 28/05/2025 ================== */
+	LEFT(CONVERT(VARCHAR, a.DtMovimento,112),6) AS NuAnoMes,
+    a.NuContaContabil AS CdAgenteRecebedor,
+    a.NuContaContabilFlexCube AS NuContaDebito,
+    CASE WHEN A.NuContaContabil = 198 THEN 'FRAUDE CONFIRMADA'
+         WHEN A.NuContaContabil = 218 THEN 'FRAUDE ERRO OPERACIONAL'
+         WHEN A.NuContaContabil = 219 THEN 'FRAUDE CONDENATORIA'
+	END AS DsTipoFraude,
+    sum(a.VrLancamentoContabil) AS VrLancamentoContabil
+	/* ================ Incluido na nova query 28/05/2025 ================== */
+			,CASE WHEN A.CdProduto = 10 THEN 'CRÉDITO PESSOAL'
+		 		WHEN A.CdProduto = 11 THEN 'CONSIGNADO'
+		 		WHEN A.CdProduto = 12 THEN 'CDC - Crédito Direto'
+		 		WHEN A.CdProduto = 13 THEN 'CDC - Crédito Direto'
+		 		WHEN A.CdProduto = 14 THEN 'CDC - Crédito Direto'
+			END AS Produto
+			/* ================ Incluido na nova query 28/05/2025 ================== */
+			,'FRAUDE CONFIRMADA' as NmMotivoEvento
+FROM
+    STGTXT_FLEX.TbLancamentoContabilFlexCube AS a
+	/* ================ Incluido na nova query 28/05/2025 ================== */
+	LEFT JOIN DBA.VwTbContrato AS c on a.Nucontrato = c.Nucontrato
+
+WHERE
+     a.NuContaContabil IN (198,219,218)
+     AND a.NuContaContabilFlexCube IN (81999008405008,
+                             81999008400243,
+                             81999008400251,
+                             81999008400260,
+                             81999008403005,
+                             81952100100009,
+                             8195210000000000002000000,
+                             8199900000006020004000000,
+                             8199900000008000011000000,
+                             8199900000006020005000000,
+                             8199900000006020030000000,
+                             8199900000006020032000000
+                            )
+    AND a.DtMovimento = (SELECT MAX(aa.DtMovimento)
+                            FROM STGTXT_FLEX.TbLancamentoContabilFlexCube AS aa
+                                WHERE aa.Nucontrato = a.Nucontrato
+                                       AND aa.DtMovimento = a.DtMovimento)
+    AND a.DtMovimento>= DATEADD(month, -48, CAST(getdate() AS DATE))
+GROUP BY
+    a.nucontrato,
+	c.DtContrato,
+    a.DtMovimento,
+    a.NuContaContabil,
+    a.NuContaContabilFlexCube,
+	A.CdProduto
+order by 3
+
+	)
+;QUIT;
+
+PROC SQL;
+CREATE TABLE TbContratosFraudadosNova2 AS
+SELECT
+	NuContrato
+	,DtContrato
+	,dtProcessamento
+	,INPUT(NuAnoMes,BEST12.) AS NuAnoMes
+	,CdAgenteRecebedor
+	,NuContaDebito
+	,DsTipoFraude
+	,VrLancamentoContabil
+	,Produto
+	,NmMotivoEvento
+FROM TbContratosFraudadosNova
+where NuAnoMes >= '202501'
+;RUN;
+
+DATA TbContratosFraudadosFinal;
+SET
+TbContratosFraudados2
+TbContratosFraudadosNova2
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbContratosFraudadosFinal2 AS
+SELECT
+	NuContrato
+	,DATEPART(DtContrato) AS DtContrato FORMAT DATE9.
+	,dtProcessamento
+	,NuAnoMes
+	,CdAgenteRecebedor
+	,NuContaDebito
+	,DsTipoFraude
+	,VrLancamentoContabil
+	,Produto
+	,NmMotivoEvento
+
+FROM TbContratosFraudadosFinal
+WHERE YEAR(DATEPART(DtContrato))*100+month(DATEPART(DtContrato)) >= &safraM7.
+AND NuAnoMes = &safraM1.
+ORDER BY 2 ASC
+;RUN;
+
+PROC SQL;
+CREATE TABLE tbproducaoFraude AS
+SELECT
+
+	NuAnoMes AS NuAnoMesContrato
+/*	,year(intnx('month',DtLiquidacaoEfetiva,1))*100+month(intnx('month',DtLiquidacaoEfetiva,1)) as NuAnoMesLiq*/
+	,year(DtLiquidacaoEfetiva)*100+month(DtLiquidacaoEfetiva) as NuAnoMesLiq
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,CdFilial
+	,NuContrato
+	,SqContratoFinanceiro
+	,DtContrato
+	,DtLiquidacaoEfetiva
+	,DtCancelamento
+	,VrMargemContribuicao
+	,VrMargemContribuicaoFinal
+	,VrMargem
+	,VrProducao
+	,VrContrato
+
+FROM bases.tbproducao
+WHERE NuAnoMes >= &safraM13.
+AND NuContrato IN (SELECT NuContrato From TbContratosFraudadosFinal2)
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbDescontoFraude AS
+SELECT
+	NuAnoMesContrato
+	,NuAnoMesLiq
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,CdFilial
+	,NuContrato
+	,'Fraude'  AS Status
+	,SqContratoFinanceiro
+	,DtContrato
+	,DtLiquidacaoEfetiva
+	,DtCancelamento
+	,VrMargemContribuicao
+	,VrMargemContribuicaoFinal
+	,VrMargem
+	,VrProducao
+	,VrContrato
+
+FROM tbproducaoFraude
+WHERE NuAnoMesContrato >= &safraM7.
+AND NuAnoMesLiq = &safraM1.
+;RUN;
+
+/* ======================================================== */
+/* ================ Contratos ================== */
+/* ======================================================== */
+
+PROC SQL;
+CREATE TABLE tbproducaoCanc AS
+SELECT
+	NuAnoMes AS NuAnoMesContrato
+/*	,year(intnx('month',DtCancelamento,1))*100+month(intnx('month',DtCancelamento,1)) as NuAnoMesCanc*/
+	,year(DtCancelamento)*100+month(DtCancelamento) as NuAnoMesCanc
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,CdFilial
+	,NuContrato
+	,SqContratoFinanceiro
+	,DtContrato
+	,DtLiquidacaoEfetiva
+	,DtCancelamento
+	,VrMargemContribuicao
+	,VrMargemContribuicaoFinal
+	,VrMargem
+	,VrProducao
+	,VrContrato
+FROM bases.tbproducao
+WHERE NuAnoMes >= &safraM13.
+AND DtCancelamento <> .
+;RUN;
+
+PROC SQL;
+CREATE TABLE tbproducaoCancResumo AS
+SELECT
+	NuAnoMesContrato
+	,NuAnoMesCanc
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,CdFilial
+	,NuContrato
+	,'Cancelado'  AS Status
+	,SqContratoFinanceiro
+	,DtContrato
+	,DtLiquidacaoEfetiva
+	,DtCancelamento
+	,VrMargemContribuicao
+	,VrMargemContribuicaoFinal
+	,VrMargem
+	,VrProducao
+	,VrContrato
+
+FROM tbproducaoCanc
+WHERE NuAnoMesContrato >= &safraM7.
+AND NuAnoMesCanc = &safraM1.
+;RUN;
+
+DATA TbDesconto;
+SET
+tbproducaoCancResumo
+TbDescontoFraude
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbDescontoFinal AS
+SELECT
+	 NuAnoMesContrato
+	,coalesce(NuAnoMesCanc,NuAnoMesLiq) AS NuAnoMesAnt
+	,COALESCE(DtCancelamento,DtLiquidacaoEfetiva) AS DtFinal FORMAT DDMMYY10.
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,. AS IdMatricula
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,CdFilial
+	,DtContrato
+	,NuContrato
+	,Status
+	,VrMargemContribuicao
+FROM TbDesconto
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbDescontoFinal2 AS
+SELECT
+/*	 NuAnoMesContrato*/
+/*	,NuAnoMesAnt*/
+/*	,DtFinal */
+ 	 year(intnx('month',DtFinal,1))*100+month(intnx('month',DtFinal,1)) as NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,IdMatricula
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdParceiroComercial
+	,NmParceiroComercial
+	,CdFilial
+	,DtContrato
+	,NuContrato
+	,Status
+	,(VrMargemContribuicao * -1) AS VrMargemDescontos22 format commax18.2
+
+,CASE WHEN VrMargemContribuicao > 0 THEN (VrMargemContribuicao * -1) ELSE 0 END  AS VrMargemDescontos format commax18.2
+
+FROM TbDescontoFinal
+;RUN;
+
+PROC SQL; delete from basegrc.TbMargemDescontosAnalitico WHERE NuAnoMes = &safraM0.;
+
+DATA basegrc.TbMargemDescontosAnalitico;
+SET
+basegrc.TbMargemDescontosAnalitico
+TbDescontoFinal2
+;RUN;
+
+/*======================== Parte 2 ========================== */
+
+/* ======================================================== */
+/* ================= Meta Colaborador  ==================== */
+/* ======================================================== */
+
+data tbproducao (keep=nucontrato fxidade);
+set tmp.tbproducao;
+  where nmgrupoprodutometa = 'Leves';
+run;
+
+proc sql;
+create table bases.TbMargemDescontos as
+select
+	 a.NuAnoMes
+	,a.CdColaborador
+	,a.NmColaborador
+	,a.NmGrupoCargoColaborador
+	,a.DsLoginN1
+	,a.NmGrupoProdutoMeta
+	,case when b.fxidade = 'ZeroKM' then 'Novos'
+	      when coalesce(b.fxidade,'Nulo') not in ('ZeroKM','Nulo') then 'Usados'
+	end as StVeiculo
+	,a.DsTipoCanalProducao
+	,a.CdFilial
+	,'VrMargemContribuicao' as TpValor
+	,intnx('year',today(),0) as DtAtualizacao format yymmdd10.
+	,sum(a.VrMargemDescontos) as VrMargemDescontos
+from basegrc.TbMargemDescontosAnalitico a
+left join tbproducao b
+  on a.nucontrato = b.nucontrato
+  and a.NuAnoMes >= 202301
+where a.NuAnoMes >= 201801
+group by 1,2,3,4,5,6,7,8,9,10,11
+;run;
+
+proc sql;
+create table TbMargemDescontosAnalitico as
+select
+	 Descontos.NuAnoMes
+	,Descontos.CdColaborador
+	,Descontos.NmColaborador
+	,Descontos.NmGrupoCargoColaborador
+	,Descontos.DsLoginN1
+	,Descontos.NmGrupoProdutoMeta
+	,Descontos.DsTipoCanalProducao
+	,Descontos.CdParceiroComercial
+	,Descontos.NmParceiroComercial
+	,Descontos.CdFilial
+	,EstruturaComercial.NmAreaEstruturaComercial
+	,EstruturaComercial.NmSubEstruturaComercialA
+	,EstruturaComercial.NmSubEstruturaComercialH
+	,EstruturaComercial.NmCanalEstruturaComercial
+	,EstruturaComercial.DsLoginN2H
+	,EstruturaComercial.DsLoginN2A
+	,EstruturaComercial.DsLoginN3H
+	,EstruturaComercial.DsLoginN3A
+	,EstruturaComercial.LstSubstituicao
+	,Descontos.DtContrato
+	,Descontos.NuContrato
+	,Descontos.Status
+	,Descontos.VrMargemDescontos
+
+from basegrc.TbMargemDescontosAnalitico Descontos
+
+	left join bases.TbEstruturaComercial EstruturaComercial
+		on  Descontos.NuAnoMes = EstruturaComercial.NuAnoMes
+		and Descontos.CdFilial = EstruturaComercial.CdFilial
+		and EstruturaComercial.NmNivel = 'N2'
+
+where Descontos.NuAnoMes >= 201801
+;quit;
+
+proc export
+data=TbMargemDescontosAnalitico
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMargemDescontosAnalitico.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMargemDescontosAnalitico.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";

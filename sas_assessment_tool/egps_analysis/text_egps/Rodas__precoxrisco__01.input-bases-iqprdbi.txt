@@ -1,0 +1,214 @@
+START_METADATA
+PROJECT: Rodas__precoxrisco
+FILE_SAS: 01.input-bases-iqprdbi.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC DATASETS (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 146
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: InicioGCp
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_DADO_FNNCO [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRAZO_FNNCO [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_GARANTIA [BIGQUERY], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRZO_FNNCO_PRPSA [BIGQUERY], CONVSIMU.TBSIMULACOES [SAS/Local], INFGER.ROLLOUTPPR [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_DADO_FNNCO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRAZO_FNNCO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PROPOSTA_GARANTIA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.TRUSTED_APRO_SIMU.TB_SIMULACAO_PRZO_FNNCO_PRPSA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM; Pass-Through Native (BIGQUERY) - JOIN], CONVSIMU.TBSIMULACOES [DATA Step - SET], INFGER.ROLLOUTPPR [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: DELTA_PRECO_CONV, DELTA_PRECO_CONV_001, DELTA_PRECO_CONV_002, DELTA_PRECO_CONV_003, INFOCLIENTE2, QTD_SIMU_PROP
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+Data InfoCliente2 (Keep=nuproposta flpap);
+set convsimu.TBSIMULACOES (Where=(flpap <> '' and nuproposta <> .));
+if flpap = 'Não' then flpap = 'N';
+else if flpap = 'Sim' then flpap = 'S';
+;run;
+
+PROC SORT DATA=InfoCliente2 NODUPKEY;
+BY NuProposta;
+RUN;
+
+/*
+   STEP 02.01
+   Conexão ao GCP para buscar simulações e propostas
+*/
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd'
+READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100
+);
+create table DELTA_PRECO_CONV_001 as
+select
+* /*Script em SAS */
+from connection to perm(
+	select DISTINCT
+	  cast(SimulacaoProposta.Cd_Simulacao_Proposta as INT64) as  CdSimulacaoProposta,
+	  Cast(PrazoFinanciamentoProposta.Nu_Proposta as int64) as NuProposta,
+	  SimulacaoProposta.Sg_Sistema_Origem as SgSistemaOrigem,
+      CASE WHEN LastDt.Nu_Proposta IS NULL THEN 'N' ELSE 'S' END AS PropostaValida,
+      cast(SimulacaoProposta.Dt_Simulacao_Proposta as date) AS DtSimulacaoProposta,
+      SimulacaoProposta.Dt_Simulacao_Proposta AS TmSimulacaoProposta,
+      SimulacaoDadoFnnco.Cd_Tabela_Financiamento as CdTabelaFinanciamento,
+      cast(SimulacaoDadoFnnco.Pc_Entrada as float64) as PcEntrada,
+      cast(SimulacaoDadoFnnco.Pc_Entrada_Ajustada as float64)  as PcEntradaAjustada,
+      cast(SimulacaoDadoFnnco.Qt_Dia_Carencia as int64) as QtDiaCarencia,
+      Cast(SimulacaoDadoFnnco.Pc_Taxa_Retorno as float64) as PcTaxaRetorno,
+      Cast(SimulacaoPrazoFnnco.Vr_Total_Seguro as float64) as VrTotalSeguro,
+      Cast(SimulacaoPrazoFnnco.Vr_Prestacao as float64) as VrPrestacao,
+      Cast(SimulacaoPrazoFnnco.Tx_Inicio_Financiamento as float64) as TxInicioFinanciamento,
+
+      cast((lag(Tx_Inicio_Financiamento, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) as float64) AS TxInicioFinanciamentoAnt,
+      cast(SimulacaoPrazoFnnco.Tx_Original_Financiamento as float64) as TxOriginalFinanciamento,
+      cast(SimulacaoPrazoFnnco.Pc_Probabilidade_Aprovacao as float64) as PcProbabilidadeAprovacao,
+      cast(SimulacaoPrazoFnnco.Pc_Variacao_Tabela_Fnnco as float64) AS PcVariacaoTabelaFinanciamento,
+      cast((lag(Pc_Variacao_Tabela_Fnnco, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) as float64) AS PcVariacaoTabelaFinanciamentoAnt,
+      cast(SimulacaoPrazoFnnco.Tx_Financiamento_Solicitada as float64) as TxFinanciamentoSolicitada,
+      CAST(SUBSTRING(CAST(SimulacaoProposta.Nu_Cpf_Cnpj AS STRING),6,2) AS INT) AS SubCpfCnpj,
+      CASE WHEN ((SimulacaoProposta.Dt_Simulacao_Proposta BETWEEN '2019-09-25' AND '2020-03-10') AND (CAST(SUBSTRING(CAST(SimulacaoProposta.Nu_Cpf_Cnpj AS STRING),6,2) AS INT) >= 50))
+             OR ((SimulacaoProposta.Dt_Simulacao_Proposta >= '2020-03-10') AND (CAST(SUBSTRING(CAST(SimulacaoProposta.Nu_Cpf_Cnpj AS STRING),6,2) AS INT) BETWEEN 71 AND 80))
+           THEN 'Convencional'
+            ELSE 'Nova'
+     END AS Politica,
+      CASE WHEN SimulacaoPrazoFnnco.Pc_Probabilidade_Aprovacao  >= '0' THEN 'N' ELSE 'S' END AS FlProbAprNegativa,
+	  CASE WHEN (lag(SimulacaoPrazoFnnco.Qt_Parcela, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) = SimulacaoPrazoFnnco.Qt_Parcela OR (lag(SimulacaoPrazoFnnco.Qt_Parcela, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) IS NULL THEN 1 ELSE 0 END AS FlParcela,
+	  CASE WHEN (lag(SimulacaoDadoFnnco.Pc_Taxa_Retorno, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) = SimulacaoDadoFnnco.Pc_Taxa_Retorno OR (lag(SimulacaoDadoFnnco.Pc_Taxa_Retorno, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) IS NULL THEN 1 ELSE 0 END AS FlPcTaxaRetorno,
+	  CASE WHEN (lag(SimulacaoDadoFnnco.Cd_Tabela_Financiamento, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) = SimulacaoDadoFnnco.Cd_Tabela_Financiamento OR (lag(SimulacaoDadoFnnco.Cd_Tabela_Financiamento, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) IS NULL THEN 1 ELSE 0 END AS FlCdTabelaFinanciamento,
+
+	  CASE WHEN CASE WHEN (lag(SimulacaoPrazoFnnco.Qt_Parcela, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) = SimulacaoPrazoFnnco.Qt_Parcela OR (lag(SimulacaoPrazoFnnco.Qt_Parcela, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) IS NULL THEN 1 ELSE 0 END = 1
+         AND CASE WHEN (lag(SimulacaoDadoFnnco.Pc_Taxa_Retorno, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) = SimulacaoDadoFnnco.Pc_Taxa_Retorno OR (lag(SimulacaoDadoFnnco.Pc_Taxa_Retorno, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) IS NULL THEN 1 ELSE 0 END = 1
+         AND CASE WHEN (lag(SimulacaoDadoFnnco.Cd_Tabela_Financiamento, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) = SimulacaoDadoFnnco.Cd_Tabela_Financiamento OR (lag(SimulacaoDadoFnnco.Cd_Tabela_Financiamento, 1) over (partition by PrazoFinanciamentoProposta.Nu_Proposta order by SimulacaoProposta.Dt_Simulacao_Proposta)) IS NULL THEN 1 ELSE 0 END = 1 THEN 0
+		ELSE 1 END AS FlMetricaAlterada
+
+	from `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta` as SimulacaoProposta
+
+		LEFT JOIN `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta_garantia` as SimulacaoPropostaGarantia
+			ON SimulacaoProposta.Cd_Simulacao_Proposta = SimulacaoPropostaGarantia.Cd_Simulacao_Proposta
+
+		INNER JOIN `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_prazo_fnnco` as SimulacaoPrazoFnnco
+			ON SimulacaoPropostaGarantia.Cd_Simulacao_Dado_Fnnco = SimulacaoPrazoFnnco.Cd_Simulacao_Dado_Fnnco
+
+		LEFT JOIN `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_dado_fnnco` as SimulacaoDadoFnnco
+			ON SimulacaoPropostaGarantia.Cd_Simulacao_Dado_Fnnco = SimulacaoDadoFnnco.Cd_Simulacao_Dado_Fnnco
+
+		LEFT JOIN `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_przo_fnnco_prpsa` as PrazoFinanciamentoProposta
+			ON SimulacaoPrazoFnnco.Cd_Simulacao_Prazo_Fnnco = PrazoFinanciamentoProposta.Cd_Simulacao_Prazo_Fnnco
+
+		LEFT JOIN (SELECT Nu_Proposta, MAX(cd_simulacao_prazo_fnnco) AS cd_simulacao_prazo_fnnco FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_przo_fnnco_prpsa` GROUP BY Nu_Proposta) LastDt
+      	ON  PrazoFinanciamentoProposta.cd_simulacao_prazo_fnnco = LastDt.cd_simulacao_prazo_fnnco
+/*		AND PrazoFinanciamentoProposta.Dt_Inclusao = LastDt.LastDtInclusao*/
+
+    WHERE 1=1
+      AND cast(PrazoFinanciamentoProposta.Nu_Proposta as int64) > 0
+/*       AND SimulacaoProposta.Dt_Simulacao_Proposta >= '2025-12-08'*/
+      AND SimulacaoProposta.Dt_Simulacao_Proposta >= &InicioGCp.
+);
+disconnect from perm;
+quit;
+
+PROC SQL;
+  CREATE TABLE QTD_SIMU_PROP AS
+    SELECT
+	  NuProposta,
+	  COUNT(DISTINCT CdSimulacaoProposta) AS QtdSimulacoes
+	FROM DELTA_PRECO_CONV_001
+	GROUP BY 1;
+RUN;
+
+PROC SQL;
+  CREATE TABLE DELTA_PRECO_CONV_002 AS
+    SELECT
+	  A.*,
+	  B.QtdSimulacoes
+	FROM DELTA_PRECO_CONV_001 A
+	LEFT JOIN QTD_SIMU_PROP B ON A.NuProposta = B.NuProposta
+    WHERE PropostaValida = 'S';
+RUN;
+
+PROC SQL;
+  CREATE TABLE DELTA_PRECO_CONV_003 AS
+    SELECT
+      A.NuProposta,
+	  A.SgSistemaOrigem AS SistemaOrigem,
+      A.DtSimulacaoProposta,
+      A.CdTabelaFinanciamento,
+      A.PcEntrada,
+      A.PcEntradaAjustada,
+      A.QtDiaCarencia,
+      A.PcTaxaRetorno,
+      A.VrTotalSeguro,
+      A.VrPrestacao,
+      A.TxInicioFinanciamento,
+      COALESCE(A.TxOriginalFinanciamento,0) AS TxOriginalFinanciamento,
+      COALESCE(A.TxFinanciamentoSolicitada,0) AS TxFinanciamentoSolicitada,
+      CASE WHEN calculated TxFinanciamentoSolicitada <> calculated TxOriginalFinanciamento AND A.DtSimulacaoProposta < '21JUN2021'd
+           THEN COALESCE(A.PcVariacaoTabelaFinanciamentoAnt,A.PcVariacaoTabelaFinanciamento,0)
+           ELSE COALESCE(A.PcVariacaoTabelaFinanciamento,0)
+      END AS PcVariacaoTabelaFinanciamento,
+      calculated TxOriginalFinanciamento + calculated PcVariacaoTabelaFinanciamento AS TaxaComDelta,
+      A.PcProbabilidadeAprovacao,
+      COALESCE(CASE WHEN calculated TxFinanciamentoSolicitada <> calculated TxOriginalFinanciamento
+                    THEN calculated TxFinanciamentoSolicitada - calculated TaxaComDelta
+                    ELSE 0
+               END,0) AS VariacaoTaxaSolicitada,
+      A.FlMetricaAlterada,
+      A.SubCpfCnpj,
+      A.Politica,
+      A.FlProbAprNegativa,
+	  A.QtdSimulacoes,
+      CASE WHEN C.CdRollout <> . THEN C.Tipo ELSE 'Controle' END AS FlagDelta
+    FROM DELTA_PRECO_CONV_002 A
+    /*LEFT JOIN INFGER.RANGEDELTATEORICO B
+      ON A.DtSimulacaoProposta >= B.DtInicio AND A.DtSimulacaoProposta < COALESCE(B.DtFim,TODAY()+1)
+      AND ROUND(A.PcProbabilidadeAprovacao,0.0001) BETWEEN B.PcProbInicio AND B.PcProbFim */
+    LEFT JOIN INFGER.ROLLOUTPPR C
+      ON A.DtSimulacaoProposta >= C.DtInicio AND A.DtSimulacaoProposta < COALESCE(C.DtFim,TODAY()+1)
+      AND A.SubCpfCnpj BETWEEN C.InicioRange AND C.FimRange
+      AND ROUND(A.PcProbabilidadeAprovacao,0.01) BETWEEN C.InicioScore AND C.FimScore;
+RUN;
+
+PROC SQL;
+  CREATE TABLE DELTA_PRECO_CONV AS
+    SELECT
+	  *,
+	  CASE WHEN VariacaoTaxaSolicitada < 0 THEN 'A'
+	       WHEN VariacaoTaxaSolicitada > 0 THEN 'M'
+		   WHEN VariacaoTaxaSolicitada = 0 THEN 'T'
+	  END AS TpOrigemTaxaDelta
+	FROM DELTA_PRECO_CONV_003;
+RUN;
+
+PROC DATASETS LIBRARY=WORK;
+  DELETE DELTA_PRECO_CONV_001 DELTA_PRECO_CONV_002 DELTA_PRECO_CONV_003 QTD_SIMU_PROP;
+RUN;
+QUIT;

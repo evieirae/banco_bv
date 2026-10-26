@@ -1,0 +1,209 @@
+START_METADATA
+PROJECT: SAS_UC4__tbefetivacaodiasuteis
+FILE_SAS: tbefetivacaodiasuteis.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:05 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 134
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], TMP.TBORIGINACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - JOIN], TMP.TBORIGINACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteis.csv, /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteisSolar.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteis.csv, /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteisSolar.csv
+TEMP/DISCARDED OUTPUTS: TBEFETIVACAODIASUTEIS, TBEFETIVACAODIASUTEISSOLAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (csv: 2, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteis.csv
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteisSolar.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* =============== Efetivacao Dias Uteis ================== */
+/* ======================================================== */
+
+proc sql;
+create table TbEfetivacaoDiasUteis as
+select
+	 Originacao.NuAnoMes
+	,Originacao.NmGrupoProdutoMeta
+	,Originacao.QtDiasUteisEfetivacao
+	,Originacao.FlDiasUteisMaturacao
+	,Originacao.NmAreaEstruturaComercialC
+	,Originacao.NmSubEstruturaComercialC
+	,Originacao.NmCanalEstruturaComercial
+	,Originacao.NmColaboradorC
+	,Originacao.CdFilialC
+	,Originacao.NmGrupoCargoColaborador
+	,Originacao.DsTipoCanalProducao
+	,Originacao.CanalProducaoSolar
+	,Originacao.CdTabelaFinanciamento
+	,CATS(Originacao.CdParceiroComercial,' - ',Originacao.NmParceiroComercial) as NmParceiroComercial
+	,Originacao.NmTipoParceiroComercial
+	,Originacao.TpPessoa
+	,Originacao.FxIdade
+	,Originacao.FxParcela
+	,Originacao.FxEntrada
+	,Originacao.FxScoreFim
+	,Originacao.DsLoginN2C
+	,Originacao.DsLoginN3C
+	,Originacao.LstSubstituicaoC
+	,ColaboradorFocal.LstColaboradorFocal
+	,case when day(Originacao.DtEntradaProposta) > 15 then 2 else 1 end as TpData
+	,Originacao.DtAtualizacao
+	,sum(Originacao.FlPropostaOriginada) as QtPropostaOriginada
+	,sum(Originacao.FlPropostaNegada) as QtPropostaNegada
+	,sum(Originacao.FlPropostaAprovada) as QtPropostaAprovada
+	,sum(Originacao.FlPropostaEfetivada) as QtPropostaEfetivada
+	,sum(case when Originacao.FlConcorrente = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApConcorrencia
+	,sum(case when Originacao.FlConcorrente = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgConcorrencia
+
+	,sum(case when Originacao.FlBancoBrasil = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApBancoBrasil
+	,sum(case when Originacao.FlBancoBrasil = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgBancoBrasil
+
+	,sum(case when Originacao.FlBradesco = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApBradesco
+	,sum(case when Originacao.FlBradesco = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgBradesco
+
+	,sum(case when Originacao.FlItau = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApItau
+	,sum(case when Originacao.FlItau = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgItau
+
+	,sum(case when Originacao.FlPan = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApPan
+	,sum(case when Originacao.FlPan = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgPan
+
+	,sum(case when Originacao.FlSafra = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApSafra
+	,sum(case when Originacao.FlSafra = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgSafra
+
+	,sum(case when Originacao.FlSantander = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApSantander
+	,sum(case when Originacao.FlSantander = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgSantander
+
+	,sum(case when Originacao.FlMontadoras = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApMontadoras
+	,sum(case when Originacao.FlMontadoras = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgMontadoras
+
+	,sum(case when Originacao.FlOutros = 1 and Originacao.StProposta in ('A','PA','CA') then 1 else 0 end) as QtPropostasApOutros
+	,sum(case when Originacao.FlOutros = 1 and Originacao.StProposta in ('N') then 1 else 0 end) as QtPropostasNgOutros
+
+from tmp.TbOriginacao Originacao
+	left join basegrc.TbColaboradorFocal ColaboradorFocal
+		on  Originacao.CdFilialC = ColaboradorFocal.CdFilial
+		and Originacao.NmGrupoProdutoMeta = ColaboradorFocal.NmGrupoProdutoMeta
+
+where Originacao.NmGrupoProdutoMeta in ('Leves','Motos','Pesados','CVG Leves','CVG Pesados','Leves-BVO')
+	and Originacao.NuAnoMes >= 202301
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26
+;run;
+
+/* ======================================================== */
+/* ============ Efetivacao Dias Uteis SOLAR =============== */
+/* ======================================================== */
+
+proc export
+data=TbEfetivacaoDiasUteis
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteis.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteis.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";
+
+proc sql;
+create table TbEfetivacaoDiasUteisSolar as
+select
+	 Originacao.DtEntradaProposta
+	,Originacao.NuAnoMes
+	,Originacao.QtDiasUteisEfetivacao
+	,case
+		when Originacao.QtDiasUteisEfetivacao <= 5 	then 'Ate 5 dias uteis'
+		when Originacao.QtDiasUteisEfetivacao <= 10 then 'De 6 a 10 dias uteis'
+		when Originacao.QtDiasUteisEfetivacao <= 15 then 'De 11 a 15 dias uteis'
+		when Originacao.QtDiasUteisEfetivacao <= 20 then 'De 16 a 20 dias uteis'
+		when Originacao.QtDiasUteisEfetivacao > 20 	then 'De 21 a 32 dias uteis'
+		end as FxDiasUteisEfetivacao
+	,Originacao.FlDiasUteisMaturacao
+	,Originacao.NmAreaEstruturaComercial
+	,Originacao.NmSubEstruturaComercialA
+	,Originacao.NmCanalEstruturaComercial
+	,Originacao.NmColaborador
+	,Originacao.CdFilialC
+	,Originacao.DsTipoCanalProducao
+	,Originacao.CanalProducaoSolar
+	,Originacao.CdTabelaFinanciamento
+	,CATS(Originacao.CdParceiroComercial,' - ',Originacao.NmParceiroComercial) as NmParceiroComercial
+	,Originacao.NmTipoParceiroComercial
+	,Originacao.FxParcela
+	,Originacao.FxEntrada
+	,Originacao.FxScoreFim
+	,Originacao.TpPessoa
+	,Originacao.DsLoginN1
+	,Originacao.DsLoginN2A
+	,Originacao.DsLoginN3A
+	,Originacao.LstSubstituicao
+	,ColaboradorFocal.LstColaboradorFocal
+	,case when day(Originacao.DtEntradaProposta) > 15 then 2 else 1 end as TpData
+	,Originacao.DtAtualizacao
+	,sum(Originacao.FlPropostaOriginada) as QtPropostaOriginada
+	,sum(Originacao.FlPropostaNegada) as QtPropostaNegada
+	,sum(Originacao.FlPropostaAprovada) as QtPropostaAprovada
+	,sum(Originacao.FlPropostaEfetivada) as QtPropostaEfetivada
+	,sum(Originacao.VrPropostaEfetivada) as VrPropostaEfetivada
+	,sum(Originacao.VrFinanciamento) as VrFinanciamento
+
+from tmp.TbOriginacao Originacao
+	left join basegrc.TbColaboradorFocal ColaboradorFocal
+		on  Originacao.CdFilialC = ColaboradorFocal.CdFilial
+		and Originacao.NmGrupoProdutoMeta = ColaboradorFocal.NmGrupoProdutoMeta
+
+where Originacao.NmGrupoProdutoMeta = 'Solar'
+	and Originacao.NuAnoMes >= 202301
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26
+;run;
+
+proc export
+data=TbEfetivacaoDiasUteisSolar
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteisSolar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbEfetivacaoDiasUteisSolar.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";

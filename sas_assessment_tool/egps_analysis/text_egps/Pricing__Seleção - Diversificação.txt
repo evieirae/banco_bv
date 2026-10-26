@@ -1,0 +1,1002 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Pricing__Seleção - Diversificação
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:23 UTC
+BUSINESS_AREA: Pricing
+TARGET_ARCH: DBT_BQ (Score: 25)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (5x | +25)
+----------------------------------------
+LINES_OF_CODE: 882
+CODE_TASKS_COUNT: 11
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BASEGRC = /riscosbvf/BA/bases_gerenciais; CRM = /riscosbvf/CRM/comp_total; INFCVS = /infogrc/convsimu; INFOGRC = /infogrc/precoxrisco; PRICING = /riscosbvf/Mazzuca; PROJETOS = /projetos/MISV/data/bases; SOLITMP = /infogrc/solicitacaopontual/tmp
+DETECTED_MACROS_DEFINED: DataAte, DataDe, FxRetorno, SafraAte, SafraDe, mes
+DETECTED_MACROS_USED: DataAte, DataDe, Faixa, FxRetorno, SafraAte, SafraDe, i, mes, meses
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBPORTEPDV [SAS/Local], INFCVS.TBSIMULACOES [SAS/Local], INFOGRC.PPR_ANALITICO [SAS/Local], PROJETOS.TBINAD [SAS/Local], PROJETOS.TBPARCEIROCOMERCIAL [SAS/Local], PROJETOS.TBPOTENCIALRODAS [SAS/Local], PROJETOS.TBPRODUCAO [SAS/Local], SOLITMP.PARAMETROGRUPO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASEGRC, INFCVS, INFOGRC, PROJETOS, SOLITMP
+EXPORTED_LIBNAMES: PRICING
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBPORTEPDV [PROC SQL - FROM], INFCVS.TBSIMULACOES [PROC SQL - FROM], INFOGRC.PPR_ANALITICO [PROC SQL - FROM], PRICING.BV_COMPENSA_PROD_CN [PROC SQL - FROM], PRICING.BV_COMPENSA_PROD_MOTOS [PROC SQL - FROM], PROJETOS.TBINAD [PROC SORT - DATA=], PROJETOS.TBPARCEIROCOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN], PROJETOS.TBPOTENCIALRODAS [PROC SQL - FROM], PROJETOS.TBPRODUCAO [PROC SQL - FROM; PROC SQL - JOIN], SOLITMP.PARAMETROGRUPO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): PRICING.BV_COMPENSA_PROD_CN, PRICING.BV_COMPENSA_PROD_MOTOS
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): PRICING.BV_COMPENSA_PROD_CN, PRICING.BV_COMPENSA_PROD_MOTOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: AUXPDVEXCLUSIVO, AUXPORTE, BV_COMPENSA_PROD_AUX, BV_COMPENSA_PROD_AUX_CN, BV_COMPENSA_PROD_AUX_MOTOS, BV_COMPENSA_PROD_CN, BV_COMPENSA_PROD_MOTOS, BV_COMPENSA_PROD_SEGV, BV_COMPENSA_SHARE_CN, BV_COMPENSA_SHARE_MOTOS, COMISSAO_CONTRATO_CN, COMISSAO_CONTRATO_MOTOS, COMISSAO_PORTAL, INAD_CN, PROD_CONT_HIST_COMPENSA_LEVESCN, PROD_CONT_HIST_COMPENSA_MOTOS, PROD_CONT_HIST_COMPENSA_PESADOS, RESUMOPRODCN, RESUMOPRODEGVCN, RESUMOPRODMOTOS, RESUMOSHARECN, RESUMOSHAREMOTOS, SELECAO_BV_COMPENSA_CN, SELECAO_BV_COMPENSA_MOTOS, SELECAO_BV_COMPENSA_PESADOS, TBINAD_AUX
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET DataDe='01OCT2025'D;
+%LET DataAte='28FEB2026'D;
+%LET SafraDe=202510;
+%LET SafraAte=202602;
+%LET mes=%scan(&meses,&i);
+%LET FxRetorno=%scan(&Faixa,&i);
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: BaseBVCompensa */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 29 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BaseBVCompensa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vQSlkdlfyyBJEC79/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+LIBNAME INFCVS '/infogrc/convsimu';
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+libname basegrc '/riscosbvf/BA/bases_gerenciais';
+LIBNAME PRICING '/riscosbvf/Mazzuca';
+%let DataDe = '01OCT2025'D;
+%let DataAte = '28FEB2026'D;
+%let SafraDe = 202510;
+%let SafraAte = 202602;
+
+PROC SQL;
+CREATE TABLE AuxPorte AS
+SELECT
+CdParceiroComercial,
+FlPorteA
+FROM BASEGRC.TBPORTEPDV
+WHERE NuAno = 2026;RUN;
+
+PROC SQL;
+CREATE TABLE COMISSAO_CONTRATO_CN AS
+SELECT
+NuProposta,
+INTNX('quarter',A.DtContrato,0) FORMAT YYQ. AS Trimestre,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Mes,
+DtContrato,
+CdParceiroComercial,
+Regional,
+Filial,
+Canal,
+CASE WHEN CdTaxaRetorno = 1 then 0
+     WHEN CdTaxaRetorno = 2 then 1.2
+	 WHEN CdTaxaRetorno = 3 then 2.4
+	 WHEN CdTaxaRetorno = 4 then 3.6
+	 WHEN CdTaxaRetorno = 14 then 1.4
+	 WHEN CdTaxaRetorno = 22 then 2.6
+	 WHEN CdTaxaRetorno = 28 then 6
+	 WHEN CdTaxaRetorno = 42 then 4.8
+	 WHEN CdTaxaRetorno = 47 then 5.29
+	 WHEN CdTaxaRetorno = 50 then 4.5
+	 WHEN CdTaxaRetorno = 51 then 4
+	 WHEN CdTaxaRetorno = 52 then 4.6
+	 WHEN CdTaxaRetorno = 24 then 3
+	 ELSE 0 END AS Retorno,
+PcTaxaRetorno as ComissaoTotal,
+SUM(VrProducao) as VrProducao
+FROM INFCVS.TBSIMULACOES as A
+WHERE Produto = 'Leves' and DtContrato >= &DataDe and DtContrato <= &DataAte and Canal IN ("LOJA CANAL NEGOCIOS")
+group by 1,2,3,4,5,6,7,8,9,10;RUN;
+PROC SQL;
+CREATE TABLE COMISSAO_CONTRATO_CN AS
+SELECT
+NuProposta,
+Trimestre,
+Mes,
+CdParceiroComercial,
+Regional,
+Filial,
+Canal,
+CASE WHEN Retorno = 3.6 then 'R3'
+     WHEN Retorno = 4.8 THEN 'R4'
+     WHEN Retorno = 6.0 then 'R5'
+     ELSE 'DEMAIS' END AS FxRetorno,
+SUM(ComissaoTotal/100*VrProducao) as ComissaoTotal,
+SUM(Retorno/100*VrProducao) as Retorno,
+SUM((ComissaoTotal - Retorno)/100*VrProducao) as Plus,
+SUM(VrProducao) as VrProducao
+FROM COMISSAO_CONTRATO_CN
+group by 1,2,3,4,5,6,7,8;RUN;
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_AUX_CN AS
+SELECT
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Mes,
+A.CdConvenio as CdParceiroComercial,
+B.NmParceiroComercial,
+A.DsTipoCanalProducao,
+C.FxRetorno,
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VpSpread) as Spread,
+SUM(A.VrMargem) as VrMargem,
+SUM(A.FlTxAlterada) as ContratosPA,
+SUM(A.FlPropostaEfetivada) as QtdContratos,
+SUM(CASE WHEN A.FlTxAlterada = 1 then VarTaxaAlterada/100*A.VrProducao else 0 end) as TamanhoPA,
+SUM(B.VrComissaoTotal) as VrComissaoTotal,
+SUM(C.Retorno) AS Retorno,
+SUM(C.Plus) as Plus
+FROM INFOGRC.PPR_ANALITICO AS A
+LEFT JOIN PROJETOS.TBPRODUCAO AS B ON A.NuProposta=B.NuProposta
+LEFT JOIN COMISSAO_CONTRATO_CN AS C ON A.NuProposta = C.NuProposta
+WHERE Produto = 'Leves' and A.DtContrato >= &DataDe and A.DtContrato <= &DataAte and A.DsTipoCanalProducao IN ("LOJA CANAL NEGOCIOS")
+GROUP BY 1,2,3,4,5;RUN;
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_CN AS
+SELECT
+A.*,
+CASE WHEN D.NmSubEstruturaComercialC = 'Canal de Negócios' THEN 'Canal de Negócios'
+ELSE 'DEMAIS' END AS Regional,
+D.NmAreaEstruturaComercialC as Filial,
+F.FlPorteA As Porte
+FROM BV_COMPENSA_PROD_AUX_CN AS A
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS D ON A.CdParceiroComercial=D.CdParceiroComercial
+LEFT JOIN AuxPorte AS F ON A.CdParceiroComercial = F.CdParceiroComercial
+WHERE D.NmSubEstruturaComercialC = 'Canal de Negócios';RUN;
+PROC SQL;
+CREATE TABLE BV_COMPENSA_SHARE_CN AS
+SELECT
+NuAnoMes AS Mes,
+A.NmAreaEstruturaComercialC as Filial,
+CASE WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional I' THEN 'C1-R1'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional II' THEN 'C1-R2'
+ 	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional III' THEN 'C1-R3'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional IV' THEN 'C2-R4'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional V'  THEN 'C2-R5'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional VI' THEN 'C2-R6'
+ELSE 'DEMAIS' END AS Regional,
+A.CdParceiroComercial,
+SUM(QtContrato) as QtContrato,
+SUM(QtGravamesMercado) AS QtGravamesMercado
+FROM PROJETOS.TBPOTENCIALRODAS AS A
+WHERE NuAnoMes >= &SafraDe AND NuAnoMes <= &SafraAte AND NmGrupoProduto = 'Leves'
+AND A.FlAtivo = 'S' AND FlAtualizacaoMercado  = 1
+GROUP BY 1,2,3,4;QUIT;
+
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_SEGV AS
+SELECT
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Mes,
+A.CdConvenio as CdParceiroComercial,
+SUM(CASE WHEN Produto IN ('CVG Leves','CVG Pesados') THEN A.VrProducao ELSE 0 END) as VrProducaoEGV
+FROM INFOGRC.PPR_ANALITICO AS A
+WHERE A.DtContrato >= &DataDe and A.DtContrato <= &DataAte and A.DsTipoCanalProducao in ("LOJA CANAL NEGOCIOS")
+GROUP BY 1,2;RUN;
+
+DATA PRICING.BV_COMPENSA_PROD_CN;
+SET BV_COMPENSA_PROD_CN;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BaseBVCompensa */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: MacroTranspor */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 29 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: MacroTranspor */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hScvShqVBvE4S3qf/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL NOPRINT;
+SELECT DISTINCT Mes INTO:Meses
+separated by ' '
+from PRICING.BV_COMPENSA_PROD_CN;quit;
+PROC SQL NOPRINT;
+SELECT DISTINCT FxRetorno INTO:Faixa
+separated by ' '
+from PRICING.BV_COMPENSA_PROD_CN;quit;
+
+%macro transpor_dados;
+PROC SQL;
+CREATE TABLE ResumoProdCN AS
+SELECT
+Regional,
+Filial,
+NmParceiroComercial,
+CdParceiroComercial,
+DsTipoCanalProducao,
+Porte,
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then VrProducao else 0 end) AS VrProducao_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then VrMargem else 0 end) AS Vrmargem_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then VrMargem else 0 end)/sum(case when Mes = &mes then VrProducao else 0 end),0) AS Margem_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then VrComissaoTotal else 0 end) AS VrComissaoTotal_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then VrComissaoTotal else 0 end)/sum(case when Mes = &mes then VrProducao else 0 end),0) AS ComissaoTotal_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then QtdContratos else 0 end) AS Contrato_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&Faixa));
+	%let FxRetorno = %scan(&Faixa,&i);
+	COALESCE(sum(case when FxRetorno = "&FxRetorno" AND Mes = &SafraAte then VrProducao else 0 end)/sum(case when Mes = &SafraAte then VrProducao else 0 end),0) AS Producao_&FxRetorno
+	%if &i < %sysfunc(countw(&Faixa))%then %do;,%end;%end;
+
+from PRICING.BV_COMPENSA_PROD_CN
+group by Regional,
+Filial,
+CdParceiroComercial,
+NmParceiroComercial,
+DsTipoCanalProducao,
+Porte;
+quit;
+%mend;
+%transpor_dados;
+
+PROC SQL NOPRINT;
+SELECT DISTINCT Mes INTO:Meses
+separated by ' '
+from BV_COMPENSA_SHARE_CN;quit;
+%macro transpor_dados;
+PROC SQL;
+CREATE TABLE ResumoShareCN AS
+SELECT
+CdParceiroComercial,
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then QtContrato else 0 end),0) AS QtGravemeBV_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then QtGravamesMercado else 0 end),0) AS QtGravamesMercado_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then QtContrato else 0 end)/sum(case when Mes = &mes then QtGravamesMercado else 0 end),0) AS SharePDV_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;
+
+from BV_COMPENSA_SHARE_CN
+group by Regional,
+Filial,
+CdParceiroComercial;
+quit;
+%mend;
+%transpor_dados;
+
+PROC SQL NOPRINT;
+SELECT DISTINCT Mes INTO:Meses
+separated by ' '
+from BV_COMPENSA_PROD_SEGV;quit;
+%macro transpor_dados;
+PROC SQL;
+CREATE TABLE ResumoProdEGVCN AS
+SELECT
+CdParceiroComercial,
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then VrProducaoEGV else 0 end) AS VrProducaoEGV_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;
+
+from BV_COMPENSA_PROD_SEGV
+group by
+CdParceiroComercial;
+quit;
+%mend;
+%transpor_dados;
+
+PROC SQL;
+CREATE TABLE SELECAO_BV_COMPENSA_CN AS
+SELECT
+A.*,
+B.*,
+C.*
+FROM RESUMOPRODCN AS A
+LEFT JOIN RESUMOSHARECN AS B
+ON A.CdParceiroComercial = B.CdParceiroComercial
+LEFT JOIN ResumoProdEGVCN AS C
+ON A.CdParceiroComercial = C.CdParceiroComercial
+WHERE
+QtGravamesMercado_202510 IS NOT NULL AND
+QtGravamesMercado_202511 IS NOT NULL AND
+QtGravamesMercado_202512 IS NOT NULL AND
+QtGravamesMercado_202601 IS NOT NULL AND
+QtGravamesMercado_202602 IS NOT NULL
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: MacroTranspor */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Inad */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 29 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Inad */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gigFzsxvLa5fblgA/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sort data=PROJETOS.TBINAD out=TBINAD_AUX nodupkey;
+   by NuProposta;
+run;
+PROC SQL;
+CREATE TABLE INAD_CN AS
+SELECT
+CdParceiroComercial,
+SUM(VrParcelaElegivelInad30) AS VrParcelaElegivelInad30,
+SUM(VrParcelaInad30) AS VrParcelaInad30
+FROM TBINAD_AUX AS A
+where DtEntradaProposta >= &DataDe AND NmGrupoProdutoMeta = "Leves"
+GROUP BY 1
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Inad */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 29 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-jijJKuaPBoz7jsdB/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE Prod_Cont_Hist_Compensa_LevesCN AS
+SELECT
+A.CdParceiroComercial,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Safra,
+SUM (A.VrProducao) AS VrProducao,
+COUNT (NuProposta) AS QntdContratos
+FROM PROJETOS.TBPRODUCAO AS A
+WHERE A.NmGrupoProdutoMeta = "Leves" AND A.DtContrato >= '01DEC2024'D
+GROUP BY 1,2;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: R-máximo */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 29 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: R-máximo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ISwkB1cMMxLyJX7d/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME SOLITMP '/infogrc/solicitacaopontual/tmp';
+PROC SQL;
+CREATE TABLE COMISSAO_portal AS
+SELECT *
+FROM SOLITMP.PARAMETROGRUPO AS A
+WHERE Produto = "Leves" ;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: R-máximo */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BaseBVCompensa */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 36 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BaseBVCompensa */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-LngbyG88nEiBUI4r/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+LIBNAME INFCVS '/infogrc/convsimu';
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+LIBNAME CRM '/riscosbvf/CRM/comp_total';
+libname basegrc '/riscosbvf/BA/bases_gerenciais';
+LIBNAME PRICING '/riscosbvf/Mazzuca';
+%let DataDe = '01MAY2025'D;
+%let DataAte = '30SEP2025'D;
+%let SafraDe = 202505;
+%let SafraAte = 202509;
+
+PROC SQL;
+CREATE TABLE AuxPorte AS
+SELECT
+CdParceiroComercial,
+FlPorteA
+FROM BASEGRC.TBPORTEPDV
+WHERE NuAno = 2025;RUN;
+
+PROC SQL;
+CREATE TABLE AuxPDVexclusivo AS
+SELECT
+CdParceiroComercial,
+CASE WHEN PredominanciaProduto = 'Motos' THEN 'PDVMotos' ELSE 'Demais' END AS FlPDVExclusivo
+FROM PROJETOS.TBPARCEIROCOMERCIAL
+;RUN;
+
+PROC SQL;
+CREATE TABLE COMISSAO_CONTRATO_MOTOS AS
+SELECT
+A.NuProposta,
+INTNX('quarter',A.DtContrato,0) FORMAT YYQ. AS Trimestre,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Mes,
+A.DtContrato,
+A.CdParceiroComercial,
+A.Regional,
+A.Filial,
+A.Canal,
+CASE WHEN CdTaxaRetorno = 1 then 0
+     WHEN CdTaxaRetorno = 2 then 1.2
+	 WHEN CdTaxaRetorno = 3 then 2.4
+	 WHEN CdTaxaRetorno = 4 then 3.6
+	 WHEN CdTaxaRetorno = 14 then 1.4
+	 WHEN CdTaxaRetorno = 22 then 2.6
+	 WHEN CdTaxaRetorno = 28 then 6
+	 WHEN CdTaxaRetorno = 42 then 4.8
+	 WHEN CdTaxaRetorno = 47 then 5.29
+	 WHEN CdTaxaRetorno = 50 then 4.5
+	 WHEN CdTaxaRetorno = 51 then 4
+	 WHEN CdTaxaRetorno = 52 then 4.6
+	 WHEN CdTaxaRetorno = 24 then 3
+	 ELSE 0 END AS Retorno,
+PcTaxaRetorno as ComissaoTotal,
+SUM(VrProducao) as VrProducao
+FROM INFCVS.TBSIMULACOES as A
+LEFT JOIN AuxPDVexclusivo as B ON A.CdParceiroComercial = B.CdParceiroComercial
+WHERE Produto = 'Motos' and DtContrato >= &DataDe and DtContrato <= &DataAte and Canal in ('MULTIMARCAS','CONCESSIONARIAS') and B.FlPDVExclusivo = 'PDVMotos'
+group by 1,2,3,4,5,6,7,8,9,10;RUN;
+PROC SQL;
+CREATE TABLE COMISSAO_CONTRATO_MOTOS AS
+SELECT
+NuProposta,
+Trimestre,
+Mes,
+CdParceiroComercial,
+Regional,
+Filial,
+Canal,
+CASE WHEN Retorno = 3.6 then 'R3'
+     WHEN Retorno = 4.8 THEN 'R4'
+     WHEN Retorno = 6.0 then 'R5'
+     ELSE 'DEMAIS' END AS FxRetorno,
+SUM(ComissaoTotal/100*VrProducao) as ComissaoTotal,
+SUM(Retorno/100*VrProducao) as Retorno,
+SUM((ComissaoTotal - Retorno)/100*VrProducao) as Plus,
+SUM(VrProducao) as VrProducao
+FROM COMISSAO_CONTRATO_MOTOS
+group by 1,2,3,4,5,6,7,8;RUN;
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_AUX_MOTOS AS
+SELECT
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Mes,
+A.CdConvenio as CdParceiroComercial,
+B.NmParceiroComercial,
+A.DsTipoCanalProducao,
+C.FxRetorno,
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VpSpread) as Spread,
+SUM(A.VrMargem) as VrMargem,
+SUM(A.FlTxAlterada) as ContratosPA,
+SUM(A.FlPropostaEfetivada) as QtdContratos,
+SUM(CASE WHEN A.FlTxAlterada = 1 then VarTaxaAlterada/100*A.VrProducao else 0 end) as TamanhoPA,
+SUM(B.VrComissaoTotal) as VrComissaoTotal,
+SUM(C.Retorno) AS Retorno,
+SUM(C.Plus) as Plus
+FROM INFOGRC.PPR_ANALITICO AS A
+LEFT JOIN PROJETOS.TBPRODUCAO AS B ON A.NuProposta=B.NuProposta
+LEFT JOIN COMISSAO_CONTRATO_MOTOS AS C ON A.NuProposta = C.NuProposta
+LEFT JOIN AuxPDVexclusivo as D ON A.CdConvenio = D.CdParceiroComercial
+WHERE Produto = 'Motos' and A.DtContrato >= &DataDe and A.DtContrato <= &DataAte and C.Canal in ('MULTIMARCAS','CONCESSIONARIAS') and D.FlPDVExclusivo = 'PDVMotos'
+GROUP BY 1,2,3,4,5;RUN;
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_MOTOS AS
+SELECT
+A.*,
+CASE WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional I' THEN 'C1-R1'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional II' THEN 'C1-R2'
+ 	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional III' THEN 'C1-R3'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional IV' THEN 'C2-R4'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional V' THEN 'C2-R5'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional VI' THEN 'C2-R6'
+ELSE NmSubEstruturaComercialC END AS Regional,
+D.NmAreaEstruturaComercialC as Filial,
+F.FlPorteA As Porte
+FROM BV_COMPENSA_PROD_AUX_MOTOS AS A
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS D ON A.CdParceiroComercial=D.CdParceiroComercial
+LEFT JOIN AuxPorte AS F ON A.CdParceiroComercial = F.CdParceiroComercial;RUN;
+
+PROC SQL;
+CREATE TABLE AuxPDVexclusivo AS
+SELECT
+CdParceiroComercial,
+CASE WHEN PredominanciaProduto = 'Motos' THEN 'PDVMotos' ELSE 'Demais' END AS FlPDVExclusivo
+FROM PROJETOS.TBPARCEIROCOMERCIAL
+;RUN;
+
+PROC SQL;
+CREATE TABLE BV_COMPENSA_SHARE_MOTOS AS
+SELECT
+NuAnoMes AS Mes,
+A.NmAreaEstruturaComercialC as Filial,
+CASE WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional I' THEN 'C1-R1'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional II' THEN 'C1-R2'
+ 	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional III' THEN 'C1-R3'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional IV' THEN 'C2-R4'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional V' THEN 'C2-R5'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional VI' THEN 'C2-R6'
+ELSE NmSubEstruturaComercialC END AS Regional,
+A.CdParceiroComercial,
+SUM(QtContrato) as QtContrato,
+SUM(QtGravamesMercado) AS QtGravamesMercado
+FROM PROJETOS.TBPOTENCIALRODAS AS A
+LEFT JOIN AuxPDVexclusivo AS B ON A.CdParceiroComercial=B.CdParceiroComercial
+WHERE NuAnoMes >= &SafraDe AND NuAnoMes <= &SafraAte AND NmGrupoProduto = 'Motos'
+AND A.FlAtivo = 'S' AND FlAtualizacaoMercado  = 1 AND A.NmCanalEstruturaComercialC = 'Canal Veiculos'
+AND A.NmSubEstruturaComercialC in ('Canal Rodas e EGV - Regional I', 'Canal Rodas e EGV - Regional II',
+'Canal Rodas e EGV - Regional III', 'Canal Rodas e EGV - Regional IV',
+'Canal Rodas e EGV - Regional V', 'Canal Rodas e EGV - Regional VI','Canal Motos')
+AND NmTipoParceiroComercial in ('Loja','Concessionaria') and B.FlPDVExclusivo = 'PDVMotos'
+GROUP BY 1,2,3,4;QUIT;
+
+DATA PRICING.BV_COMPENSA_PROD_MOTOS;
+SET BV_COMPENSA_PROD_MOTOS;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BaseBVCompensa */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: MacroTranspor */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 36 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: MacroTranspor */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-BfJFzWIgE7VKN4T5/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL NOPRINT;
+SELECT DISTINCT Mes INTO:Meses
+separated by ' '
+from PRICING.BV_COMPENSA_PROD_MOTOS;quit;
+PROC SQL NOPRINT;
+SELECT DISTINCT FxRetorno INTO:Faixa
+separated by ' '
+from PRICING.BV_COMPENSA_PROD_MOTOS;quit;
+
+%macro transpor_dados;
+PROC SQL;
+CREATE TABLE ResumoProdMOTOS AS
+SELECT
+Regional,
+Filial,
+NmParceiroComercial,
+CdParceiroComercial,
+DsTipoCanalProducao,
+Porte,
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then VrProducao else 0 end) AS VrProducao_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then VrMargem else 0 end) AS Vrmargem_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then VrMargem else 0 end)/sum(case when Mes = &mes then VrProducao else 0 end),0) AS Margem_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then VrComissaoTotal else 0 end) AS VrComissaoTotal_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then VrComissaoTotal else 0 end)/sum(case when Mes = &mes then VrProducao else 0 end),0) AS ComissaoTotal_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	sum(case when Mes = &mes then QtdContratos else 0 end) AS Contrato_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&Faixa));
+	%let FxRetorno = %scan(&Faixa,&i);
+	COALESCE(sum(case when FxRetorno = "&FxRetorno" AND Mes = &SafraAte then VrProducao else 0 end)/sum(case when Mes = &SafraAte then VrProducao else 0 end),0) AS Producao_&FxRetorno
+	%if &i < %sysfunc(countw(&Faixa))%then %do;,%end;%end;
+
+from PRICING.BV_COMPENSA_PROD_MOTOS
+group by Regional,
+Filial,
+CdParceiroComercial,
+NmParceiroComercial,
+DsTipoCanalProducao,
+Porte;
+quit;
+%mend;
+%transpor_dados;
+
+PROC SQL NOPRINT;
+SELECT DISTINCT Mes INTO:Meses
+separated by ' '
+from BV_COMPENSA_SHARE_MOTOS;quit;
+%macro transpor_dados;
+PROC SQL;
+CREATE TABLE ResumoShareMOTOS AS
+SELECT
+Regional,
+Filial,
+CdParceiroComercial,
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then QtContrato else 0 end),0) AS QtGravemeBV_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then QtGravamesMercado else 0 end),0) AS QtGravamesMercado_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;,
+
+%do i = 1 %to %sysfunc(countw(&meses));
+	%let mes = %scan(&meses,&i);
+	COALESCE(sum(case when Mes = &mes then QtContrato else 0 end)/sum(case when Mes = &mes then QtGravamesMercado else 0 end),0) AS SharePDV_&mes
+	%if &i < %sysfunc(countw(&meses))%then %do;,%end;%end;
+
+from BV_COMPENSA_SHARE_MOTOS
+group by Regional,
+Filial,
+CdParceiroComercial;
+quit;
+%mend;
+%transpor_dados;
+
+PROC SQL;
+CREATE TABLE SELECAO_BV_COMPENSA_MOTOS AS
+SELECT
+A.*,
+B.*
+FROM RESUMOPRODMOTOS AS A
+LEFT JOIN RESUMOSHAREMOTOS AS B
+ON A.CdParceiroComercial = B.CdParceiroComercial
+WHERE
+QtGravamesMercado_202505 IS NOT NULL AND
+QtGravamesMercado_202506 IS NOT NULL AND
+QtGravamesMercado_202507 IS NOT NULL AND
+QtGravamesMercado_202508 IS NOT NULL AND
+QtGravamesMercado_202509 IS NOT NULL
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: MacroTranspor */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BaseProdShare */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 36 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BaseProdShare */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-av5538A62OsjkU3b/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE Prod_Cont_Hist_Compensa_Motos AS
+SELECT
+A.CdParceiroComercial,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Safra,
+SUM (A.VrProducao) AS VrProducao,
+COUNT (NuProposta) AS QntdContratos
+FROM PROJETOS.TBPRODUCAO AS A
+WHERE A.NmGrupoProdutoMeta = "Motos" AND A.DtContrato >= '01DEC2024'D
+GROUP BY 1,2;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BaseProdShare */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BaseSeleçãoPesados */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: PFD Flow 41 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BaseSeleçãoPesados */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gzwdfmiHMglnkD1K/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+LIBNAME PRICING '/riscosbvf/Mazzuca';
+%let DataDe = '01OCT2025'D;
+%let DataAte = '28FEB2026'D;
+%let SafraDe = 202510;
+%let SafraAte = 202602;
+
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_AUX AS
+SELECT
+A.NuProposta,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Safra,
+A.CdConvenio as CdParceiroComercial,
+B.NmParceiroComercial,
+A.DsTipoCanalProducao,
+CASE WHEN D.PredominanciaProduto = 'Pesados' THEN 'PDV dedicado' ELSE 'Demais' END AS FlPDVDedicado,
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VpSpread) as Spread,
+SUM(B.VrMargemContribuicao) as VrMargem,
+SUM(A.FlTxAlterada) as ContratosPA,
+SUM(A.FlPropostaEfetivada) as QtdContratos,
+SUM(CASE WHEN A.FlTxAlterada = 1 then VarTaxaAlterada/100*A.VrProducao else 0 end) as TamanhoPA,
+SUM(B.VrComissaoTotal) as VrComissaoTotal
+FROM INFOGRC.PPR_ANALITICO AS A
+LEFT JOIN PROJETOS.TBPRODUCAO AS B ON A.NuProposta=B.NuProposta
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS D ON A.CdConvenio = D.CdParceiroComercial
+WHERE Produto = 'Pesados' and A.DtContrato >= &DataDe and A.DtContrato <= &DataAte
+GROUP BY 1,2,3,4,5;RUN;
+PROC SQL;
+CREATE TABLE SELECAO_BV_COMPENSA_PESADOS AS
+SELECT
+A.*,
+CASE WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional I' THEN 'C1-R1'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional II' THEN 'C1-R2'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional III' THEN 'C1-R3'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional IV' THEN 'C2-R4'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional V' THEN 'C2-R5'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional VI' THEN 'C2-R6'
+ELSE D.NmSubEstruturaComercialC END AS Regional,
+D.NmAreaEstruturaComercialC as Filial,
+D.NmTipoParceiroComercial,
+D.DsLoginN1C as GR
+FROM BV_COMPENSA_PROD_AUX AS A
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS D ON A.CdParceiroComercial=D.CdParceiroComercial;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BaseSeleçãoPesados */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BaseProdShare */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: PFD Flow 41 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BaseProdShare */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-t82LwxDaE3XXOw1e/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE Prod_Cont_Hist_Compensa_Pesados AS
+SELECT
+A.CdParceiroComercial,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Safra,
+SUM (A.VrProducao) AS VrProducao,
+COUNT (NuProposta) AS QntdContratos
+FROM PROJETOS.TBPRODUCAO AS A
+WHERE A.NmGrupoProdutoMeta = "Pesados" AND A.DtContrato >= '01DEC2024'D
+GROUP BY 1,2;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BaseProdShare */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+LIBNAME INFCVS '/infogrc/convsimu';
+LIBNAME PROJETOS '/projetos/MISV/data/bases';
+LIBNAME CRM '/riscosbvf/CRM/comp_total';
+libname basegrc '/riscosbvf/BA/bases_gerenciais';
+%let DataDe = '01MAY2025'D;
+%let DataAte = '30SEP2025'D;
+%let SafraDe = 202505;
+%let SafraAte = 202509;
+
+PROC SQL;
+CREATE TABLE AuxPorte AS
+SELECT
+CdParceiroComercial,
+FlPorteA
+FROM BASEGRC.TBPORTEPDV
+WHERE NuAno = 2025;RUN;
+
+PROC SQL;
+CREATE TABLE AuxPDVexclusivo AS
+SELECT
+CdParceiroComercial,
+CASE WHEN PredominanciaProduto = 'Motos' THEN 'PDVMotos' ELSE 'Demais' END AS FlPDVExclusivo
+FROM PROJETOS.TBPARCEIROCOMERCIAL
+;RUN;
+
+PROC SQL;
+CREATE TABLE COMISSAO_CONTRATO_MOTOS AS
+SELECT
+A.NuProposta,
+INTNX('quarter',A.DtContrato,0) FORMAT YYQ. AS Trimestre,
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Mes,
+A.DtContrato,
+A.CdParceiroComercial,
+A.Regional,
+A.Filial,
+A.Canal,
+CASE WHEN CdTaxaRetorno = 1 then 0
+     WHEN CdTaxaRetorno = 2 then 1.2
+	 WHEN CdTaxaRetorno = 3 then 2.4
+	 WHEN CdTaxaRetorno = 4 then 3.6
+	 WHEN CdTaxaRetorno = 14 then 1.4
+	 WHEN CdTaxaRetorno = 22 then 2.6
+	 WHEN CdTaxaRetorno = 28 then 6
+	 WHEN CdTaxaRetorno = 42 then 4.8
+	 WHEN CdTaxaRetorno = 47 then 5.29
+	 WHEN CdTaxaRetorno = 50 then 4.5
+	 WHEN CdTaxaRetorno = 51 then 4
+	 WHEN CdTaxaRetorno = 52 then 4.6
+	 WHEN CdTaxaRetorno = 24 then 3
+	 ELSE 0 END AS Retorno,
+PcTaxaRetorno as ComissaoTotal,
+SUM(VrProducao) as VrProducao
+FROM INFCVS.TBSIMULACOES as A
+LEFT JOIN AuxPDVexclusivo as B ON A.CdParceiroComercial = B.CdParceiroComercial
+WHERE Produto = 'Motos' and DtContrato >= &DataDe and DtContrato <= &DataAte and Canal in ('MULTIMARCAS','CONCESSIONARIAS') and B.FlPDVExclusivo = 'PDVMotos'
+group by 1,2,3,4,5,6,7,8,9,10;RUN;
+PROC SQL;
+CREATE TABLE COMISSAO_CONTRATO_MOTOS AS
+SELECT
+NuProposta,
+Trimestre,
+Mes,
+CdParceiroComercial,
+Regional,
+Filial,
+Canal,
+CASE WHEN Retorno = 3.6 then 'R3'
+     WHEN Retorno = 4.8 THEN 'R4'
+     WHEN Retorno = 6.0 then 'R5'
+     ELSE 'DEMAIS' END AS FxRetorno,
+SUM(ComissaoTotal/100*VrProducao) as ComissaoTotal,
+SUM(Retorno/100*VrProducao) as Retorno,
+SUM((ComissaoTotal - Retorno)/100*VrProducao) as Plus,
+SUM(VrProducao) as VrProducao
+FROM COMISSAO_CONTRATO_MOTOS
+group by 1,2,3,4,5,6,7,8;RUN;
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_AUX_MOTOS AS
+SELECT
+Input (cats(year(A.DtContrato),put(month(A.DtContrato),z2.)),8.) as Mes,
+A.CdConvenio as CdParceiroComercial,
+B.NmParceiroComercial,
+A.DsTipoCanalProducao,
+C.FxRetorno,
+SUM(A.VrProducao) as VrProducao,
+SUM(A.VpSpread) as Spread,
+SUM(A.VrMargem) as VrMargem,
+SUM(A.FlTxAlterada) as ContratosPA,
+SUM(A.FlPropostaEfetivada) as QtdContratos,
+SUM(CASE WHEN A.FlTxAlterada = 1 then VarTaxaAlterada/100*A.VrProducao else 0 end) as TamanhoPA,
+SUM(B.VrComissaoTotal) as VrComissaoTotal,
+SUM(C.Retorno) AS Retorno,
+SUM(C.Plus) as Plus
+FROM INFOGRC.PPR_ANALITICO AS A
+LEFT JOIN PROJETOS.TBPRODUCAO AS B ON A.NuProposta=B.NuProposta
+LEFT JOIN COMISSAO_CONTRATO_MOTOS AS C ON A.NuProposta = C.NuProposta
+LEFT JOIN AuxPDVexclusivo as D ON A.CdConvenio = D.CdParceiroComercial
+WHERE Produto = 'Motos' and A.DtContrato >= &DataDe and A.DtContrato <= &DataAte and C.Canal in ('MULTIMARCAS','CONCESSIONARIAS') and D.FlPDVExclusivo = 'PDVMotos'
+GROUP BY 1,2,3,4,5;RUN;
+PROC SQL;
+CREATE TABLE BV_COMPENSA_PROD_MOTOS AS
+SELECT
+A.*,
+CASE WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional I' THEN 'C1-R1'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional II' THEN 'C1-R2'
+ 	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional III' THEN 'C1-R3'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional IV' THEN 'C2-R4'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional V' THEN 'C2-R5'
+	 WHEN D.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional VI' THEN 'C2-R6'
+ELSE NmSubEstruturaComercialC END AS Regional,
+D.NmAreaEstruturaComercialC as Filial,
+F.FlPorteA As Porte
+FROM BV_COMPENSA_PROD_AUX_MOTOS AS A
+LEFT JOIN PROJETOS.TBPARCEIROCOMERCIAL AS D ON A.CdParceiroComercial=D.CdParceiroComercial
+LEFT JOIN AuxPorte AS F ON A.CdParceiroComercial = F.CdParceiroComercial;RUN;
+
+PROC SQL;
+CREATE TABLE AuxPDVexclusivo AS
+SELECT
+CdParceiroComercial,
+CASE WHEN PredominanciaProduto = 'Motos' THEN 'PDVMotos' ELSE 'Demais' END AS FlPDVExclusivo
+FROM PROJETOS.TBPARCEIROCOMERCIAL
+;RUN;
+
+PROC SQL;
+CREATE TABLE BV_COMPENSA_SHARE_MOTOS AS
+SELECT
+NuAnoMes AS Mes,
+A.NmAreaEstruturaComercialC as Filial,
+CASE WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional I' THEN 'C1-R1'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional II' THEN 'C1-R2'
+ 	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional III' THEN 'C1-R3'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional IV' THEN 'C2-R4'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional V' THEN 'C2-R5'
+	 WHEN A.NmSubEstruturaComercialC = 'Canal Rodas e EGV - Regional VI' THEN 'C2-R6'
+ELSE NmSubEstruturaComercialC END AS Regional,
+A.CdParceiroComercial,
+SUM(QtContrato) as QtContrato,
+SUM(QtGravamesMercado) AS QtGravamesMercado
+FROM PROJETOS.TBPOTENCIALRODAS AS A
+LEFT JOIN AuxPDVexclusivo AS B ON A.CdParceiroComercial=B.CdParceiroComercial
+WHERE NuAnoMes >= &SafraDe AND NuAnoMes <= &SafraAte AND NmGrupoProduto = 'Motos'
+AND A.FlAtivo = 'S' AND FlAtualizacaoMercado  = 1 AND A.NmCanalEstruturaComercialC = 'Canal Veiculos'
+AND A.NmSubEstruturaComercialC in ('Canal Rodas e EGV - Regional I', 'Canal Rodas e EGV - Regional II',
+'Canal Rodas e EGV - Regional III', 'Canal Rodas e EGV - Regional IV',
+'Canal Rodas e EGV - Regional V', 'Canal Rodas e EGV - Regional VI','Canal Motos')
+AND NmTipoParceiroComercial in ('Loja','Concessionaria') and B.FlPDVExclusivo = 'PDVMotos'
+GROUP BY 1,2,3,4;QUIT;
+
+DATA PRICING.BV_COMPENSA_PROD_MOTOS;
+SET BV_COMPENSA_PROD_MOTOS;run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */

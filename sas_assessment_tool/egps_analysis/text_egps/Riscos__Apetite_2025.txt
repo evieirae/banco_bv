@@ -1,0 +1,2081 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Apetite_2025
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:19 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 65)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -676
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: INFILE  (3x | +30), RETAIN (1x | +10), %MACRO (5x | +25)
+----------------------------------------
+LINES_OF_CODE: 1693
+CODE_TASKS_COUNT: 11
+DETECTED_PROCS: FREQ, SORT, SQL
+HAS_DATA_STEP: Yes (40x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CARTEIRA = /riscosbv/credito/MISCREDITO/CARTEIRA; MISCRED = /riscosbv/credito/MISCREDITO; PDD = /riscosbv/credito/PDD_RESULTADO; TABLEAU = /riscosbv/credito/MISCREDITO/TABLEAU
+DETECTED_MACROS_DEFINED: ANOMES, DT_MAX_VENCIMENTARIO, PR, ULT_DIA, i, ultimo_dia
+DETECTED_MACROS_USED: ANOMES, Segmento, ULT_DIA, anomes, i, mesfim, mesini, mesref, n, ult_dia, ultimo_dia
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: MESFIM, MESINI, MESREF, N, SEGMENTO
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): MISCRED.APETITE_INTEGRADO_&I [SAS/Local], MISCRED.BASE_UNICA_ATACADO_&MESREF [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202509 [SAS/Local], TABLEAU.BASE_ATIVOS_202509 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_2, WORK.BASE_FINAL_1
+IMPORTED_LIBNAMES: MISCRED, TABLEAU
+EXPORTED_LIBNAMES: BU_BASETOP_&N
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_2, WORK.BASE_FINAL_1, WORK.VENCIMENTARIO_0
+TABLE_READ_PROVENANCE (Flow): MISCRED.APETITE_INTEGRADO_&I [PROC SQL - FROM], MISCRED.BASE_UNICA_ATACADO_&MESREF [PROC SQL - FROM], MISCRED.BASE_UNICA_ATACADO_202509 [DATA Step - SET; PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], TABLEAU.BASE_ATIVOS_202509 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], WORK.BASE_2 [PROC SQL - FROM], WORK.BASE_FINAL_1 [PROC SQL - FROM], WORK.VENCIMENTARIO_0 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BU_BASETOP_&N._&MESREF
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: APET, APETITE_INTEGRADO_202509, APET_TOT_&I, BASE_2, BASE_APETITE_0, BASE_APETITE_0_1, BASE_APETITE_1, BASE_APETITE_2, BASE_APETITE_3, BASE_BU, BASE_FINAL_1, BASE_FINAL_2, BASE_FINANCAS, BASE_FINANCAS_CLIENTE, BASE_UNICA, BASE_UNICA_ATACADO_202509, BU_&MESREF, BU_POND, BU_TOP_&MESREF, BU_TOTAL_&MESREF, CONSOLIDA, DEPARA_MACROSETOR, DISPONIBILIDADE_0_MACRO, DISPONIBILIDADE_0_SETOR, DISPONIBILIDADE_1_MACRO, DISPONIBILIDADE_1_SETOR, DISPONIBILIDADE_2_MACRO, DISPONIBILIDADE_2_SETOR, DISPONIBILIDADE_3_SETOR, DISPONIBILIDADE_4_SETOR, DISPONIBILIDADE_5_MACRO, DISPONIBILIDADE_5_SETOR, EXP_TOP25_&I, EXP_TOT_&I, FL_MAIORES_GRUPOS, FREQ_SET, GRUPOS, PRAZO_POND_MACRO, PRAZO_POND_SETOR, SALDI_LIQ, SPREAD_POND_MACRO, SPREAD_POND_SETOR, VENCIMENTARIO_1, WORK.DEPARA_MACROSETOR_0, WORK.LIMITE_MACROSETOR, WORK.LIMITE_SETOR, WORK.VENCIMENTARIO_0
+DYNAMIC REFS (Ambiguous): MISCRED.APETITE_INTEGRADO_{I}, MISCRED.BASE_UNICA_ATACADO_{MESREF}, N._{MESREF}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET DT_MAX_VENCIMENTARIO=%SYSFUNC(intnx(month,"&ULT_DIA."d,6,e),YYYYMMDD.);
+%LET ULT_DIA='30sep2025'D;
+%LET ANOMES=202509;
+%LET PR=14925535700;
+%LET ultimo_dia=&ULT_DIA;
+%LET i=%eval(&i + 88);
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01_VARIABLES_LIBNAMES */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 92 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01_VARIABLES_LIBNAMES */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vJgjk4p5bCFjy3Ph/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET ULT_DIA = '30sep2025'D;
+%LET ANOMES = 202509;
+
+%LET PR = 14925535700;  
+
+%LET ultimo_dia = &ULT_DIA;
+
+LIBNAME TABLEAU "/riscosbv/credito/MISCREDITO/TABLEAU";
+LIBNAME MISCRED BASE "/riscosbv/credito/MISCREDITO";
+LIBNAME CARTEIRA BASE "/riscosbv/credito/MISCREDITO/CARTEIRA";
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01_VARIABLES_LIBNAMES */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02_De_Para_Macro_Setor */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 92 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02_De_Para_Macro_Setor */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-fRdmLvjbz1haUYSk/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA WORK.DEPARA_MACROSETOR_0;
+    LENGTH
+        SETOR        	  	$ 45
+        MACRO_SETOR       	$ 45 ;
+    FORMAT
+        SETOR             	$CHAR45.
+        MACRO_SETOR       	$CHAR45. ;
+    INFORMAT
+        SETOR             	$CHAR45.
+        MACRO_SETOR       	$CHAR45. ;
+    INFILE DATALINES4
+        DLM='7F'x
+        MISSOVER
+        DSD ;
+    INPUT
+        MACRO_SETOR       	: $CHAR45.
+        SETOR       		: $CHAR45. ;
+DATALINES4;
+AGRONEGOCIOTRADING AGRO
+AGRONEGOCIODEF. AGRICOLAS, FERTILIZANTES E SEMENTES
+AGRONEGOCIOREVENDA INSUMOS AGRÍCOLAS
+AGRONEGOCIOIMPLEMENTOS AGRICOLAS
+AGRONEGOCIOCOOPERATIVAS
+AGRONEGOCIOACUCAR E ALCOOL
+AGRONEGOCIOPRODUTOR RURAL PJ
+AGRONEGOCIOAGROINDUSTRIA
+AGRONEGOCIOPRODUTOR RURAL PF
+AGRONEGOCIOPME AGRO
+ENERGIAGERACAO DE ENERGIA ELETRICA
+ENERGIADISTRIBUICAO DE ENERGIA ELETRICA
+ENERGIACOMERCIALIZACAO DE ENERGIA ELETRICA
+ENERGIATRANSMISSAO DE ENERGIA ELETRICA
+VAREJOVAREJO ESSENCIAL
+VAREJOVAREJO NÃO ESSENCIAL
+VAREJODISTRIBUIDORES DE PAINEL SOLAR
+VAREJOREVENDAS
+INDUSTRIA DE ALIMENTOSINDUSTRIA ALIMENT. / BEBIDAS
+INDUSTRIA DE ALIMENTOSINDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E
+INDUSTRIA DE ALIMENTOSLATICINIOS
+INDUSTRIA DE ALIMENTOSABATE BOVINO
+INDUSTRIA (DEMAIS)BENS DE CAPITAL
+INDUSTRIA (DEMAIS)CERAMICAS
+INDUSTRIA (DEMAIS)EMBALAGENS
+INDUSTRIA (DEMAIS)INDUSTRIA BENS DE CONSUMO
+INDUSTRIA (DEMAIS)INDUSTRIA OUTROS
+INDUSTRIA (DEMAIS)TEXTIL
+OIL & GASDOWNSTREAM / MIDSTREAM / SERVIÇOS DE APOIO
+OIL & GASUPSTREAM
+METAIS E MINÉRIOSSIDERURGIA PRODUCAO
+METAIS E MINÉRIOSMINERACAO
+METAIS E MINÉRIOSMETALURGIA PRODUCAO
+METAIS E MINÉRIOSSIDERURGIA DISTRIBUICAO
+METAIS E MINÉRIOSMETALURGIA DISTRIBUICAO
+REAL ESTATECONSTRUCAO CIVIL - MATERIAIS P/ CONSTRUCAO
+REAL ESTATECONSTRUCAO CIVIL - PESADA
+REAL ESTATECONSTRUCAO CIVIL - INCORPORACAO
+REAL ESTATECONSTRUCAO CIVIL - PROPERTIES/SHOPPINGS
+TRANSPORTE E LOGÍSTICAFERROVIAS
+TRANSPORTE E LOGÍSTICALOGISTICA
+TRANSPORTE E LOGÍSTICANAVEGACAO
+TRANSPORTE E LOGÍSTICAPORTOS
+QUIMICO & FARMACEUTICOQUIMICO
+QUIMICO & FARMACEUTICOFARMACEUTICO
+TURISMO & AÉREASCIAS AEREAS
+TURISMO & AÉREASTURISMO
+VEICULOS (Montad. / Concess. / Autopeças)CONCESSIONARIAS
+VEICULOS (Montad. / Concess. / Autopeças)MONTADORAS/AUTO-PECAS
+DEMAISPAPEL E CELULOSE
+DEMAISINSTITUICOES FINANCEIRAS
+DEMAISSANEAMENTO
+DEMAISTELECOMUNICACOES
+DEMAIST.I.
+DEMAISLOCADORAS
+DEMAISMADEIRA
+DEMAISHIGIENE E LIMPEZA
+DEMAISCONCESSOES RODOVIARIAS
+DEMAISSAUDE
+DEMAISSAUDE ANIMAL
+DEMAISCURTUME
+DEMAISMIDIA
+DEMAISPRIVATE
+SERVIÇOS & TELEMARKETINGSERVICOS
+SERVIÇOS & TELEMARKETINGTELEMARKETING
+SERVIÇOS & TELEMARKETINGTRADING
+;;;;
+
+PROC SQL;
+	CREATE TABLE WORK.LIMITE_SETOR (
+		 SETOR CHAR(50),
+		 LIM_VER_SET_STR CHAR(10),
+		 LIM_AMR_SET_STR CHAR(10),
+		 LIM_VER_SET NUM,
+		 LIM_AMR_SET NUM
+		 );
+
+	INSERT INTO WORK.LIMITE_SETOR
+		VALUES('ACUCAR E ALCOOL', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('DEF. AGRICOLAS, FERTILIZANTES E SEMENTES', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('REVENDA INSUMOS AGRÍCOLAS', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('IMPLEMENTOS AGRICOLAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('TRADING AGRO', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('AGROINDUSTRIA', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('COOPERATIVAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PRODUTOR RURAL PF', '>3%' ,'>2%', 0.03, 0.02)
+		VALUES('PRODUTOR RURAL PJ', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('PME AGRO', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('DISTRIBUICAO DE ENERGIA ELETRICA', '>5%' ,' >4%', 0.05, 0.04)
+		VALUES('GERACAO DE ENERGIA ELETRICA', '>10%' ,' >9%', 0.1, 0.09)
+		VALUES('COMERCIALIZACAO DE ENERGIA ELETRICA', '>1%' ,' >0,8%', 0.01, 0.008)
+		VALUES('TRANSMISSAO DE ENERGIA ELETRICA', '>12%' ,' >11%', 0.12, 0.11)
+		VALUES('METALURGIA DISTRIBUICAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('METALURGIA PRODUCAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('MINERACAO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('SIDERURGIA DISTRIBUICAO', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('SIDERURGIA PRODUCAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CONSTRUCAO CIVIL - PESADA', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('CONSTRUCAO CIVIL - PROPERTIES/SHOPPINGS', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('CONSTRUCAO CIVIL - INCORPORACAO', '>4%' , ' >3%', 0.04, 0.03)
+		VALUES('CONSTRUCAO CIVIL - MATERIAIS P/ CONSTRUCAO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('DOWNSTREAM / MIDSTREAM / SERVIÇOS DE APOIO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('UPSTREAM', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('VAREJO NÃO ESSENCIAL', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('VAREJO ESSENCIAL', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('DISTRIBUIDORES DE PAINEL SOLAR', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('REVENDAS', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('INDUSTRIA ALIMENT. / BEBIDAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('LATICINIOS', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('ABATE BOVINO', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('BENS DE CAPITAL', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('CERAMICAS', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('EMBALAGENS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INDUSTRIA BENS DE CONSUMO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('INDUSTRIA OUTROS', '>8%' ,'>7%', 0.08, 0.07)
+		VALUES('TEXTIL', '>5%' ,' >4%', 0.05, 0.04)
+		VALUES('FERROVIAS', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('LOGISTICA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('NAVEGACAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PORTOS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('FARMACEUTICO', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('QUIMICO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CONCESSIONARIAS', '>10%' ,' >9%', 0.06, 0.05)
+		VALUES('MONTADORAS/AUTO-PECAS', '>10%' ,' >9%', 0.06, 0.05)
+		VALUES('CIAS AEREAS', '>1,5%' ,' >1,2%', 0.015, 0.012)
+		VALUES('TURISMO', '>6%' ,' >5%', 0.04, 0.03)
+		VALUES('CONCESSOES RODOVIARIAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CURTUME', '>1%' ,' >0,5%', 0.01, 0.005)
+		VALUES('HIGIENE E LIMPEZA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('LOCADORAS', '>10%' ,' >9%', 0.1, 0.09)
+		VALUES('MADEIRA', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('MIDIA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PAPEL E CELULOSE', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SANEAMENTO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SAUDE', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SAUDE ANIMAL', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('T.I.', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('TELECOMUNICACOES', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INSTITUICOES FINANCEIRAS', 'L=R' ,' L=R', 0, 0)
+		VALUES('SERVICOS',  '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('TELEMARKETING', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('TRADING', '>8%' ,' >7%', 0.08, 0.07);
+
+ QUIT;
+
+PROC SQL;
+	CREATE TABLE WORK.LIMITE_MACROSETOR (
+		 MACRO_SETOR CHAR(50),
+		 LIM_VER_MCR_STR CHAR(10),
+		 LIM_AMR_MCR_STR CHAR(10),
+		 LIM_VER_MCR NUM,
+		 LIM_AMR_MCR NUM
+	);
+
+	INSERT INTO WORK.LIMITE_MACROSETOR
+		VALUES('AGRONEGOCIO', '>28%' ,' >25%', 0.28, 0.25)
+		VALUES('ENERGIA', '>20%' ,' >18%', 0.2, 0.18)
+		VALUES('INDUSTRIA DE ALIMENTOS', '>10%' ,' >8%', 0.1, 0.08)
+		VALUES('INDUSTRIA (DEMAIS)', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('TRANSPORTE E LOGÍSTICA', '>15%' ,' >13%', 0.1, 0.08)
+		VALUES('QUIMICO & FARMACEUTICO', '>15%' ,' >13%', 0.15, 0.13)
+		VALUES('VEICULOS (Montad. / Concess. / Autopeças)', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('TURISMO & AÉREAS', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('METAIS E MINÉRIOS', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('OIL & GAS', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('REAL ESTATE', '>6%' ,' >4%', 0.06, 0.04)
+		VALUES('VAREJO', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('SERVIÇOS & TELEMARKETING', '>8%' ,' >6%', 0.08, 0.06);
+QUIT;
+
+PROC SQL;
+	CREATE TABLE DEPARA_MACROSETOR AS
+		SELECT 	A.*,
+				B.LIM_VER_SET_STR,
+				B.LIM_AMR_SET_STR,
+				B.LIM_VER_SET,
+				B.LIM_AMR_SET,
+				C.LIM_VER_MCR_STR,
+				C.LIM_AMR_MCR_STR,
+				C.LIM_VER_MCR,
+				C.LIM_AMR_MCR
+
+	FROM	DEPARA_MACROSETOR_0 AS A
+	LEFT JOIN LIMITE_SETOR AS B ON(A.SETOR = B.SETOR)
+	LEFT JOIN LIMITE_MACROSETOR AS C ON(A.MACRO_SETOR = C.MACRO_SETOR);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02_De_Para_Macro_Setor */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03_Base_Apetite */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 92 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03_Base_Apetite */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-nZxHnlVpdZutYTsK/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA BU_POND;
+	SET MISCRED.BASE_UNICA_ATACADO_&ANOMES.;
+
+
+	PRAZO_POND = ((DtVencimentoParcela - &ULT_DIA.)/365)*VRSALDO;
+
+	WHERE YEAR(DtVencimentoParcela) NE 2100;
+RUN;
+
+PROC SQL;
+	CREATE TABLE BU_POND AS
+	SELECT 	A.*,
+			B.MACRO_SETOR
+
+	FROM 		BU_POND AS A
+	LEFT JOIN	DEPARA_MACROSETOR AS B ON(A.DsSetorClienteRisco_novo = B.SETOR);
+QUIT;
+
+proc freq
+data= BU_POND;
+table MACRO_SETOR*DsSetorClienteRisco_novo/out=freq_Set;
+run;
+
+PROC SQL;
+	CREATE TABLE PRAZO_POND_SETOR AS
+		SELECT	DsSetorClienteRisco_novo,
+				SUM(PRAZO_POND) AS PRAZO_POND,
+				SUM(VRSALDO) AS VRSALDO,
+				SUM(PRAZO_POND)/SUM(VRSALDO) AS PRAZO_SETOR
+	FROM BU_POND
+	GROUP BY 1;
+
+	CREATE TABLE PRAZO_POND_MACRO AS
+		SELECT	MACRO_SETOR,
+				SUM(PRAZO_POND) AS PRAZO_POND,
+				SUM(VRSALDO) AS VRSALDO,
+				SUM(PRAZO_POND)/SUM(VRSALDO) AS PRAZO_MACRO
+	FROM BU_POND
+	GROUP BY 1;
+
+QUIT;
+
+DATA BASE_UNICA_ATACADO_&ANOMES.;
+	SET MISCRED.BASE_UNICA_ATACADO_&ANOMES.;
+	IF 	DsProduto IN (	"NDF CETIP" ,
+						"OPCOES FLEXIVEIS" ,
+						"SWAP COM FLUXO" ,
+						"CREDIT LINK NOTE" ,
+						"CREDIT DEFAULT SWAP" ,
+						"NON DELIVERABLE FORWARD",
+						"SWAP" ,
+						"SWAP CETIP") THEN
+		VrAjusteMTM = 0;
+
+	VRSALDO = VRSALDO * 1;
+RUN;
+
+
+
+PROC SQL;
+CREATE TABLE BASE_APETITE_0 AS
+	SELECT DISTINCT
+			A.AnoMes_Referencia as 'Data Ref'n,
+			A.DsGrupoEconomicoRisco as 'Grupo Econômico'n,
+			B.MACRO_SETOR as 'Macro Setor'n,
+			A.DsSetorClienteRisco_novo as 'Setor crédito'n,
+			A.DsNivelRiscoSetor_novo as 'Nível Risco'n,
+			A.Tipo_carteira, 
+			A.DsProduto,
+
+			COALESCE(SUM(A.VrSaldo),0) AS 'Exposição Bruta'N,
+			COALESCE(SUM(A.VrAjusteMTM),0) AS AJUSTEMTM,
+			COALESCE(SUM(A.VrProvisao),0) AS PROVISAO,
+			C.PRAZO_SETOR as 'Prazo Médio setor'n,
+
+			B.LIM_VER_SET_STR,
+			B.LIM_AMR_SET_STR,
+			B.LIM_VER_SET ,
+			B.LIM_AMR_SET,
+			B.LIM_VER_MCR_STR,
+			B.LIM_AMR_MCR_STR,
+			B.LIM_VER_MCR,
+			B.LIM_AMR_MCR
+
+	FROM BASE_UNICA_ATACADO_&ANOMES. AS A
+	LEFT JOIN DEPARA_MACROSETOR AS B ON(A.DsSetorClienteRisco_novo = B.SETOR)
+	LEFT JOIN PRAZO_POND_SETOR AS C ON(A.DsSetorClienteRisco_novo = C.DsSetorClienteRisco_novo)
+
+	WHERE DsTipoCarteira in ('OPAC', 'REGULAR')
+	GROUP BY 1,2,3,4,5,6,7;
+QUIT;
+
+PROC SQL;
+	CREATE TABLE BASE_APETITE_0_1 AS
+	SELECT DISTINCT	A.*,
+
+					C.PRAZO_MACRO AS 'Prazo Médio macro'n
+
+	FROM BASE_APETITE_0 AS A
+
+	LEFT JOIN PRAZO_POND_MACRO AS C ON( A.'Macro Setor'n = C.MACRO_SETOR);
+
+QUIT;
+
+DATA BASE_APETITE_1;
+SET BASE_APETITE_0_1;
+PDD = PROVISAO - AJUSTEMTM;
+
+IF 'Prazo Médio macro'n < 0 THEN 'Prazo Médio macro'n = 0;
+IF 'Prazo Médio setor'n < 0 THEN 'Prazo Médio setor'n = 0;
+
+RUN;
+
+DATA BASE_APETITE_2;
+SET BASE_APETITE_1;
+
+'Exposição Líquida'N = 'Exposição Bruta'N - PDD;
+
+RUN;
+
+
+
+PROC SQL;
+	CREATE TABLE SALDI_LIQ AS
+	SELECT DISTINCT
+					"JOIN" AS JOIN,
+					SUM('Exposição Líquida'N) AS TOTAL_LIQ FORMAT COMMAX22.2
+	FROM BASE_APETITE_2
+	;
+	CREATE TABLE DISPONIBILIDADE_0_setor AS
+		SELECT DISTINCT
+						"JOIN" AS JOIN,
+						A.'Setor crédito'n,
+						MAX(A.LIM_VER_SET) AS LIM_VER_SET format PERCENT8.2,
+						MAX(A.LIM_AMR_SET) AS LIM_AMR_SET format PERCENT8.2,
+						SUM(A.'Exposição Líquida'N) AS 'Exposição Líquida'N
+
+	FROM BASE_APETITE_2 AS A
+	GROUP BY 1,2;
+
+	CREATE TABLE DISPONIBILIDADE_0_macro AS
+		SELECT DISTINCT
+						"JOIN" AS JOIN,
+						A.'Macro Setor'n,
+						MAX(A.LIM_VER_MCR) AS LIM_VER_MCR format PERCENT8.2,
+						MAX(A.LIM_AMR_MCR) AS LIM_AMR_MCR format PERCENT8.2,
+						SUM(A.'Exposição Líquida'N) AS 'Exposição Líquida'N
+
+	FROM BASE_APETITE_2 AS A
+	GROUP BY 1,2;
+QUIT;
+
+PROC SQL;
+	CREATE TABLE DISPONIBILIDADE_1_setor AS
+	SELECT DISTINCT
+					A.*,
+					B.TOTAL_LIQ
+	FROM DISPONIBILIDADE_0_setor AS A
+	LEFT JOIN SALDI_LIQ AS B ON(A.JOIN = B.JOIN);
+QUIT;
+
+PROC SQL;
+	CREATE TABLE DISPONIBILIDADE_1_macro AS
+	SELECT DISTINCT
+					A.*,
+					B.TOTAL_LIQ
+	FROM DISPONIBILIDADE_0_macro AS A
+	LEFT JOIN SALDI_LIQ AS B ON(A.JOIN = B.JOIN);
+QUIT;
+
+DATA DISPONIBILIDADE_2_setor;
+SET DISPONIBILIDADE_1_setor;
+
+'% SETOR'N = 'Exposição Líquida'N / TOTAL_LIQ;
+ format '% SETOR'n PERCENT8.2;
+RUN;
+
+DATA DISPONIBILIDADE_2_macro;
+SET DISPONIBILIDADE_1_macro;
+
+'% MACRO'N = 'Exposição Líquida'N / TOTAL_LIQ;
+ format '% MACRO'n PERCENT8.2;
+RUN;
+
+DATA DISPONIBILIDADE_3_setor;
+SET DISPONIBILIDADE_2_setor;
+
+			IF '% SETOR'N >= LIM_VER_SET 		THEN FAROL_SETOR = "VERMELHO";
+	ELSE 	IF '% SETOR'N >= LIM_AMR_SET 		THEN FAROL_SETOR = "AMARELO";
+	ELSE	IF '% SETOR'N < LIM_AMR_SET  		THEN FAROL_SETOR = "VERDE";
+
+RUN;
+
+DATA DISPONIBILIDADE_4_setor;
+SET DISPONIBILIDADE_3_setor;
+
+if 'Setor crédito'N in ('PRIVATE','PRODUTOR RURAL PF')	then FAROL_SETOR = "";
+
+	IF 'Setor crédito'N = 'INSTITUICOES FINANCEIRAS' 			THEN DO;
+		IF ((11361495516*1.5) - 'Exposição Líquida'N) > 0 		THEN FAROL_SETOR = "VERDE";
+		IF ((11361495516*1.5) - 'Exposição Líquida'N) <= 0 		THEN FAROL_SETOR = "VERMELHO";
+	END;
+
+Disponibilidade_setor = LIM_VER_SET * TOTAL_LIQ - 'Exposição Líquida'N;
+format Disponibilidade_setor COMMAX22.2;
+
+RUN;
+
+DATA DISPONIBILIDADE_5_setor;
+SET DISPONIBILIDADE_4_setor;
+
+if 'Setor crédito'N IN ('PRIVATE','PRODUTOR RURAL PF') then Disponibilidade_setor = .;
+
+RUN;
+
+DATA DISPONIBILIDADE_5_macro;
+SET DISPONIBILIDADE_2_macro;
+
+			IF '% MACRO'N >= LIM_VER_MCR 		THEN FAROL_MACRO = "VERMELHO";
+	ELSE 	IF '% MACRO'N >= LIM_AMR_MCR 		THEN FAROL_MACRO = "AMARELO";
+	ELSE	IF '% MACRO'N < LIM_AMR_MCR  		THEN FAROL_MACRO = "VERDE";
+
+	IF 'Macro Setor'N IN ("" "DEMAIS") THEN DELETE;
+
+Disponibilidade_macro = LIM_VER_MCR * TOTAL_LIQ - 'Exposição Líquida'N;
+format Disponibilidade_macro COMMAX22.2;
+
+RUN;
+
+
+PROC SQL;
+	CREATE TABLE BASE_APETITE_3 AS
+		SELECT	A.'Data Ref'N,
+				A.'Grupo Econômico'N,
+				A.'Macro Setor'N,
+				A.'Setor crédito'N,
+				A.'Nível Risco'N,
+				A.Tipo_carteira,
+				A.DsProduto,
+				A.'Exposição Bruta'N,
+				A.'Exposição Líquida'N,
+				A.PDD,
+				A.LIM_VER_SET,
+				A.LIM_VER_MCR,
+				A.LIM_AMR_SET,
+				A.LIM_AMR_MCR,
+				B.'% SETOR'N,
+				B.FAROL_SETOR,
+				C.'% MACRO'N,
+				C.FAROL_MACRO,
+				B.Disponibilidade_setor,
+				C.Disponibilidade_macro
+
+
+
+
+
+	FROM  BASE_APETITE_2 AS A
+	LEFT JOIN DISPONIBILIDADE_5_setor AS B ON(A.'Setor crédito'N = B.'Setor crédito'N)
+	LEFT JOIN DISPONIBILIDADE_5_macro AS C ON(A.'Macro Setor'N = C.'Macro Setor'N);
+QUIT;
+
+
+
+
+
+DATA APETITE_INTEGRADO_&ANOMES.;
+	SET BASE_APETITE_3;
+
+	IF UPCASE('Setor Crédito'n) = "PMES" THEN 'Setor Crédito'n = "PMES";
+
+	
+	format LIM_NÍVELRISCO_ALTO_VER PERCENT8.2;
+	LIM_NÍVELRISCO_ALTO_VER = 0.08;
+	format LIM_NÍVELRISCO_ALTO_AMR PERCENT8.2;
+	LIM_NÍVELRISCO_ALTO_AMR = 0.07;
+
+	format LIM_NÍVELRISCO_MEDIO_VER PERCENT8.2;
+	LIM_NÍVELRISCO_MEDIO_VER = 0.1;
+	format LIM_NÍVELRISCO_MEDIO_AMR PERCENT8.2;
+	LIM_NÍVELRISCO_MEDIO_AMR = 0.09;
+
+	format LIM_NÍVELRISCO_BAIXO_VER PERCENT8.2;
+	LIM_NÍVELRISCO_BAIXO_VER = 0.15;
+	format LIM_NÍVELRISCO_BAIXO_AMR PERCENT8.2;
+	LIM_NÍVELRISCO_BAIXO_AMR = 0.13;
+	
+
+	
+	format LIM_LARGE_VER COMMAX22.2;
+	LIM_LARGE_VER = 630 * 1000000;
+	format LIM_LARGE_AMR COMMAX22.2;
+	LIM_LARGE_AMR = 530 * 1000000;
+
+	format LIM_CORPORATE_VER COMMAX22.2;
+	LIM_CORPORATE_VER = 300 * 1000000;
+	format LIM_CORPORATE_AMR COMMAX22.2;
+	LIM_CORPORATE_AMR = 200 * 1000000;
+
+	format LIM_INSTITFINC_VER COMMAX22.2;
+	LIM_INSTITFINC_VER = 1000 * 1000000;
+	format LIM_INSTITFINC_AMR COMMAX22.2;
+	LIM_INSTITFINC_AMR = 900 * 1000000;
+	
+
+	
+	format LIM_PME_VER COMMAX22.2;
+	LIM_PME_VER = 1700 * 1000000;
+	format LIM_PME_AMR COMMAX22.2;
+	LIM_PME_AMR = 1500 * 1000000;
+	
+
+RUN;
+
+
+
+%MACRO TOP4 (Segmento);
+
+PROC SQL;
+CREATE TABLE GRUPOS AS
+SELECT  'Grupo Econômico'N,
+		Tipo_carteira,
+		SUM('Exposição Bruta'N) AS Exp
+FROM APETITE_INTEGRADO_&ANOMES.
+GROUP BY 1,2
+ORDER BY CALCULATED Exp DESC;
+
+CREATE TABLE GRUPOS AS
+SELECT  *,
+		 MONOTONIC() AS Ranking
+FROM GRUPOS
+WHERE  Tipo_carteira = &Segmento.
+	   AND CALCULATED Ranking <5;
+QUIT;
+
+DATA FL_MAIORES_GRUPOS;
+SET GRUPOS FL_MAIORES_GRUPOS ;
+FL_MAIORES_GPS=1;
+RUN;
+
+%MEND;
+
+DATA FL_MAIORES_GRUPOS;
+SET _NULL_;
+RUN;
+
+%TOP4('GPR/AE');
+%TOP4('LARGE');
+%TOP4('CORPORATE');
+%TOP4('FI');
+
+data APETITE_INTEGRADO_&ANOMES.;
+set APETITE_INTEGRADO_&ANOMES.;
+
+	if 'Grupo Econômico'N IN ('ADVENT KOPENHAGEN') then do;
+		LIM_CORPORATE_VER = 630000000;
+		LIM_CORPORATE_AMR = 504000000;
+	end;
+RUN;
+
+PROC SQL;
+CREATE TABLE APETITE_INTEGRADO_&ANOMES. AS
+SELECT A.*,
+		CASE WHEN B.FL_MAIORES_GPS = 1 THEN 1 ELSE 0 END AS FL_MAIORES_GPS,
+		CASE WHEN A.'Grupo Econômico'n in ( 'BTG PACTUAL' 'CAIXA ECONOMICA FEDERAL'	'BRADESCO' 'SANTANDER' 'BANCO DO BRASIL' 'ITAU') THEN 1 ELSE 0 END AS FL_S1
+FROM APETITE_INTEGRADO_&ANOMES. A
+LEFT JOIN FL_MAIORES_GRUPOS B
+ON A.'Grupo Econômico'N = B.'Grupo Econômico'N;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03_Base_Apetite */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: TOP20 */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 92 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: TOP20 */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-pugYYfsYJjbTgvYK/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname MISCRED '/riscosbv/credito/MISCREDITO';
+libname PDD     '/riscosbv/credito/PDD_RESULTADO';
+
+%macro top(n);
+    data BU_basetop_&n._&mesref.;
+        set BU_top_&mesref.;
+        if _N_ <= &n.;
+        MARCACAO = "TOP&n.";
+    run;
+%mend;
+
+%macro monta_bu(mesref);
+    proc sql;
+        create table BU_&mesref. as
+            select distinct AnoMes_Referencia,
+                            DsGrupoEconomicoRisco,
+                            TIPO_CARTEIRA,
+                            DsGrupoProduto,
+                            DsProduto,
+                            DsStatus_Monitoramento,
+                            DsRatingCliente,
+                            sum(VrSaldo)                   as VrSaldo           format=COMMAX15.0,
+                            sum(VrProvisao)                as VrProvisao        format=COMMAX15.0,
+                            min(DtInicioOperacao)          as ini_operacao      format=MMDDYY10.,
+                            max(DtVencimentoParcela)       as fim_operacao      format=MMDDYY10.
+            from MISCRED.BASE_UNICA_ATACADO_&mesref.
+            where TIPO_CARTEIRA not in ("CORRETORA", "SECURITIES")
+              and DsTipoCarteira = "REGULAR"
+              and DsGrupoEconomicoRisco not in ("S3 BANK")
+            group by 1,2,3,4,5,6,7;
+    quit;
+
+    data BU_&mesref.;
+        set BU_&mesref.;
+
+        
+        if prxmatch('/SACADO|SACADO SME |SACADO SME/', DsGrupoEconomicoRisco) then TIPO_CARTEIRA = "SMES";
+
+        if DsGrupoEconomicoRisco in (
+            'DEB SECURITIZADA FARMTECH', 'DEB SECURITIZADA VAMOS',
+            'FIAGRO MULTITECNICA', 'REDE SIM') then TIPO_CARTEIRA = 'FIDC';
+        if substr(DsGrupoEconomicoRisco,1,4) = 'DEB ' then TIPO_CARTEIRA = 'FIDC';
+        if prxmatch('/FIDC|FIDC |CAIENA AGR |CAIENA AGR/', DsGrupoEconomicoRisco) then TIPO_CARTEIRA = "FIDC";
+        if DsGrupoEconomicoRisco = "FIDC TRADEMASTER" then TIPO_CARTEIRA = "FIDC";
+
+        if DsGrupoEconomicoRisco = "TRADEMASTER" then TIPO_CARTEIRA = "CORPORATE";
+        if DsGrupoEconomicoRisco = "SERVIMED FIDC" then TIPO_CARTEIRA = "FIDC";
+        if DsGrupoEconomicoRisco = "SERVIMED" then TIPO_CARTEIRA = "LARGE";
+
+        if (DsProduto = "CESSÃO DE PORTFÓLIO MULTI" or DsProduto = "CCB PEAC") and
+           DsGrupoEconomicoRisco in ('AIZ.', 'AGRO GALAXY', 'AMAZON', 'VESTAS', 'VILLEFORT') then TIPO_CARTEIRA = 'CORPORATE';
+
+        if (DsProduto = "CESSÃO DE PORTFÓLIO MULTI" or DsProduto = "CCB PEAC") and
+           DsGrupoEconomicoRisco in (
+            'MAGAZINE LUIZA', 'CARREFOUR', 'ATACADAO','ATACADAO S.A.','ATACADAO S.A',
+            'GERDAU', 'ARCELOR', 'DAIMLER', 'PAO DE ACUCAR', 'DROGASIL', 'AMBEV',
+            'VIA VAREJO', 'HAVAN', 'LOCAMERICA', 'LOJAS AMERICANAS', 'LABORATORIO FLEURY') then TIPO_CARTEIRA = 'LARGE';
+
+        
+        if year(fim_operacao) < 2100 then fim_operacao = fim_operacao;
+        else fim_operacao = .;
+
+        if AnoMes_Referencia = 14823 then AnoMes_Referencia = 202012;
+
+        
+        days = sum(fim_operacao, -ini_operacao);
+        dif_dias = intck('day', ini_operacao, fim_operacao);
+
+        if AnoMes_Referencia = 202306 and days > 15000 then days = .;
+        if AnoMes_Referencia = 202306 and dif_dias > 15000 then days = .;
+
+        
+        if DsGrupoEconomicoRisco in (
+            "BANCO DO BRASIL", "BANCO BRADESCO", "BRADESCO", "BTG PACTUAL",
+            "CAIXA ECONÔMICA FEDERAL", "BANCO ITAU", "ITAU", "BANCO SANTANDER", "SANTANDER") then delete;
+    run;
+
+    proc sql;
+        create table BU_top_&mesref. as
+            select distinct AnoMes_Referencia,
+                            DsGrupoEconomicoRisco,
+                            sum(VrSaldo)           as VrSaldo         format=COMMAX15.0,
+                            mean(VrSaldo)          as VrSaldo_Medio   format=COMMAX15.0,
+                            sum(VrProvisao)        as VrProvisao      format=COMMAX15.0,
+                            mean(dif_dias)         as PRAZO_MEDIO_DIAS
+            from BU_&mesref.
+            group by 1,2;
+    quit;
+
+    proc sql;
+        create table BU_total_&mesref. as
+            select distinct AnoMes_Referencia,
+                            "TOTAL"                as DsGrupoEconomicoRisco,
+                            "TOTAL"                as MARCACAO         format=$10.,
+                            sum(VrSaldo)           as VrSaldo          format=COMMAX15.0,
+                            mean(VrSaldo)          as VrSaldo_Medio    format=COMMAX15.0,
+                            sum(VrProvisao)        as VrProvisao       format=COMMAX15.0,
+                            0                      as VrAjustePrudencial format=COMMAX15.0,
+                            0                      as VrImpairment     format=COMMAX15.0,
+                            mean(dif_dias)         as PRAZO_MEDIO_DIAS
+            from BU_&mesref.
+            group by 1,2,3;
+    quit;
+
+    proc sort data=BU_top_&mesref.; by descending VrSaldo; run;
+
+    %top(1);
+    %top(5);
+    %top(10);
+    %top(20);
+	%top(50);
+%mend;
+
+%monta_bu(&anomes.);
+
+data CONSOLIDA;
+    retain AnoMes_Referencia MARCACAO SEGMENTO DsGrupoEconomicoRisco
+           VrSaldo VrSaldo_Medio VrProvisao VrAjustePrudencial VrImpairment PRAZO_MEDIO_DIAS;
+    format MARCACAO $10. DsGrupoEconomicoRisco $50.;
+    set BU_total_: BU_basetop_:;
+
+    DsGrupoEconomicoRisco = strip(DsGrupoEconomicoRisco);
+    if index(upcase(DsGrupoEconomicoRisco), 'SECURITIZADA') > 0 then delete;
+    if index(upcase(DsGrupoEconomicoRisco), 'FIDC') > 0 then delete;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: TOP20 */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01_VARIABLES_LIBNAMES */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 98 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01_VARIABLES_LIBNAMES */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-OjtGMnjfTuCw1hNu/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET ULT_DIA = '30sep2025'D;
+%LET ANOMES = 202509;
+%LET PR = 14271153500; 
+
+%LET ultimo_dia = &ULT_DIA;
+
+LIBNAME TABLEAU "/riscosbv/credito/MISCREDITO/TABLEAU";
+LIBNAME MISCRED BASE "/riscosbv/credito/MISCREDITO";
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01_VARIABLES_LIBNAMES */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 02_De_Para_Macro_Setor */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 98 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 02_De_Para_Macro_Setor */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vtviQtpV8p7Ckoey/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA WORK.DEPARA_MACROSETOR_0;
+    LENGTH
+        SETOR        	  	$ 45
+        MACRO_SETOR       	$ 45 ;
+    FORMAT
+        SETOR             	$CHAR45.
+        MACRO_SETOR       	$CHAR45. ;
+    INFORMAT
+        SETOR             	$CHAR45.
+        MACRO_SETOR       	$CHAR45. ;
+    INFILE DATALINES4
+        DLM='7F'x
+        MISSOVER
+        DSD ;
+    INPUT
+        MACRO_SETOR       	: $CHAR45.
+        SETOR       		: $CHAR45. ;
+DATALINES4;
+AGRONEGOCIOTRADING AGRO
+AGRONEGOCIODEF. AGRICOLAS, FERTILIZANTES E SEMENTES
+AGRONEGOCIOREVENDA INSUMOS AGRÍCOLAS
+AGRONEGOCIOIMPLEMENTOS AGRICOLAS
+AGRONEGOCIOCOOPERATIVAS
+AGRONEGOCIOACUCAR E ALCOOL
+AGRONEGOCIOPRODUTOR RURAL PJ
+AGRONEGOCIOAGROINDUSTRIA
+AGRONEGOCIOPRODUTOR RURAL PF
+AGRONEGOCIOPME AGRO
+ENERGIAGERACAO DE ENERGIA ELETRICA
+ENERGIADISTRIBUICAO DE ENERGIA ELETRICA
+ENERGIACOMERCIALIZACAO DE ENERGIA ELETRICA
+ENERGIATRANSMISSAO DE ENERGIA ELETRICA
+VAREJOVAREJO ESSENCIAL
+VAREJOVAREJO NÃO ESSENCIAL
+VAREJODISTRIBUIDORES DE PAINEL SOLAR
+VAREJOREVENDAS
+INDUSTRIA DE ALIMENTOSINDUSTRIA ALIMENT. / BEBIDAS
+INDUSTRIA DE ALIMENTOSINDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E
+INDUSTRIA DE ALIMENTOSLATICINIOS
+INDUSTRIA DE ALIMENTOSABATE BOVINO
+INDUSTRIA (DEMAIS)BENS DE CAPITAL
+INDUSTRIA (DEMAIS)CERAMICAS
+INDUSTRIA (DEMAIS)EMBALAGENS
+INDUSTRIA (DEMAIS)INDUSTRIA BENS DE CONSUMO
+INDUSTRIA (DEMAIS)INDUSTRIA OUTROS
+INDUSTRIA (DEMAIS)TEXTIL
+OIL & GASDOWNSTREAM / MIDSTREAM / SERVIÇOS DE APOIO
+OIL & GASUPSTREAM
+METAIS E MINÉRIOSSIDERURGIA PRODUCAO
+METAIS E MINÉRIOSMINERACAO
+METAIS E MINÉRIOSMETALURGIA PRODUCAO
+METAIS E MINÉRIOSSIDERURGIA DISTRIBUICAO
+METAIS E MINÉRIOSMETALURGIA DISTRIBUICAO
+REAL ESTATECONSTRUCAO CIVIL - MATERIAIS P/ CONSTRUCAO
+REAL ESTATECONSTRUCAO CIVIL - PESADA
+REAL ESTATECONSTRUCAO CIVIL - INCORPORACAO
+REAL ESTATECONSTRUCAO CIVIL - PROPERTIES/SHOPPINGS
+TRANSPORTE E LOGÍSTICAFERROVIAS
+TRANSPORTE E LOGÍSTICALOGISTICA
+TRANSPORTE E LOGÍSTICANAVEGACAO
+TRANSPORTE E LOGÍSTICAPORTOS
+QUIMICO & FARMACEUTICOQUIMICO
+QUIMICO & FARMACEUTICOFARMACEUTICO
+TURISMO & AÉREASCIAS AEREAS
+TURISMO & AÉREASTURISMO
+VEICULOS (Montad. / Concess. / Autopeças)CONCESSIONARIAS
+VEICULOS (Montad. / Concess. / Autopeças)MONTADORAS/AUTO-PECAS
+DEMAISPAPEL E CELULOSE
+DEMAISINSTITUICOES FINANCEIRAS
+DEMAISSANEAMENTO
+DEMAISTELECOMUNICACOES
+DEMAIST.I.
+DEMAISLOCADORAS
+DEMAISMADEIRA
+DEMAISHIGIENE E LIMPEZA
+DEMAISCONCESSOES RODOVIARIAS
+DEMAISSAUDE
+DEMAISSAUDE ANIMAL
+DEMAISCURTUME
+DEMAISMIDIA
+DEMAISPRIVATE
+SERVIÇOS & TELEMARKETINGSERVICOS
+SERVIÇOS & TELEMARKETINGTELEMARKETING
+SERVIÇOS & TELEMARKETINGTRADING
+;;;;
+
+PROC SQL;
+	CREATE TABLE WORK.LIMITE_SETOR (
+		 SETOR CHAR(50),
+		 LIM_VER_SET_STR CHAR(10),
+		 LIM_AMR_SET_STR CHAR(10),
+		 LIM_VER_SET NUM,
+		 LIM_AMR_SET NUM
+		 );
+
+	INSERT INTO WORK.LIMITE_SETOR
+		VALUES('ACUCAR E ALCOOL', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('DEF. AGRICOLAS, FERTILIZANTES E SEMENTES', '>4%' ,' >3%', 0.04, 0.03) 
+		VALUES('REVENDA INSUMOS AGRÍCOLAS', '>4%' ,' >3%', 0.04, 0.03) 
+		VALUES('IMPLEMENTOS AGRICOLAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('TRADING AGRO', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('AGROINDUSTRIA', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('COOPERATIVAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PRODUTOR RURAL PF', '>3%' ,'>2%', 0.03, 0.02)
+		VALUES('PRODUTOR RURAL PJ', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('PME AGRO', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('DISTRIBUICAO DE ENERGIA ELETRICA', '>5%' ,' >4%', 0.05, 0.04)
+		VALUES('GERACAO DE ENERGIA ELETRICA', '>10%' ,' >9%', 0.1, 0.09)
+		VALUES('COMERCIALIZACAO DE ENERGIA ELETRICA', '>1%' ,' >0,8%', 0.01, 0.008)
+		VALUES('TRANSMISSAO DE ENERGIA ELETRICA', '>12%' ,' >11%', 0.12, 0.11)
+		VALUES('METALURGIA DISTRIBUICAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('METALURGIA PRODUCAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('MINERACAO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('SIDERURGIA DISTRIBUICAO', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('SIDERURGIA PRODUCAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CONSTRUCAO CIVIL - PESADA', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('CONSTRUCAO CIVIL - PROPERTIES/SHOPPINGS', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('CONSTRUCAO CIVIL - INCORPORACAO', '>4%' , ' >3%', 0.04, 0.03)
+		VALUES('CONSTRUCAO CIVIL - MATERIAIS P/ CONSTRUCAO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('DOWNSTREAM / MIDSTREAM / SERVIÇOS DE APOIO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('UPSTREAM', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('VAREJO NÃO ESSENCIAL', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('VAREJO ESSENCIAL', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('DISTRIBUIDORES DE PAINEL SOLAR', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('REVENDAS', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('INDUSTRIA ALIMENT. / BEBIDAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('LATICINIOS', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('ABATE BOVINO', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('BENS DE CAPITAL', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('CERAMICAS', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('EMBALAGENS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INDUSTRIA BENS DE CONSUMO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('INDUSTRIA OUTROS', '>8%' ,'>7%', 0.08, 0.07)
+		VALUES('TEXTIL', '>5%' ,' >4%', 0.05, 0.04)
+		VALUES('FERROVIAS', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('LOGISTICA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('NAVEGACAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PORTOS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('FARMACEUTICO', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('QUIMICO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CONCESSIONARIAS', '>10%' ,' >9%', 0.06, 0.05)
+		VALUES('MONTADORAS/AUTO-PECAS', '>10%' ,' >9%', 0.06, 0.05)
+		VALUES('CIAS AEREAS', '>1,5%' ,' >1,2%', 0.015, 0.012)
+		VALUES('TURISMO', '>6%' ,' >5%', 0.04, 0.03)
+		VALUES('CONCESSOES RODOVIARIAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CURTUME', '>1%' ,' >0,5%', 0.01, 0.005)
+		VALUES('HIGIENE E LIMPEZA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('LOCADORAS', '>10%' ,' >9%', 0.1, 0.09)
+		VALUES('MADEIRA', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('MIDIA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PAPEL E CELULOSE', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SANEAMENTO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SAUDE', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SAUDE ANIMAL', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('T.I.', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('TELECOMUNICACOES', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INSTITUICOES FINANCEIRAS', 'L=R' ,' L=R', 0, 0)
+		VALUES('SERVICOS',  '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('TELEMARKETING', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('TRADING', '>8%' ,' >7%', 0.08, 0.07);
+
+ QUIT;
+
+PROC SQL;
+	CREATE TABLE WORK.LIMITE_MACROSETOR (
+		 MACRO_SETOR CHAR(50),
+		 LIM_VER_MCR_STR CHAR(10),
+		 LIM_AMR_MCR_STR CHAR(10),
+		 LIM_VER_MCR NUM,
+		 LIM_AMR_MCR NUM
+	);
+
+	INSERT INTO WORK.LIMITE_MACROSETOR
+		VALUES('AGRONEGOCIO', '>28%' ,' >25%', 0.28, 0.25)
+		VALUES('ENERGIA', '>20%' ,' >18%', 0.2, 0.18)
+		VALUES('INDUSTRIA DE ALIMENTOS', '>10%' ,' >8%', 0.1, 0.08)
+		VALUES('INDUSTRIA (DEMAIS)', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('TRANSPORTE E LOGÍSTICA', '>15%' ,' >13%', 0.1, 0.08)
+		VALUES('QUIMICO & FARMACEUTICO', '>15%' ,' >13%', 0.15, 0.13)
+		VALUES('VEICULOS (Montad. / Concess. / Autopeças)', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('TURISMO & AÉREAS', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('METAIS E MINÉRIOS', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('OIL & GAS', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('REAL ESTATE', '>6%' ,' >4%', 0.06, 0.04)
+		VALUES('VAREJO', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('SERVIÇOS & TELEMARKETING', '>8%' ,' >6%', 0.08, 0.06);
+QUIT;
+
+PROC SQL;
+	CREATE TABLE DEPARA_MACROSETOR AS
+		SELECT 	A.*,
+				B.LIM_VER_SET_STR,
+				B.LIM_AMR_SET_STR,
+				B.LIM_VER_SET,
+				B.LIM_AMR_SET,
+				C.LIM_VER_MCR_STR,
+				C.LIM_AMR_MCR_STR,
+				C.LIM_VER_MCR,
+				C.LIM_AMR_MCR
+
+	FROM	DEPARA_MACROSETOR_0 AS A
+	LEFT JOIN LIMITE_SETOR AS B ON(A.SETOR = B.SETOR)
+	LEFT JOIN LIMITE_MACROSETOR AS C ON(A.MACRO_SETOR = C.MACRO_SETOR);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 02_De_Para_Macro_Setor */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 03_Spread */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 98 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 03_Spread */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Fvxw45rUcmC14cXA/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE BASE_UNICA AS
+	SELECT
+		t1.DsTipoCarteira,
+		t1.DsClassificacaoCarteira,
+		t1.AnoMes_Referencia,
+		t1.CdClienteRisco,
+		t1.DsClienteRisco,
+		t1.DsGrupoEconomicoRisco,
+		t1.DsRatingCliente,
+		t1.Flag_Novo_Rating,
+		t1.DsSetorClienteRisco_novo,
+		t1.DsNivelRiscoSetor_novo,
+		t1.DsAreaPlc,
+		t1.DsStatus_Monitoramento,
+		t1.NuObjetoNegociacao,
+		t1.DsGrupoProduto,
+		t1.DsProduto,
+		t1.DtInicioOperacao,
+		t1.DtVencimentoParcela,
+		' ' AS NumDiasVencidos,
+		t1.DsMoeda_Indexador,
+		t1.VrSaldoPrincipalAtual,
+		t1.VrSaldo,
+		
+		
+		
+
+
+
+		t1.VrProvisao,
+		t1.VrLimiteGrupoAprovado,
+		t1.VrLimiteGrupoDisponivel,
+		t1.DtVencimentoLimite 
+		
+	FROM MISCRED.BASE_UNICA_ATACADO_&anomes. t1
+		WHERE DsTipoCarteira = 'REGULAR';
+QUIT;
+
+DATA BASE_UNICA;
+
+	SET BASE_UNICA;
+
+	
+	IF (DtVencimentoParcela-"&ultimo_dia"D) < 0 THEN PRAZO = 0;
+	ELSE PRAZO = DtVencimentoParcela-"&ultimo_dia"D;
+
+	
+	IF DsGrupoProduto = "Operações de Garantias" AND YEAR(DtVencimentoParcela) = 2100 THEN FIANCA_INDETERMINADO = 1;
+	ELSE FIANCA_INDETERMINADO = 0;
+
+	IF NuObjetoNegociacao = 'RMEP3' THEN DtVencimentoParcela = '01JAN2100'D;
+
+RUN;
+
+DATA BASE_BU;
+	SET BASE_UNICA (WHERE=(NuObjetoNegociacao IS NOT MISSING));
+	IF DsProduto = 'OPERAÇÃO DE LEASING' THEN NuObjetoNegociacao = COMPRESS(PUT(INPUT(COMPRESS(NuObjetoNegociacao,'C/R'),20.),Z20.));
+RUN;
+
+PROC SQL;
+	DROP TABLE BASE_UNICA;
+QUIT;
+
+					PROC SQL;
+						CREATE TABLE BASE_2 AS
+							SELECT
+								year(t1.ANOMES)*100+month(t1.ANOMES) as ANOREF,
+								t1.Grupo_Economico_SAS AS GrupoEconomico,
+								t1.cdCliente AS CdClienteRisco,
+								t1.DsClienteRisco,
+								t1.CdObjetoNegociacao AS NuObjetoNegociacao,
+								t1.Data_Inicio_Oper,
+								t1.Data_Vencimento_Oper,
+								t1.CdModalidade_Produto_SAS,
+								t1.Modalidade_Produto_SAS,
+								t1.Grupo_CA_SAS,
+								t1.Carteira_Gerencial_SAS_BRL format commax22.2,
+								t1.Volume_Prod_Mes_SAS_BRL as Vol_Producao format commax22.2,
+								t1.Evento,
+								t1.Segmento_Mercado_SAS,
+								t1.Spread format percent7.2,
+								t1.Indexador,
+								t1.Officer_SAS,
+								t1.Head_Ativo,
+								t1.Divisao_Comercial_SAS,
+								t1.GRUPO as Grupo_Final,
+								t1.Faixa_FT2 as Faixa_faturamento
+							FROM TABLEAU.BASE_ATIVOS_&ANOMES. t1
+								WHERE t1.CdObjetoNegociacao IS NOT MISSING;
+					QUIT;
+					
+
+					DATA BASE_2;
+						SET BASE_2;
+
+						
+						IF CdModalidade_Produto_SAS IN ('355','356','358') THEN DO;
+							NuObjetoNegociacao = substr(NuObjetoNegociacao, find(NuObjetoNegociacao,'-')+1, find(NuObjetoNegociacao,' ') - find(NuObjetoNegociacao,'-')-1);
+						END;
+
+						
+						IF Modalidade_Produto_SAS = 'Fiança - Loan 4131' THEN DELETE;
+					RUN;
+
+					PROC SQL;
+					CREATE TABLE BASE_FINANCAS AS
+						SELECT
+							t1.NuObjetoNegociacao,
+							t1.Indexador,
+							t1.Modalidade_Produto_SAS,
+							t1.Officer_SAS,
+							t1.Head_Ativo,
+							t1.Divisao_Comercial_SAS,
+							t1.Grupo_Final,
+							t1.Faixa_faturamento,
+							(AVG(t1.SPREAD)) FORMAT=PERCENT7.2 AS SPREAD
+						FROM WORK.BASE_2 t1
+							GROUP BY 1,2
+					;
+					CREATE TABLE BASE_FINANCAS_CLIENTE AS
+						SELECT
+							 CdClienteRisco,
+							MAX(Faixa_Faturamento) AS Faixa_Faturamento
+						FROM WORK.BASE_2
+							WHERE CdClienteRisco NOT IN ( ., -1) 
+							GROUP BY 1;
+					QUIT;
+					
+
+					DATA BASE_FINANCAS;
+						SET BASE_FINANCAS;
+						IF Modalidade_Produto_SAS= 'Leasing Financeiro' THEN NuObjetoNegociacao = COMPRESS(PUT(INPUT(COMPRESS(NuObjetoNegociacao,'C/R'),20.),Z20.));
+					RUN;
+
+					PROC SORT DATA=BASE_FINANCAS NODUPKEY;
+						BY NuObjetoNegociacao;
+					RUN;
+
+					
+
+					DATA BASE_FINAL_1 ;
+						SET JOIN_BU_FINANCAS;
+
+						
+
+						Spread_X_VrSaldo = SPREAD * VrSaldo;
+						IF FIANCA_INDETERMINADO = 0 THEN Prazo_X_VrSaldo = PRAZO * VrSaldo;
+						ELSE Prazo_X_VrSaldo = 0;
+						RENAME DsMoeda_Indexador = CARTEIRA;
+						
+						VrSaldo = COALESCE(VrSaldo,0);
+						VrProvisao = COALESCE(VrProvisao,0);
+
+
+
+					RUN;
+
+					PROC SORT DATA=BASE_FINAL_1;
+						BY DsGrupoEconomicoRisco NuObjetoNegociacao DtVencimentoParcela;
+					RUN;
+
+					
+
+					PROC SQL;
+					CREATE TABLE BASE_FINAL_2 AS
+						SELECT
+							t1.AnoMes_Referencia,
+							t1.DsGrupoEconomicoRisco AS Grupo,
+							t1.CdClienteRisco,
+							t1.DsClienteRisco LABEL='' AS Empresa,
+							t1.DsSetorClienteRisco_novo,
+							t1.DsStatus_Monitoramento,
+							t1.DsAreaPlc,
+							t1.DtInicioOperacao,
+							t1.NuObjetoNegociacao,
+							t1.DsProduto,
+							(SUM(t1.VrSaldo)) FORMAT=COMMAX22.2 AS Saldo,
+							t1.DsClassificacaoCarteira AS DsClassificacaoCarteira,
+							CASE
+								WHEN t1.DsProduto IN (
+									'FINAME BNDES', 'COMPROR FLEX', 'OPERAÇÃO DE LEASING', 'BNDES AUTOMATICO', 'LOAN OFFSHORE', 'LOAN-4131',
+									'CAPITAL DE GIRO PRE', 'Adiantamento a Cooperados', 'FORFAITING', 'CERTIFICADO DC DO AGRONEGOCIO') THEN 'Empréstimos'
+								WHEN UPCASE(SUBSTR(t1.DsProduto,1,13)) IN ('CRÉDITO RURAL','CREDITO RURAL') THEN 'Empréstimos'
+								WHEN t1.DsProduto IN ('FINIMP') THEN 'Trade Finance'
+								WHEN t1.DsProduto IN ('ACOES PREFERENCIAIS RESGATAVEIS') THEN 'Operações Estruturadas'
+								WHEN t1.DsProduto IN (
+									'OPCOES FLEXIVEIS','NDF CETIP','SWAP COM FLUXO','SWAP CETIP','CREDIT DEFAULT SWAP','SWAP','NON DELIVERABLE FORWARD',
+									'CREDIT COLLATERAL') THEN 'Derivativos'
+								ELSE t1.DsGrupoProduto
+							END AS GrupoProdutoNovo,
+							' ' as Trimestre,
+							t1.CARTEIRA AS Moeda,
+							' ' AS Faixa_Faturamento,
+							INTNX('MONTH',INPUT(PUT(t1.AnoMes_Referencia,6. -L),YYMMN6.),1)-1 AS Nova_Data FORMAT=DDMMYYS10.,
+							SUM(t1.VrProvisao) AS Saldo_PDD,
+
+
+
+
+							t1.DsNivelRiscoSetor_novo AS RiscoSetor,
+							t1.Officer_SAS,
+							t1.Head_Ativo,
+							t1.Divisao_Comercial_SAS,
+							t1.Grupo_Final,
+							t1.Spread,
+							SUM(t1.Spread*t1.VrSaldo) AS Pond_Spread,
+							'' AS Ajuste_Fin,
+							'' AS login_Head,
+							'' AS Gerente_Credito,
+							'' AS Analista_Credito,
+							'' AS Setor_Final,
+							'' AS 'Hibrido?'n,
+							t1.VrLimiteGrupoAprovado,
+							t1.VrLimiteGrupoDisponivel,
+							t1.DtVencimentoLimite
+						FROM WORK.BASE_FINAL_1 t1
+							GROUP BY
+								t1.AnoMes_Referencia,
+								t1.DsGrupoEconomicoRisco,
+								t1.CdClienteRisco,
+								t1.DsClienteRisco,
+								t1.DsSetorClienteRisco_novo,
+								t1.DsStatus_Monitoramento,
+								t1.DsAreaPlc,
+								t1.DtInicioOperacao,
+								t1.NuObjetoNegociacao,
+								t1.DsProduto,
+								t1.DsClassificacaoCarteira,
+								t1.DsGrupoProduto,
+								t1.CARTEIRA,
+
+								t1.DsNivelRiscoSetor_novo,
+								t1.Officer_SAS,
+								t1.Head_Ativo,
+								t1.Divisao_Comercial_SAS,
+								t1.Grupo_Final,
+								t1.Spread,
+								t1.VrLimiteGrupoAprovado,
+								t1.VrLimiteGrupoDisponivel,
+								t1.DtVencimentoLimite ;
+					QUIT;
+
+					
+
+					PROC SQL;
+						CREATE TABLE BASE_FINAL_2 AS
+						SELECT 	A.*,
+								B.MACRO_SETOR
+
+						FROM 		BASE_FINAL_2 AS A
+						LEFT JOIN	DEPARA_MACROSETOR AS B ON(A.DsSetorClienteRisco_novo = B.SETOR);
+					QUIT;
+
+					PROC SQL;
+						CREATE TABLE SPREAD_POND_SETOR AS
+						SELECT	DsSetorClienteRisco_novo,
+								SUM(Pond_Spread) / SUM(Saldo) AS SPREAD_MEDIO_SETOR
+						FROM BASE_FINAL_2
+						WHERE GrupoProdutoNovo NOT IN ("Mercado Bancário" "Derivativos")
+						GROUP BY 1;
+
+						CREATE TABLE SPREAD_POND_MACRO AS
+						SELECT	MACRO_SETOR,
+								SUM(Pond_Spread) / SUM(Saldo) AS SPREAD_MEDIO_MACRO
+						FROM BASE_FINAL_2
+						WHERE GrupoProdutoNovo NOT IN ("Mercado Bancário" "Derivativos")
+						GROUP BY 1;
+					QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 03_Spread */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 04_Base_Apetite */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 98 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 04_Base_Apetite */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-vChcEbCvhSpS6Vid/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA BU_POND;
+	SET MISCRED.BASE_UNICA_ATACADO_&ANOMES.;
+
+	PRAZO_POND = ((DtVencimentoParcela - &ULT_DIA.)/365)*VRSALDO;
+
+	WHERE YEAR(DtVencimentoParcela) NE 2100;
+RUN;
+
+PROC SQL;
+	CREATE TABLE BU_POND AS
+	SELECT 	A.*,
+			B.MACRO_SETOR
+
+	FROM 		BU_POND AS A
+	LEFT JOIN	DEPARA_MACROSETOR AS B ON(A.DsSetorClienteRisco_novo = B.SETOR);
+QUIT;
+
+PROC SQL;
+	CREATE TABLE PRAZO_POND_SETOR AS
+		SELECT	DsSetorClienteRisco_novo,
+				SUM(PRAZO_POND) AS PRAZO_POND,
+				SUM(VRSALDO) AS VRSALDO,
+				SUM(PRAZO_POND)/SUM(VRSALDO) AS PRAZO_SETOR
+	FROM BU_POND
+	GROUP BY 1;
+
+	CREATE TABLE PRAZO_POND_MACRO AS
+		SELECT	MACRO_SETOR,
+				SUM(PRAZO_POND) AS PRAZO_POND,
+				SUM(VRSALDO) AS VRSALDO,
+				SUM(PRAZO_POND)/SUM(VRSALDO) AS PRAZO_MACRO
+	FROM BU_POND
+	GROUP BY 1;
+
+QUIT;
+
+DATA BASE_UNICA_ATACADO_&ANOMES.;
+	SET MISCRED.BASE_UNICA_ATACADO_&ANOMES.;
+
+	IF 	DsProduto IN (	"NDF CETIP" ,
+						"OPCOES FLEXIVEIS" ,
+						"SWAP COM FLUXO" ,
+						"CREDIT LINK NOTE" ,
+						"CREDIT DEFAULT SWAP" ,
+						"NON DELIVERABLE FORWARD",
+						"SWAP" ,
+						"SWAP CETIP") THEN
+		VrAjusteMTM = 0;
+
+	VRSALDO = VRSALDO * 1;
+RUN;
+
+PROC SQL;
+CREATE TABLE BASE_APETITE_0 AS
+	SELECT DISTINCT
+			A.AnoMes_Referencia as 'Data Ref'n,
+			A.DsGrupoEconomicoRisco as 'Grupo Econômico'n,
+			B.MACRO_SETOR as 'Macro Setor'n,
+			A.DsSetorClienteRisco_novo as 'Setor crédito'n,
+			A.DsNivelRiscoSetor_novo as 'Nível Risco'n,
+			A.Tipo_carteira,
+			A.DsProduto,
+			COALESCE(SUM(A.VrSaldo),0) AS 'Exposição Bruta'N,
+			COALESCE(SUM(A.VrAjusteMTM),0) AS AJUSTEMTM,
+			COALESCE(SUM(A.VrProvisao),0) AS PROVISAO,
+			C.PRAZO_SETOR as 'Prazo Médio setor'n,
+			D.SPREAD_MEDIO_SETOR as 'Spread Médio setor'n,
+			B.LIM_VER_SET,
+			B.LIM_AMR_SET,
+			B.LIM_VER_SET ,
+			B.LIM_VER_MCR,
+			B.LIM_AMR_MCR,
+			B.LIM_VER_MCR,
+			B.LIM_AMR_MCR
+
+	FROM BASE_UNICA_ATACADO_&ANOMES. AS A
+	LEFT JOIN DEPARA_MACROSETOR AS B ON(A.DsSetorClienteRisco_novo = B.SETOR)
+	LEFT JOIN PRAZO_POND_SETOR AS C ON(A.DsSetorClienteRisco_novo = C.DsSetorClienteRisco_novo)
+	LEFT JOIN SPREAD_POND_SETOR AS D ON(A.DsSetorClienteRisco_novo = D.DsSetorClienteRisco_novo)
+	WHERE DsTipoCarteira in ('REGULAR', 'OPAC')
+	GROUP BY 1,2,3,4,5,6,7;
+QUIT;
+
+PROC SQL;
+	CREATE TABLE BASE_APETITE_0_1 AS
+	SELECT DISTINCT	A.*,
+					B.SPREAD_MEDIO_MACRO AS 'Spread Médio macro'n,
+					C.PRAZO_MACRO AS 'Prazo Médio macro'n
+
+	FROM BASE_APETITE_0 AS A
+	LEFT JOIN SPREAD_POND_MACRO AS B ON( A.'Macro Setor'n = B.MACRO_SETOR)
+	LEFT JOIN PRAZO_POND_MACRO AS C ON( A.'Macro Setor'n = C.MACRO_SETOR);
+
+QUIT;
+
+DATA BASE_APETITE_1;
+SET BASE_APETITE_0_1;
+PDD = PROVISAO - AJUSTEMTM;
+
+IF 'Prazo Médio macro'n < 0 THEN 'Prazo Médio macro'n = 0;
+IF 'Prazo Médio setor'n < 0 THEN 'Prazo Médio setor'n = 0;
+
+RUN;
+
+DATA BASE_APETITE_2;
+SET BASE_APETITE_1;
+
+'Exposição Líquida'N = 'Exposição Bruta'N - PDD;
+
+RUN;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PROC SQL;
+	CREATE TABLE SALDI_LIQ AS
+	SELECT DISTINCT
+					"JOIN" AS JOIN,
+					SUM('Exposição Líquida'N) AS TOTAL_LIQ FORMAT COMMAX22.2
+	FROM BASE_APETITE_2
+	;
+	CREATE TABLE DISPONIBILIDADE_0_setor AS
+		SELECT DISTINCT
+						"JOIN" AS JOIN,
+						A.'Setor crédito'n,
+						MAX(A.LIM_VER_SET) AS LIM_VER_SET format PERCENT8.2,
+						MAX(A.LIM_AMR_SET) AS LIM_AMR_SET format PERCENT8.2,
+						SUM(A.'Exposição Líquida'N) AS 'Exposição Líquida'N
+
+	FROM BASE_APETITE_2 AS A
+	GROUP BY 1,2;
+
+	CREATE TABLE DISPONIBILIDADE_0_macro AS
+		SELECT DISTINCT
+						"JOIN" AS JOIN,
+						A.'Macro Setor'n,
+						MAX(A.LIM_VER_MCR) AS LIM_VER_MCR format PERCENT8.2,
+						MAX(A.LIM_AMR_MCR) AS LIM_AMR_MCR format PERCENT8.2,
+						SUM(A.'Exposição Líquida'N) AS 'Exposição Líquida'N
+
+	FROM BASE_APETITE_2 AS A
+	GROUP BY 1,2;
+QUIT;
+
+PROC SQL;
+	CREATE TABLE DISPONIBILIDADE_1_setor AS
+	SELECT DISTINCT
+					A.*,
+					B.TOTAL_LIQ
+	FROM DISPONIBILIDADE_0_setor AS A
+	LEFT JOIN SALDI_LIQ AS B ON(A.JOIN = B.JOIN);
+QUIT;
+
+PROC SQL;
+	CREATE TABLE DISPONIBILIDADE_1_macro AS
+	SELECT DISTINCT
+					A.*,
+					B.TOTAL_LIQ
+	FROM DISPONIBILIDADE_0_macro AS A
+	LEFT JOIN SALDI_LIQ AS B ON(A.JOIN = B.JOIN);
+QUIT;
+
+DATA DISPONIBILIDADE_2_setor;
+SET DISPONIBILIDADE_1_setor;
+
+'% SETOR'N = 'Exposição Líquida'N / TOTAL_LIQ;
+ format '% SETOR'n PERCENT8.2;
+RUN;
+
+DATA DISPONIBILIDADE_2_macro;
+SET DISPONIBILIDADE_1_macro;
+
+'% MACRO'N = 'Exposição Líquida'N / TOTAL_LIQ;
+ format '% MACRO'n PERCENT8.2;
+RUN;
+
+DATA DISPONIBILIDADE_3_setor;
+SET DISPONIBILIDADE_2_setor;
+
+			IF '% SETOR'N >= LIM_VER_SET 		THEN FAROL_SETOR = "VERMELHO";
+	ELSE 	IF '% SETOR'N >= LIM_AMR_SET 		THEN FAROL_SETOR = "AMARELO";
+	ELSE	IF '% SETOR'N < LIM_AMR_SET  		THEN FAROL_SETOR = "VERDE";
+
+RUN;
+
+DATA DISPONIBILIDADE_4_setor;
+SET DISPONIBILIDADE_3_setor;
+	IF 'Setor crédito'N = 'PMES' 						THEN DELETE;
+	IF 'Setor crédito'N = 'INDUSTRIA OUTROS' 			THEN FAROL_SETOR = "VERDE";
+	IF 'Setor crédito'N = 'PRODUTOR RURAL PF' 			THEN FAROL_SETOR = "";
+	IF 'Setor crédito'N = 'PME AGRO' 						THEN FAROL_SETOR = "";
+
+	IF 'Setor crédito'N = 'INSTITUICOES FINANCEIRAS' 			THEN DO;
+		IF ((12774040013*1.5) - 'Exposição Líquida'N) > 0 		THEN FAROL_SETOR = "VERDE";
+		IF ((12774040013*1.5) - 'Exposição Líquida'N) <= 0 		THEN FAROL_SETOR = "VERMELHO";
+		END;
+	IF 'Setor crédito'N = 'PROJECT FINANCE' 			THEN DO;
+		IF ((12774040013*0.3) - 'Exposição Líquida'N) > 0 		THEN FAROL_SETOR = "VERDE";
+		IF ((12774040013*0.3) - 'Exposição Líquida'N) <= 0 		THEN FAROL_SETOR = "VERMELHO";
+		END;
+
+Disponibilidade_setor = LIM_VER_SET * TOTAL_LIQ - 'Exposição Líquida'N;
+format Disponibilidade_setor COMMAX22.2;
+
+RUN;
+
+DATA DISPONIBILIDADE_5_setor;
+SET DISPONIBILIDADE_4_setor;
+
+	IF 'Setor crédito'N = 'INSTITUICOES FINANCEIRAS' 			THEN DO;
+		Disponibilidade_setor = ((12774040013*1.5)  - 'Exposição Líquida'N); END;
+
+	IF 'Setor crédito'N = 'PROJECT FINANCE' 					THEN DO;
+		Disponibilidade_setor = ((12774040013*0.3) - 'Exposição Líquida'N); END;
+
+	IF 'Setor crédito'N IN ('PRODUTOR RURAL PF' 'INDUSTRIA OUTROS' 'PME AGRO')
+																THEN Disponibilidade_setor = .;
+
+RUN;
+
+DATA DISPONIBILIDADE_5_macro;
+SET DISPONIBILIDADE_2_macro;
+
+			IF '% MACRO'N >= LIM_VER_MCR 		THEN FAROL_MACRO = "VERMELHO";
+	ELSE 	IF '% MACRO'N >= LIM_AMR_MCR 		THEN FAROL_MACRO = "AMARELO";
+	ELSE	IF '% MACRO'N < LIM_AMR_MCR  		THEN FAROL_MACRO = "VERDE";
+
+	IF 'Macro Setor'N IN ("" "DEMAIS") THEN DELETE;
+
+Disponibilidade_macro = LIM_VER_MCR * TOTAL_LIQ - 'Exposição Líquida'N;
+format Disponibilidade_macro COMMAX22.2;
+
+RUN;
+
+
+PROC SQL;
+	CREATE TABLE BASE_APETITE_3 AS
+		SELECT	A.'Data Ref'N,
+				A.'Grupo Econômico'N,
+				A.'Macro Setor'N,
+				A.'Setor crédito'N,
+				A.'Nível Risco'N,
+				A.Tipo_carteira,
+				A.DsProduto,
+				A.'Exposição Bruta'N,
+				A.'Exposição Líquida'N,
+				A.PDD,
+				A.LIM_VER_SET,
+				A.LIM_VER_MCR,
+				A.LIM_AMR_SET,
+				A.LIM_AMR_MCR,
+				B.'% SETOR'N,
+				B.FAROL_SETOR,
+				C.'% MACRO'N,
+				C.FAROL_MACRO,
+				B.Disponibilidade_setor,
+				C.Disponibilidade_macro,
+				A.'Spread Médio setor'N,
+				A.'Spread Médio macro'N,
+				A.'Prazo Médio setor'n,
+				A.'Prazo Médio macro'n
+
+	FROM  BASE_APETITE_2 AS A
+	LEFT JOIN DISPONIBILIDADE_5_setor AS B ON(A.'Setor crédito'N = B.'Setor crédito'N)
+	LEFT JOIN DISPONIBILIDADE_5_macro AS C ON(A.'Macro Setor'N = C.'Macro Setor'N);
+QUIT;
+
+
+
+DATA APETITE_INTEGRADO_&ANOMES.;
+	SET BASE_APETITE_3;
+
+	IF UPCASE('Setor Crédito'n) = "PMES" THEN 'Setor Crédito'n = "PMES";
+
+	
+	format LIM_NÍVELRISCO_ALTO_VER PERCENT8.2;
+	LIM_NÍVELRISCO_ALTO_VER = 0.08;
+	format LIM_NÍVELRISCO_ALTO_AMR PERCENT8.2;
+	LIM_NÍVELRISCO_ALTO_AMR = 0.07;
+
+	format LIM_NÍVELRISCO_MEDIO_VER PERCENT8.2;
+	LIM_NÍVELRISCO_MEDIO_VER = 0.1;
+	format LIM_NÍVELRISCO_MEDIO_AMR PERCENT8.2;
+	LIM_NÍVELRISCO_MEDIO_AMR = 0.09;
+
+	format LIM_NÍVELRISCO_BAIXO_VER PERCENT8.2;
+	LIM_NÍVELRISCO_BAIXO_VER = 0.15;
+	format LIM_NÍVELRISCO_BAIXO_AMR PERCENT8.2;
+	LIM_NÍVELRISCO_BAIXO_AMR = 0.13;
+	
+
+	
+	format LIM_LARGE_VER COMMAX22.2;
+	LIM_LARGE_VER = 630 * 1000000;
+	format LIM_LARGE_AMR COMMAX22.2;
+	LIM_LARGE_AMR = 530 * 1000000;
+
+	format LIM_CORPORATE_VER COMMAX22.2;
+	LIM_CORPORATE_VER = 300 * 1000000;
+	format LIM_CORPORATE_AMR COMMAX22.2;
+	LIM_CORPORATE_AMR = 200 * 1000000;
+
+	format LIM_INSTITFINC_VER COMMAX22.2;
+	LIM_INSTITFINC_VER = 1000 * 1000000;
+	format LIM_INSTITFINC_AMR COMMAX22.2;
+	LIM_INSTITFINC_AMR = 900 * 1000000;
+	
+
+	
+	format LIM_PME_VER COMMAX22.2;
+	LIM_PME_VER = 1700 * 1000000;
+	format LIM_PME_AMR COMMAX22.2;
+	LIM_PME_AMR = 1500 * 1000000;
+	
+
+RUN;
+
+
+
+%MACRO TOP4 (Segmento);
+
+PROC SQL;
+CREATE TABLE GRUPOS AS
+SELECT  'Grupo Econômico'N,
+		Tipo_carteira,
+		SUM('Exposição Bruta'N) AS Exp
+FROM APETITE_INTEGRADO_&ANOMES.
+GROUP BY 1,2
+ORDER BY CALCULATED Exp DESC;
+
+CREATE TABLE GRUPOS AS
+SELECT  *,
+		 MONOTONIC() AS Ranking
+FROM GRUPOS
+WHERE  Tipo_carteira = &Segmento.
+	   AND CALCULATED Ranking <5;
+QUIT;
+
+DATA FL_MAIORES_GRUPOS;
+SET GRUPOS FL_MAIORES_GRUPOS ;
+FL_MAIORES_GPS=1;
+RUN;
+
+%MEND;
+
+DATA FL_MAIORES_GRUPOS;
+SET _NULL_;
+RUN;
+
+%TOP4('GPR/AE');
+%TOP4('LARGE');
+%TOP4('CORPORATE');
+%TOP4('FI');
+
+data APETITE_INTEGRADO_&ANOMES.;
+set APETITE_INTEGRADO_&ANOMES.;
+
+	if 'Grupo Econômico'N IN ('ADVENT KOPENHAGEN') then do;
+		LIM_CORPORATE_VER = 630000000;
+		LIM_CORPORATE_AMR = 504000000;
+	end;
+	if 'Setor crédito'N IN ('ELETRICO','CONCESSOES PUBLICAS','PRIVATE') then do;
+		FAROL_SETOR = "";
+	end;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE APETITE_INTEGRADO_&ANOMES. AS
+SELECT A.*,
+		CASE WHEN B.FL_MAIORES_GPS = 1 THEN 1 ELSE 0 END AS FL_MAIORES_GPS,
+		CASE WHEN A.'Grupo Econômico'n in ( 'BTG PACTUAL' 'CAIXA ECONOMICA FEDERAL'	'BRADESCO' 'SANTANDER' 'BANCO DO BRASIL' 'ITAU') THEN 1 ELSE 0 END AS FL_S1
+FROM APETITE_INTEGRADO_&ANOMES. A
+LEFT JOIN FL_MAIORES_GRUPOS B
+ON A.'Grupo Econômico'N = B.'Grupo Econômico'N;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 04_Base_Apetite */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 99_Vencimentario */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: PFD Flow 98 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 99_Vencimentario */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-d8dArujl8ucCRNXa/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET DT_MAX_VENCIMENTARIO = %SYSFUNC(intnx(month,"&ULT_DIA."d,6,e),YYYYMMDD.);
+
+
+PROC SQL;
+	CREATE TABLE WORK.VENCIMENTARIO_0 AS
+		SELECT
+			t1.DsGrupoEconomicoRisco,
+			T1.DsSetorClienteRisco_novo,
+			put(t1.DtVencimentoParcela, yymmn.) as DT_Vencimento,
+			intnx('month', "&ult_dia."d, 6) as MAX_VENCIMENTARIO format=YYMMN.,
+			intck('month',"&ult_dia."d, T1.DtVencimentoParcela) AS Meses_diff,
+			t1.VrSaldo,
+			B.MACRO_SETOR
+		FROM MISCRED.BASE_UNICA_ATACADO_&anomes. t1
+			LEFT JOIN DEPARA_MACROSETOR AS B ON(T1.DsSetorClienteRisco_novo = B.SETOR)
+		WHERE DsTipoCarteira = 'REGULAR' AND CALCULATED Meses_diff BETWEEN 0 AND 6;
+QUIT;
+
+PROC SQL;
+	CREATE TABLE VENCIMENTARIO_1 AS
+		SELECT
+			&anomes. as dt_ref,
+			DsSetorClienteRisco_novo,
+			MACRO_SETOR,
+			DT_Vencimento,
+			Meses_diff,
+			SUM(VrSaldo) AS SALDO_VENCIMENTARIO
+		FROM WORK.VENCIMENTARIO_0
+		GROUP BY 1,2,3,4,5;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 99_Vencimentario */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 99_AnalisePontual */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: PFD Flow 98 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 99_AnalisePontual */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-AU3OmDLXSIFtIfx2/code.sas */
+/* =========================INÍCIO TASK========================= */
+%macro APET (mesini, mesfim);
+
+%do i = &mesini. %to &mesfim.;
+%if %substr(&i, 5, 2) >= 13 %then %let i = %eval(&i + 88);
+
+	proc sql;
+	create table APET_TOT_&i. as select distinct
+
+	'Data Ref'n 				as MES,
+	'Grupo Econômico'n          as Grupo,
+	sum('Exposição Bruta'n) 	as Exp_Bruta,
+	sum('Exposição Líquida'n) 	as Exp_Liq
+	from MISCRED.APETITE_INTEGRADO_&i.
+	where 'Grupo Econômico'n not in ('BTG PACTUAL' 'CAIXA ECONOMICA FEDERAL' 'BRADESCO' 'SANTANDER' 'BANCO DO BRASIL' 'ITAU') and
+		   TIPO_CARTEIRA NOT IN ('SECURITIES' 'CORRETORA')
+	group by 1,2
+	order by calculated Exp_Liq desc;
+
+	create table EXP_TOP25_&i. as
+	select *,
+		   MONOTONIC() AS Ranking
+	from APET_TOT_&i.
+	where CALCULATED Ranking LE 25;
+
+	create table EXP_TOT_&i. as
+	select distinct
+	MES				as MES,
+	'CARTEIRA'      as Grupo,
+	sum(Exp_Bruta) 	as Exp_Bruta,
+	sum(Exp_Liq) 	as Exp_Liq
+	from APET_TOT_&i.
+	group by 1,2;
+	quit;
+
+%end;
+
+%mend;
+
+%APET (202112,202212);
+
+
+
+
+
+data APET;
+set EXP_TOT_:
+	EXP_TOP25_:;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 99_AnalisePontual */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: PFD Flow 98 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-lL5hckttf1S3hUHN/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA WORK.DEPARA_MACROSETOR_0;
+    LENGTH
+        SETOR        	  	$ 45
+        MACRO_SETOR       	$ 45 ;
+    FORMAT
+        SETOR             	$CHAR45.
+        MACRO_SETOR       	$CHAR45. ;
+    INFORMAT
+        SETOR             	$CHAR45.
+        MACRO_SETOR       	$CHAR45. ;
+    INFILE DATALINES4
+        DLM='7F'x
+        MISSOVER
+        DSD ;
+    INPUT
+        MACRO_SETOR       	: $CHAR45.
+        SETOR       		: $CHAR45. ;
+DATALINES4;
+AGRONEGOCIOTRADING AGRO
+AGRONEGOCIODEF. AGRICOLAS, FERTILIZANTES E SEMENTES
+AGRONEGOCIOREVENDA INSUMOS AGRÍCOLAS
+AGRONEGOCIOIMPLEMENTOS AGRICOLAS
+AGRONEGOCIOCOOPERATIVAS
+AGRONEGOCIOACUCAR E ALCOOL
+AGRONEGOCIOPRODUTOR RURAL PJ
+AGRONEGOCIOAGROINDUSTRIA
+AGRONEGOCIOPRODUTOR RURAL PF
+AGRONEGOCIOPME AGRO
+ENERGIAGERACAO DE ENERGIA ELETRICA
+ENERGIADISTRIBUICAO DE ENERGIA ELETRICA
+ENERGIACOMERCIALIZACAO DE ENERGIA ELETRICA
+ENERGIATRANSMISSAO DE ENERGIA ELETRICA
+VAREJOVAREJO ESSENCIAL
+VAREJOVAREJO NÃO ESSENCIAL
+VAREJODISTRIBUIDORES DE PAINEL SOLAR
+VAREJOREVENDAS
+INDUSTRIA DE ALIMENTOSINDUSTRIA ALIMENT. / BEBIDAS
+INDUSTRIA DE ALIMENTOSINDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E
+INDUSTRIA DE ALIMENTOSLATICINIOS
+INDUSTRIA DE ALIMENTOSABATE BOVINO
+INDUSTRIA (DEMAIS)BENS DE CAPITAL
+INDUSTRIA (DEMAIS)CERAMICAS
+INDUSTRIA (DEMAIS)EMBALAGENS
+INDUSTRIA (DEMAIS)INDUSTRIA BENS DE CONSUMO
+INDUSTRIA (DEMAIS)INDUSTRIA OUTROS
+INDUSTRIA (DEMAIS)TEXTIL
+OIL & GASDOWNSTREAM / MIDSTREAM / SERVIÇOS DE APOIO
+OIL & GASUPSTREAM
+METAIS E MINÉRIOSSIDERURGIA PRODUCAO
+METAIS E MINÉRIOSMINERACAO
+METAIS E MINÉRIOSMETALURGIA PRODUCAO
+METAIS E MINÉRIOSSIDERURGIA DISTRIBUICAO
+METAIS E MINÉRIOSMETALURGIA DISTRIBUICAO
+REAL ESTATECONSTRUCAO CIVIL - MATERIAIS P/ CONSTRUCAO
+REAL ESTATECONSTRUCAO CIVIL - PESADA
+REAL ESTATECONSTRUCAO CIVIL - INCORPORACAO
+REAL ESTATECONSTRUCAO CIVIL - PROPERTIES/SHOPPINGS
+TRANSPORTE E LOGÍSTICAFERROVIAS
+TRANSPORTE E LOGÍSTICALOGISTICA
+TRANSPORTE E LOGÍSTICANAVEGACAO
+TRANSPORTE E LOGÍSTICAPORTOS
+QUIMICO & FARMACEUTICOQUIMICO
+QUIMICO & FARMACEUTICOFARMACEUTICO
+TURISMO & AÉREASCIAS AEREAS
+TURISMO & AÉREASTURISMO
+VEICULOS (Montad. / Concess. / Autopeças)CONCESSIONARIAS
+VEICULOS (Montad. / Concess. / Autopeças)MONTADORAS/AUTO-PECAS
+DEMAISPAPEL E CELULOSE
+DEMAISINSTITUICOES FINANCEIRAS
+DEMAISSANEAMENTO
+DEMAISTELECOMUNICACOES
+DEMAIST.I.
+DEMAISLOCADORAS
+DEMAISMADEIRA
+DEMAISHIGIENE E LIMPEZA
+DEMAISCONCESSOES RODOVIARIAS
+DEMAISSAUDE
+DEMAISSAUDE ANIMAL
+DEMAISCURTUME
+DEMAISMIDIA
+DEMAISPRIVATE
+SERVIÇOS & TELEMARKETINGSERVICOS
+SERVIÇOS & TELEMARKETINGTELEMARKETING
+SERVIÇOS & TELEMARKETINGTRADING
+
+;;;;
+
+PROC SQL;
+	CREATE TABLE WORK.LIMITE_SETOR (
+		 SETOR CHAR(50),
+		 LIM_VER_SET_STR CHAR(10),
+		 LIM_AMR_SET_STR CHAR(10),
+		 LIM_VER_SET NUM,
+		 LIM_AMR_SET NUM
+		 );
+
+	INSERT INTO WORK.LIMITE_SETOR
+		VALUES('ACUCAR E ALCOOL', '>8%' ,'>7%', 0.08, 0.07)
+		VALUES('DEF. AGRICOLAS, FERTILIZANTES E SEMENTES', '>4%' ,'>3%', 0.04, 0.03) 
+		VALUES('REVENDA INSUMOS AGRÍCOLAS', '>4%' ,'>3%', 0.04, 0.03) 
+		VALUES('IMPLEMENTOS AGRICOLAS', '>8%' ,'>7%', 0.08, 0.07)
+		VALUES('TRADING AGRO', '>6%' ,'>5%', 0.06, 0.05)
+		VALUES('AGROINDUSTRIA', '>10%' ,'>9%', 0.10, 0.09)
+		VALUES('COOPERATIVAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PRODUTOR RURAL PF', '>3%' ,'>2%', 0.03, 0.02)
+		VALUES('PRODUTOR RURAL PJ', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('PME AGRO', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('DISTRIBUICAO DE ENERGIA ELETRICA', '>5%' ,'>4%', 0.05, 0.04)
+		VALUES('GERACAO DE ENERGIA ELETRICA', '>10%' ,'>9%', 0.1, 0.09)
+		VALUES('COMERCIALIZACAO DE ENERGIA ELETRICA', '>1%' ,' >0,8%', 0.01, 0.008)
+		VALUES('TRANSMISSAO DE ENERGIA ELETRICA', '>12%' ,' >11%', 0.12, 0.11)
+		VALUES('METALURGIA DISTRIBUICAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('METALURGIA PRODUCAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('MINERACAO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('SIDERURGIA DISTRIBUICAO', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('SIDERURGIA PRODUCAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CONSTRUCAO CIVIL - PESADA', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('CONSTRUCAO CIVIL - PROPERTIES/SHOPPINGS', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('CONSTRUCAO CIVIL - INCORPORACAO', '>4%' , ' >3%', 0.04, 0.03)
+		VALUES('CONSTRUCAO CIVIL - MATERIAIS P/ CONSTRUCAO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('DOWNSTREAM / MIDSTREAM / SERVIÇOS DE APOIO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('UPSTREAM', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('VAREJO NÃO ESSENCIAL', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('VAREJO ESSENCIAL', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('DISTRIBUIDORES DE PAINEL SOLAR', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('REVENDAS', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('INDUSTRIA ALIMENT. / BEBIDAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('LATICINIOS', '>6%' ,' >5%', 0.06, 0.05) 
+		VALUES('ABATE BOVINO', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('BENS DE CAPITAL', '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('CERAMICAS', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('EMBALAGENS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INDUSTRIA BENS DE CONSUMO', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('INDUSTRIA OUTROS', '>8%' ,'>7%', 0.08, 0.07)
+		VALUES('TEXTIL', '>5%' ,' >4%', 0.05, 0.04)
+		VALUES('FERROVIAS', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('LOGISTICA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('NAVEGACAO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PORTOS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('FARMACEUTICO', '>10%' ,' >9%', 0.10, 0.09)
+		VALUES('QUIMICO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CONCESSIONARIAS', '>10%' ,' >9%', 0.06, 0.05)
+		VALUES('MONTADORAS/AUTO-PECAS', '>10%' ,' >9%', 0.06, 0.05)
+		VALUES('CIAS AEREAS', '>1,5%' ,' >1,2%', 0.015, 0.012)
+		VALUES('TURISMO', '>6%' ,' >5%', 0.04, 0.03)
+		VALUES('CONCESSOES RODOVIARIAS', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('CURTUME', '>1%' ,' >0,5%', 0.01, 0.005)
+		VALUES('HIGIENE E LIMPEZA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('LOCADORAS', '>10%' ,' >9%', 0.1, 0.09)
+		VALUES('MADEIRA', '>3%' ,' >2%', 0.03, 0.02)
+		VALUES('MIDIA', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('PAPEL E CELULOSE', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SANEAMENTO', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SAUDE', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('SAUDE ANIMAL', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('T.I.', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('TELECOMUNICACOES', '>8%' ,' >7%', 0.08, 0.07)
+		VALUES('INSTITUICOES FINANCEIRAS', 'L=R' ,' L=R', 0, 0)
+		VALUES('SERVICOS',  '>6%' ,' >5%', 0.06, 0.05)
+		VALUES('TELEMARKETING', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('TRADING', '>8%' ,' >7%', 0.08, 0.07);
+
+ QUIT;
+
+PROC SQL;
+	CREATE TABLE WORK.LIMITE_MACROSETOR (
+		 MACRO_SETOR CHAR(50),
+		 LIM_VER_MCR_STR CHAR(10),
+		 LIM_AMR_MCR_STR CHAR(10),
+		 LIM_VER_MCR NUM,
+		 LIM_AMR_MCR NUM
+	);
+
+	INSERT INTO WORK.LIMITE_MACROSETOR
+		VALUES('AGRONEGOCIO', '>28%' ,' >25%', 0.28, 0.25)
+		VALUES('ENERGIA', '>20%' ,' >18%', 0.2, 0.18)
+		VALUES('INDUSTRIA DE ALIMENTOS', '>10%' ,' >8%', 0.1, 0.08)
+		VALUES('INDUSTRIA (DEMAIS)', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('TRANSPORTE E LOGÍSTICA', '>15%' ,' >13%', 0.1, 0.08)
+		VALUES('QUIMICO & FARMACEUTICO', '>15%' ,' >13%', 0.15, 0.13)
+		VALUES('VEICULOS (Montad. / Concess. / Autopeças)', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('TURISMO & AÉREAS', '>4%' ,' >3%', 0.04, 0.03)
+		VALUES('METAIS E MINÉRIOS', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('OIL & GAS', '>10%' ,' >8%', 0.10, 0.08)
+		VALUES('REAL ESTATE', '>6%' ,' >4%', 0.06, 0.04)
+		VALUES('VAREJO', '>8%' ,' >6%', 0.08, 0.06)
+		VALUES('SERVIÇOS & TELEMARKETING', '>8%' ,' >6%', 0.08, 0.06);
+QUIT;
+
+PROC SQL;
+	CREATE TABLE DEPARA_MACROSETOR AS
+		SELECT 	A.*,
+				B.LIM_VER_SET_STR,
+				B.LIM_AMR_SET_STR,
+				B.LIM_VER_SET,
+				B.LIM_AMR_SET,
+				C.LIM_VER_MCR_STR,
+				C.LIM_AMR_MCR_STR,
+				C.LIM_VER_MCR,
+				C.LIM_AMR_MCR
+
+	FROM	DEPARA_MACROSETOR_0 AS A
+	LEFT JOIN LIMITE_SETOR AS B ON(A.SETOR = B.SETOR)
+	LEFT JOIN LIMITE_MACROSETOR AS C ON(A.MACRO_SETOR = C.MACRO_SETOR);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */

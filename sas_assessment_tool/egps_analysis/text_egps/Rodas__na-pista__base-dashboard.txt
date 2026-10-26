@@ -1,0 +1,275 @@
+START_METADATA
+PROJECT: Rodas__na-pista
+FILE_SAS: base-dashboard.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -6
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 204
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Acesso, Grupos, Partic, Public, Vendas, Visual
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/na-pista/codigo/step-evolucao-grupos.sas, /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/NA-PISTA/CODIGO/STEP-EVOLUCAO-GRUPOS.SAS [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], NAPISTA.GRUPOSAUXILIARES [SAS/Local], NAPISTA.TBACESSOS [SAS/Local], NAPISTA.TBGRUPOS [SAS/Local], NAPISTA.TBPARTICIPACOES [SAS/Local], NAPISTA.TBPUBLICACOES [SAS/Local], NAPISTA.TBVENDAS [SAS/Local], NAPISTA.TBVISUALIZACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/na-pista/codigo/step-evolucao-grupos.sas, /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], NAPISTA.GRUPOSAUXILIARES [PROC SQL - FROM], NAPISTA.TBACESSOS [PROC SQL - FROM], NAPISTA.TBGRUPOS [PROC SQL - FROM], NAPISTA.TBPARTICIPACOES [PROC SQL - FROM], NAPISTA.TBPUBLICACOES [PROC SQL - FROM], NAPISTA.TBVENDAS [PROC SQL - FROM], NAPISTA.TBVISUALIZACOES [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/na-pista/codigo/step-evolucao-grupos.sas, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: ACESSOS, COMPRAS, GRUPOSGR, GRUPOS_CADASTRADOS, NUCNPJLOJA, PARTICIPACOES, PUBLICACOES, TBNAPISTA, TBNAPISTA_02, TBNAPISTA_FINAL, TBPARCEIROCOMERCIAL, VENDAS, VISUALIZACOES
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/na-pista/codigo/step-evolucao-grupos.sas
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+/* Busca dados da última atualização*/
+PROC SQL; SELECT MAX(DtAtualizacao) INTO :Vendas FROM NAPISTA.TBVENDAS;        RUN;
+PROC SQL; SELECT MAX(DtAtualizacao) INTO :Public FROM NAPISTA.TBPUBLICACOES;   RUN;
+PROC SQL; SELECT MAX(DtAtualizacao) INTO :Visual FROM NAPISTA.TBVISUALIZACOES; RUN;
+PROC SQL; SELECT MAX(DtAtualizacao) INTO :Partic FROM NAPISTA.TBPARTICIPACOES; RUN;
+PROC SQL; SELECT MAX(DtAtualizacao) INTO :Acesso FROM NAPISTA.TBACESSOS;       RUN;
+PROC SQL; SELECT MAX(DtAtualizacao) INTO :Grupos FROM NAPISTA.TBGRUPOS;        RUN;
+
+/* Monta base para o dashboard */
+PROC SQL;
+CREATE TABLE VENDAS AS
+  SELECT
+    OfertaDtFim AS Data,
+    VencedorNuCnpjLoja AS NuCnpjLoja,
+    SUM(CASE WHEN StatusPagamento = 'Pago' then 1 else 0 end) as QtdPagamento,
+	COUNT(*) AS QtdVendas
+  FROM
+    NAPISTA.TBVENDAS
+  WHERE
+    DtAtualizacao = &Vendas.
+  GROUP BY 1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE COMPRAS AS
+  SELECT
+    OfertaDtFim AS Data,
+    VencedorNuCnpjLoja AS NuCnpjLoja,
+    COUNT(*) AS QtdCompras
+FROM
+    NAPISTA.TBVENDAS
+WHERE
+    DtAtualizacao = &Vendas.
+GROUP BY 1,2;
+;RUN;
+
+PROC SQL;
+CREATE TABLE PUBLICACOES AS
+  SELECT
+    OfertaDtInicio AS Data,
+    VendedorNuCnpjLoja AS NuCnpjLoja,
+    COUNT(*) AS QtdPublicacoes
+  FROM
+    NAPISTA.TBPUBLICACOES
+  WHERE
+    DtAtualizacao = &Public.
+  GROUP BY 1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE VISUALIZACOES AS
+  SELECT
+    DtVisualizacao AS Data,
+    VisualizadorNuCnpjLoja AS NuCnpjLoja,
+    SUM(QtdVisualizacao) AS QtdVisualizacoes
+  FROM
+    NAPISTA.TBVISUALIZACOES
+  WHERE
+    DtAtualizacao = &Visual.
+  GROUP BY 1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE PARTICIPACOES AS
+  SELECT
+    DtOfertaLance AS Data,
+    ParticipanteNuCnpjLoja AS NuCnpjLoja,
+    SUM(QtdParticipacao) AS QtdParticipacoes
+  FROM
+    NAPISTA.TBPARTICIPACOES
+  WHERE
+    DtAtualizacao = &Partic.
+  GROUP BY 1,2;
+RUN;
+
+PROC SQL;
+CREATE TABLE ACESSOS AS
+  SELECT
+    DtAcesso AS Data,
+    NuCnpjLoja,
+    COUNT(*) AS QtdAcessos
+  FROM
+    NAPISTA.TBACESSOS
+  WHERE
+    DtAtualizacao = &Acesso.
+    AND DtAcesso <> .
+  GROUP BY 1,2;
+RUN;
+
+DATA TbNaPista;
+ MERGE VENDAS COMPRAS PUBLICACOES VISUALIZACOES PARTICIPACOES ACESSOS;
+ BY Data NuCnpjLoja;
+RUN;
+
+/* Carrega dados do parceiro */
+PROC SQL;
+CREATE TABLE TbParceiroComercial AS
+  SELECT
+    NuCnpjLoja,
+    STRIP(PUT(CdParceiroComercial,6.)) || ' - ' || NmParceiroComercial AS NmParceiroComercial,
+    NmAreaEstruturaComercialC,
+    NmSubEstruturaComercialC,
+    NmCanalEstruturaComercialC,
+    DsLoginN1C,
+    DsLoginN2C,
+    DsLoginN3C,
+    LstSubstituicaoC,
+    NmTipoParceiroComercial,
+	CdTipoParceiroComercial,
+    CASE WHEN FlAtivo = 'S' THEN 1 ELSE 0 END AS FlAtivo,
+    DtUltimaAtualizacao
+  FROM
+    BASES.TbParceiroComercial
+  WHERE NuCnpjLoja IS NOT NULL
+
+  OUTER UNION CORRESPONDING
+
+  SELECT
+    NuCnpjLoja,
+    Grupo AS NmParceiroComercial,
+    Grupo AS NmAreaEstruturaComercialC,
+    Grupo AS NmSubEstruturaComercialC,
+    Grupo AS NmCanalEstruturaComercialC,
+    Grupo AS DsLoginN1C,
+    Grupo AS DsLoginN2C,
+    Grupo AS DsLoginN3C,
+    Grupo AS LstSubstituicaoC,
+    Grupo AS NmTipoParceiroComercial,
+    0     AS CdTipoParceiroComercial,
+    0     AS FlAtivo,
+    .     AS DtUltimaAtualizacao
+  FROM
+    NAPISTA.GRUPOSAUXILIARES
+  WHERE NuCnpjLoja IS NOT NULL;
+RUN;
+
+PROC SORT DATA=TbParceiroComercial;
+BY DESCENDING FlAtivo
+   DESCENDING NmSubEstruturaComercialC
+   DESCENDING DtUltimaAtualizacao;
+RUN;
+
+PROC SORT DATA=TbParceiroComercial NODUPKEY;
+BY NuCnpjLoja;
+RUN;
+
+/* Enriquecer base NaPista com dados de parceiro */
+PROC SQL;
+CREATE TABLE TbNaPista_02 AS
+  SELECT
+    A.Data,
+    B.NmSubEstruturaComercialC AS Regional,
+    B.NmAreaEstruturaComercialC AS Filial,
+    B.DsLoginN1C AS LoginGR,
+    B.DsLoginN2C AS LoginGF,
+    B.DsLoginN3C,
+    B.LstSubstituicaoC,
+    B.NmParceiroComercial,
+    B.NmTipoParceiroComercial AS TipoLoja,
+    A.QtdVendas,
+	A.QtdCompras,
+	A.QtdPagamento,
+    A.QtdPublicacoes,
+    A.QtdVisualizacoes,
+    A.QtdParticipacoes,
+    A.QtdAcessos,
+    MAX(&Vendas.,&Public.,&Visual.,&Partic.,&Acesso.) AS DtAtualizacao FORMAT=DATE9.
+  FROM
+    TbNaPista A
+  LEFT JOIN
+    TbParceiroComercial B
+    ON A.NuCnpjLoja = B.NuCnpjLoja;
+RUN;
+
+%include '/infogrc/na-pista/codigo/step-evolucao-grupos.sas';
+
+PROC SQL;
+CREATE TABLE GRUPOS_CADASTRADOS AS
+  SELECT
+    DtCriacaoGrupo AS Data,
+    NuCnpjLojaFilial AS NuCnpjLoja
+  FROM
+    NAPISTA.TBGRUPOS
+  WHERE
+    DtAtualizacao = &Grupos.;
+RUN;
+
+PROC SQL;
+CREATE TABLE GRUPOSGR AS
+  SELECT
+    A.NuCnpjLoja,
+    A.NmParceiroComercial,
+    A.NmAreaEstruturaComercialC AS Filial,
+    A.NmSubEstruturaComercialC AS Regional,
+    A.DsLoginN1C AS LoginGR,
+    A.DsLoginN2C AS LoginGF,
+    A.DsLoginN3C,
+    A.LstSubstituicaoC,
+    A.NmTipoParceiroComercial AS TipoLoja,
+    A.FlAtivo,
+    B.Data,
+    CASE WHEN B.Data <> . THEN 1 ELSE 0 END AS FlCadastroNaPista
+  FROM
+    TbParceiroComercial A
+  LEFT JOIN
+    GRUPOS_CADASTRADOS B
+    ON A.NuCnpjLoja = B.NuCnpjLoja
+  WHERE
+    A.DsLoginN1C LIKE "%.%";
+RUN;
+
+PROC SQL;
+CREATE TABLE TbNaPista_Final AS
+  SELECT 'Base Principal' AS TpDados, * FROM TbNaPista_02
+  OUTER UNION CORRESPONDING
+  SELECT 'Grupos GR' AS TpDados, * FROM GRUPOSGR
+  OUTER UNION CORRESPONDING
+  SELECT 'Evolução cadastro Grupos' AS TpDados, * FROM GRUPOS_DIARIO;
+RUN;
+
+%ExportaCSV(TbNaPista,TbNaPista_Final);

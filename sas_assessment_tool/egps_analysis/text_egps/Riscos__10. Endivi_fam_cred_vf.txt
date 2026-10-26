@@ -1,0 +1,1408 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__10. Endivi_fam_cred_vf
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:30 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 18
+ODS_OUTPUTS_DETECTED: lst
+TRIGGERS: DATA _NULL_ (6x | +480), PROC DATASETS (2x | +40), PROC REG (8x | +120), PROC CONTENTS (1x | +10), PROC TRANSPOSE (2x | +20), %MACRO (13x | +65)
+----------------------------------------
+LINES_OF_CODE: 1041
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: ARIMA, AUTOREG, CONTENTS, DATASETS, MEANS, MODEL, PRINT, REG, SGPLOT, SGRENDER, SQL, TEMPLATE, TRANSPOSE, UNIVARIATE, X12, X13
+HAS_DATA_STEP: Yes (36x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: BASE_INPUT, MODELO, RESPOSTA, VARIAVEIS, n, var
+DETECTED_MACROS_USED: BASE_INPUT, MODELO, Modelo, Nvar, RESPOSTA, VARIAVEIS, a, a0, base, count, data, dftest, flag, hetero_equacao, hetero_param, i, min, n, resp, var, var1, vari, variaveis, variavel, x
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: BASE, DATA, N, RESP, VAR, VAR1, VARI, VARIAVEL
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): SASHELP.VTABLE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DRSC\Sup_Riscos\RCA\5_Teste_Estresse\1_Rodadas\202412_TEBU_ICAAP\01. Variáveis Macro\05. Redesenvolvimento dos Modelos TEBU 2024\00. Base_Novo_Modelo_2024_v1.xlsx[SHEET='CONF_ABS']
+TEMP/DISCARDED_FILE_INPUT: WORK.BASE_NOVO_MODELO <- N:\DRSC\Sup_Riscos\RCA\5_Teste_Estresse\1_Rodadas\202412_TEBU_ICAAP\01. Variáveis Macro\05. Redesenvolvimento dos Modelos TEBU 2024\00. Base_Novo_Modelo_2024_v1.xlsx[SHEET='CONF_ABS']
+TABLE_READ_PROVENANCE (Flow): SASHELP.VTABLE [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: AUTOCORREL, AUX_EQUACAO, AUX_EQUACAO2, AUX_PARAM, AUX_PARAM2, AUX_VAR_EXPLIC, BASE_IN, BASE_N, BASE_OVER90, BASE_OVER90_A, BASE_OVER90_B, BASE_OVER90_D, BASE_OVER90_PI, BASE_OVER90_PI_RESU, ESTACIONARIEDADE, ESTACION_DFTEST, ESTACION_DFTEST2, ESTACION_DFTEST_&N, FITRO_&X, HETEROCEDAST, JB_FINAL, JB_NORM, MARKERS, MULTICOL, NAME, NOPRINT, OUT, OUTRES, PARAM_DFFITS, PARAM_DFFITS2, PONTOS_INFLUENTES, PONTOS_INFLUENTES2, REGOUT, RESID1, SAIDA_&X, SAIDA_MULTICOL2, SAIDA_MULTICOL2T, T1, T2, TESTE2_&I, TESTEEEEEEEE, TESTE_&I, TESTE_HET, _2, _3
+DYNAMIC REFS (Ambiguous): B.D_{FLAG}, MODELO._DIFA_{VARIAVEL}, MODELO._DIFP_{VARIAVEL}, MODELO._L10_{VARIAVEL}, MODELO._L11_{VARIAVEL}, MODELO._L12_{VARIAVEL}, MODELO._L1_{VARIAVEL}, MODELO._L2_{VARIAVEL}, MODELO._L3_{VARIAVEL}, MODELO._L4_{VARIAVEL}, MODELO._L5_{VARIAVEL}, MODELO._L6_{VARIAVEL}, MODELO._L7_{VARIAVEL}, MODELO._L8_{VARIAVEL}, MODELO._L9_{VARIAVEL}, MODELO._{VARIAVEL}
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET BASE_INPUT=BASE_NOVO_MODELO;
+%LET MODELO=TB;
+%LET RESPOSTA=TB_DIFA_End_fam_cred;
+%LET VARIAVEIS=TB_L1_DIFA_End_fam_cred
+	TB_L12_DIFP_MM6_Dolar
+	d_176;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DRSC\Sup_Riscos\RCA\5_Teste_Estresse\1_Rodadas\202412_TEBU_ICAAP\01. Variáveis Macro\05. Redesenvolvimento dos Modelos TEBU 2024\00. Base_Novo_Modelo_2024_v1.xlsx[SHEET='CONF_ABS']|N:/DRSC/SUP_RISCOS/RCA/5_TESTE_ESTRESSE/1_RODADAS/202412_TEBU_ICAAP/01. VARIÁVEIS MACRO/05. REDESENVOLVIMENTO DOS MODELOS TEBU 2024|00. BASE_NOVO_MODELO_2024_V1.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Correções Variaveis Iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 78 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Correções Variaveis Iniciais */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-YVebRcYVcTD3AfQt/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET BASE_INPUT = BASE_NOVO_MODELO;
+%LET MODELO = TB;
+
+data BASE_OVER90_A;
+set &BASE_INPUT.;
+where SAFRA >= 201801 AND SAFRA <= 202412;
+run;
+
+
+
+%macro teste_sazonalidade(variavel);
+
+PROC SQL;
+SELECT MIN(&variavel.) INTO :MIN
+FROM BASE_OVER90_A;
+RUN;
+
+proc sql;
+create table BASE_OVER90_A as
+select *,
+(case when &min.<=0 then (&variavel.+((-1)*(&min.)+0.1)) else &variavel. end) as &variavel.2
+from BASE_OVER90_A;
+quit;
+
+ods output D8A#1=SalesD8A_1;
+ods output D8A#2=SalesD8A_2;
+ods output D8A#3=SalesD8A_3;
+ods output D8A#4=SalesD8A_4;
+
+proc x13 data=BASE_OVER90_A date=data;
+   var &variavel.2;
+   transform power=0;
+   arima model=( (0,1,1)(0,1,1) );
+   estimate;
+   x11;
+run;
+
+title 'Stable Seasonality Test';
+proc print data=SalesD8A_1 LABEL;
+run;
+title 'Nonparametric Stable Seasonality Test';
+proc print data=SalesD8A_2 LABEL;
+run;
+title 'Moving Seasonality Test';
+proc print data=SalesD8A_3 LABEL;
+run;
+title 'Combined Seasonality Test';
+proc print data=SalesD8A_4 LABEL NOOBS;
+   var _NAME_ Name1 Label1 cValue1;
+run;
+
+proc x12 data=BASE_OVER90_A date=data noprint;
+var &variavel.2;
+x11;
+output out=out a1 d11;
+run;
+title 'Serie DSZonalizada';
+proc sgplot data=out;
+series x=data y=&variavel.2_A1 / name = "A1" markers
+markerattrs=(color=red symbol='asterisk')
+lineattrs=(color=red);
+series x=data y=&variavel.2_D11 / name= "D11" markers
+markerattrs=(symbol='circle')
+lineattrs=(color=blue);
+yaxis label='Original and Seasonally Adjusted Time Series';
+run;
+
+proc sql;
+create table BASE_OVER90_A as
+select a.*,
+(case when &min.<=0 then b.&variavel.2_D11+&min.-0.1 else b.&variavel.2_D11 end) as &variavel._DSZ
+from BASE_OVER90_A as a
+left join out as b
+on a.data=b.data;
+quit;
+
+%mend;
+%teste_sazonalidade(Spread);
+%teste_sazonalidade(Renda);
+%teste_sazonalidade(Confianca);
+%teste_sazonalidade(Desemprego);
+%teste_sazonalidade(PIB);
+%teste_sazonalidade(IPCA);
+%teste_sazonalidade(Dolar);
+%teste_sazonalidade(Selic);
+%teste_sazonalidade(Confianca_emp); 
+%teste_sazonalidade(Comp); 
+%teste_sazonalidade(IBC); 
+%teste_sazonalidade(IPC); 
+%teste_sazonalidade(Inad_pf); 
+%teste_sazonalidade(End_fam); 
+%teste_sazonalidade(End_fam_cred); 
+
+data BASE_OVER90_B;
+set BASE_OVER90_A;
+run;
+
+%macro media_movel(var1);
+
+data BASE_OVER90_B;
+set BASE_OVER90_B;
+
+MM3_&var1. = (&var1.+lag(&var1.)+lag2(&var1.))/3;
+MM6_&var1. = (&var1.+lag(&var1.)+lag2(&var1.)+lag3(&var1.)+lag4(&var1.)+lag5(&var1.))/6;
+
+run;
+%mend;
+%media_movel(Spread_DSZ);
+%media_movel(Renda);
+%media_movel(Confianca_DSZ);
+%media_movel(Desemprego_DSZ);
+%media_movel(PIB);
+%media_movel(IPCA);
+%media_movel(Dolar);
+%media_movel(Selic);
+%media_movel(Confianca_emp_DSZ); 
+%media_movel(Comp_DSZ); 
+%media_movel(IBC_DSZ); 
+%media_movel(IPC); 
+%media_movel(Inad_pf_DSZ); 
+%media_movel(End_fam); 
+%media_movel(End_fam_cred); 
+
+
+
+
+
+%macro teste_estacionariedade(variavel,n);
+
+ods graphics on;
+
+proc arima data=BASE_OVER90_B;
+  identify var=&variavel. stationarity=(adf=0);
+  run;
+  identify var=&variavel. stationarity=(pp=0);
+  run;
+quit;
+
+ods graphics off;
+
+%dftest(BASE_OVER90_B, &variavel., ar=0 );
+
+data estacion_dftest_&n.;
+variavel="&variavel.";
+p_value_ADF=&dftest.;
+run;
+
+%mend;
+
+%teste_estacionariedade(Spread_DSZ,1);
+%teste_estacionariedade(Renda,2);
+%teste_estacionariedade(Confianca_DSZ,3);
+%teste_estacionariedade(Desemprego_DSZ,4);
+%teste_estacionariedade(PIB,5);
+%teste_estacionariedade(IPCA,6);
+%teste_estacionariedade(Dolar,7);
+%teste_estacionariedade(Selic,8);
+%teste_estacionariedade(Confianca_emp_DSZ,9); 
+%teste_estacionariedade(Comp_DSZ,10); 
+%teste_estacionariedade(IBC_DSZ,11); 
+%teste_estacionariedade(IPC,12); 
+%teste_estacionariedade(Inad_pf_DSZ,13); 
+%teste_estacionariedade(End_fam,14); 
+%teste_estacionariedade(End_fam_cred,15); 
+
+%teste_estacionariedade(MM3_Spread_DSZ,16);
+%teste_estacionariedade(MM3_Renda,17);
+%teste_estacionariedade(MM3_Confianca_DSZ,18);
+%teste_estacionariedade(MM3_Desemprego_DSZ,19);
+%teste_estacionariedade(MM3_PIB,20);
+%teste_estacionariedade(MM3_IPCA,21);
+%teste_estacionariedade(MM3_Dolar,22);
+%teste_estacionariedade(MM3_Selic,23);
+%teste_estacionariedade(MM3_Confianca_emp_DSZ,24); 
+%teste_estacionariedade(MM3_Comp_DSZ,25); 
+%teste_estacionariedade(MM3_IBC_DSZ,26); 
+%teste_estacionariedade(MM3_IPC,27); 
+%teste_estacionariedade(MM3_Inad_pf_DSZ,28); 
+%teste_estacionariedade(MM3_End_fam,29); 
+%teste_estacionariedade(MM3_End_fam_cred,30); 
+
+%teste_estacionariedade(MM6_Spread_DSZ,31);
+%teste_estacionariedade(MM6_Renda,32);
+%teste_estacionariedade(MM6_Confianca_DSZ,33);
+%teste_estacionariedade(MM6_Desemprego_DSZ,34);
+%teste_estacionariedade(MM6_PIB,35);
+%teste_estacionariedade(MM6_IPCA,36);
+%teste_estacionariedade(MM6_Dolar,37);
+%teste_estacionariedade(MM6_Selic,38);
+%teste_estacionariedade(MM6_Confianca_emp_DSZ,39); 
+%teste_estacionariedade(MM6_Comp_DSZ,40); 
+%teste_estacionariedade(MM6_IBC_DSZ,41); 
+%teste_estacionariedade(MM6_IPC,42); 
+%teste_estacionariedade(MM6_Inad_pf_DSZ,43); 
+%teste_estacionariedade(MM6_End_fam,44); 
+%teste_estacionariedade(MM6_End_fam_cred,45); 
+
+data estacion_dftest;
+set estacion_dftest_1 - estacion_dftest_24;
+run;
+
+proc sql;
+create table estacion_dftest as
+select *,
+(case when p_value_ADF>0.05 then "não estacionario" else "estacionario" end) as ADF
+from estacion_dftest;
+quit;
+
+%macro cria_diff(variavel);
+
+data BASE_OVER90_B;
+set BASE_OVER90_B;
+L1_&variavel.=lag(&variavel.);
+run;
+
+proc sql;
+create table BASE_OVER90_B as
+select *,
+&variavel.-L1_&variavel. as &Modelo._DIFA_&variavel.,
+(&variavel./L1_&variavel.)-1 as &Modelo._DIFP_&variavel.
+from BASE_OVER90_B;
+quit;
+
+%mend;
+%cria_diff(Spread_DSZ);
+%cria_diff(Renda);
+%cria_diff(Confianca_DSZ);
+%cria_diff(Desemprego_DSZ);
+%cria_diff(PIB);
+%cria_diff(IPCA);
+%cria_diff(Dolar);
+%cria_diff(Selic);
+%cria_diff(Confianca_emp_DSZ); 
+%cria_diff(Comp_DSZ); 
+%cria_diff(IBC_DSZ); 
+%cria_diff(IPC); 
+%cria_diff(Inad_pf_DSZ); 
+%cria_diff(End_fam); 
+%cria_diff(End_fam_cred); 
+
+%cria_diff(MM3_Spread_DSZ);
+%cria_diff(MM3_Renda);
+%cria_diff(MM3_Confianca_DSZ);
+%cria_diff(MM3_Desemprego_DSZ);
+%cria_diff(MM3_PIB);
+%cria_diff(MM3_IPCA);
+%cria_diff(MM3_Dolar);
+%cria_diff(MM3_Selic);
+%cria_diff(MM3_Confianca_emp_DSZ); 
+%cria_diff(MM3_Comp_DSZ); 
+%cria_diff(MM3_IBC_DSZ); 
+%cria_diff(MM3_IPC); 
+%cria_diff(MM3_Inad_pf_DSZ); 
+%cria_diff(MM3_End_fam); 
+%cria_diff(MM3_End_fam_cred); 
+
+%cria_diff(MM6_Spread_DSZ);
+%cria_diff(MM6_Renda);
+%cria_diff(MM6_Confianca_DSZ);
+%cria_diff(MM6_Desemprego_DSZ);
+%cria_diff(MM6_PIB);
+%cria_diff(MM6_IPCA);
+%cria_diff(MM6_Dolar);
+%cria_diff(MM6_Selic);
+%cria_diff(MM6_Confianca_emp_DSZ); 
+%cria_diff(MM6_Comp_DSZ); 
+%cria_diff(MM6_IBC_DSZ); 
+%cria_diff(MM6_IPC); 
+%cria_diff(MM6_Inad_pf_DSZ); 
+%cria_diff(MM6_End_fam); 
+%cria_diff(MM6_End_fam_cred); 
+
+%macro teste_estacionariedade2(variavel,n);
+
+ods graphics on;
+
+proc arima data=BASE_OVER90_B;
+  identify var=&variavel. stationarity=(adf=0);
+  run;
+  identify var=&variavel. stationarity=(pp=0);
+  run;
+quit;
+
+ods graphics off;
+
+%dftest(BASE_OVER90_B, &variavel., ar=0 );
+
+data estacion_dftest_&n.;
+variavel="&variavel.";
+p_value_ADF=&dftest.;
+run;
+
+%mend;
+
+%teste_estacionariedade2(&Modelo._DIFA_Spread_DSZ,1);
+%teste_estacionariedade2(&Modelo._DIFA_Renda,2);
+%teste_estacionariedade2(&Modelo._DIFA_Confianca_DSZ,3);
+%teste_estacionariedade2(&Modelo._DIFA_Desemprego_DSZ,4);
+%teste_estacionariedade2(&Modelo._DIFA_PIB,5);
+%teste_estacionariedade2(&Modelo._DIFA_IPCA,6);
+%teste_estacionariedade2(&Modelo._DIFA_Dolar,7);
+%teste_estacionariedade2(&Modelo._DIFA_Selic,8);
+%teste_estacionariedade2(&Modelo._DIFA_Confianca_emp_DSZ,9); 
+%teste_estacionariedade2(&Modelo._DIFA_Comp_DSZ,10); 
+%teste_estacionariedade2(&Modelo._DIFA_IBC_DSZ,11); 
+%teste_estacionariedade2(&Modelo._DIFA_IPC,12); 
+%teste_estacionariedade2(&Modelo._DIFA_Inad_pf_DSZ,13); 
+%teste_estacionariedade2(&Modelo._DIFA_End_fam,14); 
+%teste_estacionariedade2(&Modelo._DIFA_End_fam_cred,15); 
+%teste_estacionariedade2(&Modelo._DIFP_Renda,16);
+%teste_estacionariedade2(&Modelo._DIFP_Confianca_DSZ,17);
+%teste_estacionariedade2(&Modelo._DIFP_Dolar,18);
+%teste_estacionariedade2(&Modelo._DIFP_Confianca_emp_DSZ,19); 
+
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Spread_DSZ,20);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Renda,21);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Confianca_DSZ,22);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Desemprego_DSZ,23);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_PIB,24);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_IPCA,25);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Dolar,26);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Selic,27);
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Confianca_emp_DSZ,28); 
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Comp_DSZ,29); 
+%teste_estacionariedade2(&Modelo._DIFA_MM3_IBC_DSZ,30); 
+%teste_estacionariedade2(&Modelo._DIFA_MM3_IPC,31); 
+%teste_estacionariedade2(&Modelo._DIFA_MM3_Inad_pf_DSZ,32); 
+%teste_estacionariedade2(&Modelo._DIFA_MM3_End_fam,33); 
+%teste_estacionariedade2(&Modelo._DIFA_MM3_End_fam_cred,34); 
+%teste_estacionariedade2(&Modelo._DIFP_MM3_Renda,35);
+%teste_estacionariedade2(&Modelo._DIFP_MM3_Confianca_DSZ,36);
+%teste_estacionariedade2(&Modelo._DIFP_MM3_Dolar,37);
+%teste_estacionariedade2(&Modelo._DIFP_MM3_Confianca_emp_DSZ,38); 
+
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Spread_DSZ,39);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Renda,40);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Confianca_DSZ,41);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Desemprego_DSZ,42);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_PIB,43);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_IPCA,44);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Dolar,45);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Selic,46);
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Confianca_emp_DSZ,47); 
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Comp_DSZ,48); 
+%teste_estacionariedade2(&Modelo._DIFA_MM6_IBC_DSZ,49); 
+%teste_estacionariedade2(&Modelo._DIFA_MM6_IPC,50); 
+%teste_estacionariedade2(&Modelo._DIFA_MM6_Inad_pf_DSZ,51); 
+%teste_estacionariedade2(&Modelo._DIFA_MM6_End_fam,52); 
+%teste_estacionariedade2(&Modelo._DIFA_MM6_End_fam_cred,53); 
+%teste_estacionariedade2(&Modelo._DIFP_MM6_Renda,54);
+%teste_estacionariedade2(&Modelo._DIFP_MM6_Confianca_DSZ,55);
+%teste_estacionariedade2(&Modelo._DIFP_MM6_Dolar,56);
+%teste_estacionariedade2(&Modelo._DIFP_MM6_Confianca_emp_DSZ,57); 
+
+data estacion_dftest2;
+set estacion_dftest_1 - estacion_dftest_33;
+run;
+
+proc sql;
+create table estacion_dftest2 as
+select *,
+(case when p_value_ADF>0.05 then "não estacionario" else "estacionario" end) as ADF
+from estacion_dftest2;
+quit;
+
+data BASE_OVER90_D;
+set BASE_OVER90_B;
+
+&Modelo._L1_DIFA_Spread_DSZ=lag(&Modelo._DIFA_Spread_DSZ);
+&Modelo._L1_DIFA_MM3_Spread_DSZ=lag(&Modelo._DIFA_MM3_Spread_DSZ);
+&Modelo._L1_DIFA_MM6_Spread_DSZ=lag(&Modelo._DIFA_MM6_Spread_DSZ);
+
+&Modelo._L1_DIFA_Renda=lag(&Modelo._DIFA_Renda);
+
+&Modelo._L1_DIFA_Confianca_DSZ=lag(&Modelo._DIFA_Confianca_DSZ);
+&Modelo._L1_DIFA_MM3_Confianca_DSZ=lag(&Modelo._DIFA_MM3_Confianca_DSZ);
+&Modelo._L1_DIFA_MM6_Confianca_DSZ=lag(&Modelo._DIFA_MM6_Confianca_DSZ);
+
+&Modelo._L1_DIFA_Confianca_emp_DSZ=lag(&Modelo._DIFA_Confianca_emp_DSZ);
+&Modelo._L1_DIFA_MM3_Confianca_emp_DSZ=lag(&Modelo._DIFA_MM3_Confianca_emp_DSZ);
+&Modelo._L1_DIFA_MM6_Confianca_emp_DSZ=lag(&Modelo._DIFA_MM6_Confianca_emp_DSZ);
+
+&Modelo._L1_DIFA_Comp_DSZ=lag(&Modelo._DIFA_Comp_DSZ);
+&Modelo._L1_DIFA_MM3_Comp_DSZ=lag(&Modelo._DIFA_MM3_Comp_DSZ);
+&Modelo._L1_DIFA_MM6_Comp_DSZ=lag(&Modelo._DIFA_MM6_Comp_DSZ);
+
+&Modelo._L1_DIFA_IBC_DSZ=lag(&Modelo._DIFA_IBC_DSZ);
+&Modelo._L1_DIFA_MM3_IBC_DSZ=lag(&Modelo._DIFA_MM3_IBC_DSZ);
+&Modelo._L1_DIFA_MM6_IBC_DSZ=lag(&Modelo._DIFA_MM6_IBC_DSZ);
+
+&Modelo._L1_DIFA_IPC=lag(&Modelo._DIFA_IPC);
+&Modelo._L1_DIFA_MM3_IPC=lag(&Modelo._DIFA_MM3_IPC);
+&Modelo._L1_DIFA_MM6_IPC=lag(&Modelo._DIFA_MM6_IPC);
+
+&Modelo._L1_DIFA_Inad_pf_DSZ=lag(&Modelo._DIFA_Inad_pf_DSZ);
+&Modelo._L1_DIFA_MM3_Inad_pf_DSZ=lag(&Modelo._DIFA_MM3_Inad_pf_DSZ);
+&Modelo._L1_DIFA_MM6_Inad_pf_DSZ=lag(&Modelo._DIFA_MM6_Inad_pf_DSZ);
+
+&Modelo._L1_DIFA_End_fam=lag(&Modelo._DIFA_End_fam);
+&Modelo._L1_DIFA_MM3_End_fam=lag(&Modelo._DIFA_MM3_End_fam);
+&Modelo._L1_DIFA_MM6_End_fam=lag(&Modelo._DIFA_MM6_End_fam);
+
+&Modelo._L1_DIFA_End_fam_cred=lag(&Modelo._DIFA_End_fam_cred);
+&Modelo._L1_DIFA_MM3_End_fam_cred=lag(&Modelo._DIFA_MM3_End_fam_cred);
+&Modelo._L1_DIFA_MM6_End_fam_cred=lag(&Modelo._DIFA_MM6_End_fam_cred);
+
+
+
+&Modelo._L1_DIFP_Renda=lag(&Modelo._DIFP_Renda);
+
+&Modelo._L1_DIFP_Confianca_DSZ=lag(&Modelo._DIFP_Confianca_DSZ);
+&Modelo._L1_DIFP_MM3_Confianca_DSZ=lag(&Modelo._DIFP_MM3_Confianca_DSZ);
+&Modelo._L1_DIFP_MM6_Confianca_DSZ=lag(&Modelo._DIFP_MM6_Confianca_DSZ);
+
+&Modelo._L1_DIFP_Confianca_emp_DSZ=lag(&Modelo._DIFP_Confianca_emp_DSZ);
+&Modelo._L1_DIFP_MM3_Confianca_emp_DSZ=lag(&Modelo._DIFP_MM3_Confianca_emp_DSZ);
+&Modelo._L1_DIFP_MM6_Confianca_emp_DSZ=lag(&Modelo._DIFP_MM6_Confianca_emp_DSZ);
+run;
+
+%macro cria_lags(variavel);
+
+data BASE_OVER90_D;
+set BASE_OVER90_D;
+&Modelo._L1_&variavel.=lag(&Modelo._&variavel.);
+&Modelo._L2_&variavel.=lag2(&Modelo._&variavel.);
+&Modelo._L3_&variavel.=lag3(&Modelo._&variavel.);
+&Modelo._L4_&variavel.=lag4(&Modelo._&variavel.);
+&Modelo._L5_&variavel.=lag5(&Modelo._&variavel.);
+&Modelo._L6_&variavel.=lag6(&Modelo._&variavel.);
+&Modelo._L7_&variavel.=lag7(&Modelo._&variavel.);
+&Modelo._L8_&variavel.=lag8(&Modelo._&variavel.);
+&Modelo._L9_&variavel.=lag9(&Modelo._&variavel.);
+&Modelo._L10_&variavel.=lag10(&Modelo._&variavel.);
+&Modelo._L11_&variavel.=lag11(&Modelo._&variavel.);
+&Modelo._L12_&variavel.=lag12(&Modelo._&variavel.);
+run;
+
+%mend;
+
+%cria_lags(DIFA_Desemprego_DSZ);
+%cria_lags(DIFA_PIB);
+%cria_lags(DIFA_IPCA);
+%cria_lags(DIFA_Dolar);
+%cria_lags(DIFA_MM3_Dolar);
+%cria_lags(DIFA_MM6_Dolar);
+%cria_lags(DIFA_Selic);
+%cria_lags(DIFP_Dolar);
+%cria_lags(DIFP_MM3_Dolar);
+%cria_lags(DIFP_MM6_Dolar);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Correções Variaveis Iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Construção do Modelo Inicial */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 78 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Construção do Modelo Inicial */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Z6eAJlMn6SJlEQQG/code.sas */
+/* =========================INÍCIO TASK========================= */
+data BASE_OVER90;
+set BASE_OVER90_D;
+where SAFRA >= 201801 AND SAFRA <= 202412;
+run;
+
+%LET RESPOSTA =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+&Modelo._DIFA_End_fam_cred
+
+
+
+
+
+
+
+
+
+
+
+
+
+;
+
+%LET VARIAVEIS =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+&Modelo._L1_DIFA_End_fam_cred
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+&Modelo._L1_DIFA_Desemprego_DSZ
+&Modelo._L2_DIFA_Desemprego_DSZ
+&Modelo._L3_DIFA_Desemprego_DSZ
+&Modelo._L4_DIFA_Desemprego_DSZ
+&Modelo._L5_DIFA_Desemprego_DSZ
+&Modelo._L6_DIFA_Desemprego_DSZ
+&Modelo._L7_DIFA_Desemprego_DSZ
+&Modelo._L8_DIFA_Desemprego_DSZ
+&Modelo._L9_DIFA_Desemprego_DSZ
+&Modelo._L10_DIFA_Desemprego_DSZ
+&Modelo._L11_DIFA_Desemprego_DSZ
+&Modelo._L12_DIFA_Desemprego_DSZ
+
+&Modelo._L1_DIFA_PIB
+&Modelo._L2_DIFA_PIB
+&Modelo._L3_DIFA_PIB
+&Modelo._L4_DIFA_PIB
+&Modelo._L5_DIFA_PIB
+&Modelo._L6_DIFA_PIB
+&Modelo._L7_DIFA_PIB
+&Modelo._L8_DIFA_PIB
+&Modelo._L9_DIFA_PIB
+&Modelo._L10_DIFA_PIB
+&Modelo._L11_DIFA_PIB
+&Modelo._L12_DIFA_PIB
+
+&Modelo._L1_DIFA_IPCA
+&Modelo._L2_DIFA_IPCA
+&Modelo._L3_DIFA_IPCA
+&Modelo._L4_DIFA_IPCA
+&Modelo._L5_DIFA_IPCA
+&Modelo._L6_DIFA_IPCA
+&Modelo._L7_DIFA_IPCA
+&Modelo._L8_DIFA_IPCA
+&Modelo._L9_DIFA_IPCA
+&Modelo._L10_DIFA_IPCA
+&Modelo._L11_DIFA_IPCA
+&Modelo._L12_DIFA_IPCA
+
+&Modelo._L1_DIFA_Dolar
+&Modelo._L2_DIFA_Dolar
+&Modelo._L3_DIFA_Dolar
+&Modelo._L4_DIFA_Dolar
+&Modelo._L5_DIFA_Dolar
+&Modelo._L6_DIFA_Dolar
+&Modelo._L7_DIFA_Dolar
+&Modelo._L8_DIFA_Dolar
+&Modelo._L9_DIFA_Dolar
+&Modelo._L10_DIFA_Dolar
+&Modelo._L11_DIFA_Dolar
+&Modelo._L12_DIFA_Dolar
+&Modelo._L1_DIFA_MM3_Dolar
+&Modelo._L2_DIFA_MM3_Dolar
+&Modelo._L3_DIFA_MM3_Dolar
+&Modelo._L4_DIFA_MM3_Dolar
+&Modelo._L5_DIFA_MM3_Dolar
+&Modelo._L6_DIFA_MM3_Dolar
+&Modelo._L7_DIFA_MM3_Dolar
+&Modelo._L8_DIFA_MM3_Dolar
+&Modelo._L9_DIFA_MM3_Dolar
+&Modelo._L10_DIFA_MM3_Dolar
+&Modelo._L11_DIFA_MM3_Dolar
+&Modelo._L12_DIFA_MM3_Dolar
+&Modelo._L1_DIFA_MM6_Dolar
+&Modelo._L2_DIFA_MM6_Dolar
+&Modelo._L3_DIFA_MM6_Dolar
+&Modelo._L4_DIFA_MM6_Dolar
+&Modelo._L5_DIFA_MM6_Dolar
+&Modelo._L6_DIFA_MM6_Dolar
+&Modelo._L7_DIFA_MM6_Dolar
+&Modelo._L8_DIFA_MM6_Dolar
+&Modelo._L9_DIFA_MM6_Dolar
+&Modelo._L10_DIFA_MM6_Dolar
+&Modelo._L11_DIFA_MM6_Dolar
+&Modelo._L12_DIFA_MM6_Dolar
+&Modelo._L1_DIFP_Dolar
+&Modelo._L2_DIFP_Dolar
+&Modelo._L3_DIFP_Dolar
+&Modelo._L4_DIFP_Dolar
+&Modelo._L5_DIFP_Dolar
+&Modelo._L6_DIFP_Dolar
+&Modelo._L7_DIFP_Dolar
+&Modelo._L8_DIFP_Dolar
+&Modelo._L9_DIFP_Dolar
+&Modelo._L10_DIFP_Dolar
+&Modelo._L11_DIFP_Dolar
+&Modelo._L12_DIFP_Dolar
+&Modelo._L1_DIFP_MM3_Dolar
+&Modelo._L2_DIFP_MM3_Dolar
+&Modelo._L3_DIFP_MM3_Dolar
+&Modelo._L4_DIFP_MM3_Dolar
+&Modelo._L5_DIFP_MM3_Dolar
+&Modelo._L6_DIFP_MM3_Dolar
+&Modelo._L7_DIFP_MM3_Dolar
+&Modelo._L8_DIFP_MM3_Dolar
+&Modelo._L9_DIFP_MM3_Dolar
+&Modelo._L10_DIFP_MM3_Dolar
+&Modelo._L11_DIFP_MM3_Dolar
+&Modelo._L12_DIFP_MM3_Dolar
+&Modelo._L1_DIFP_MM6_Dolar
+&Modelo._L2_DIFP_MM6_Dolar
+&Modelo._L3_DIFP_MM6_Dolar
+&Modelo._L4_DIFP_MM6_Dolar
+&Modelo._L5_DIFP_MM6_Dolar
+&Modelo._L6_DIFP_MM6_Dolar
+&Modelo._L7_DIFP_MM6_Dolar
+&Modelo._L8_DIFP_MM6_Dolar
+&Modelo._L9_DIFP_MM6_Dolar
+&Modelo._L10_DIFP_MM6_Dolar
+&Modelo._L11_DIFP_MM6_Dolar
+&Modelo._L12_DIFP_MM6_Dolar
+
+&Modelo._L1_DIFA_Selic
+&Modelo._L2_DIFA_Selic
+&Modelo._L3_DIFA_Selic
+&Modelo._L4_DIFA_Selic
+&Modelo._L5_DIFA_Selic
+&Modelo._L6_DIFA_Selic
+&Modelo._L7_DIFA_Selic
+&Modelo._L8_DIFA_Selic
+&Modelo._L9_DIFA_Selic
+&Modelo._L10_DIFA_Selic
+&Modelo._L11_DIFA_Selic
+&Modelo._L12_DIFA_Selic
+
+;
+
+proc reg data=BASE_OVER90 outest=PARAMETROS;
+   model &RESPOSTA. = &VARIAVEIS./ noint SELECTION = Stepwise include=1;
+OUTPUT OUT=OUTRES
+RESIDUAL=RES PREDICTED=Y;
+run;
+
+
+/*
+%LET RESPOSTA =
+	&Modelo._DIFA_End_fam_cred;
+%LET VARIAVEIS =
+	TB_L1_DIFA_End_fam_cred
+	TB_L12_DIFP_MM6_Dolar
+
+;
+
+proc reg data=BASE_OVER90 outest=PARAMETROS;
+  	model  &RESPOSTA. = &VARIAVEIS. / noint SELECTION = none;
+OUTPUT OUT=OUTRES
+RESIDUAL=RES PREDICTED=Y;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Construção do Modelo Inicial */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Pontos Influentes */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 78 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Pontos Influentes */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-hPrLa8UkT28Nem3a/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc reg data=BASE_OVER90 plots(only) = DFFITS(label);
+   model &RESPOSTA. =
+		&variaveis.
+
+		/ noint;
+   id SAFRA;
+run; quit;
+
+ods graphics on;
+
+proc reg data=BASE_OVER90 plots(only)=(dfbetas dffits);
+      model &RESPOSTA. =
+			&variaveis.
+
+		/ noint;
+		 output out=RegOut pred=Pred rstudent=RStudent dffits=DFFits cookd=CooksD;
+quit;
+
+ods graphics off;
+
+data param_dffits (keep=&variaveis.);
+set BASE_OVER90;
+run;
+
+proc sql;
+create table param_dffits2 as
+   select MemName, NVar, nobs
+      from sashelp.vtable
+         where Libname = 'WORK';
+
+create table param_dffits2 as
+select *
+from param_dffits2 (where=(memname='PARAM_DFFITS'));
+quit;
+
+data _null_;
+set param_dffits2;
+call symputx('nobs',nobs);
+call symputx('nvar',nvar);
+run;
+
+proc sql;
+create table Pontos_Influentes as
+select safra, data, DFFits,
+(case when DFFits>= (-1)*(2*((&nvar./&nobs.)**(1/2))) and DFFits<= 2*((&nvar./&nobs.)**(1/2)) then 0 else 1 end) as flag_PI
+from RegOut;
+run;
+
+proc sql;
+create table Pontos_Influentes2 as
+select *,
+(intck('MONTH','01jan2007'd,data))+1 as flag, 
+monotonic() as m,
+count(*) as n
+from Pontos_Influentes (where=(flag_PI=1));
+quit;
+
+data _null_;
+set pontos_influentes2;
+where m=1;
+call symputx('n',n);
+run;
+
+%macro constroi_tab;
+
+data base_over90_pi;
+set base_over90;
+run;
+
+%do x=1 %to &n. %by 1;
+
+data fitro_&x.;
+set Pontos_Influentes2;
+where m=&x.;
+run;
+
+data _null_;
+set fitro_&x.;
+call symputx('flag',flag);
+run;
+
+proc sql;
+create table saida_&x. as
+select safra, 1 as d_&flag.
+from fitro_&x.;
+quit;
+
+proc sql;
+create table base_over90_pi as
+select a.*, coalesce(b.d_&flag.,0) as d_&flag.
+from base_over90_pi as a
+left join saida_&x. as b
+on a.safra=b.safra;
+quit;
+
+%end;
+
+%mend;
+%constroi_tab;
+
+proc reg data=BASE_OVER90_PI outest=PARAMETROS;
+   model &RESPOSTA. =
+		&variaveis.
+
+
+
+
+D_176
+
+
+
+/ noint SELECTION = NONE;
+OUTPUT OUT=OUTRES
+RESIDUAL=RES PREDICTED=Y;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Pontos Influentes */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Testes Iniciais */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 78 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Testes Iniciais */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-66vv8TGfkNROFIgh/code.sas */
+/* =========================INÍCIO TASK========================= */
+%LET RESPOSTA =
+	TB_DIFA_End_fam_cred;
+%LET VARIAVEIS =
+	TB_L1_DIFA_End_fam_cred
+	TB_L12_DIFP_MM6_Dolar
+	d_176
+;
+
+
+
+
+
+
+%macro jbtest(data,var);
+   ods listing close;
+   proc univariate data = &data ;
+       var &var;
+      ods output moments = _1;
+   run;
+
+   data _2;
+      set _1;
+      label = label1; value = nValue1; output;
+      label = label2; value = nValue2; output;
+      drop cvalue: label1 label2 nvalue:;
+   run;
+
+   proc transpose data = _2 out = _3;
+      by varname notsorted;
+      id label;
+      var value;
+   run;
+
+   data JB_final;
+      set _3;
+      jb = (skewness**2 * n)/6 + ((kurtosis)**2 *n)/24;
+      p = 1 - probchi(jb, 2);
+      lable jb = 'JB Statistic' p = 'P-value'
+         kurtosis = 'Excess Kurtosis';
+   run;
+   ods listing;
+   proc print data = JB_final label;
+      var varname n skewness kurtosis jb p;
+   run;
+
+   proc datasets nolist;
+      delete _:;
+   quit;
+%mend;
+%jbtest(OUTRES, RES);
+
+proc sql;
+create table JB_norm as
+select
+n,
+mean,
+'Std Deviation'n as Std_Deviation,
+Variance,
+Skewness,
+Kurtosis,
+jb as JarqueBera,
+p as p_value,
+(case when p>0.05 then "sim"
+				  else "não" end) as normalidade_residuos
+from JB_final;
+quit;
+
+
+
+
+
+data aux_var_explic;
+aux_var="&VARIAVEIS.";
+run;
+
+data testeeeeeeee ;
+  set aux_var_explic;
+count=count(aux_var,"&MODELO.");
+call symput('count',trim(count));
+run;
+
+%macro aux_var_explic;
+
+data _null_;
+set parametros;
+call symput('a0',0);
+run;
+
+data teste_het;
+set BASE_OVER90_PI;
+a0 = &a0.;
+run;
+
+data aux_param;
+var0="a0";
+run;
+
+data aux_equacao;
+var0="a0";
+run;
+
+%do i=1 %to &count. %by 1;
+
+data teste_&i. ;
+set aux_var_explic;
+var&i.=scan(aux_var,&i.," ");
+call symput("var&i.",trim(var&i.));
+run;
+
+data teste2_&i. ;
+set parametros;
+call symput("a&i.",&&var&i..);
+run;
+
+data teste_het;
+set teste_het;
+a&i. = &&a&i..;
+run;
+
+data aux_param;
+set aux_param;
+var&i.="a&i.";
+run;
+
+data aux_equacao;
+set aux_equacao;
+var&i.=cat("+ ","a&i."," * ","&&var&i..");
+run;
+
+%end;
+
+data aux_param2 (keep=concatenado);
+set aux_param;
+format concatenado $30000.;
+concatenado=catx("", of var:);
+run;
+
+data aux_equacao2 (keep=concatenado);
+set aux_equacao;
+format concatenado $30000.;
+concatenado=catx("", of var:);
+run;
+
+%mend;
+%aux_var_explic;
+
+data _null_;
+set aux_param2;
+call symput('hetero_param',concatenado);
+run;
+
+data _null_;
+set aux_equacao2;
+call symput('hetero_equacao',concatenado);
+run;
+
+proc model data=teste_het;
+	ods output HeteroTest=SAIDA_HETEROTEST;
+      parms &hetero_param.;
+      &RESPOSTA. = &hetero_equacao.;
+      fit &RESPOSTA. / white
+	out=resid1 outresid;
+run;
+
+proc sql;
+create table heterocedast as
+select Test, Statistic, ProbChiSq,
+(case when ProbChiSq>0.05 then "sim"
+				  else "não" end) as homocedasticidade
+from SAIDA_HETEROTEST;
+quit;
+
+
+
+
+
+proc reg data=BASE_OVER90_PI;
+  model &RESPOSTA. =
+	 &VARIAVEIS. / noint dw;
+run;
+
+
+
+proc autoreg data=BASE_OVER90_PI;
+   model &RESPOSTA. =
+		 &VARIAVEIS. / noint dw=12  dwprob;
+run;
+
+proc autoreg data=BASE_OVER90_PI;
+ods output Godfrey=saida_godfrey;
+   model &RESPOSTA. =
+		 &VARIAVEIS. / noint godfrey=2; 
+run;
+
+proc sql;
+create table autocorrel as
+select LM, ProbLM,
+(case when ProbLM>0.05 then "não" else "sim" end) as autocorrel_residuos
+from saida_godfrey (where=(Alt="AR(2)"));
+quit;
+
+
+
+
+
+proc reg data=BASE_OVER90_PI outvif outest=saida_multicol ridge=0;
+ model &RESPOSTA. =
+		 &VARIAVEIS. / noint vif tol collin ;
+run;
+
+data saida_multicol2 (drop=_MODEL_ _TYPE_ _DEPVAR_ _RIDGE_ _PCOMIT_ _RMSE_);
+set saida_multicol;
+where _TYPE_="RIDGEVIF";
+run;
+
+proc transpose data=saida_multicol2 out=saida_multicol2t;
+run;
+
+proc sql;
+create table multicol as
+select
+max(COL1) as max_VIF
+from saida_multicol2t;
+create table multicol as
+select *,
+(case when max_VIF>10 then "sim" else "não" end) as multicolinearidade
+from multicol;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Testes Iniciais */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Testes Adicionais */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 78 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Testes Adicionais */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-JkdhznNjPIOu52Ti/code.sas */
+/* =========================INÍCIO TASK========================= */
+data BASE_OVER90_PI_resu (keep= data &RESPOSTA. &variaveis.);
+set BASE_OVER90_PI;
+run;
+
+
+
+proc means data= BASE_OVER90_PI_resu N NMISS MIN MAX MEAN VAR MODE P1 P25 Median P75 P99 nolabels;
+run;
+
+
+%macro descritiva(base);
+%let var = '                                                             ';
+data base_in;
+set &base.;
+run;
+data base_n;
+set base_in;
+run;
+proc contents data=base_n out=t1 noprint;
+run;
+proc sql noprint;
+select freq(NAME) INTO :Nvar
+from t1;
+quit;
+%let n=1;
+%do %while (%eval(&n.) LE %eval(&Nvar.));
+data t2;
+set t1;
+if _N_ = %eval(&n.);
+run;
+data _null_;
+set t2;
+call symput('var',NAME);
+run;
+%put "&var.";
+%put "&n.";
+
+title "Análise descritiva da série: &var..";
+ proc sgplot data=base_in;
+ series y=&var. x=data;
+run;
+%let n = %eval(&n.+1);
+%end;
+proc datasets nolist nodetails;
+ delete t1 t2 base_n base_in;
+run;
+title "";
+%mend;
+%descritiva(BASE_OVER90_PI_resu);
+
+
+%macro estacionariedade_var(base, vari);
+data estacionariedade;
+ set &base.;
+run;
+
+title "Análise descritiva da série: &vari..";
+ proc sgplot data=estacionariedade;
+ series y=&vari. x=data;
+run;
+
+title "Análise de estacionariedade da variável: &vari..";
+ods graphics on;
+proc arima data=estacionariedade ;
+ identify var=&vari. nlag=12 STATIONARITY=(ADF);
+run;
+ods graphics off;
+title "";
+%mend;
+%estacionariedade_var(BASE_OVER90_PI, LEVES_DIFA_OVER90);
+%estacionariedade_var(BASE_OVER90_PI, L10_LEVES_DIFP_SCORE);
+%estacionariedade_var(BASE_OVER90_PI, L6_LEVES_DIFA_RENDA);
+
+
+%macro univ_var(base, vari);
+PROC UNIVARIATE data=&base. normal;
+VAR &vari.;
+HISTOGRAM &vari. / normal;
+PROBPLOT &vari.;
+output kurtosis=kur skewness=ske;
+TITLE "Tests for Normality of Variable: &vari..";
+QUIT;
+%mend;
+%univ_var(OUTRES, RES);
+
+
+%macro graph_biv(base, resp, vari);
+Title "Análise descritiva das séries";
+ods path show;
+ods path(prepend) work.templat(update);
+proc template;
+define statgraph dualseries;
+   begingraph;
+   entrytitle "Distribuição séries";
+   layout overlay / xaxisopts=(label="Safra");
+
+	seriesplot x=data y=&resp. / name="Y" legendlabel="Resposta: &resp..";
+	seriesplot x=data y=&vari. / yaxis=y2 lineattrs=(color=red) name="X" legendlabel="Explicativa: &vari..";
+
+      discretelegend "Y" "X" / valign=bottom title="Análise descritiva das séries";
+   endlayout;
+   endgraph;
+end;
+run;
+proc sgrender data=&base. template=dualseries;
+run;
+Title "";
+%mend;
+%graph_biv(BASE_OVER90_PI, LEVES_DIFA_OVER90, L10_LEVES_DIFP_SCORE);
+
+ods graphics on ;
+proc reg data= BASE_OVER90_PI plots=all rsquare outest=parametros;
+model &RESPOSTA. =
+		 &VARIAVEIS. / noint
+
+dwProb spec sbc WHITE rsquare influence;
+
+OUTPUT OUT=outres
+RESIDUAL=res PREDICTED=Y;
+TITLE'Regressão';
+run;
+quit;
+ods graphics off ;
+
+PROC UNIVARIATE data=outres normal;
+VAR res;
+HISTOGRAM res / normal;
+PROBPLOT res;
+output kurtosis=kur skewness=ske normaltest;
+TITLE'Tests for Normality of Residuals';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Testes Adicionais */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%LET RESPOSTA =
+	&Modelo._DIFA_End_fam_cred;
+%LET VARIAVEIS =
+	TB_L1_DIFA_End_fam_cred
+	TB_L8_DIFA_Desemprego_DSZ
+	TB_L12_DIFP_MM6_Dolar
+
+;
+
+proc reg data=BASE_OVER90 outest=PARAMETROS;
+  	model  &RESPOSTA. = &VARIAVEIS. / noint SELECTION = none;
+OUTPUT OUT=OUTRES
+RESIDUAL=RES PREDICTED=Y;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc reg data=BASE_OVER90_PI outest=PARAMETROS;
+   model &RESPOSTA. =
+		&variaveis.
+
+
+
+
+D_176
+
+
+
+/ noint SELECTION = NONE;
+OUTPUT OUT=OUTRES
+RESIDUAL=RES PREDICTED=Y;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+ods graphics on ;
+proc reg data= BASE_OVER90_PI plots=all rsquare outest=parametros;
+model &RESPOSTA. =
+		 &VARIAVEIS. / noint
+
+dwProb spec sbc WHITE rsquare influence;
+
+OUTPUT OUT=outres
+RESIDUAL=res PREDICTED=Y;
+TITLE'Regressão';
+run;
+quit;
+ods graphics off ;
+
+PROC UNIVARIATE data=outres normal;
+VAR res;
+HISTOGRAM res / normal;
+PROBPLOT res;
+output kurtosis=kur skewness=ske normaltest;
+TITLE'Tests for Normality of Residuals';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

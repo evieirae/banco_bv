@@ -1,0 +1,328 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_Alertas_BVO
+FILE_SAS: Gera_alerta_bvo.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 253
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ALERTA_BVO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.ALERTA_BVO
+TABLE_READ_PROVENANCE (Flow): WORK.ALERTA_BVO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /Alerta_BVO.csv, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./Alerta_BVO.csv
+TEMP/DISCARDED OUTPUTS: ALERTA_BVO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /Alerta_BVO.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: Gera_alerta_bvo.sas														| */
+/* | Descricao: Programa para gerar base e envio de alerta de superfaturamento no produto BVO			| */
+/* | Objetivo: 	Alertar as áreas sobre possíveis tentativas de fraude					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera tabela de dados com casos de faturamento acima da molicar     =========================*/
+/* ======================================================================================*/
+
+proc sql;
+  connect to bigquery as perm (
+    project='bv-saem-dtm'
+    credfile='/projetos/acessos/bq/em/saem-dtm.json'
+    schema='bv-pdbd-prd'
+    READ_MODE=storage
+    ALLOW_LARGE_RESULTS=must
+    MAX_CHAR_LEN=100
+  );
+
+  create table Alerta_BVO as
+  select * from connection to perm
+  (
+    WITH
+    tb_simulacao_proposta AS (
+      SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta`
+      WHERE dt_simulacao_proposta >=  '2025-12-01'
+        AND dt_simulacao_proposta <  '2027-01-01'
+    ),
+    tb_simulacao_proposta_garantia AS (
+      SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_proposta_garantia`
+      WHERE dt_simulacao_garantia >=  '2025-12-01'
+        AND dt_simulacao_garantia <  '2027-01-01'
+    ),
+    tb_simulacao_dado_fnnco AS (
+      SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_dado_fnnco`
+      WHERE dt_simulacao_financiamento >=  '2025-12-01'
+        AND dt_simulacao_financiamento <  '2027-01-01'
+    ),
+    tb_simulacao_prazo_fnnco AS (
+      SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_prazo_fnnco`
+      WHERE dt_simulacao_prazo_fnnco >=  '2025-12-01'
+        AND dt_simulacao_prazo_fnnco <  '2027-01-01'
+    ),
+    tb_simulacao_przo_fnnco_prpsa AS (
+      SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_przo_fnnco_prpsa`
+      WHERE dt_inclusao >=  '2025-12-01'
+        AND dt_inclusao <  '2027-01-01'
+    ),
+    tb_simulacao_prazo_faixa_aprvo AS (
+      SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_simulacao_prazo_faixa_aprvo`
+      WHERE dt_inclusao >=  '2025-12-01'
+        AND dt_inclusao <  '2027-01-01'
+    ),
+    tb_proposta_parceria AS (
+      SELECT * FROM `bv-pdbd-prd.trusted_apro_simu.tb_proposta_parceria`
+      WHERE dt_inclusao >=  '2025-12-01'
+        AND dt_inclusao <  '2027-01-01'
+    ),
+    tb_proposta_prd AS (
+      SELECT nuproposta, vrproposta, stproposta
+      FROM `bv-pdbd-prd.trusted_dbcred.tbproposta`
+      WHERE dtentradaproposta >=  '2025-12-01'
+        AND dtentradaproposta <  '2027-01-01'
+    ),
+	Parceiro_Comercial as (
+
+    select
+    cdparceirocomercial,
+    nmparceirocomercial,
+    nmsubestruturacomercialc,
+    nmareaestruturacomercialc,
+    nmcanalestruturacomercialc,
+    cduf from
+    `bv-pdbd-prd.trusted_negc_rodas.tbparceirocomercial`
+   ),
+    tb_apro_simu AS (
+      SELECT DISTINCT
+        CAST(a.cd_simulacao_proposta AS INT64) AS cd_simulacao_proposta,
+        a.dt_simulacao_proposta,
+        CAST(e.nu_proposta AS INT64) AS nu_proposta,
+	CAST(a.cd_parceiro_comercial as int64) as cd_parceiro_comercial,
+	  i.nmparceirocomercial,
+     i.nmsubestruturacomercialc,
+     i.nmareaestruturacomercialc,
+     i.nmcanalestruturacomercialc,
+     i.cduf,
+        CAST(g.cd_parceiro_externo AS INT64) AS cd_parceiro_externo,
+        f.cd_simulacao_prazo_fnnco AS Simu_Parc,
+        c.cd_simulacao_dado_fnnco AS cd_simu_dado,
+        f.ds_motivo_decisao_pdec AS motivo_decisao,
+        a.st_pre_analise_bvo AS Decisao_preAnalise_Bvo,
+        f.pc_probabilidade_aprovacao AS ProbabilidadeAprovacao,
+        e.nu_proposta AS nuProposta,
+        d.qt_parcela,
+        c.vr_entrada,
+        b.ds_marca,
+        b.ds_marca_modelo,
+        b.aa_fabricacao,
+        b.aa_modelo,
+        b.cd_molicar,
+        b.vr_veiculo_simulacao,
+        b.vr_veiculo_molicar,
+        h.vrproposta,
+        h.stproposta,
+        SAFE_DIVIDE(CAST(b.vr_veiculo_simulacao AS NUMERIC), NULLIF(CAST(b.vr_veiculo_molicar AS NUMERIC),0)) - 1 AS perc_vrsimu_x_molic
+      FROM tb_simulacao_proposta a
+      LEFT JOIN tb_simulacao_proposta_garantia b ON b.cd_simulacao_proposta = a.cd_simulacao_proposta
+      LEFT JOIN tb_simulacao_dado_fnnco c ON c.cd_simulacao_dado_fnnco = b.cd_simulacao_dado_fnnco
+      LEFT JOIN tb_simulacao_prazo_fnnco d ON d.cd_simulacao_dado_fnnco = c.cd_simulacao_dado_fnnco
+      LEFT JOIN tb_simulacao_przo_fnnco_prpsa e ON e.cd_simulacao_prazo_fnnco = d.cd_simulacao_prazo_fnnco
+      LEFT JOIN tb_simulacao_prazo_faixa_aprvo f ON d.cd_simulacao_prazo_fnnco = f.cd_simulacao_prazo_fnnco
+      LEFT JOIN tb_proposta_parceria g ON g.cd_simulacao_proposta = a.cd_simulacao_proposta
+      LEFT JOIN tb_proposta_prd h ON h.nuproposta = CAST(e.nu_proposta AS NUMERIC)
+	  LEFT JOIN parceiro_comercial i on a.cd_parceiro_comercial = i.cdparceirocomercial
+      WHERE h.nuproposta IS NOT NULL
+        AND CAST(g.cd_parceiro_externo AS INT64) = 41
+        AND TRIM(UPPER(h.stproposta)) = 'A'
+    )
+
+    SELECT *,
+      CASE WHEN perc_vrsimu_x_molic >= 0.00 AND perc_vrsimu_x_molic < 0.05 THEN 1 ELSE 0 END AS zero_a_4_perc_acima,
+      CASE WHEN perc_vrsimu_x_molic >= 0.05 AND perc_vrsimu_x_molic < 0.10 THEN 1 ELSE 0 END AS cinco_a_10perc_acima,
+      CASE WHEN perc_vrsimu_x_molic >= 0.10 AND perc_vrsimu_x_molic < 0.20 THEN 1 ELSE 0 END AS dez_a_20perc_acima,
+      CASE WHEN perc_vrsimu_x_molic >= 0.20 AND perc_vrsimu_x_molic < 0.30 THEN 1 ELSE 0 END AS vinte_a_30perc_acima,
+      CASE WHEN perc_vrsimu_x_molic >= 0.30 THEN 1 ELSE 0 END AS maior_que_30perc_acima
+    FROM tb_apro_simu
+    WHERE perc_vrsimu_x_molic IS NOT NULL AND perc_vrsimu_x_molic >= 0
+    ORDER BY dt_simulacao_proposta, Simu_Parc
+  );
+
+  disconnect from perm;
+quit;
+/* ======================================================================================*/
+/* =====================Gera arqvuio csv com casos de faturamento acima da molicar     =========================*/
+/* ======================================================================================*/
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+	DATA= Alerta_BVO
+	FILE="&dir_csv./Alerta_BVO.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* ======================================================================================*/
+/* =====================Gera e envia e-mail de alerta com casos de faturamento acima da molicar     =========================*/
+/* ======================================================================================*/
+
+data _NULL_;
+	OPTIONS
+		EMAILHOST=smtprelay.bvnet.bv
+		EMAILPORT=25
+		EMAILAUTHPROTOCOL=NONE
+		EMAILID='srv_emprestimos@bv.com.br';
+		FILENAME MAIL EMAIL
+		CONTENT_TYPE="text/html"
+		ATTACH= "&dir_csv./Alerta_BVO.csv"
+		TO=('flavio.luis@bv.com.br','ramon.sales@bv.com.br','leticia.gomez@bv.com.br','anna.esposito@bv.com.br','mariana.cardoso@bv.com.br','rafael.arimochi@bv.com.br')
+/*		BCC=('marcio.shiroma@bv.com.br')*/
+		SENSITIVITY="CONFIDENTIAL"
+		SUBJECT="ALERTA BVO - APNP SUPERFATURADO";
+	ods html3
+		body=MAIL
+		style=HTMLBlue
+		rs=none;
+
+ods text='Prezados,';
+ods text=' ';
+ods text='Segue abaixo relatório de APNPs e principais ofensores com valor declarado acima da molicar por faixa. Em anexo base analitica.';
+ods text=' ';
+ods text=' ';
+
+PROC SQL;
+   /*CREATE TABLE WORK.REPORT_ALERTA_BVO AS */
+   SELECT
+       t1.cd_parceiro_comercial,
+	   t1.cduf,
+       /* Conta propostas distintas quando a condição é verdadeira */
+       COUNT(DISTINCT CASE WHEN t1.zero_a_4_perc_acima   = 1 THEN t1.nuproposta END) AS ppta_zero_a_4_perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.cinco_a_10perc_acima  = 1 THEN t1.nuproposta END) AS ppta_cinco_a_10perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.dez_a_20perc_acima    = 1 THEN t1.nuproposta END) AS ppta_dez_a_20perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.vinte_a_30perc_acima  = 1 THEN t1.nuproposta END) AS ppta_vinte_a_30perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.maior_que_30perc_acima= 1 THEN t1.nuproposta END) AS ppta_maior_que_30perc_acima
+
+   FROM WORK.ALERTA_BVO t1
+   GROUP BY t1.cd_parceiro_comercial,t1.cduf
+   order by
+  	ppta_maior_que_30perc_acima desc,
+	ppta_vinte_a_30perc_acima desc,
+	ppta_dez_a_20perc_acima desc,
+	ppta_cinco_a_10perc_acima desc,
+	ppta_zero_a_4_perc_acima desc
+
+;
+QUIT;
+
+PROC SQL;
+   /*CREATE TABLE WORK.REPORT_ALERTA_BVO AS */
+   SELECT
+       t1.cd_parceiro_comercial,
+	   t1.cduf,
+	   datepart(t1.dt_simulacao_proposta) AS datasimu format=ddmmyy10.,
+       /* Conta propostas distintas quando a condição é verdadeira */
+       COUNT(DISTINCT CASE WHEN t1.zero_a_4_perc_acima   = 1 THEN t1.nuproposta END) AS ppta_zero_a_4_perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.cinco_a_10perc_acima  = 1 THEN t1.nuproposta END) AS ppta_cinco_a_10perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.dez_a_20perc_acima    = 1 THEN t1.nuproposta END) AS ppta_dez_a_20perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.vinte_a_30perc_acima  = 1 THEN t1.nuproposta END) AS ppta_vinte_a_30perc_acima,
+       COUNT(DISTINCT CASE WHEN t1.maior_que_30perc_acima= 1 THEN t1.nuproposta END) AS ppta_maior_que_30perc_acima
+
+   FROM WORK.ALERTA_BVO t1
+   GROUP BY t1.cduf,t1.cd_parceiro_comercial, datasimu
+   order by
+   datasimu desc,
+	ppta_maior_que_30perc_acima desc,
+	ppta_vinte_a_30perc_acima desc,
+	ppta_dez_a_20perc_acima desc,
+	ppta_cinco_a_10perc_acima desc,
+	ppta_zero_a_4_perc_acima desc
+
+;
+QUIT;
+
+ods text=' ';
+ods text='Att,';
+ods text=' ';
+;
+ods text='MIS VAREJO - Tribo Rodas';
+ods text='******ATENÇÃO ESTE É UM ENVIO AUTOMATIZADO. EM CASO DE DÚVIDAS ENVIE EMAIL PARA FLAVIO.LUIS@BV.COM.BR**********';
+run;
+
+ods html3 close;
+
+/*
+proc sql;
+	select
+          dt_simulacao_proposta,
+		  cd_simulacao_proposta,
+	 cd_parceiro_comercial,
+          cd_parceiro_externo,
+          Simu_Parc,
+          cd_simu_dado,
+     	  cd_molicar,
+          motivo_decisao,
+          ProbabilidadeAprovacao,
+          nuProposta,
+          stproposta,
+          vrproposta,
+		  ds_marca,
+          ds_marca_modelo,
+          aa_fabricacao,
+          aa_modelo,
+          qt_parcela,
+          vr_entrada,
+          vr_veiculo_simulacao,
+          vr_veiculo_molicar,
+          perc_vrsimu_x_molic,
+          zero_a_4_perc_acima,
+          cinco_a_10perc_acima,
+          dez_a_20perc_acima,
+          vinte_a_30perc_acima,
+          maior_que_30perc_acima
+	from Alerta_BVO
+;
+quit;*/

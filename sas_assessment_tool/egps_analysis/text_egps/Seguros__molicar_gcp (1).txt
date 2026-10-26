@@ -1,0 +1,269 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Seguros__molicar_gcp (1)
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:11 UTC
+BUSINESS_AREA: Seguros
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 192
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DATASEG.TBSEGUROSCOMPLETA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.MOLICAR2
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): C:\Users\rafael.arruda\Downloads\script_job_3ce6ce36f137af97f9c9fc576383cfd3_10.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.MOLICAR <- C:\Users\rafael.arruda\Downloads\script_job_3ce6ce36f137af97f9c9fc576383cfd3_10.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.MOLICAR, WORK.MOLICAR2
+TABLE_READ_PROVENANCE (Flow): DATASEG.TBSEGUROSCOMPLETA [PROC SQL - FROM; PROC SQL - JOIN], WORK.MOLICAR [PROC SQL - FROM], WORK.MOLICAR2 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: ANALISE, CASCO, GM, MOLICAR2, NACIONALIDADE, NACIONALIDADE_STG, RCF
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET SYSLAST=WORK.MOLICAR;
+
+[[ FILE_REFS_MACRO ]]
+IN|C:\Users\rafael.arruda\Downloads\script_job_3ce6ce36f137af97f9c9fc576383cfd3_10.csv|C:/USERS/RAFAEL.ARRUDA/DOWNLOADS|SCRIPT_JOB_3CE6CE36F137AF97F9C9FC576383CFD3_10.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 13 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-v6zx9kyLVSdsPAzT/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE ANALISE AS
+
+select distinct
+dtcontrato,
+stproposta,
+NUPROPOSTA,
+CdModelo,NuChassis,
+DsCategoria,
+CdMarca,
+vrproducao,
+vrentrada,
+input(AaModelo,best.) as ano,
+input(cdmolicar,best.) as molicar,
+Nacionalidade_Veiculo,
+VrMercado,
+(vrrcf) as rcf,
+(vrcasco) as casco,
+(vrgarantiamecanica) as gm
+from dataseg.tbseguroscompleta
+where  NUPROPOSTA IN (355045668,355045535,355045467,355044937)
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-YnOpFMjkxxpgPsgw/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table nacionalidade_stg as
+select distinct
+input(AaModelo,best.) as ano,
+input(cdmolicar,best.) as molicar,
+Nacionalidade_Veiculo,
+VrMercado,
+count(1) as qtd
+from dataseg.tbseguroscompleta
+where Nacionalidade_Veiculo is not null
+group by
+input(AaModelo,best.),
+input(cdmolicar,best.),
+Nacionalidade_Veiculo,
+VrMercado
+;quit;
+
+proc sql;
+create table nacionalidade as
+select distinct
+q2.ano,
+q2.molicar,
+q2.Nacionalidade_Veiculo,
+max_vr
+from nacionalidade_stg q2
+inner join
+	(select distinct
+	ano,
+	molicar,
+	max(qtd) as max_qtd,
+	max(VrMercado) as max_vr
+	from nacionalidade_stg
+	group by ano,
+	molicar
+	) q1
+on q1.ano=q2.ano
+and q1.molicar=q2.molicar
+and q1.max_qtd=q2.qtd
+;quit;
+
+proc sql;
+create table molicar2 as
+select distinct q1.*,
+q2.DsCategoria,
+q2.CdMarca,
+q3.Nacionalidade_Veiculo,
+q3.max_vr,
+nuchassis,
+Q2.CdModelo,
+sum(q2.flgarantiamecanica) as flgm,
+sum(q2.flcasco) as flcasco,
+sum(q2.flrcf) as flRcf
+from
+work.molicar q1
+left join dataseg.tbseguroscompleta q2
+	on q1.aa_modelo_veiculo=input(q2.AaModelo,best.)
+	and q1.cd_molicar=input(q2.cdmolicar,best.)
+left join nacionalidade q3
+		on q1.aa_modelo_veiculo=q3.ano
+	and q1.cd_molicar=q3.molicar
+group by
+aa_modelo_veiculo,
+cd_molicar,
+GM,
+Casco,
+RCF,
+qtd_simulacoes,
+q2.DsCategoria,
+q2.CdMarca,
+q3.Nacionalidade_Veiculo,
+q3.max_vr,
+nuchassis,
+Q2.CdModelo
+;quit;
+
+proc sql;
+create table molicar2 as
+select * from molicar2
+where nuchassis is not null
+;quit;
+
+proc sort data = molicar2;
+  by cd_molicar aa_modelo_veiculo;
+run;
+
+data molicar2;
+  set molicar2;
+  count + 1;
+  by  cd_molicar aa_modelo_veiculo;
+  if first.cd_molicar  then count = 1;
+run;
+
+
+
+proc sql;
+create table GM as
+select distinct
+'Garantia Mecanica' as produto,
+qtd_simulacoes,cd_molicar,aa_modelo_veiculo,
+DsCategoria,CdMarca,Nacionalidade_Veiculo,CdModelo,NuChassis,max_vr AS ValorMolicar
+from
+work.molicar2
+where GM=0 AND flGM=0 AND aa_modelo_veiculo>2015
+and DsCategoria in ('AUTOMOVEL','UTILITARIO')
+and Nacionalidade_Veiculo='Nacional'
+and max_vr<150000
+and count<10
+order by qtd_simulacoes desc,cd_molicar,aa_modelo_veiculo
+;quit;
+
+
+
+proc sql;
+create table CASCO as
+select distinct
+'Casco' as produto,
+qtd_simulacoes,cd_molicar,aa_modelo_veiculo,
+DsCategoria,CdMarca,Nacionalidade_Veiculo,CdModelo,NuChassis,max_vr AS ValorMolicar
+from
+work.molicar2
+where CASCO=0 AND flCasco=0 AND aa_modelo_veiculo>2000
+and  Nacionalidade_Veiculo='Nacional'
+and DsCategoria in ('AUTOMOVEL','UTILITARIO')
+and count<10
+and max_vr<300000
+order by qtd_simulacoes desc,cd_molicar,aa_modelo_veiculo
+;quit;
+
+
+
+
+
+
+proc sql;
+create table RCF as
+select distinct
+'RCF' as produto,
+qtd_simulacoes,cd_molicar,aa_modelo_veiculo,
+DsCategoria,CdMarca,Nacionalidade_Veiculo,CdModelo,NuChassis,max_vr AS ValorMolicar
+
+from (
+	select distinct * from
+	work.molicar2
+	where RCF=0 AND flRCF=0 AND  aa_modelo_veiculo>2000
+	and  Nacionalidade_Veiculo='Nacional'
+	and count<10 and DsCategoria in ('AUTOMOVEL','UTILITARIO')
+	and max_vr<300000
+	union
+	select distinct * from
+	work.molicar2
+	where RCF=0 AND flRCF=0 AND aa_modelo_veiculo>2000
+	and  Nacionalidade_Veiculo='Nacional'
+	and count<10 and DsCategoria ='MOTO'
+	and max_vr<150000
+	union
+	select distinct * from
+	work.molicar2
+	where RCF=0 AND flRCF=0 AND aa_modelo_veiculo>2000
+	and  Nacionalidade_Veiculo='Nacional'
+	and count<10 and DsCategoria ='CAMINHAO'
+	and max_vr<500000)q1
+order by qtd_simulacoes desc,cd_molicar,aa_modelo_veiculo
+;quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

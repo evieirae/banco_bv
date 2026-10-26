@@ -1,0 +1,95 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-simples
+FILE_SAS: 00-parametros.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (4x | +80)
+----------------------------------------
+LINES_OF_CODE: 34
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: RENAVE = /infogrc/renave
+DETECTED_MACROS_DEFINED: qtMeses
+DETECTED_MACROS_USED: qtMeses
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/FUNCOES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /INFOGRC/UTILS/PWD.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (sas: 4)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/funcoes.sas
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /infogrc/utils/pwd.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Atualizacao:	12/09/2025													| */
+/* |	Responsavel: 	Flavio Pereira                      | */
+/* |	Alt. Realizada:	- Alterado parâmetro qtdeMeses = 13 para qtdeMeses = 24  																| */
+/* ====================================================================================== */
+
+/* Declarar libnames e strings de conexão com Sybase */
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/pwd.sas';
+%include '/infogrc/utils/libname.sas';
+%include '/infogrc/utils/funcoes.sas';
+libname Renave '/infogrc/renave';
+
+/* Chamar macros principais */
+%CRIAVARDB;
+%SAFRAESG();
+
+options compress=yes;
+
+/* INFORMAR QTD MESES PARA O DASH */
+%let qtMeses = 24;
+
+DATA _NULL_;
+  /* Define parâmetros com base no dia atual */
+  hoje = TODAY();
+  hojeXM = INTNX('MONTH', hoje, ((&qtMeses. - 1) * -1), 'BEGINNING');
+  anoAnt = INTNX('YEAR', hoje, -1, 'BEGINNING');
+
+  /* Calcula variáveis */
+  safraXM = (YEAR(hojeXM) * 100) + MONTH(hojeXM);
+  anoXM = YEAR(hojeXM);
+  anoAtual = YEAR(hoje);
+  dtIniPta = (safraXM * 100) + 1;
+
+  /* Declarar macro variáveis */
+  CALL SYMPUT('safraXM', safraXM);
+  CALL SYMPUT('anoXM', PUT(anoXM,4.));
+  CALL SYMPUT('anoAtual', PUT(anoAtual,4.));
+  CALL SYMPUT('dtIniPta', "'"||PUT(dtIniPta,8.)||"'");
+
+  CALL SYMPUT('hojeXM', "'"||PUT(hojeXM,8.)||"'");
+RUN;

@@ -1,0 +1,152 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__202404_Projeto_Dados_CTX
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:04 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 80)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80)
+----------------------------------------
+LINES_OF_CODE: 83
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CONTATOS = /riscosbv/cobranca/rribeiro/contatos; KAIQUE = /riscosbv/cobranca/kveras
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DT_ARQ
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CONTATOS.AUX_HIST_ACORDO_WHATS [SAS/Local], CONTATOS.AUX_HIST_CTX [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CONTATOS
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.DADOS_CTX_MATH, WORK.EVENTOS_WPP_1, WORK.EVENTOS_WPP_2, WORK.EVENTOS_WPP_3
+TABLE_READ_PROVENANCE (Flow): CONTATOS.AUX_HIST_ACORDO_WHATS [PROC SQL - FROM], CONTATOS.AUX_HIST_CTX [PROC SQL - FROM], WORK.DADOS_CTX_MATH [PROC EXPORT - DATA=], WORK.EVENTOS_WPP_1 [PROC SQL - FROM], WORK.EVENTOS_WPP_2 [PROC SQL - JOIN], WORK.EVENTOS_WPP_3 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbv/cobranca/kveras/darkpost/DADOS_CTX_MATH_&DT_ARQ..csv
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: WORK.DADOS_CTX_MATH, WORK.EVENTOS_WPP_1, WORK.EVENTOS_WPP_2, WORK.EVENTOS_WPP_3, WORK.EVENTOS_WPP_4
+DYNAMIC REFS (Ambiguous): {DT_ARQ}.CSV
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+OUT|/riscosbv/cobranca/kveras/darkpost/DADOS_CTX_MATH_&DT_ARQ..csv|/RISCOSBV/COBRANCA/KVERAS/DARKPOST|DADOS_CTX_MATH_#.CSV|DT_ARQ|ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-jY36KDFyG4PDCCwA/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CONTATOS '/riscosbv/cobranca/rribeiro/contatos';
+LIBNAME Kaique '/riscosbv/cobranca/kveras';
+
+
+DATA _NULL_ ;
+CALL SYMPUT('DT_ARQ', PUT(TODAY(),YYMMDDN8.));
+RUN;
+
+options reuse=yes compress=binary;
+proc sql;
+
+create table work.eventos_wpp_1 as
+
+select *
+,case when Descricao_Evento in ('Entrada Instagram','Entrada Facebook') then 'Meta'
+      when Descricao_Evento in ('EntradaGoogleSearch') then 'Google' else 'verificar' end as campanha
+from CONTATOS.AUX_HIST_CTX
+
+;quit;
+
+proc sql;
+
+create table work.eventos_wpp_2 as
+
+select
+*
+from CONTATOS.AUX_HIST_ACORDO_WHATS
+
+;quit;
+
+proc sql;
+create table work.eventos_wpp_3 as
+
+select distinct
+a.*
+,1 as flag_ctx
+,case
+	when a.Numero_Protocolo = b.Numero_Protocolo then 1
+	else 0
+end as flag_acordo
+from work.eventos_wpp_1 as a
+left join work.eventos_wpp_2 as b on a.Numero_Protocolo = b.Numero_Protocolo
+
+;quit;
+
+proc sql;
+create table work.eventos_wpp_4 as
+
+select
+Dt_Evento as dt_evento
+,Safra as safra
+,campanha
+,sum(flag_ctx) as qtd_entradas_ctx
+,sum(flag_acordo) as qtd_acordos
+from work.eventos_wpp_3
+group by
+Dt_Evento
+,Safra
+,campanha
+
+;quit;
+
+Proc SQL;
+Create table work.dados_ctx_math as
+Select
+Dt_Ref,
+Dth_Evento,
+Safra,
+Canal,
+NUCPFCNPJ,
+NUCONTRATO,
+Nome_Cliente,
+Telefone_Completo,
+Descricao_Evento,
+Observacao,
+Carteiras,
+Campanha
+From work.eventos_wpp_1;
+;quit;
+
+PROC EXPORT
+	DATA=WORK.DADOS_CTX_MATH
+	OUTFILE="/riscosbv/cobranca/kveras/darkpost/DADOS_CTX_MATH_&DT_ARQ..csv"
+	DBMS=csv
+	REPLACE;
+	PUTNAMES=YES;
+	DELIMITER=';'
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

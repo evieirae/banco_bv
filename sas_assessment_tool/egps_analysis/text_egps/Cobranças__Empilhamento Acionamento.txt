@@ -1,0 +1,266 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Empilhamento Acionamento
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:29 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -49
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 172
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ACIONA = /riscosbv/cobranca/marina/Acionamento; CAROL = /riscosbv/cobranca/caroline; DEEP = /riscosbv/cobranca/taylor/deep_center; KAUE = /riscosbv/cobranca/ksilvestre; LEO = /riscosbv/cobranca/leonardo_trinchinato
+DETECTED_MACROS_DEFINED: ano, anomes, base, datafim, datainic, mes, path, work
+DETECTED_MACROS_USED: anomes, base, datafim, datainic, libname, path, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: BASE, LIBNAME
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_COBRANCA.ASSESSORIA_ACIONAMENTOS_COBRANCA_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: ACIONA, BASE_ACIONAMENTO_&ANOMES, CAROL
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cobrança\Estrategia\Colaboradores\Kaue\Auto\Bases Robbu\depara_tabulacao.xlsx[SHEET='Ajuste']
+TEMP/DISCARDED_FILE_INPUT: WORK.depara_tabulacao <- N:\DVMD\Cobrança\Estrategia\Colaboradores\Kaue\Auto\Bases Robbu\depara_tabulacao.xlsx[SHEET='Ajuste']
+TABLE_READ_PROVENANCE (Flow): BASE_ACIONAMENTO_&ANOMES._A [DATA Step - SET; Resolved qualified read (%LET)], BV-PDBD-PRD.DVRY_CORP_COBRANCA.ASSESSORIA_ACIONAMENTOS_COBRANCA_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ACIONA.BASE_DEEP_202602, BASE_ACIONAMENTO_&ANOMES._A, CAROL.BASE_ACIONAMENTO_202602._A
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: &BASE, ACIONAMENTO_EMPILHADA, ACIONAMENTO_EMPILHADA_2, ACIONAMENTO_EMPILHADA_2024, ASSESSORIA, BASE_AUX_202602, CONTRATO, DATE9, DEEP_INTERN_2, DEEP_INTERN_GCP, TELEFONE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET anomes=202602;
+%LET ano=2026;
+%LET mes=02;
+%LET datainic='2026-02-01';
+%LET datafim='2026-02-28';
+%LET path=%sysfunc(pathname(&libname.));
+%LET work=%sysfunc(pathname(work));
+%LET base=%sysfunc(lowcase(&base.));
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DVMD\Cobrança\Estrategia\Colaboradores\Kaue\Auto\Bases Robbu\depara_tabulacao.xlsx[SHEET='Ajuste']|N:/DVMD/COBRANÇA/ESTRATEGIA/COLABORADORES/KAUE/AUTO/BASES ROBBU|DEPARA_TABULACAO.XLSX||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1. Parâmetros */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1. Parâmetros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-fdt4f8RG2ku2cBET/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let anomes = 202602;
+
+%let ano = 2026;
+%let mes = 02;
+
+%let datainic = '2026-02-01';
+%let datafim = '2026-02-28';
+
+LIBNAME KAUE '/riscosbv/cobranca/ksilvestre';
+LIBNAME LEO '/riscosbv/cobranca/leonardo_trinchinato';
+LIBNAME DEEP '/riscosbv/cobranca/taylor/deep_center';
+LIBNAME ACIONA '/riscosbv/cobranca/marina/Acionamento';
+LIBNAME carol '/riscosbv/cobranca/caroline';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1. Parâmetros */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 2.Internalização (GCP) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 2.Internalização (GCP) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gua3o5MzfDNPNBfm/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+
+create table DEEP_INTERN_gcp as select * from connection to perm
+
+(select nm_assessoria_bv as Assessoria
+	   ,dt_acionamento as data
+	   ,cd_contrato as Contrato
+	   ,cd_telefone_contato as Telefone
+	   ,ds_resultado_acionamento 
+	   ,case when ds_resultado_acionamento in ('Atendida', 'CPC', 'Discagem Sem sucesso', 'Promessa', 'Alo - Atendimento produtivo', 'CPCA') then 1 else 0 end as Tentativa
+	   ,case when ds_resultado_acionamento in ('Atendida', 'CPC', 'Promessa', 'Alo - Atendimento produtivo', 'CPCA') then 1 else 0 end as Atendida
+	   ,case when ds_resultado_acionamento in ('CPC', 'Promessa', 'CPCA') then 1 else 0 end as CPC
+	   ,case when ds_resultado_acionamento in ('Promessa', 'CPCA') then 1 else 0 end as CPCA
+	   ,case when ds_resultado_acionamento in ('Promessa') then 1 else 0 end as  Promessa
+	   ,ds_campanha as carteira
+	   ,ds_ocorrencia_chamada as OcorrenciaAssessoria
+	   ,'BASE_INTERNALIZADA' as OcorrenciaDeep
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato`
+WHERE DATE(dt_acionamento) between DATE(&datainic.) and DATE(&datafim.)
+
+	AND ds_resultado_acionamento in ('Atendida', 'CPC', 'Promessa', 'Alo - Atendimento produtivo', 'CPCA')
+    AND LENGTH(cd_contrato) = 14
+
+	)
+;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 2.Internalização (GCP) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 3. Salva Libs */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 3. Salva Libs */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-KhyMwIEMUmOhHRwZ/code.sas */
+/* =========================INÍCIO TASK========================= */
+data DEEP_INTERN_2 (drop=telefone);
+set DEEP_INTERN_GCP;
+prioridade = 1;
+telefone2 = telefone*1;
+run;
+
+data DEEP_INTERN_2 (drop=telefone2);
+set DEEP_INTERN_2;
+prioridade = 1;
+telefone = telefone2;
+run;
+
+data acionamento_empilhada;
+set DEEP_INTERN_2
+
+;
+run;
+
+PROC SORT DATA= acionamento_empilhada;
+BY Contrato DESCENDING prioridade;
+RUN;
+
+PROC SORT DATA= acionamento_empilhada out=acionamento_empilhada_2 nodupkey;
+BY data Contrato Telefone assessoria;
+RUN;
+
+data acionamento_empilhada_2024 (drop=prioridade);
+set acionamento_empilhada_2;
+run;
+
+
+data aciona.BASE_DEEP_&anomes.;
+set acionamento_empilhada_2024;
+run;
+
+	Data BASE_AUX_&anomes.;
+	Set acionamento_empilhada_2024 ;
+
+	Num_Contrato = Contrato*1;
+
+	format Data date9.;
+	format Num_Contrato 14.;
+
+	where (CPC = 1) 
+
+	;run;
+
+PROC SORT DATA = BASE_AUX_&anomes. NODUPKEY;by _ALL_;
+run;
+
+	proc sql;
+	create table Base_Acionamento_&anomes._A  as
+	select 	Num_Contrato as NuContratoGestao,
+	        Data as DtAtividade,
+	        count (*) as Qtd_Acionamentos,
+	        sum(case when ocorrenciadeep in ('SEM CONDIÇÕES DE PAGAMENTO') then 1 else 0 end) as Qtd_Sem_Condicao
+	from BASE_AUX_&anomes.
+	where num_contrato not in (0,.) and num_contrato > 12000000000000
+	group by Num_Contrato, Data;
+	quit;
+
+	data carol.Base_Acionamento_&anomes._A;
+	set Base_Acionamento_&anomes._A;
+	run;
+
+	%macro compacta_lib_base(libname,base);
+	%let path = %sysfunc(pathname(&libname.));
+	%put path = &path.;
+	%let work = %sysfunc(pathname(work));
+	%put work = &work.;
+	%let base = %sysfunc(lowcase(&base.));
+	%put base= &base.;
+	x gzip &path./&base.*;
+	%mend;
+	%compacta_lib_base(ACIONA, BASE_DEEP_&anomes.);
+
+/* =========================FIM TASK=========================== */
+/* TASK: 3. Salva Libs */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SORT DATA = BASE_AUX_&anomes. NODUPKEY;by _ALL_;
+run;
+
+	proc sql;
+	create table Base_Acionamento_&anomes._A  as
+	select 	Num_Contrato as NuContratoGestao,
+	        Data as DtAtividade,
+	        count (*) as Qtd_Acionamentos,
+	        sum(case when ocorrenciadeep in ('SEM CONDIÇÕES DE PAGAMENTO') then 1 else 0 end) as Qtd_Sem_Condicao
+	from BASE_AUX_&anomes.
+	where num_contrato not in (0,.) and num_contrato > 12000000000000
+	group by Num_Contrato, Data;
+	quit;
+
+	data carol.Base_Acionamento_&anomes._A;
+	set Base_Acionamento_&anomes._A;
+	run;
+
+	%macro compacta_lib_base(libname,base);
+	%let path = %sysfunc(pathname(&libname.));
+	%put path = &path.;
+	%let work = %sysfunc(pathname(work));
+	%put work = &work.;
+	%let base = %sysfunc(lowcase(&base.));
+	%put base= &base.;
+	x gzip &path./&base.*;
+	%mend;
+	%compacta_lib_base(ACIONA, BASE_DEEP_&anomes.);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

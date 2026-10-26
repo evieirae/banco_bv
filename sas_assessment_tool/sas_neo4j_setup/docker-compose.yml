@@ -1,0 +1,186 @@
+services:
+  neo4j:
+    image: neo4j:5.13.0
+    container_name: ${NEO4J_CONTAINER_NAME:-sas-migration-neo4j}
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-defaultpassword}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_pagecache_size=${NEO4J_PAGE_CACHE_SIZE:-512M}
+      - NEO4J_dbms_memory_heap_initial__size=${NEO4J_HEAP_INITIAL_SIZE:-512M}
+      - NEO4J_dbms_memory_heap_max__size=${NEO4J_HEAP_MAX_SIZE:-1G}
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_apoc_import_file_use__neo4j__config=true
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+    volumes:
+      - ./nodes:/import/nodes
+      - ./relationships:/import/relationships
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -a neo4j://localhost:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} 'RETURN 1' || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${HEALTHCHECK_TIMEOUT:-10s}
+      retries: ${HEALTHCHECK_RETRIES:-5}
+      start_period: ${HEALTHCHECK_START_PERIOD:-60s}
+
+  cypher-loader:
+    image: neo4j:5.13.0
+    container_name: ${CYPHER_LOADER_CONTAINER_NAME:-sas-cypher-loader}
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./nodes:/import/nodes
+      - ./relationships:/import/relationships
+    restart: "no"
+    command: >
+      bash -c '
+        echo "=== SAS Migration - Neo4j Cypher Loader (Time BV) ===" &&
+        echo "Waiting for Neo4j to be ready..." &&
+        sleep ${LOADER_WAIT_TIME:-30} &&
+        
+        echo "Listing files in /import directories:" &&
+        echo "Nodes folder:" &&
+        ls -la /import/nodes/ &&
+        echo "Relationships folder:" &&
+        ls -la /import/relationships/ &&
+        echo "" &&
+        
+        # Execute scripts in order: Clear data, Create nodes, then relationships
+        SCRIPTS_EXECUTED=0
+        TOTAL_EXPECTED=${TOTAL_EXPECTED_SCRIPTS:-8}
+        
+        echo "=== PHASE 0: Clearing Existing Data (Full Refresh) ===" &&
+        
+        # Clear all existing data
+        if [ -f "/import/nodes/clear_all_data.cypher" ]; then
+          echo "=== Executing clear_all_data.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/nodes/clear_all_data.cypher &&
+          echo "✓ Finished clear_all_data.cypher - All existing data cleared" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 5;
+        else
+          echo "⚠ clear_all_data.cypher not found - skipping data cleanup";
+        fi &&
+        
+        echo "" &&
+        echo "=== PHASE 1: Creating Nodes ===" &&
+        
+        # Create EGP Project nodes
+        if [ -f "/import/nodes/create_egpproject_nodes.cypher" ]; then
+          echo "=== Executing create_egpproject_nodes.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/nodes/create_egpproject_nodes.cypher &&
+          echo "✓ Finished create_egpproject_nodes.cypher" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 3;
+        else
+          echo "⚠ create_egpproject_nodes.cypher not found";
+        fi &&
+        
+        # Create External Source nodes
+        if [ -f "/import/nodes/create_externalsource_nodes.cypher" ]; then
+          echo "=== Executing create_externalsource_nodes.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/nodes/create_externalsource_nodes.cypher &&
+          echo "✓ Finished create_externalsource_nodes.cypher" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 3;
+        else
+          echo "⚠ create_externalsource_nodes.cypher not found";
+        fi &&
+        
+        # Create Libname Source nodes
+        if [ -f "/import/nodes/create_libnamesource_nodes.cypher" ]; then
+          echo "=== Executing create_libnamesource_nodes.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/nodes/create_libnamesource_nodes.cypher &&
+          echo "✓ Finished create_libnamesource_nodes.cypher" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 3;
+        else
+          echo "⚠ create_libnamesource_nodes.cypher not found";
+        fi &&
+        
+        # Create Include Files nodes
+        if [ -f "/import/nodes/create_includefiles_nodes.cypher" ]; then
+          echo "=== Executing create_includefiles_nodes.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/nodes/create_includefiles_nodes.cypher &&
+          echo "✓ Finished create_includefiles_nodes.cypher" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 3;
+        else
+          echo "⚠ create_includefiles_nodes.cypher not found";
+        fi &&
+        
+        echo "" &&
+        echo "=== PHASE 2: Creating Relationships ===" &&
+        
+        # Create READS_FROM relationships
+        if [ -f "/import/relationships/create_reads_from_relationships.cypher" ]; then
+          echo "=== Executing create_reads_from_relationships.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/relationships/create_reads_from_relationships.cypher &&
+          echo "✓ Finished create_reads_from_relationships.cypher" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 3;
+        else
+          echo "⚠ create_reads_from_relationships.cypher not found";
+        fi &&
+        
+        # Create WRITES_TO relationships (if exists)
+        if [ -f "/import/relationships/create_writes_to_relationships.cypher" ]; then
+          echo "=== Executing create_writes_to_relationships.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/relationships/create_writes_to_relationships.cypher &&
+          echo "✓ Finished create_writes_to_relationships.cypher" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 3;
+        else
+          echo "⚠ create_writes_to_relationships.cypher not found (optional)";
+        fi &&
+        
+        # Create DEPENDS_ON relationships (if exists)
+        if [ -f "/import/relationships/create_depends_on_relationships.cypher" ]; then
+          echo "=== Executing create_depends_on_relationships.cypher ===" &&
+          cypher-shell -a neo4j://neo4j:7687 -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-defaultpassword} -f /import/relationships/create_depends_on_relationships.cypher &&
+          echo "✓ Finished create_depends_on_relationships.cypher" &&
+          SCRIPTS_EXECUTED=$$((SCRIPTS_EXECUTED + 1)) &&
+          sleep 3;
+        else
+          echo "⚠ create_depends_on_relationships.cypher not found (optional)";
+        fi &&
+        
+        echo "" &&
+        echo "=== Summary ===" &&
+        echo "Scripts executed: $$SCRIPTS_EXECUTED / $$TOTAL_EXPECTED" &&
+        if [ $$SCRIPTS_EXECUTED -ge 4 ]; then
+          echo "✅ All scripts executed successfully!" &&
+          echo "✅ Node Types Created:" &&
+          echo "  - EgpProject nodes" &&
+          echo "  - ExternalSource nodes" &&
+          echo "  - LibnameSource nodes" &&
+          echo "  - IncludeFiles nodes" &&
+          echo "" &&
+          echo "✅ Relationships Created:" &&
+          echo "  - READS_FROM relationships" &&
+          echo "  - WRITES_TO relationships (if applicable)" &&
+          echo "  - DEPENDS_ON relationships (if applicable)" &&
+          echo "" &&
+          echo "✅ Complete SAS migration graph is now available!";
+        else
+          echo "⚠ Some scripts were not found or failed to execute";
+          echo "Expected: $$TOTAL_EXPECTED scripts, Executed: $$SCRIPTS_EXECUTED";
+        fi &&
+        echo "" &&
+        echo "🚀 Neo4j is ready at http://localhost:${NEO4J_HTTP_PORT:-7474}" &&
+        echo "📊 Use credentials: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-defaultpassword}" &&
+        echo "🔍 You can now query the complete ETL lineage graph!" &&
+        echo "" &&
+        echo "📋 Example Queries:" &&
+        echo "  • Find all source tables read by an EGP project:" &&
+        echo "    MATCH (e:EgpProject)-[:READS_FROM]->(s) WHERE e.name CONTAINS 'projeto' RETURN e, s LIMIT 50" &&
+        echo "  • Find all LibnameSource used by projects:" &&
+        echo "    MATCH (e:EgpProject)-[:READS_FROM]->(l:LibnameSource) RETURN e.name, l.name LIMIT 50" &&
+        echo "  • Find projects that use a specific source:" &&
+        echo "    MATCH (e:EgpProject)-[:READS_FROM]->(s {name: 'dba.tbproposta'}) RETURN e.name" &&
+        echo "  • Find include files used by projects:" &&
+        echo "    MATCH (e:EgpProject)-[:DEPENDS_ON]->(i:IncludeFiles) RETURN e.name, i.name LIMIT 50"
+      '

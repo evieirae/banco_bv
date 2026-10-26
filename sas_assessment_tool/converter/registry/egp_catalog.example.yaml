@@ -1,0 +1,95 @@
+# =============================================================================
+# Catálogo EGP → área de negócio + componente dbt (ARQUIVO DE EXEMPLO)
+# =============================================================================
+# Uso:
+#   1. Copie este arquivo para:  egp_catalog.yaml
+#   2. Ajuste entradas reais (não versionar segredos).
+#   3. O extrator / passo Intake (MIGRATION_SPEC) lê por egp_key ou nome do .egp.
+#
+# Mapa área → cd_governanca (labels dbt): veja area_cd_governanca.example.yaml
+#   (copiar para area_cd_governanca.yaml). O campo `area` abaixo deve ser chave nesse mapa.
+#
+# Mapa área → componente_dbt + git (clone opcional): veja area_componente_dbt.example.yaml
+#   (copiar para area_componente_dbt.yaml). Permite `bootstrap_egp_catalog scan --area <slug>`
+#   sem repetir --componente em cada lote.
+#
+# Convenção sugerida para egp_key:
+#   Mesmo nome do projeto sem extensão .egp (como em text_egps/[NOME_SEM_EXT].txt).
+#
+# Resolução da raiz do projeto dbt (padrão):
+#   Path(converter) / defaults.dbt_project_path / entrada.componente_dbt
+#   Ex.: .../converter/converted_egps/dbt-srcg-anlt-plataforma
+# Override por entrada:
+#   Se a entrada definir dbt_project_path, usa-se apenas esse caminho relativo ao converter/
+#   (sem juntar componente_dbt) — para monorepos ou paths não padrão.
+# =============================================================================
+
+schema_version: 1
+
+defaults:
+  staging_mode: reuse_existing
+  target_arch_override: null
+  dbt_project_path: converted_egps
+  # PII (dbt): exige policy_tags com PII_INTERNO_* inferido do componente (fora de migracao_sas)
+  # para tipos sensíveis alvo — ver pii_sensitive_yml_guard.STRICT_REFERENCE_ENTRY_IDS e README.
+  pii_reference_interno_strict: false
+
+entries:
+  - egp_key: "202601 - gera arquivo batimentos atuacao manual"
+    egp_file: "202601 - gera arquivo batimentos atuacao manual.egp"
+    area: cobranca
+    componente_dbt: dbt-srcg-anlt-plataforma
+    owner: "@squad-cobranca-negativacao"
+    staging_mode: hybrid
+    target_arch_override: DBT_BQ
+    notes: >
+      Predominância BigQuery; saída TXT pode ser job à parte ou modelo Python no mesmo pacote.
+    staging_ref_map:
+      - sas_or_source_id: "bv-pdbd-prd.dvry_corp_cobranca.batimentonegativacao_cartoes_fato"
+        ref_model: "stg_cobranca__batimentonegativacao_cartoes_fato"
+      - sas_or_source_id: "bv-pdbd-prd.dvry_clie_crm.tbpessoacadastro"
+        ref_model: "stg_crm__tbpessoacadastro"
+
+  - egp_key: "Marcacao_Teste_IOF_GCP"
+    egp_file: "Marcacao_Teste_IOF_GCP.egp"
+    area: cobranca
+    componente_dbt: dbt-srcg-anlt-plataforma
+    owner: "@squad-cobranca-estrategia"
+    staging_mode: reuse_existing
+    target_arch_override: null
+    notes: "Staging de delqmst/uda3 já existe; converter intermediate para ref(stg_*)."
+    staging_ref_map:
+      - sas_or_source_id: "bv-pdbd-prd.trusted_rcvry.delqmst"
+        ref_model: "stg_rcvry__delqmst"
+      - sas_or_source_id: "bv-pdbd-prd.trusted_rcvry.uda3"
+        ref_model: "stg_rcvry__uda3"
+
+  - egp_key: "Consulta_Faturamento_GCP"
+    egp_file: "Consulta_Faturamento_GCP.egp"
+    area: financeiro
+    componente_dbt: dbt-srcg-anlt-plataforma
+    owner: "@squad-financeiro"
+    staging_mode: generate_new
+    target_arch_override: DBT_BQ
+    notes: "Projeto pequeno; sem staging prévio na área."
+
+  # Exemplo de override (path completo relativo ao converter/, sem usar componente_dbt na pasta):
+  # - egp_key: "Legado_monorepo_X"
+  #   area: cobranca
+  #   componente_dbt: nome_logico_pacote
+  #   dbt_project_path: packages/outro_repo/dbt_core
+
+# =============================================================================
+# Campos referência
+# =============================================================================
+# egp_key          : chave única alinhada a NOME_SEM_EXT / pasta text_egps
+# egp_file         : nome do arquivo em received_egps/ (informativo)
+# area             : área de negócio (slug ou nome curto acordado pelo time)
+# componente_dbt   : nome da pasta do clone/projeto dbt (usado no join com defaults.dbt_project_path)
+# dbt_project_path : em defaults = pasta base (ex.: converted_egps). Em entrada = override do path completo.
+# owner            : time ou canal (Slack, e-mail)
+# staging_mode     : reuse_existing | generate_new | hybrid
+# target_arch_override : força DBT_BQ ou DATABRICKS independente do extrator
+# staging_ref_map  : lista { sas_or_source_id, ref_model } para modo reuse/hybrid
+# notes            : texto livre
+# =============================================================================

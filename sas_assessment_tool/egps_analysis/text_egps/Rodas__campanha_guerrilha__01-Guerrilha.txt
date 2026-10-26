@@ -1,0 +1,247 @@
+START_METADATA
+PROJECT: Rodas__campanha_guerrilha
+FILE_SAS: 01-Guerrilha.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 165
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, IMPORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: SafraApuracao, SafraApuracaoM1
+DETECTED_MACROS_USED: SafraApuracao, SafraApuracaom1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/CAMPANHA_GUERRILHA/VM/CODE/GUERRILHA_202601/METAGUERRILHA_ACUMULADO.CSV [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.TBCOLABORADORFOCAL [SAS/Local], BASEGRC.TBPORTEPDV [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/campanha_guerrilha/vm/code/Guerrilha_202601/MetaGuerrilha_Acumulado.csv, /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBCOLABORADORFOCAL [PROC SQL - FROM], BASEGRC.TBPORTEPDV [PROC SQL - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN], TMP.TBPRODUCAO [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/campanha_guerrilha/vm/code/Guerrilha_202601/MetaGuerrilha_Acumulado.csv, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TbCampanhaGuerrilha.csv
+TEMP/DISCARDED OUTPUTS: COLABORADOR, COLABORADORTR, METAGUERRILHA_ACUMULADO, TBCOLABORADORFOCAL, TBGUERRILHACOMPENSA, TBGUERRILHACOMPENSACONTR, TBPARCEIROCOMERCIAL, TBPRODUCAO, TBPRODUCAOCN, TBPRODUCAOFINAL, TBPRODUCAOLEVES, TBPRODUCAOMOTOS, TBPRODUCAOPESADOS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/campanha_guerrilha/vm/code/Guerrilha_202601/MetaGuerrilha_Acumulado.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/***********************************************************/
+/* Caminho dos programas de libnames, conexÃµes e parmetros */
+/***********************************************************/
+%include '/infogrc/utils/all-includes.sas';
+
+/*DEFINI SAFRA DE APURACAO*/
+
+%let SafraApuracao = 202602;
+
+/* Mês anterior (M-1) em yyyymm */
+%let SafraApuracaoM1 = %sysfunc(
+  putn(
+    %sysfunc(intnx(month,
+                   %sysfunc(inputn(&SafraApuracao., yymmn6.)),
+                   -1, b)),
+    yymmn6.)
+);
+
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+/*:::::::::::::SEPARA BASE DE PRODUÃ‡ÃƒO :::::::::::::::::::::::::::*/
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+
+/*IMporta CSV */
+proc import datafile= "/infogrc/campanha_guerrilha/vm/code/Guerrilha_202601/MetaGuerrilha_Acumulado.csv"
+out=MetaGuerrilha_Acumulado
+dbms=csv replace;
+delimiter=";"
+;run;
+
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+/*:::::::::::::SEPARA BASE DE PRODUÃ‡ÃƒO :::::::::::::::::::::::::::*/
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+
+proc sql;
+create table tbparceirocomercial as
+select
+ a.*,
+ b.NmSubEstruturaComercialC
+from MetaGuerrilha_Acumulado as a
+	left join  tmp.tbparceirocomercial as b
+	on a.cdparceirocomercial = b.cdparceirocomercial
+where  1=1
+;run;
+
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+/*:::::::::::::SEPARA BASE DE PRODUÃ‡ÃƒO :::::::::::::::::::::::::::*/
+/*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+
+Data TbProducaoLeves (Keep=nuanomes DtAtualizacao cdparceirocomercial NmSubEstruturaComercialC Nucontrato Vrproducao nmgrupoprodutometa);
+set Tmp.TbProducao (Where=(	NuAnomes >= &SafraApuracaom1.
+							and nmgrupoprodutometa IN ('Leves','CVG Leves','CVG Pesados','Pesados','Motos')
+							and NmSubEstruturaComercialC IN ('Canal Rodas e EGV - Regional I','Canal Rodas e EGV - Regional IV','Canal Rodas e EGV - Regional III','Canal Rodas e EGV - Regional VI','Canal Rodas e EGV - Regional V','Canal Rodas e EGV - Regional II')))
+;run;
+
+Data TbProducaoMotos (Keep=nuanomes DtAtualizacao cdparceirocomercial NmSubEstruturaComercialC Nucontrato Vrproducao nmgrupoprodutometa );
+set Tmp.TbProducao (Where=(	NuAnomes >= &SafraApuracaom1.
+							and nmgrupoprodutometa = 'Motos'
+							and NmSubEstruturaComercialC IN ('Canal Motos')))
+;run;
+
+Data TbProducaoPesados (Keep=nuanomes DtAtualizacao cdparceirocomercial NmSubEstruturaComercialC Nucontrato Vrproducao nmgrupoprodutometa );
+set Tmp.TbProducao (Where=(	NuAnomes >= &SafraApuracaom1.
+							and nmgrupoprodutometa IN  ('Pesados')
+							and NmSubEstruturaComercialC IN ('Canal Pesados')))
+;run;
+
+Data TbProducaoCn (Keep=nuanomes DtAtualizacao cdparceirocomercial NmSubEstruturaComercialC Nucontrato Vrproducao nmgrupoprodutometa );
+set Tmp.TbProducao (Where=(	NuAnomes >= &SafraApuracaom1.
+							and nmgrupoprodutometa in('Leves','Pesados','CVG Leves','CVG Pesados','Motos')
+							and NmSubEstruturaComercialC IN ('Canal de Negócios')))
+;run;
+
+Data TbProducao;
+Set TbProducaoLeves
+	TbProducaoMotos
+	TbProducaoPesados
+	TbProducaoCN
+;run;
+
+proc sql;
+create table TbProducaoFinal as
+select distinct
+nuanomes,
+cdparceirocomercial,
+DtAtualizacao,
+NmSubEstruturaComercialC,
+nmgrupoprodutometa,
+sum( case when nmgrupoprodutometa = 'Motos' and NmSubEstruturaComercialC Not IN ('Canal Motos') then 0.5 else 1 end ) as QtContratos,
+Sum(Vrproducao) as Vrproducao
+
+from TbProducao
+where  1=1
+group by 1,2,3,4,5
+;run;
+
+/*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+/*:::::::::::::APURACAO DA CAMPANHA POR META DE VALOR DE PRODUÃ‡ÃƒO :::::::::::::::::::::::::::*/
+/*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
+
+proc sql;
+create table TbGuerrilhaCompensaContr as
+select distinct
+b.Nuanomes,
+a1.CdParceiroComercial as CdParceiroCampanha,
+a1.NmParceiroComercial as NmParceiroCampanha,
+a1.NmSubEstruturaComercialC,
+a1.NmAreaEstruturaComercialC,
+a1.NmCanalEstruturaComercialC,
+a1.flativo,
+a2.nmgrupoprodutometa,
+a1.DsLoginN1C,
+a1.DsLoginN2C,
+a1.DsLoginN3C,
+a1.LstSubstituicaoC,
+a1.NmFilialC,
+a2.DtAtualizacao as DtAtualizacaoPRD format=ddmmyy10.,
+b.Meta as VrMetaQtContratos,
+0 as Incremento,
+COALESCE(c.FlPorteA, 'Sem porte informado') AS FlPorteA,
+a2.QtContratos,
+a2.Vrproducao,
+Case when a2.QtContratos >= b.Meta then 1  else 0 end as AtingMeta,
+Case when a2.QtContratos >= b.Meta then 'Sim'  else 'Nao' end as DescrAtingMeta,
+Case when a2.QtContratos >= b.Meta + 0 then 1 else 0 end as Kit,
+Case when a2.QtContratos >= b.Meta + 0 then 'Sim' else 'Nao' end as DescrKit
+
+from tmp.TbParceiroComercial as a1
+
+	Left join TbProducaoFinal as A
+		on a1.CdParceiroComercial = a.CdParceiroComercial
+
+	Inner join MetaGuerrilha_Acumulado as B
+		on a1.CdParceiroComercial = b.CdParceiroComercial
+
+	Left join TbProducaoFinal as A2
+		on a2.CdParceiroComercial = b.CdParceiroComercial
+			and a2.nuanomes = b.nuanomes
+
+	left join basegrc.TbPortepdv C
+		on a1.NuCnpjLoja = c.NuCnpjLoja
+		AND c.NuAno = year(today())
+
+where 1=1
+/*and a1.flativo = 'S'*/
+/*and CdParceiroCampanha in (437345)*/
+/*and VrMetaValorProducao = 0*/
+/*and (b.CdParceiroComercial is not null or VrMetaValorProducao = 0 )*/
+/*and CdCampanha not in(610,612)*/
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+;run;
+
+/*GERA FOCAL*/
+
+PROC SQL;
+CREATE TABLE Colaborador AS
+SELECT DISTINCT
+NmAreaEstruturaComercial,
+LstColaboradorFocal
+FROM  basegrc.TbColaboradorFocal ColaboradorFocal
+WHERE  1=1
+;run;
+
+proc transpose data=Colaborador out=ColaboradorTr(drop=_NAME_ _LABEL_) prefix=LstColaboradorFocal_;
+    by NmAreaEstruturaComercial;;
+        var LstColaboradorFocal;
+run;
+
+PROC SQL;
+CREATE TABLE TbColaboradorFocal AS
+SELECT DISTINCT
+NmAreaEstruturaComercial,
+LstColaboradorFocal_1||','||LstColaboradorFocal_2||','||LstColaboradorFocal_3||','||LstColaboradorFocal_4||','||
+	 LstColaboradorFocal_5||','||LstColaboradorFocal_6||','||LstColaboradorFocal_7 as LstColaboradorFocal
+FROM ColaboradorTr
+WHERE  1=1
+;run;
+
+PROC SQL;
+CREATE TABLE TbGuerrilhaCompensa AS
+SELECT DISTINCT
+a.*,
+b.LstColaboradorFocal
+FROM  TbGuerrilhaCompensaContr as a
+	left join TbColaboradorFocal as b
+	on a.NmAreaEstruturaComercialC = b.NmAreaEstruturaComercial
+WHERE  1=1
+;run;
+
+proc export
+data=TbGuerrilhaCompensa
+file='/riscosbvf/BA/processos/output/TbCampanhaGuerrilha.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

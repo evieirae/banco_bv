@@ -1,0 +1,927 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__atualizacao_graficos_matriz_v1
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:22 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 759
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (7x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISCRED = /riscosbv/credito/MISCREDITO
+DETECTED_MACROS_DEFINED: anomes
+DETECTED_MACROS_USED: ANOMES, anomes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): MISCRED.BASE_UNICA_ATACADO_202508 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202509 [SAS/Local], MISCRED.INFOS_MATRIZ_202509 [SAS/Local], MISCRED.MATRIZ_GRUPOS_202509 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: MISCRED
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DRSC\Sup_Riscos\MIS_PDD\Atividades\MIS\04_RELATORIOS\50_Matriz_Resiliencia\de_para_rating.txt
+TEMP/DISCARDED_FILE_INPUT: WORK.de_para_rating <- N:\DRSC\Sup_Riscos\MIS_PDD\Atividades\MIS\04_RELATORIOS\50_Matriz_Resiliencia\de_para_rating.txt
+TABLE_READ_PROVENANCE (Flow): MISCRED.BASE_UNICA_ATACADO_202508 [PROC SQL - FROM], MISCRED.BASE_UNICA_ATACADO_202509 [DATA Step - SET; Resolved dynamic lib.member&macro (%LET)], MISCRED.INFOS_MATRIZ_202509 [DATA Step - SET; PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)], MISCRED.MATRIZ_GRUPOS_202509 [PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE1, BASES_MATRIZ, BASE_UNICA_ATACADO, BASE_UNICA_ATACADO_CORRIGIDA, BASE_UNICA_GPS, BU_A_1, BU_A_2, BU_B_1, BU_B_2, CALCULA_PRAZO_OPERACOES, DUPLICADO, GRUPO_ECONOMICO, GRUPO_ECONOMICO1, GRUPO_ECONOMICO2, GRUPO_ECONOMICO_FIM, GRUPO_ECONOMICO_UNICO, INFOS_MATRIZ_202509, JUNTA_GRUPO_ECONOMICO, MATRIZ_RESILIENCIA, PREVIA_MATRIZ_RESILIENCIA_202509, TABELA_RESUMO, TESTE_DUPLICIDADE, VENCIMENTARIO, VENCIMENTARIO_FIM, VISAO_GRUPO, VISAO_GRUPO_VALIDARCREDITO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET anomes=202509;
+
+[[ FILE_REFS_MACRO ]]
+IN|N:\DRSC\Sup_Riscos\MIS_PDD\Atividades\MIS\04_RELATORIOS\50_Matriz_Resiliencia\de_para_rating.txt|N:/DRSC/SUP_RISCOS/MIS_PDD/ATIVIDADES/MIS/04_RELATORIOS/50_MATRIZ_RESILIENCIA|DE_PARA_RATING.TXT||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: graficos iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 27 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: graficos iniciais */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-FUfk1p37QjIsENHK/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname MISCRED BASE "/riscosbv/credito/MISCREDITO";
+
+%let anomes = 202509; 
+
+data BASE_UNICA_ATACADO;
+set miscred.base_unica_atacado_&anomes.;
+run;
+
+data BASE_UNICA_ATACADO;
+set BASE_UNICA_ATACADO;
+where DsGrupoEconomicoRisco NOT CONTAINS 'VOTORANTIM' and DsGrupoEconomicoRisco ne 'BOLSA B3' and Cluster_Risco not contains "PME";
+run;
+
+data BASE_UNICA_ATACADO_corrigida;
+set BASE_UNICA_ATACADO;
+
+
+
+IF  DsGrupoEconomicoRisco in ('CREDZ') OR DsGrupoEconomicoRisco =: ("SACADO") THEN DELETE;
+IF DsGrupoEconomicoRisco in ('BTG PACTUAL') THEN DELETE;
+IF DsGrupoEconomicoRisco in ('AIZ.') THEN DELETE;
+run;
+
+proc sql;
+create table visao_grupo_validarcredito as
+select distinct
+CdGrupo_Economico,
+DsGrupoEconomicoRisco,
+DsSetorClienteRisco_novo,
+Avaliação_Setorial,
+Avaliação_Grupo,
+cluster_risco,
+CdGrupo_Economico,
+sum(VrSaldo) as VrSaldo
+from BASE_UNICA_ATACADO_corrigida (where=(cluster_risco ne 'NA'))
+group by 1,2,3,4,5,6;
+quit;
+
+
+
+proc sql;
+create table matriz_resiliencia as
+select
+(case when a.Avaliação_Setorial="Fortemente Positivo" then 1 else
+(case when a.Avaliação_Setorial="Levemente Positivo" then 2 else
+(case when a.Avaliação_Setorial="Neutro" then 3 else
+(case when a.Avaliação_Setorial="Levemente Negativo" then 4 else
+(case when a.Avaliação_Setorial="Fortemente Negativo" then 5 else 0 end) end) end) end) end) as n,
+a.Avaliação_Setorial,
+b.Saldo as AtivosEspeciais,
+c.Saldo as Critico,
+d.Saldo as Preocupante,
+e.Saldo as Atencao,
+f.Saldo as Normal
+
+from (select distinct Avaliação_Setorial from BASE_UNICA_ATACADO_corrigida) as a
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Ativos Especiais" group by 1) as b
+on a.Avaliação_Setorial=b.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Critico" group by 1) as c
+on a.Avaliação_Setorial=c.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Preocupante" group by 1) as d
+on a.Avaliação_Setorial=d.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Atenção" group by 1) as e
+on a.Avaliação_Setorial=e.Avaliação_Setorial
+left join (select distinct Avaliação_Setorial, sum(VrSaldo) as Saldo from BASE_UNICA_ATACADO_corrigida where Avaliação_Grupo="Normal" group by 1) as f
+on a.Avaliação_Setorial=f.Avaliação_Setorial
+
+;
+quit;
+
+proc sql;
+create table matriz_resiliencia as 
+select *
+from matriz_resiliencia (where=(Avaliação_Setorial ne "NA"))
+order by n;
+quit;
+
+proc sql;
+create table base_unica_gps as
+select DsGrupoEconomicoRisco, Cluster_Risco, sum (VrSaldo) as Saldo
+from BASE_UNICA_ATACADO_corrigida (where=(cluster_risco ne 'NA'))
+group by 1,2;
+quit;
+
+
+
+proc sql;
+create table calcula_prazo_operacoes as
+select a.*,
+b.pd,
+b.pd*a.VrSaldo as pd_saldo,
+intck('MONTH','30sep2025'd,a.DtVencimentoParcela) as prazo,
+intck('MONTH','30sep2025'd,a.DtVencimentoParcela)*a.VrSaldo as prazo_saldo
+from BASE_UNICA_ATACADO_corrigida (where=(cluster_risco ne 'NA')) as a
+left join de_para_rating as b
+on a.Flag_Novo_Rating=b.modelo
+and a.DsRatingCliente=b.Rating;
+quit;
+
+proc sql;
+create table visao_grupo as
+select cluster_risco,
+DsGrupoEconomicoRisco,
+sum(VrSaldo) as VrSaldo,
+sum(VrProvisao) as VrProvisao, 
+sum(prazo_saldo) as prazo_pond,
+max(prazo) as prazo,
+sum(pd_saldo) as pd_saldo,
+max(pd) as pd
+from calcula_prazo_operacoes
+group by 1,2;
+quit;
+
+proc sql;
+create table tabela_resumo as 
+select cluster_risco,
+count(*) as Grupos,
+sum(VrSaldo) as Exposicao,
+sum(VrProvisao) as Provisao,
+sum(prazo_pond) as prazo_pond,
+mean(prazo) as prazo,
+sum(pd_saldo) as pd_pond,
+mean(pd) as pd1
+from visao_grupo
+group by 1;
+quit;
+
+proc sql;
+create table vencimentario as
+select cluster_risco,
+(year(DtVencimentoParcela)*100)+month(DtVencimentoParcela) as anomes_vencimento,
+sum(VrSaldo) as VrSaldo
+from BASE_UNICA_ATACADO_corrigida (where=(cluster_risco ne 'NA'))
+group by 1,2;
+quit;
+
+proc sql;
+create table vencimentario_fim as
+select a.*,
+b.VrSaldo as Beneficiado,
+c.VrSaldo as Resiliente,
+d.VrSaldo as Auxilio,
+e.VrSaldo as Saida,
+f.VrSaldo as Saida_AE,
+sum(e.VrSaldo,f.VrSaldo) as Saida_Total
+from (select distinct anomes_vencimento from vencimentario) as a
+left join (select anomes_vencimento, VrSaldo from vencimentario where cluster_risco="Beneficiado") as b
+on a.anomes_vencimento=b.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario where cluster_risco="Resiliente") as c
+on a.anomes_vencimento=c.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario where cluster_risco="Auxilio") as d
+on a.anomes_vencimento=d.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario where cluster_risco="Saida") as e
+on a.anomes_vencimento=e.anomes_vencimento
+left join (select anomes_vencimento, VrSaldo from vencimentario where cluster_risco="AE") as f
+on a.anomes_vencimento=f.anomes_vencimento;
+quit;
+
+proc sql;
+create table Previa_Matriz_Resiliencia_&anomes. as
+select distinct
+		case when d.Cluster_Risco = a.Cluster_Risco then 'Sem alteração'
+		     when d.Cluster_Risco = '' then 'Novo'
+		     when d.Cluster_Risco <> a.Cluster_Risco then 'Alteração de Cluster'
+			 end as Movimentação
+		,c.NmGerenteCredito
+		,c.NmAnalistaCredito
+		,a.DsGrupoEconomicoRisco
+		,a.CdGrupo_Economico 
+		,d.Avaliação_Grupo as Avaliação_Grupo_Ant
+		,a.Avaliação_Grupo
+		,d.Avaliação_Setorial as Avaliação_Setorial_Ant
+		,a.Avaliação_Setorial
+		,d.Cluster_Risco as Cluster_Risco_Ant
+		,a.Cluster_Risco
+		,b.SegmentoAtuacaoFinal AS SegmentoAtuacaoFinal 
+
+from visao_grupo_validarcredito a
+left join miscred.infos_matriz_&anomes. b
+
+on a.DsGrupoEconomicoRisco = b.DsGrupoEconomicoRisco
+left join miscred.matriz_grupos_&anomes. c
+on a.DsGrupoEconomicoRisco = c.NmGrupoEconomico
+left join (select DsGrupoEconomicoRisco, Avaliação_Grupo, Avaliação_Setorial, Cluster_Risco, sum(VrSaldo) as VrSaldo
+from miscred.base_unica_atacado_202508 
+where Cluster_Risco not in ('NA' '') group by 1,2,3,4) d
+on a.DsGrupoEconomicoRisco = d.DsGrupoEconomicoRisco
+;quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: graficos iniciais */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: comparação mes anterior */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 27 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: comparação mes anterior */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ARvKeGG7wgtYOcJC/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql; 
+create table Grupo_Economico1 as select distinct DsGrupoEconomicoRisco, NmGerenteCredito, Login_Analista from miscred.base_unica_atacado_202508;
+create table Grupo_Economico2 as select distinct DsGrupoEconomicoRisco, NmGerenteCredito, Login_Analista  from BASE_UNICA_ATACADO_corrigida;
+quit;
+
+data junta_grupo_economico;
+set Grupo_Economico1 Grupo_Economico2;
+run;
+
+proc sql;
+create table grupo_economico as select distinct DsGrupoEconomicoRisco from junta_grupo_economico (where=(DsGrupoEconomicoRisco ne "-"));
+quit;
+
+proc sql;
+create table grupo_economico as
+select distinct a.*,
+coalesce(b.NmGerenteCredito,c.NmGerenteCredito) as NmGerenteCredito,
+coalesce(b.Login_Analista,c.Login_Analista) as Login_Analista
+from grupo_economico as a
+left join Grupo_Economico2 as b
+on a.DsGrupoEconomicoRisco=b.DsGrupoEconomicoRisco
+left join Grupo_Economico1 as c
+on a.DsGrupoEconomicoRisco=c.DsGrupoEconomicoRisco;
+quit;
+
+proc sql;
+create table teste_duplicidade as
+select *,
+count(*) as n
+from grupo_economico
+group by DsGrupoEconomicoRisco;
+quit;
+
+proc sql;
+create table duplicado as
+select *,
+(case when DsGrupoEconomicoRisco="FRIMESA" and missing(NmGerenteCredito) then 1 else 0 end) as duplicado
+from grupo_economico;
+quit;
+
+data grupo_economico_fim (drop=duplicado);
+set duplicado;
+where duplicado ne 1;
+run;
+
+proc sql;
+create table BU_A_1 as
+select *, (case when ((year(DtInicioOperacao))*100+month(DtInicioOperacao))=202401 then VrSaldo else 0 end) as Producao
+from miscred.base_unica_atacado_202508; 
+quit;
+
+proc sql;
+create table BU_A_2 as
+select distinct DsGrupoEconomicoRisco,
+Avaliação_Grupo,
+Avaliação_Setorial,
+Cluster_Risco,
+sum(VrSaldo) as VrSaldo,
+sum(Producao) as Producao
+from BU_A_1
+group by 1,2,3,4;
+quit;
+
+proc sql;
+create table BU_B_1 as
+select *, (case when ((year(DtInicioOperacao))*100+month(DtInicioOperacao))=&anomes. then VrSaldo else 0 end) as Producao
+from BASE_UNICA_ATACADO_corrigida;
+quit;
+
+proc sql;
+create table BU_B_2 as
+select distinct DsGrupoEconomicoRisco,
+Avaliação_Grupo,
+Avaliação_Setorial,
+
+Cluster_Risco,
+sum(VrSaldo) as VrSaldo,
+sum(Producao) as Producao
+from BU_B_1
+group by 1,2,3,4;
+quit;
+
+proc sql;
+create table grupo_economico_unico as
+select
+  DsGrupoEconomicoRisco,
+  min(NmGerenteCredito) as NmGerenteCredito,
+  min(Login_Analista) as Login_Analista
+from grupo_economico_fim
+group by DsGrupoEconomicoRisco;
+quit;
+
+proc sql;
+create table join as 
+select distinct a.DsGrupoEconomicoRisco,
+a.NmGerenteCredito,
+a.Login_Analista,
+c.Avaliação_Grupo,
+b.Avaliação_Grupo as Avaliação_Grupo_Ant,
+c.Avaliação_Setorial,
+b.Avaliação_Setorial as Avaliação_Setorial_Ant,
+c.Cluster_Risco,
+b.Cluster_Risco as Cluster_Risco_Ant,
+c.Producao as Producao_mes,
+c.VrSaldo as Exposicao,
+b.VrSaldo as Exposicao_Ant,
+coalesce(c.VrSaldo,0)-coalesce(b.VrSaldo,0) as Delta
+
+from grupo_economico_unico as a
+left join BU_A_2 as b
+on a.DsGrupoEconomicoRisco=b.DsGrupoEconomicoRisco
+left join BU_B_2 as c
+on a.DsGrupoEconomicoRisco=c.DsGrupoEconomicoRisco
+where c.Cluster_Risco <> "NA" AND b.Cluster_Risco <> "NA";
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: comparação mes anterior */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: ajuste bases hist */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 27 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: ajuste bases hist */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Amjcyiw3JHaaapoW/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO AJUSTE_HIST (ANOMES);
+
+%if &anomes. <202306 %then %do;
+data INFOS_MATRIZ_&ANOMES. (drop=Flag_Preocupante rename=Flag_Preocupante_=Flag_Preocupante);
+set MISCRED.INFOS_MATRIZ_&ANOMES.;
+if Flag_Preocupante = . then Flag_Preocupante_='NÃO'; else Flag_Preocupante_='Preocupante';
+%end;
+
+%if &anomes. ge 202306 %then %do;
+data INFOS_MATRIZ_&ANOMES.;
+set MISCRED.INFOS_MATRIZ_&ANOMES.;
+%end;
+
+Ref = &anomes.;
+
+if &anomes. = 202412 then do;
+if  DsGrupoEconomicoRisco in ('CREDZ') OR DsGrupoEconomicoRisco =: ("SACADO") THEN DELETE;
+
+IF DsGrupoEconomicoRisco = 'MONDIAL' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO'; END;
+IF DsGrupoEconomicoRisco = 'AFONSO FRANCA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'AURORA' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Beneficiado'; END;
+IF DsGrupoEconomicoRisco = 'BALDAN' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'BELENUS' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'BLUEQUEST' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'BRITANIA' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO'; END;
+IF DsGrupoEconomicoRisco = 'CARGO POLO' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'COLOMBO' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'COOPERCARGA' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'CZARNIKOW TRADING' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Beneficiado'; END;
+IF DsGrupoEconomicoRisco = 'DI SANTINNI' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Fortemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'DUFRIO' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Fortemente Negativo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'EPEMA' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'FIAGRO MULTITECNICA' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'FIBERX' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'GELCO' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'GRUNNER' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'GRUPO JB' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'IMC MEAL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Fortemente Negativo'; Cluster_Matriz = 'Auxilio'; SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL'; END;
+IF DsGrupoEconomicoRisco = 'INTEGRAL MEDICA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'JUMIL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'KROMINOX' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'LAVORO' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'MACCAFERRI' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'MARILAN' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'MONTESANTO' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'MULTIACOS' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'PADTEC' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'PAO DE ACUCAR' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'PARANA EQUIPAMENTOS' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'PAREBEM' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'POLIREX' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'PORTOBELLO' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'PRIME COMERCIO' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'SG COMERCIO EXTERIOR' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; SegmentoAtuacaoFinal = 'TRADING / REVENDEDORAS'; END;
+IF DsGrupoEconomicoRisco = 'SOUTH SERVICE' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'STOQUE MERCANTIL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; SegmentoAtuacaoFinal = 'VAREJO ESSENCIAL'; END;
+IF DsGrupoEconomicoRisco = 'TANAC' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'TINDIANA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'TRANSPANORAMA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'TRANSVIDAL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'VELOSO GREEN COFFEE' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'VENCE TUDO' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Beneficiado'; END;
+IF DsGrupoEconomicoRisco = 'VERTYS GROUP' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'VYTTRA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+
+end;
+
+if &anomes. = 202311 then do;
+if DsGrupoEconomicoRisco = 'FERNANDEZ' then Eixo_X = 'Normal';
+if DsGrupoEconomicoRisco = 'FERNANDEZ' then Eixo_Y = 'Neutro';
+if DsGrupoEconomicoRisco = 'FERNANDEZ' then Cluster_Matriz = 'Beneficiado';
+
+if DsGrupoEconomicoRisco = 'MOTTU' then Eixo_X = 'Normal';
+if DsGrupoEconomicoRisco = 'MOTTU' then Cluster_Matriz = 'Beneficiado';
+
+end;
+
+if &anomes. = 202310 then do;
+
+if DsGrupoEconomicoRisco = 'FERNANDEZ' then Eixo_X = 'Normal';
+if DsGrupoEconomicoRisco = 'FERNANDEZ' then Eixo_Y = 'Neutro';
+if DsGrupoEconomicoRisco = 'FERNANDEZ' then Cluster_Matriz = 'Beneficiado';
+end;
+
+if &anomes. = 202309 then do;
+
+if DsGrupoEconomicoRisco = 'ADESTE' then Eixo_X = 'Normal';
+if DsGrupoEconomicoRisco = 'ADESTE' then Cluster_Matriz = 'Beneficiado';
+
+if DsGrupoEconomicoRisco = 'EXPOCACCER' then Eixo_X = 'Normal';
+if DsGrupoEconomicoRisco = 'EXPOCACCER' then Cluster_Matriz = 'Beneficiado';
+
+if DsGrupoEconomicoRisco = 'EXPORTADORA GUAXUPE' then Eixo_X = 'Normal';
+if DsGrupoEconomicoRisco = 'EXPORTADORA GUAXUPE' then Cluster_Matriz = 'Beneficiado';
+
+end;
+
+if &anomes. = 202308 then do;
+	if DsGrupoEconomicoRisco = 'SOTRAN' then Eixo_X = 'Ativos Especiais';
+	if DsGrupoEconomicoRisco = 'SOTRAN' then Cluster_Matriz = 'AE';
+
+	if DsGrupoEconomicoRisco = 'ALLONDA' then Eixo_X = 'Ativos Especiais';
+	if DsGrupoEconomicoRisco = 'ALLONDA' then Cluster_Matriz = 'AE';
+
+	if DsGrupoEconomicoRisco = 'DAVACA' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'DAVACA' then Cluster_Matriz = 'Resiliente';
+
+	if DsGrupoEconomicoRisco = 'VERDI' then Eixo_X = 'Atenção';
+	if DsGrupoEconomicoRisco = 'VERDI' then Cluster_Matriz = 'Auxilio';
+
+	if DsGrupoEconomicoRisco = 'AMBEV' then Eixo_X = 'Atenção';
+	if DsGrupoEconomicoRisco = 'AMBEV' then Cluster_Matriz = 'Resiliente';
+
+	
+	
+
+	if DsGrupoEconomicoRisco = 'MARCOPOLO' then Eixo_X = 'Atenção';
+	if DsGrupoEconomicoRisco = 'MARCOPOLO' then Cluster_Matriz = 'Auxilio';
+
+	if DsGrupoEconomicoRisco = 'BELENUS' then Eixo_X = 'Atenção';
+	if DsGrupoEconomicoRisco = 'BELENUS' then Cluster_Matriz = 'Auxilio';
+
+	if DsGrupoEconomicoRisco = 'OFT SERVICE' then Eixo_X = 'Critico';
+	if DsGrupoEconomicoRisco = 'OFT SERVICE' then Cluster_Matriz = 'Saida';
+
+	if DsGrupoEconomicoRisco = 'OURO VERDE TRANSPORTE' then Eixo_X = 'Normal';
+	if DsGrupoEconomicoRisco = 'OURO VERDE TRANSPORTE' then Cluster_Matriz = 'Beneficiado';
+
+	if DsGrupoEconomicoRisco = 'MAKRO ENGENHARIA LTDA' then Eixo_X = 'Ativos Especiais';
+	if DsGrupoEconomicoRisco = 'MAKRO ENGENHARIA LTDA' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'MAKRO ENGENHARIA LTDA' then Cluster_Matriz = 'AE';
+end;
+
+if &anomes. = 202307 then do;
+	if DsGrupoEconomicoRisco = 'SOTRAN' then Eixo_X = 'Ativos Especiais';
+	if DsGrupoEconomicoRisco = 'SOTRAN' then Cluster_Matriz = 'AE';
+end;
+
+if &anomes. = 202306 then do;
+	if DsGrupoEconomicoRisco = 'UNIGEL' then Eixo_X = 'Critico';
+	if DsGrupoEconomicoRisco = 'UNIGEL' then Cluster_Matriz = 'Saida';
+
+	if DsGrupoEconomicoRisco = 'SOTRAN' then Eixo_X = 'Ativos Especiais';
+	if DsGrupoEconomicoRisco = 'SOTRAN' then Cluster_Matriz = 'AE';
+end;
+
+if &anomes. = 202305 then do;
+	if DsGrupoEconomicoRisco = 'ALLONDA' then Eixo_X = 'Ativos Especiais';
+	if DsGrupoEconomicoRisco = 'ALLONDA' then Cluster_Matriz = 'AE';
+
+	if DsGrupoEconomicoRisco = 'LIASA' then Eixo_X = 'Atenção';
+	if DsGrupoEconomicoRisco = 'LIASA' then Cluster_Matriz = 'Resiliente';
+
+	if DsGrupoEconomicoRisco = 'LOJAS RENNER' then Eixo_X = 'Atenção';
+	if DsGrupoEconomicoRisco = 'LOJAS RENNER' then Cluster_Matriz = 'Auxilio';
+end;
+
+if &anomes. = 202304 then do;
+	if DsGrupoEconomicoRisco = 'M CASSAB' then Eixo_X = 'Preocupante';
+	if DsGrupoEconomicoRisco = 'LOJAS RENNER' then Eixo_X = 'Atenção';
+	if DsGrupoEconomicoRisco = 'VERDI' then Eixo_X = 'Preocupante';
+	if DsGrupoEconomicoRisco = 'COPOBRAS' then Eixo_X = 'Preocupante';
+	if DsGrupoEconomicoRisco = 'ANCORA SIDERURGICA' then Eixo_X = 'Preocupante';
+	if DsGrupoEconomicoRisco = 'GOCIL' then Eixo_X = 'Preocupante';
+	if DsGrupoEconomicoRisco = 'ALUBAR' then Eixo_X = 'Preocupante';
+	if DsGrupoEconomicoRisco = 'MALLORY' then Eixo_X = 'Preocupante';
+
+	
+	if DsGrupoEconomicoRisco = 'M CASSAB' then SegmentoAtuacaoFinal = 'INDUSTRIA OUTROS';
+	if DsGrupoEconomicoRisco = 'GRUPO CACIQUE' then SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'COPAGRI' then SegmentoAtuacaoFinal = 'TRADING AGRO';
+	if DsGrupoEconomicoRisco = 'ENGELMIG' then SegmentoAtuacaoFinal = 'CONSTRUCAO CIVIL - PESADA';
+	if DsGrupoEconomicoRisco = 'VERDI' then SegmentoAtuacaoFinal = 'CONSTRUCAO CIVIL - INCORPORACAO';
+	if DsGrupoEconomicoRisco = 'WINE' then SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'LATICINIOS JUSSARA' then SegmentoAtuacaoFinal = 'INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E';
+	if DsGrupoEconomicoRisco = 'IPANEMA QUEIJOS' then SegmentoAtuacaoFinal = 'INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E';
+	if DsGrupoEconomicoRisco = 'GRAND CRU IMPORTADORA' then SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'DAVACA' then SegmentoAtuacaoFinal = 'INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E';
+	if DsGrupoEconomicoRisco = 'BERTOLINI' then SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO';
+	if DsGrupoEconomicoRisco = 'ALUBAR' then SegmentoAtuacaoFinal = 'BENS DE CAPITAL';
+	if DsGrupoEconomicoRisco = 'CARBONI' then SegmentoAtuacaoFinal = 'PRODUTOR RURAL PJ';
+	if DsGrupoEconomicoRisco = 'GRECO E GUERREIRO' then SegmentoAtuacaoFinal = 'EMBALAGENS';
+	if DsGrupoEconomicoRisco = 'REFRAMAX' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'ORIZON' then SegmentoAtuacaoFinal = 'SANEAMENTO';
+	if DsGrupoEconomicoRisco = 'NPE GROUP' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'GRUPO CARD' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'EQS ENGENHARIA' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'CORR PLASTIK' then SegmentoAtuacaoFinal = 'INDUSTRIA OUTROS';
+	if DsGrupoEconomicoRisco = 'CATARATAS' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'ATAKAREJO' then SegmentoAtuacaoFinal = 'VAREJO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'ALL NATIONS' then SegmentoAtuacaoFinal = 'T.I.';
+	if DsGrupoEconomicoRisco = 'AGIS' then SegmentoAtuacaoFinal = 'T.I.';
+	if DsGrupoEconomicoRisco = 'MONDIAL' then SegmentoAtuacaoFinal = 'INDUSTRIA OUTROS';
+	if DsGrupoEconomicoRisco = 'ELECTROLUX' then SegmentoAtuacaoFinal = 'INDUSTRIA OUTROS';
+	if DsGrupoEconomicoRisco = 'SG COMERCIO EXTERIOR' then SegmentoAtuacaoFinal = 'SIDERURGIA DISTRIBUICAO';
+	if DsGrupoEconomicoRisco = 'REDE SIM' then SegmentoAtuacaoFinal = 'LOGISTICA';
+	if DsGrupoEconomicoRisco = 'NEODENT' then SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO';
+	if DsGrupoEconomicoRisco = 'JAHU' then SegmentoAtuacaoFinal = 'INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E';
+	if DsGrupoEconomicoRisco = 'FLOR ARTE' then SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'ELGIN MAQUINAS' then SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO';
+	if DsGrupoEconomicoRisco = 'DPA' then SegmentoAtuacaoFinal = 'INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E';
+	if DsGrupoEconomicoRisco = 'CONDOR' then SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO';
+	if DsGrupoEconomicoRisco = 'AVIL' then SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'AKER SOLUTIONS' then SegmentoAtuacaoFinal = 'UPSTREAM';
+	if DsGrupoEconomicoRisco = 'ADVENT KOPENHAGEN' then SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'CNA' then SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO';
+	if DsGrupoEconomicoRisco = 'TIJUCA ALIMENTOS' then SegmentoAtuacaoFinal = 'INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E';
+	if DsGrupoEconomicoRisco = 'BRASIF RENTAL' then SegmentoAtuacaoFinal = 'CONSTRUCAO CIVIL - MATERIAIS P/CONSTRUCAO';
+	if DsGrupoEconomicoRisco = 'AGORA TELECOM' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'MULLER' then SegmentoAtuacaoFinal = 'AGROINDUSTRIA';
+	if DsGrupoEconomicoRisco = 'MELHORAMENTOS' then SegmentoAtuacaoFinal = 'ACUCAR E ALCOOL';
+	if DsGrupoEconomicoRisco = 'MONTECITRUS' then SegmentoAtuacaoFinal = 'PRODUTOR RURAL PJ';
+	if DsGrupoEconomicoRisco = 'SOUTH SERVICE' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'DISTRIBUIDORA DE ALIMENTOS' then SegmentoAtuacaoFinal = 'VAREJO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'CAMDA' then SegmentoAtuacaoFinal = 'COOPERATIVAS';
+	if DsGrupoEconomicoRisco = 'M CASSAB' then SegmentoAtuacaoFinal = 'INDUSTRIA OUTROS';
+	if DsGrupoEconomicoRisco = 'ALVOAR' then SegmentoAtuacaoFinal = 'INDUSTRIA DE PROCESSAMENTO PROT. ANIMAL E';
+	if DsGrupoEconomicoRisco = 'PATENSE' then SegmentoAtuacaoFinal = 'SAUDE ANIMAL';
+	if DsGrupoEconomicoRisco = 'PATENSE' then SegmentoAtuacaoFinal = 'SAUDE ANIMAL';
+	if DsGrupoEconomicoRisco = 'FOKUS LOGISTICA' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'IMC MEAL' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'COPLANA' then SegmentoAtuacaoFinal = 'COOPERATIVAS';
+	if DsGrupoEconomicoRisco = 'VASCONCELOS INDUSTRIA' then SegmentoAtuacaoFinal = 'AGROINDUSTRIA';
+	if DsGrupoEconomicoRisco = 'GRUPO JOSE ALVES' then SegmentoAtuacaoFinal = 'INDUSTRIA ALIMENT./BEBIDAS';
+	if DsGrupoEconomicoRisco = 'PURO GRAO' then SegmentoAtuacaoFinal = 'AGROQUIMICA/IMPL./SEMENTES E REV.';
+	if DsGrupoEconomicoRisco = 'COPERAGUAS' then SegmentoAtuacaoFinal = 'COOPERATIVAS';
+	if DsGrupoEconomicoRisco = 'OURO SAFRA' then SegmentoAtuacaoFinal = 'AGROQUIMICA/IMPL./SEMENTES E REV.';
+	if DsGrupoEconomicoRisco = 'FORTAL EMPREENDIMENTOS' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'SPREAD' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'SPREAD' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'TSEA' then SegmentoAtuacaoFinal = 'INDUSTRIA OUTROS';
+	if DsGrupoEconomicoRisco = 'JF CITRUS' then SegmentoAtuacaoFinal = 'INDUSTRIA ALIMENT./BEBIDAS';
+	if DsGrupoEconomicoRisco = 'MEGATRON' then SegmentoAtuacaoFinal = 'INDUSTRIA OUTROS';
+	if DsGrupoEconomicoRisco = 'POLI NUTRI' then SegmentoAtuacaoFinal = 'SAUDE ANIMAL';
+	if DsGrupoEconomicoRisco = 'COMPASS' then SegmentoAtuacaoFinal = 'AGROQUIMICA/IMPL./SEMENTES E REV.';
+	if DsGrupoEconomicoRisco = 'STOQUE MERCANTIL' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'KIMBERLIT' then SegmentoAtuacaoFinal = 'AGROQUIMICA/IMPL./SEMENTES E REV.';
+	if DsGrupoEconomicoRisco = 'RAIZEN' then SegmentoAtuacaoFinal = 'ACUCAR E ALCOOL';
+	if DsGrupoEconomicoRisco = 'SAGA' then SegmentoAtuacaoFinal = 'MONTADORAS/AUTO-PECAS';
+	if DsGrupoEconomicoRisco = 'SUL PLATA' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'AGROPANTANAL' then SegmentoAtuacaoFinal = 'TRADING AGRO';
+	if DsGrupoEconomicoRisco = 'COOPADAP' then SegmentoAtuacaoFinal = 'COOPERATIVAS';
+	if DsGrupoEconomicoRisco = 'AGROPECUARIA LOCKS' then SegmentoAtuacaoFinal = 'PRODUTOR RURAL PJ';
+	if DsGrupoEconomicoRisco = 'MATRIX ENERGIA' then SegmentoAtuacaoFinal = 'GERACAO DE ENERGIA ELETRICA';
+	if DsGrupoEconomicoRisco = 'CAMPO RICO' then SegmentoAtuacaoFinal = 'TRADING AGRO';
+	if DsGrupoEconomicoRisco = 'GRAO DE OURO' then SegmentoAtuacaoFinal = 'AGROINDUSTRIA';
+	if DsGrupoEconomicoRisco = 'GRUPO YES' then SegmentoAtuacaoFinal = 'SAUDE ANIMAL';
+	if DsGrupoEconomicoRisco = 'ILUMISOL' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'CRAS LOGISTICA' then SegmentoAtuacaoFinal = 'TRADING AGRO';
+	if DsGrupoEconomicoRisco = 'AGRO JOTABASSO' then SegmentoAtuacaoFinal = 'PRODUTOR RURAL PJ';
+	if DsGrupoEconomicoRisco = 'SERVIMED FIDC' then SegmentoAtuacaoFinal = 'FARMACEUTICO';
+	if DsGrupoEconomicoRisco = 'RAZAC' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'TB GREEN' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'FIDC TECNOMYL' then SegmentoAtuacaoFinal = 'AGROQUIMICA/IMPL./SEMENTES E REV.';
+	if DsGrupoEconomicoRisco = 'PORTAL AGRO' then SegmentoAtuacaoFinal = 'AGROQUIMICA/IMPL./SEMENTES E REV.';
+	if DsGrupoEconomicoRisco = 'DAIMLER' then SegmentoAtuacaoFinal = 'MONTADORAS/AUTO-PECAS';
+	if DsGrupoEconomicoRisco = 'TOYOTA' then SegmentoAtuacaoFinal = 'MONTADORAS/AUTO-PECAS';
+	if DsGrupoEconomicoRisco = 'VESTCASA' then SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL';
+	if DsGrupoEconomicoRisco = 'LAFAETE' then SegmentoAtuacaoFinal = 'SERVICOS';
+	if DsGrupoEconomicoRisco = 'CARPEC' then SegmentoAtuacaoFinal = 'COOPERATIVAS';
+	if DsGrupoEconomicoRisco = 'TMSA' then SegmentoAtuacaoFinal = 'LOGISTICA';
+
+	if DsGrupoEconomicoRisco = 'M CASSAB' then SegmentoAtuacaoFinal = 'Neutro';
+	if DsGrupoEconomicoRisco = 'GRUPO CACIQUE' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'COPAGRI' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'ENGELMIG' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'VERDI' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'WINE' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'LATICINIOS JUSSARA' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'IPANEMA QUEIJOS' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'GRAND CRU IMPORTADORA' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'DAVACA' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'BERTOLINI' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'ALUBAR' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'CARBONI' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'GRECO E GUERREIRO' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'REFRAMAX' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'ORIZON' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'NPE GROUP' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'GRUPO CARD' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'EQS ENGENHARIA' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'CORR PLASTIK' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'CATARATAS' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'ATAKAREJO' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'ALL NATIONS' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'AGIS' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'MONDIAL' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'ELECTROLUX' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'SG COMERCIO EXTERIOR' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'REDE SIM' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'NEODENT' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'JAHU' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'FLOR ARTE' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'ELGIN MAQUINAS' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'DPA' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'CONDOR' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'AVIL' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'AKER SOLUTIONS' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'ADVENT KOPENHAGEN' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'CNA' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'TIJUCA ALIMENTOS' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'BRASIF RENTAL' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'AGORA TELECOM' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'MULLER' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'MELHORAMENTOS' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'MONTECITRUS' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'SOUTH SERVICE' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'DISTRIBUIDORA DE ALIMENTOS' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'CAMDA' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'M CASSAB' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'ALVOAR' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'PATENSE' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'PATENSE' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'FOKUS LOGISTICA' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'IMC MEAL' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'COPLANA' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'VASCONCELOS INDUSTRIA' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'GRUPO JOSE ALVES' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'PURO GRAO' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'COPERAGUAS' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'OURO SAFRA' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'FORTAL EMPREENDIMENTOS' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'SPREAD' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'SPREAD' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'TSEA' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'JF CITRUS' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'MEGATRON' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'POLI NUTRI' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'COMPASS' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'STOQUE MERCANTIL' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'KIMBERLIT' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'RAIZEN' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'SAGA' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'SUL PLATA' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'AGROPANTANAL' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'COOPADAP' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'AGROPECUARIA LOCKS' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'MATRIX ENERGIA' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'CAMPO RICO' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'GRAO DE OURO' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'GRUPO YES' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'ILUMISOL' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'CRAS LOGISTICA' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'AGRO JOTABASSO' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'SERVIMED FIDC' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'RAZAC' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'TB GREEN' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'FIDC TECNOMYL' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'PORTAL AGRO' then Eixo_Y = 'Fortemente Positivo';
+	if DsGrupoEconomicoRisco = 'DAIMLER' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'TOYOTA' then Eixo_Y = 'Neutro';
+	if DsGrupoEconomicoRisco = 'VESTCASA' then Eixo_Y = 'Fortemente Negativo';
+	if DsGrupoEconomicoRisco = 'LAFAETE' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'CARPEC' then Eixo_Y = 'Levemente Positivo';
+	if DsGrupoEconomicoRisco = 'TMSA' then Eixo_Y = 'Levemente Negativo';
+	if DsGrupoEconomicoRisco = 'BOLSA B3' then Eixo_Y = 'Neutro';
+
+	
+	if DsGrupoEconomicoRisco = 'M CASSAB' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'ALOVAR' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'LOJAS RENNER' then Cluster_Matriz = "Auxilio";
+	if DsGrupoEconomicoRisco = 'VERDI' then Cluster_Matriz = 'Saida';
+	if DsGrupoEconomicoRisco = 'COPOBRAS' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'ANCORA SIDERURGICA' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'GOCIL' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'ALUBAR' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'MALLORY' then Cluster_Matriz = 'Auxilio';
+
+	if DsGrupoEconomicoRisco = 'GRUPO CACIQUE' then Cluster_Matriz = 'Saida';
+	if DsGrupoEconomicoRisco = 'COPAGRI' then Cluster_Matriz = 'Saida';
+	if DsGrupoEconomicoRisco = 'ENGELMIG' then Cluster_Matriz = 'Saida';
+	if DsGrupoEconomicoRisco = 'VERDI' then Cluster_Matriz = 'Saida';
+	if DsGrupoEconomicoRisco = 'WINE' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'LATICINIOS JUSSARA' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'IPANEMA QUEIJOS' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'GRAND CRU IMPORTADORA' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'DAVACA' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'BERTOLINI' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'ALUBAR' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'CARBONI' then Cluster_Matriz = 'Auxilio';
+	if DsGrupoEconomicoRisco = 'GRECO E GUERREIRO' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'REFRAMAX' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'ORIZON' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'NPE GROUP' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'GRUPO CARD' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'EQS ENGENHARIA' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'CORR PLASTIK' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'CATARATAS' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'ATAKAREJO' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'ALL NATIONS' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'AGIS' then Cluster_Matriz = 'Beneficiado';
+	if DsGrupoEconomicoRisco = 'MONDIAL' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'ELECTROLUX' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'SG COMERCIO EXTERIOR' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'REDE SIM' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'NEODENT' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'JAHU' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'FLOR ARTE' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'ELGIN MAQUINAS' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'DPA' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'CONDOR' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'AVIL' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'AKER SOLUTIONS' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'ADVENT KOPENHAGEN' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'CNA' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'TIJUCA ALIMENTOS' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'BRASIF RENTAL' then Cluster_Matriz = 'Resiliente';
+	if DsGrupoEconomicoRisco = 'ALVOAR' then Cluster_Matriz = 'Auxilio';
+end;
+
+if &anomes. = 202303 then do;
+	if DsGrupoEconomicoRisco="LOJAS RENNER" then Eixo_X="Atenção";
+	if DsGrupoEconomicoRisco="LOJAS RENNER" then Cluster_Matriz="Auxilio";
+
+	if DsGrupoEconomicoRisco="MANETONI" then Eixo_X="Atenção";
+	if DsGrupoEconomicoRisco="MANETONI" then Cluster_Matriz="Auxilio";
+
+	if DsGrupoEconomicoRisco="VERDI" then Eixo_X="Atenção";
+	if DsGrupoEconomicoRisco="VERDI" then Cluster_Matriz="Auxilio";
+
+	if DsGrupoEconomicoRisco="BRASIF RENTAL" then SegmentoAtuacaoFinal="LOCADORAS"; 
+	if DsGrupoEconomicoRisco="BRASIF RENTAL" then Eixo_Y="Fortemente Positivo";
+	if DsGrupoEconomicoRisco="BRASIF RENTAL" then Cluster_Matriz="Beneficiado";
+
+	if DsGrupoEconomicoRisco="RI HAPPY" then Eixo_X="Critico"; 
+	if DsGrupoEconomicoRisco="RI HAPPY" then Cluster_Matriz="Saida";
+
+	if DsGrupoEconomicoRisco="CANATIBA" then SegmentoAtuacaoFinal="TEXTIL";
+end;
+
+run;
+
+%mend;
+
+
+
+
+
+
+
+
+
+
+
+%AJUSTE_HIST (202412);
+
+
+
+
+
+data bases_matriz;
+set infos_matriz:;
+run;
+
+proc sql;
+create table base1 as
+select Ref, Cluster_Matriz, sum(Saldo_total) as Saldo
+from bases_matriz group by 1,2;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: ajuste bases hist */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data MISCRED.INFOS_MATRIZ_202412;
+set INFOS_MATRIZ_202412_TESTE;
+if  DsGrupoEconomicoRisco in ('CREDZ') OR DsGrupoEconomicoRisco =: ("SACADO") THEN DELETE;
+
+IF DsGrupoEconomicoRisco = 'MONDIAL' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO'; END;
+IF DsGrupoEconomicoRisco = 'AFONSO FRANCA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'AURORA' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Beneficiado'; END;
+IF DsGrupoEconomicoRisco = 'BALDAN' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'BELENUS' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'BLUEQUEST' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'BRITANIA' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; SegmentoAtuacaoFinal = 'INDUSTRIA BENS DE CONSUMO'; END;
+IF DsGrupoEconomicoRisco = 'CARGO POLO' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'COLOMBO' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'COOPERCARGA' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'CZARNIKOW TRADING' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Beneficiado'; END;
+IF DsGrupoEconomicoRisco = 'DI SANTINNI' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Fortemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'DUFRIO' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Fortemente Negativo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'EPEMA' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'FIAGRO MULTITECNICA' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'FIBERX' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'GELCO' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'GRUNNER' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'GRUPO JB' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'IMC MEAL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Fortemente Negativo'; Cluster_Matriz = 'Auxilio'; SegmentoAtuacaoFinal = 'VAREJO NAO ESSENCIAL'; END;
+IF DsGrupoEconomicoRisco = 'INTEGRAL MEDICA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'JUMIL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'KROMINOX' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'LAVORO' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'MACCAFERRI' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'MARILAN' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'MONTESANTO' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'MULTIACOS' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'PADTEC' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'PAO DE ACUCAR' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'PARANA EQUIPAMENTOS' THEN DO; Eixo_X = 'Critico'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'PAREBEM' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'POLIREX' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'PORTOBELLO' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'PRIME COMERCIO' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'SG COMERCIO EXTERIOR' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; SegmentoAtuacaoFinal = 'TRADING / REVENDEDORAS'; END;
+IF DsGrupoEconomicoRisco = 'SOUTH SERVICE' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'STOQUE MERCANTIL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; SegmentoAtuacaoFinal = 'VAREJO ESSENCIAL'; END;
+IF DsGrupoEconomicoRisco = 'TANAC' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Auxilio'; END;
+IF DsGrupoEconomicoRisco = 'TINDIANA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'TRANSPANORAMA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'TRANSVIDAL' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'VELOSO GREEN COFFEE' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Levemente Positivo'; Cluster_Matriz = 'Resiliente'; END;
+IF DsGrupoEconomicoRisco = 'VENCE TUDO' THEN DO; Eixo_X = 'Normal'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Beneficiado'; END;
+IF DsGrupoEconomicoRisco = 'VERTYS GROUP' THEN DO; Eixo_X = 'Preocupante'; Eixo_Y = 'Levemente Negativo'; Cluster_Matriz = 'Saida'; END;
+IF DsGrupoEconomicoRisco = 'VYTTRA' THEN DO; Eixo_X = 'Atenção'; Eixo_Y = 'Neutro'; Cluster_Matriz = 'Resiliente'; END;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,113 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_GCP_TbPessoa
+FILE_SAS: 01 - TbPessoa.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 45
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BV-PDBD-PRD.DVRY_CLIE_CRM.TBPESSOA [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CLIE_CRM.TBPESSOA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBPESSOA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBPESSOA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+PROC SQL;
+CONNECT TO bigquery AS perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+
+      schema='bv-pdbd-prd' READ_MODE=storage);
+
+   CREATE TABLE TbPessoa AS
+
+   SELECT
+
+	IdPessoa AS NuCpfCnpj
+	,NmPessoa
+	,catx('',NuDdd,NuTelefone) as NuTelefone1
+	,catx('',NuDdd2,NuTelefone2) as NuTelefone2
+	,catx('',NuDdd3,NuTelefone3) as NuTelefone3
+	,DsEmail
+	,DsEmail2
+
+	FROM connection to perm
+
+     	(
+			SELECT
+				*
+			FROM bv-pdbd-prd.dvry_clie_crm.tbpessoa
+			WHERE NuTelefone <> ''
+		);
+
+   DISCONNECT FROM perm
+;QUIT;
+
+data bases.TBPESSOA;
+
+LENGTH	DsEmail	$100.;
+informat	DsEmail	$100.;
+format	DsEmail	$100.;
+
+LENGTH	DsEmail2	$100.;
+informat	DsEmail2	$100.;
+format	DsEmail2	$100.;
+
+LENGTH	NuCpfCnpj	$14.;
+informat	NuCpfCnpj	$14.;
+format	NuCpfCnpj	$14.;
+
+LENGTH	NuTelefone1	$14.;
+informat	NuTelefone1	$14.;
+format	NuTelefone1	$14.;
+
+LENGTH	NuTelefone2	$14.;
+informat	NuTelefone2	$14.;
+format	NuTelefone2	$14.;
+
+LENGTH	NuTelefone3	$14.;
+informat	NuTelefone3	$14.;
+format	NuTelefone3	$14.;
+
+set TBPESSOA;
+run;

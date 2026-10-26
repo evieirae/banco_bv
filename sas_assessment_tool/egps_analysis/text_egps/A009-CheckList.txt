@@ -1,0 +1,129 @@
+START_METADATA
+PROJECT: SAS_UC4__A009-CheckList
+FILE_SAS: A009-CheckList.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:58 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -20
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 65
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: _CHECK = /projetos/riscosmercado/dados/rmone/checklist
+DETECTED_MACROS_DEFINED: AAAAMMDD, Modo_Exec
+DETECTED_MACROS_USED: AAAAMMDD, sysparm
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): _CHECK.CHECKLIST_&AAAAMMDD [SAS/Local], _CHECK.DEPARA_MONITORAMENTO_ALGO_ONE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: _CHECK
+EXPORTED_LIBNAMES: _CHECK
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.CHECKLIST_DATABASE, WORK.CHECKLIST_DATA_HIST
+TABLE_READ_PROVENANCE (Flow): WORK.CHECKLIST_DATABASE [PROC SQL - FROM], WORK.CHECKLIST_DATA_HIST [PROC SQL - FROM], _CHECK.CHECKLIST_&AAAAMMDD [PROC SQL - FROM], _CHECK.CHECKLIST_HISTORICO [PROC SQL - FROM], _CHECK.DEPARA_MONITORAMENTO_ALGO_ONE [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): _CHECK.CHECKLIST_HISTORICO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): _CHECK.CHECKLIST_HISTORICO, _CHECK.DEPARA_MONITORAMENTO_ALGO_ONE
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): _CHECK.CHECKLIST_HISTORICO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: WORK.CHECKLIST_DATABASE, WORK.CHECKLIST_DATA_HIST
+DYNAMIC REFS (Ambiguous): _CHECK.CHECKLIST_{AAAAMMDD}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+OPTIONS SYMBOLGEN COMPRESS=YES;
+OPTIONS dlcreatedir;
+
+%let Modo_Exec=projetos;
+
+/*Imputar Datas manuais*/
+/*%let sysparm=20230106/PTA;*/
+
+libname _CHECK "/projetos/riscosmercado/dados/rmone/checklist";
+%let AAAAMMDD=%sysfunc(SCAN(&sysparm.,1,"/"));
+
+%macro TrataBaseCheckList();
+
+	PROC SQL;
+		CREATE TABLE WORK.CHECKLIST_DATABASE AS
+			SELECT
+				*
+			FROM
+				_CHECK.CHECKLIST_&AAAAMMDD.
+		;
+	RUN;
+
+	PROC SQL;
+		CREATE TABLE WORK.CHECKLIST_DATA_HIST AS
+			SELECT
+				DtReferencia,
+				Linhas,
+				Tamanho,
+				Diretorio,
+				Arquivo
+			FROM
+				_CHECK.CHECKLIST_HISTORICO
+			WHERE
+				DtReferencia NOT IN (SELECT DISTINCT DtReferencia FROM WORK.CHECKLIST_DATABASE)
+		;
+	RUN;
+
+	PROC SQL;
+		CREATE TABLE _CHECK.CHECKLIST_HISTORICO AS
+			SELECT * FROM WORK.CHECKLIST_DATABASE
+			UNION ALL
+			SELECT * FROM WORK.CHECKLIST_DATA_HIST
+		;
+	RUN;
+
+	PROC SQL;
+
+		CREATE TABLE _CHECK.CHECKLIST_HISTORICO AS
+		SELECT
+			t.DtReferencia,
+			m.Tag,
+			catx("/",t.Diretorio,t.Arquivo) AS ChaveDirArq,
+/*			%SYSFUNC(CATX('',t.Diretorio,'/',t.Arquivo)) AS ChaveDir,*/
+			t.Linhas,
+			t.Tamanho,
+			t.Diretorio,
+			t.Arquivo
+		FROM
+			_CHECK.CHECKLIST_HISTORICO t
+		LEFT JOIN
+			_CHECK.DEPARA_MONITORAMENTO_ALGO_ONE m
+			ON m.Diretorio = t.Diretorio
+		WHERE
+			t.Diretorio NE "" OR t.Arquivo NE ""
+		ORDER BY
+			t.DtReferencia DESC,
+			m.Tag,
+			t.Diretorio,
+			t.Arquivo,
+			t.Tamanho DESC
+		;
+
+	RUN;
+
+%mend TrataBaseCheckList;
+
+%TrataBaseCheckList();

@@ -1,0 +1,152 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_TbColaborador
+FILE_SAS: 01 - TbColaborador.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 60)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -52
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 80
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: INPO = /infogrc/batidao_leves/Import/; INTGR = /riscosbvf/mis_varejo/integracao
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM7
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], INPO.TBMENSAGEM [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: INPO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], INPO.TBMENSAGEM [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas, /riscosbvf/BA/processos/tmp/Arq_Insights.csv, /riscosbvf/BA/processos/tmp/TbColaborador.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): INPO.TBMENSAGEM
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/tmp/Arq_Insights.csv, /riscosbvf/BA/processos/tmp/TbColaborador.csv
+TEMP/DISCARDED OUTPUTS: ARQ_INSIGHTS, ARQ_INSIGHTS_MATRIZ, TBCOLABORADOR, TBCOLABORADORGF, TBCOLABORADORGR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 5 paths (csv: 2, sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/Arq_Insights.csv
+[CODE REF] /riscosbvf/BA/processos/tmp/TbColaborador.csv
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+Libname intgr '/riscosbvf/mis_varejo/integracao';
+libname Inpo '/infogrc/batidao_leves/Import/';
+
+PROC SQL;
+CREATE TABLE TbColaboradorGr AS
+SELECT
+	NuAnoMes
+	,DsLoginN1	AS DsLogin
+	,NmGrupoCargo
+FROM  bases.TbEstruturaComercial
+WHERE NuAnoMes >= &safraM7.
+AND DsLoginN1 <> ''
+AND NmNivel = 'N1'
+;run;
+
+PROC SQL;
+CREATE TABLE TbColaboradorGf AS
+SELECT
+	NuAnoMes
+	,DsLoginN2A	AS DsLogin
+	,NmGrupoCargo
+FROM  bases.TbEstruturaComercial
+WHERE NuAnoMes >= &safraM7.
+AND DsLoginN2A  <> ''
+AND NmNivel = 'N2'
+AND NmFilial NOT like 'CP %'
+;run;
+
+data TbColaborador;
+set
+	TbColaboradorGr
+	TbColaboradorGf
+;run;
+
+proc sort data=TbColaborador;by descending NuAnoMes  ;run;
+
+proc sort data=TbColaborador  nodupkey;by DsLogin;run;
+
+proc export
+data=TbColaborador
+file='/riscosbvf/BA/processos/tmp/TbColaborador.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /riscosbvf/BA/processos/tmp/TbColaborador.csv  /riscosbvf/BA/processos/output/ ";
+
+PROC SQL;
+CREATE TABLE Arq_Insights AS
+	SELECT
+
+		TbColaborador.DsLogin
+		,TbColaborador.NmGrupoCargo
+		,CASE WHEN TbMensagem.Data = . THEN TODAY() ELSE TbMensagem.Data END AS Data FORMAT DDMMYY10.
+		,CASE WHEN TbMensagem.Analise = '' THEN 'Vamos fortalecer a participação no jogo e conversão, aumentando nossa Originação!' ELSE TbMensagem.Analise END AS Analise
+		,CASE WHEN TbMensagem.Ação = '' THEN 'O foco tático está na prospecção. Vamos aumentar nossa base de parceiros!' ELSE TbMensagem.Ação END AS Acao
+
+	FROM TbColaborador TbColaborador
+	LEFT JOIN Inpo.TbMensagem TbMensagem
+	ON TbColaborador.DsLogin = TbMensagem.Login
+;Run;
+
+PROC SQL;
+CREATE TABLE Arq_Insights_Matriz AS
+	SELECT DISTINCT
+
+		 '' AS DsLogin
+		,'Matriz' AS NmGrupoCargo
+		,TODAY() AS Data FORMAT DDMMYY10.
+		,'A geração de análises e ações específicas para PDVs que necessitam de atenção já está disponível para o GR' AS Analise
+		,'Fornecer recomendações baseadas em análises para otimizar a operação nos PDVs.' AS Acao
+
+	FROM TbColaborador TbColaborador
+;Run;
+
+data Arq_Insights;
+set
+	Arq_Insights
+	Arq_Insights_Matriz
+;run;
+
+proc export
+data=Arq_Insights
+file='/riscosbvf/BA/processos/tmp/Arq_Insights.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /riscosbvf/BA/processos/tmp/Arq_Insights.csv  /riscosbvf/BA/processos/output/ ";

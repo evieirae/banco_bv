@@ -1,0 +1,1875 @@
+START_METADATA
+PROJECT: SAS_UC4__tbproducao
+FILE_SAS: tbproducao.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:59 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -120
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160), CALL EXECUTE (2x | +90), %INCLUDE (2x | +40), PROC TRANSPOSE (2x | +20), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 1594
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (10x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: TpSeguro
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: TPSEGURO
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASEGRC.TBMETANAOISONOMICA [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBPRODUCAOSEGUROS
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBPRODUCAOSEGUROS
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], BASES.TBPRODUCAOSEGUROS [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM], WORK.TBPRODUCAOSEGUROS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASES.TBPRODUCAOSEGUROS
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBPRODUCAOSEGUROS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CDCOLABORADOR_CORRETO, ESTRUTURA_COMERCIAL, LOGINDSN1, TBENCARTEIRAMENTONI, TBPRODUCAO, TBPRODUCAONI, TBPRODUCAONICART, TBPRODUCAONICART_LEVES, TBPRODUCAONICART_MOTOS, TBPRODUCAONICART_PESADOS, TBPRODUCAONICART_SOLAR, TBPRODUCAONISEGUROS01, TBPRODUCAONIUNPIVOT, TBPRODUCAONI_LEVES, TBPRODUCAONI_MOTOS, TBPRODUCAONI_PESADOS, TBPRODUCAONI_SOLAR, TBPRODUCAOSEGUROS, TBPRODUCAOSEGUROS01, TBPRODUCAOSEGUROSNI, TBPRODUCAOUNPIVOT, TPSEGURO, VRPRODUCAO, VRPRODUCAONI, VRPRODUCAONI_&TPSEGURO, VRPRODUCAONI_VRAP, VRPRODUCAOSEGNI2_VRAP, VRPRODUCAOSEGNI_&TPSEGURO, VRPRODUCAOSEGNI_VRAP, VRPRODUCAOSEGNI_VRPLACASOLAR, VRPRODUCAOSEG_&TPSEGURO, VRPRODUCAOSEG_VRAP, VRPRODUCAO_&TPSEGURO, VRPRODUCAO_VRAP, VRPRODUCAO_VRPLACASOLAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ===================== Producao  ======================== */
+/* ======================================================== */
+
+PROC SQL;
+CREATE TABLE CdColaborador_Correto AS
+  SELECT DISTINCT
+    NuAnoMes,
+	DsLoginN1,
+	CdColaboradorAtivo AS CdColaborador
+  FROM BASES.TbEstruturaComercial
+  WHERE DsLoginN1 IS NOT NULL;
+RUN;
+
+proc sql;
+create table TbProducao as
+select
+	 a.NuAnoMes
+	,coalesce(b.CdColaborador,a.CdColaborador) as CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,a.DsLoginN1
+	,case when NmGrupoProdutoMeta='Leves-BVO' and CdFilial=276 then 'Leves' else NmGrupoProdutoMeta end as NmGrupoProdutoMeta
+	,case when fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as StVeiculo
+	,nmcanalestruturacomercial
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,count(*) as QtContrato format 18.0
+	,sum(VrProducao) as VrProducao format 18.2
+	,sum(CASE WHEN A.NmCanalEstruturaComercial='Canal Negocios' THEN ((A.VrProducao/A.QtCorridosDiaUtilMes) * A.QtTotalDiaUtilMes) ELSE VrProducaoProjetado END) as VrProducaoProjetado format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducao ELSE 0 END) as VrProducaoSeguros format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducaoProjetado ELSE 0 END) as VrProducaoProjetadoSeguros format 18.2
+
+	,sum(CASE
+			WHEN A.NuAnomes >= 202506 and A.NmGrupoProdutoMeta = 'Solar' and A.TPPESSOA = 'F' and FlPlacaSolarEleg = 1 THEN VrProducao
+			WHEN A.NmGrupoProdutoMeta NE 'Solar' And A.TPPESSOA = 'F' THEN VrProducao
+			ELSE 0
+		END) as VrProducaoSeguros_PlacaSolar format 18.2
+
+	,sum(CASE
+			WHEN A.NuAnomes >= 202506 and A.NmGrupoProdutoMeta = 'Solar' and A.TPPESSOA = 'F' and FlPlacaSolarEleg = 1 THEN VrProducaoProjetado
+			WHEN A.NmGrupoProdutoMeta NE 'Solar' And A.TPPESSOA = 'F' THEN VrProducaoProjetado
+			ELSE 0
+		END) as VrProducaoSegurosProjetado_Placa format 18.2
+
+	,sum(CASE
+			WHEN A.NuAnomes >= 202502 and A.NmGrupoProdutoMeta = 'Solar' and A.TPPESSOA = 'F' and FlCapEleg = 1 THEN VrProducao
+			WHEN A.NuAnomes <  202502 and A.NmGrupoProdutoMeta = 'Solar' and A.TPPESSOA = 'F' THEN VrProducao
+			WHEN A.NmGrupoProdutoMeta NE 'Solar' And A.TPPESSOA = 'F' THEN VrProducao
+			ELSE 0
+		END) as VrProducaoSeguros_AP format 18.2
+
+	,sum(CASE
+			WHEN A.NuAnomes >= 202502 and A.NmGrupoProdutoMeta = 'Solar' and A.TPPESSOA = 'F' and FlCapEleg = 1 THEN VrProducaoProjetado
+			WHEN A.NuAnomes <  202502 and A.NmGrupoProdutoMeta = 'Solar' and A.TPPESSOA = 'F' THEN VrProducaoProjetado
+			WHEN A.NmGrupoProdutoMeta NE 'Solar' And A.TPPESSOA = 'F' THEN VrProducaoProjetado
+			ELSE 0
+		END) as VrProducaoSegurosProjetado_AP format 18.2
+
+	,sum(VrMargem) as VrMargem format 18.2
+	,sum(CASE WHEN A.NmCanalEstruturaComercial='Canal Negocios' THEN ((A.VrMargem/A.QtCorridosDiaUtilMes) * A.QtTotalDiaUtilMes) ELSE VrMargemProjetado END) as VrMargemProjetado format 18.2
+
+	,sum(FlBVMais) as QtBVMais
+	,sum(FlCap) as QtCap
+	,sum(FlPlacaSolar) as QtPlacaSolar
+	,sum(FlDemais) as QtDemais
+	,sum(FlCompleto) as QtAutoTotal
+
+	,sum(VrBVMais) as VrBVMais
+	,sum(VrCap) as VrCap
+	,sum(VrPlacaSolar) as VrPlacaSolar
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMax else VrDemais end) as VrDemais
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMax end) as VrSegurosAuto
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompleto end) as VrAutoTotal
+
+	,sum(VrBVMaisProjetado) as VrBVMaisProjetado
+	,sum(VrCapProjetado) as VrCapProjetado
+	,sum(VrPlacaSolarProjetado) as VrPlacaSolarProjetado
+
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMaxProjetado else VrDemaisProjetado end) as VrDemaisProjetado
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMaxProjetado end) as VrSegurosAutoProjetado
+
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompletoProjetado end) as VrAutoTotalProjetado
+
+	,sum(FlBVMaisEleg) as QtBVMaisEleg
+	,sum(FlCapEleg) as QtCapEleg
+	,sum(FlPlacaSolarEleg) as FlPlacaSolarEleg
+	,sum(FlCompletoEleg) as QtAutoTotalEleg
+	,sum(FlDemaisEleg) as QtDemaisEleg
+from tmp.TbProducao a
+left join CdColaborador_Correto b
+  on a.dsloginn1 = b.dsloginn1
+  and a.nuanomes = b.nuanomes
+group by 1,2,3,4,5,6,7,8,9,10,11
+order by 1,2,3,4,5,6,7,8,9,10,11
+;quit;
+
+proc transpose data=TbProducao out=TbProducaoUnpivot
+(drop=_LABEL_ rename=_NAME_=TpValor rename=COL1=VrMedida where=(coalesce(VrMedida,0)<>0));
+by
+	 NuAnoMes
+	 CdColaborador
+	 NmColaborador
+	 NmGrupoCargoColaborador
+	 DsLoginN1
+	 NmGrupoProdutoMeta
+	 StVeiculo
+	 NmCanalEstruturaComercial
+	 DsTipoCanalProducao
+	 CdFilial
+	 DtAtualizacao
+;run;
+
+proc sql;
+delete from TbProducaoUnpivot where (TpValor in ('QtAutoTotal','VrAutoTotal','QtAutoTotalEleg','VrAutoTotalProjetado') and NuAnoMes < 202101);
+delete from TbProducaoUnpivot where (TpValor in ('QtAutoTotal','VrAutoTotal','QtAutoTotalEleg','VrAutoTotalProjetado') and DsTipoCanalProducao in ('LOJA CANAL NEGOCIOS','PROMOTORA'));
+delete from TbProducaoUnpivot where (NuAnoMes >= 202201 and TpValor in (
+	 'VrAutoTotal'
+	,'VrAutoTotalProjetado'
+	,'QtDemais'
+	,'QtDemaisEleg'
+	,'VrDemais'
+	,'VrDemaisProjetado'
+	,'QtBVMais'
+	));
+
+/*Alteração realizada em 18/01/2023 verificar a explicação no caminho abaixo.
+N:\DVMD\Planejamento Varejo\MIS Varejo\Processos\011. Historico de Alterações\TbProducao*/
+delete from TbProducaoUnpivot where (NuAnoMes BETWEEN 202201 AND 202212 and TpValor in (
+	 'QtAutoTotal'
+	,'QtAutoTotalEleg'
+	));
+
+delete from TbProducaoUnpivot where (NuAnoMes >= 202201 and TpValor in ('QtCap','VrCap','VrCapProjetado','QtCapEleg','QtDemaisEleg','QtAutoTotalEleg') and DsTipoCanalProducao in ('NEGOCIOS CENTRALIZADOS'));
+delete from TbProducaoUnpivot where (NuAnoMes >= 202201 and TpValor in ('QtDemaisEleg','QtAutoTotalEleg') and DsTipoCanalProducao in ('CANAL PRIVADO'));
+;run;
+
+proc sql;
+create table TbProducaoSeguros01 as
+select
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,case
+		when NmGrupoProdutoMeta = 'Leves' and TpValor in ('VrProducao','VrProducaoProjetado','VrMargem','VrMargemProjetado','VrProducaoSeguros', 'VrProducaoProjetadoSeguros') then StVeiculo
+		when NmCanalEstruturaComercial = 'Canal Veiculos' and NmGrupoProdutoMeta = 'Leves' and TpValor in ('VrBVMais', 'VrBVMaisProjetado', 'VrCap', 'VrCapProjetado', 'VrSegurosAuto', 'VrSegurosAutoProjetado') and NuAnoMes >= 202509 then StVeiculo /*QUEBRA DA PRODUÇÃO DE SEGUROS EM NÃO ISONOMICA*/
+	end as StVeiculo
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,case
+		when TpValor in ('QtContrato','VrProducao','VrProducaoProjetado') then 'VrProducao'
+		when TpValor in ('VrMargem','VrMargemProjetado') then 'VrMargemContribuicao'
+		when TpValor in ('VrProducaoSeguros', 'VrProducaoProjetadoSeguros') then 'VrProducaoSeguros'
+		when TpValor in ('VrProducaoSeguros_AP', 'VrProducaoSegurosProjetado_AP') Then 'VrProducaoSeguros_AP'
+		when TpValor in ('VrProducaoSeguros_PlacaSolar', 'VrProducaoSegurosProjetado_Placa') Then 'VrProducaoSeguros_PlacaSolar'
+
+		when NuAnoMes >= 202506 and DsTipoCanalProducao in ('CANAL SOLAR') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrAP'
+				when TpValor = 'QtCapEleg'  					then 'VrAP'
+				when TpValor = 'VrCap'  						then 'VrAP'
+				when TpValor = 'VrCapProjetado'					then 'VrAP'
+
+				when TpValor = 'QtPlacaSolar'     				then 'VrPlacaSolar'
+				when TpValor = 'QtPlacaSolarEleg'        		then 'VrPlacaSolar'
+				when TpValor = 'VrPlacaSolar'  					then 'VrPlacaSolar'
+				when TpValor = 'VrPlacaSolarProjetado'  		then 'VrPlacaSolar'
+			end
+
+		when NuAnoMes >= 202201 and DsTipoCanalProducao not in ('NEGOCIOS CENTRALIZADOS','CANAL PRIVADO') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrAP'
+				when TpValor = 'QtCapEleg'  					then 'VrAP'
+				when TpValor = 'VrCap'  						then 'VrAP'
+				when TpValor = 'VrCapProjetado'					then 'VrAP'
+
+				when TpValor = 'QtAutoTotal'     				then 'VrSegurosAuto'
+				when TpValor = 'QtAutoTotalEleg'        		then 'VrSegurosAuto'
+				when TpValor = 'VrSegurosAuto'  				then 'VrSegurosAuto'
+				when TpValor = 'VrSegurosAutoProjetado'  		then 'VrSegurosAuto'
+			end
+
+		when NuAnoMes >= 202201 and DsTipoCanalProducao in ('NEGOCIOS CENTRALIZADOS') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+			end
+
+		when NuAnoMes >= 202201 and DsTipoCanalProducao in ('CANAL PRIVADO') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrAP'
+				when TpValor = 'QtCapEleg'  					then 'VrAP'
+				when TpValor = 'VrCap'  						then 'VrAP'
+				when TpValor = 'VrCapProjetado'					then 'VrAP'
+			end
+
+		when NuAnoMes >= 202105 and DsTipoCanalProducao not in ('NEGOCIOS CENTRALIZADOS') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'PcSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'PcSPF'
+				when TpValor = 'VrBVMais'  						then 'PcSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'PcSPF'
+
+				when TpValor = 'QtCap'  						then 'PcCap'
+				when TpValor = 'QtCapEleg'  					then 'PcCap'
+				when TpValor = 'VrCap'  						then 'PcCap'
+				when TpValor = 'VrCapProjetado'					then 'PcCap'
+
+				when TpValor = 'QtDemais'  						then 'VrDemais'
+				when TpValor = 'QtDemaisEleg'  					then 'VrDemais'
+				when TpValor = 'VrDemais'  						then 'VrDemais'
+				when TpValor = 'VrDemaisProjetado'				then 'VrDemais'
+
+				when TpValor = 'QtAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'QtAutoTotalEleg'  				then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotalProjetado' 			then 'VrAutoTotal'
+			end
+
+		when NuAnoMes >= 202105 and DsTipoCanalProducao in ('NEGOCIOS CENTRALIZADOS') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrCap'
+				when TpValor = 'QtCapEleg'  					then 'VrCap'
+				when TpValor = 'VrCap'  						then 'VrCap'
+				when TpValor = 'VrCapProjetado'					then 'VrCap'
+
+				when TpValor = 'QtDemais'  						then 'VrDemais'
+				when TpValor = 'QtDemaisEleg'  					then 'VrDemais'
+				when TpValor = 'VrDemais'  						then 'VrDemais'
+				when TpValor = 'VrDemaisProjetado'				then 'VrDemais'
+
+				when TpValor = 'QtAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'QtAutoTotalEleg'  				then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotalProjetado' 			then 'VrAutoTotal'
+			end
+
+		when NuAnoMes >= 202001 then
+			 case
+				when TpValor = 'QtBVMais'						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg' 					then 'VrSPF'
+				when TpValor = 'VrBVMais' 						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado' 				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrCap'
+				when TpValor = 'QtCapEleg'  					then 'VrCap'
+				when TpValor = 'VrCap'  						then 'VrCap'
+				when TpValor = 'VrCapProjetado'					then 'VrCap'
+
+				when TpValor = 'QtDemais'  						then 'VrDemais'
+				when TpValor = 'QtDemaisEleg'  					then 'VrDemais'
+				when TpValor = 'VrDemais'  						then 'VrDemais'
+				when TpValor = 'VrDemaisProjetado' 				then 'VrDemais'
+
+				when TpValor = 'QtAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'QtAutoTotalEleg'  				then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotalProjetado' 			then 'VrAutoTotal'
+			 end
+		when NuAnoMes >= 201801 then
+			 case
+				when TpValor = 'QtBVMais' 				then 'PcSPF'
+				when TpValor = 'QtBVMaisEleg'  			then 'PcSPF'
+				when TpValor = 'VrBVMais'  				then 'PcSPF'
+				when TpValor = 'VrBVMaisProjetado'		then 'PcSPF'
+
+				when TpValor = 'QtCap'  				then 'PcCap'
+				when TpValor = 'QtCapEleg'  			then 'PcCap'
+				when TpValor = 'VrCap'  				then 'PcCap'
+				when TpValor = 'VrCapProjetado'			then 'PcCap'
+
+				when TpValor = 'QtDemais'  				then 'PcDemais'
+				when TpValor = 'QtDemaisEleg'  			then 'PcDemais'
+				when TpValor = 'VrDemais'  				then 'PcDemais'
+				when TpValor = 'VrDemaisProjetado'		then 'PcDemais'
+			 end
+
+	 end as TpValor
+	,sum(case when TpValor in ('QtContrato','QtBVMais','QtCap','QtPlacaSolar','QtDemais','QtAutoTotal') then VrMedida else 0 end) as QtNumerador
+	,sum(case when TpValor in ('QtBVMaisEleg','QtCapEleg','QtPlacaSolarEleg','QtDemaisEleg','QtAutoTotalEleg')  then VrMedida else 0 end) as QtDenominador
+	,sum(case when TpValor in ('VrProducao','VrMargem','VrBVMais','VrCap','VrPlacaSolar','VrDemais','VrAutoTotal','VrSegurosAuto', 'VrProducaoSeguros', 'VrProducaoSeguros_AP', 'VrProducaoSeguros_PlacaSolar') then VrMedida else 0 end) as VrMedida
+	,sum(case when TpValor in ('VrProducaoProjetado','VrMargemProjetado','VrBVMaisProjetado','VrCapProjetado','VrPlacaSolarProjetado','VrDemaisProjetado','VrAutoTotalProjetado','VrSegurosAutoProjetado', 'VrProducaoProjetadoSeguros', 'VrProducaoSegurosProjetado_AP', 'VrProducaoSegurosProjetado_Placa') then VrMedida else 0 end) as VrMedidaProj
+from TbProducaoUnpivot
+group by 1,2,3,4,5,6,7,8,9,10,11
+;run;
+
+/* Trecho adicionado em jan/23 para trazer o VrProducao como VrDenominador para todos os tpvalor de seguros */
+/* para realizar o cálculo de penetração financeira */
+%Macro MinimoSeguros(TpSeguro);
+PROC SQL;
+CREATE TABLE VrProducao_&TpSeguro. AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"&TpSeguro." AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoSeguros01
+  WHERE
+    TpValor = 'VrProducao'
+	AND NuAnoMes >= 202301 and NuAnoMes <= 202302
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+PROC SQL;
+CREATE TABLE VrProducaoSeg_&TpSeguro. AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"&TpSeguro." AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoSeguros01
+  WHERE
+    TpValor = 'VrProducaoSeguros'
+	AND NuAnoMes >= 202303
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+DATA VrProducao_&TpSeguro.;
+SET 	VrProducao_&TpSeguro.
+	VrProducaoSeg_&TpSeguro.
+;RUN;
+
+%Mend;
+
+DATA TpSeguro;
+INPUT tpvalor$1-13;
+CARDS;
+VrSegurosAuto
+VrSPF
+;
+RUN;
+/*VrAP - Considerei o Seguro CAP manualmente devido ajuste no Solar ser diferente*/
+
+PROC SQL;
+CREATE TABLE TpSeguro AS
+  SELECT
+    STRIP(tpvalor) AS tpvalor
+  FROM TpSeguro;
+RUN;
+
+DATA _null_;
+SET TpSeguro;
+  CALL EXECUTE('%MinimoSeguros('||tpvalor||')');
+RUN;
+
+PROC SQL;
+CREATE TABLE VrProducao_VrAP AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"VrAP" AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoSeguros01
+  WHERE
+    TpValor = 'VrProducao'
+	AND NuAnoMes >= 202301 and NuAnoMes <= 202302
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+PROC SQL;
+CREATE TABLE VrProducaoSeg_VrAP AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"VrAP" AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoSeguros01
+  WHERE
+    TpValor = 'VrProducaoSeguros_AP'
+	AND NuAnoMes >= 202303
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+DATA VrProducao_VrAP;
+SET 	VrProducao_VrAP
+		VrProducaoSeg_VrAP
+;RUN;
+
+PROC SQL;
+CREATE TABLE VrProducao_VrPlacaSolar AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"VrPlacaSolar" AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoSeguros01
+  WHERE
+    TpValor = 'VrProducaoSeguros_PlacaSolar'
+	AND NuAnoMes >= 202501
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+PROC SQL;
+CREATE TABLE VrProducao AS
+  SELECT * FROM VrProducao_VrSegurosAuto
+  OUTER UNION CORRESPONDING
+  SELECT * FROM VrProducao_VrSPF
+  OUTER UNION CORRESPONDING
+  SELECT * FROM VrProducao_VrAP
+  OUTER UNION CORRESPONDING
+  SELECT * FROM VrProducao_VrPlacaSolar;
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbProducaoSeguros AS
+  SELECT
+  	 COALESCE(A.NuAnoMes,B.NuAnoMes) AS NuAnoMes
+	,COALESCE(A.CdColaborador,B.CdColaborador) AS CdColaborador
+	,COALESCE(A.NmColaborador,B.NmColaborador) AS NmColaborador
+	,COALESCE(A.NmGrupoCargoColaborador,B.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,COALESCE(A.DsLoginN1,B.DsLoginN1) AS DsLoginN1
+	,COALESCE(A.NmGrupoProdutoMeta,B.NmGrupoProdutoMeta) AS NmGrupoProdutoMeta
+	,A.StVeiculo
+	,COALESCE(A.DsTipoCanalProducao,B.DsTipoCanalProducao) AS DsTipoCanalProducao
+	,COALESCE(A.CdFilial,B.CdFilial) AS CdFilial
+	,COALESCE(A.DtAtualizacao,B.DtAtualizacao) AS DtAtualizacao
+	,COALESCE(A.TpValor,B.TpValor) AS TpValor
+	,SUM(A.QtNumerador) AS QtNumerador
+	,SUM(A.QtDenominador) AS QtDenominador
+	,SUM(B.VrProducao) AS VrDenominador
+	,SUM(A.VrMedida) AS VrMedida
+	,SUM(A.VrMedidaProj) AS VrMedidaProj
+  FROM
+    TbProducaoSeguros01 A
+  FULL OUTER JOIN
+    VrProducao B
+	ON A.NuAnoMes = B.NuAnoMes
+	AND A.CdColaborador = B.CdColaborador
+	AND A.NmColaborador = B.NmColaborador
+	AND A.NmGrupoCargoColaborador = B.NmGrupoCargoColaborador
+	AND A.DsLoginN1 = B.DsLoginN1
+	AND A.NmGrupoProdutoMeta = B.NmGrupoProdutoMeta
+	AND A.DsTipoCanalProducao = B.DsTipoCanalProducao
+	AND A.CdFilial = B.CdFilial
+	AND A.DtAtualizacao = B.DtAtualizacao
+	AND A.TpValor = B.TpValor
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11;
+RUN;
+
+/************************************************************/
+/* GERA DADOS DE PRODUÇÃO REALIZADA PARA META NÃO-ISONÔMICA */
+/*******META NÃO ISONOMICA APENAS PARA LEVES USADOS**********/
+/************************************************************/
+
+PROC SQL;
+CREATE TABLE Estrutura_Comercial AS
+SELECT
+
+NuAnoMes,
+NmCanalEstruturaComercial,
+NmEstruturaComercialA,
+NmSubEstruturaComercialA,
+NmAreaEstruturaComercial,
+DsLoginN1,
+CdColaboradorAtivo as CdColaborador,
+NmColaborador,
+NmGrupoCargo,
+CdFilial
+
+FROM BASES.TBESTRUTURACOMERCIAL
+WHERE NuAnoMes >= 202401 AND NmCanalEstruturaComercial = 'Canal Veiculos' AND DsLoginN1 <> '';
+;RUN;
+
+PROC SQL;
+CREATE TABLE LoginDsN1 AS
+  SELECT DISTINCT
+    NuAnoMes
+	,DsLoginN1
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	FROM TbProducaoSeguros
+  WHERE NuAnoMes >= 202301
+    AND DsLoginN1 IS NOT NULL;
+RUN;
+
+proc sql;
+create table TbProducaoNI_Leves as
+select
+	 a.NuAnoMes
+	,COALESCE(b.CdColaborador, C.CdColaborador) as CdColaborador
+	,COALESCE(b.NmColaborador, C.NmColaborador) as NmColaborador
+	,COALESCE(b.NmGrupoCargoColaborador,a.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,a.DsLoginN1CartPDV
+	,a.NmGrupoProdutoMeta
+	,case when a.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as StVeiculo
+	,a.NmCanalEstruturaComercial
+	,a.DsTipoCanalProducao
+	,a.CdFilial
+	,a.DtAtualizacao
+	,count(*) as QtContrato format 18.0
+	,sum(a.VrProducao) as VrProducao format 18.2
+	,sum(a.VrProducaoProjetado) as VrProducaoProjetado format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducao ELSE 0 END) as VrProducaoSeguros format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducaoProjetado ELSE 0 END) as VrProducaoProjetadoSeguros format 18.2
+	,sum(a.VrMargem) as VrMargem format 18.2
+	,sum(a.VrMargemProjetado) as VrMargemProjetado format 18.2
+
+	,sum(a.FlBVMais) as QtBVMais
+	,sum(a.FlCap) as QtCap
+	,sum(a.FlDemais) as QtDemais
+	,sum(a.FlCompleto) as QtAutoTotal
+
+	,sum(a.VrBVMais) as VrBVMais
+	,sum(a.VrCap) as VrCap
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMax else VrDemais end) as VrDemais
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMax end) as VrSegurosAuto
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompleto end) as VrAutoTotal
+
+	,sum(VrBVMaisProjetado) as VrBVMaisProjetado
+	,sum(VrCapProjetado) as VrCapProjetado
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMaxProjetado else VrDemaisProjetado end) as VrDemaisProjetado
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMaxProjetado end) as VrSegurosAutoProjetado
+
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompletoProjetado end) as VrAutoTotalProjetado
+
+	,sum(FlBVMaisEleg) as QtBVMaisEleg
+	,sum(FlCapEleg) as QtCapEleg
+	,sum(FlCompletoEleg) as QtAutoTotalEleg
+	,sum(FlDemaisEleg) as QtDemaisEleg
+from tmp.TbProducao a
+left join
+  LoginDsN1 b
+  on a.nuanomes = b.nuanomes
+  and a.DsLoginN1CartPDV = b.DsLoginN1
+left join
+  Estrutura_Comercial c
+  on a.nuanomes = c.nuanomes
+  and a.DsLoginN1CartPDV = c.DsLoginN1
+
+where a.nuanomes >= 202301
+  and a.nmgrupoprodutometa = 'Leves'
+  and a.FxIdade <> 'ZeroKM'
+group by 1,2,3,4,5,6,7,8,9,10,11
+order by 1,2,3,4,5,6,7,8,9,10,11
+;quit;
+
+proc sql;
+create table TbProducaoNI_Motos as
+select
+	 a.NuAnoMes
+	,COALESCE(b.CdColaborador, C.CdColaborador) as CdColaborador
+	,COALESCE(b.NmColaborador, C.NmColaborador) as NmColaborador
+	,COALESCE(b.NmGrupoCargoColaborador,a.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,a.DsLoginN1CartPDV
+	,a.NmGrupoProdutoMeta
+	,case when a.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as StVeiculo
+	,a.NmCanalEstruturaComercial
+	,a.DsTipoCanalProducao
+	,a.CdFilial
+	,a.DtAtualizacao
+	,count(*) as QtContrato format 18.0
+	,sum(a.VrProducao) as VrProducao format 18.2
+	,sum(a.VrProducaoProjetado) as VrProducaoProjetado format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducao ELSE 0 END) as VrProducaoSeguros format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducaoProjetado ELSE 0 END) as VrProducaoProjetadoSeguros format 18.2
+	,sum(a.VrMargem) as VrMargem format 18.2
+	,sum(a.VrMargemProjetado) as VrMargemProjetado format 18.2
+
+	,sum(a.FlBVMais) as QtBVMais
+	,sum(a.FlCap) as QtCap
+	,sum(a.FlDemais) as QtDemais
+	,sum(a.FlCompleto) as QtAutoTotal
+
+	,sum(a.VrBVMais) as VrBVMais
+	,sum(a.VrCap) as VrCap
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMax else VrDemais end) as VrDemais
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMax end) as VrSegurosAuto
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompleto end) as VrAutoTotal
+
+	,sum(VrBVMaisProjetado) as VrBVMaisProjetado
+	,sum(VrCapProjetado) as VrCapProjetado
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMaxProjetado else VrDemaisProjetado end) as VrDemaisProjetado
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMaxProjetado end) as VrSegurosAutoProjetado
+
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompletoProjetado end) as VrAutoTotalProjetado
+
+	,sum(FlBVMaisEleg) as QtBVMaisEleg
+	,sum(FlCapEleg) as QtCapEleg
+	,sum(FlCompletoEleg) as QtAutoTotalEleg
+	,sum(FlDemaisEleg) as QtDemaisEleg
+from tmp.TbProducao a
+left join
+  LoginDsN1 b
+  on a.nuanomes = b.nuanomes
+  and a.DsLoginN1CartPDV = b.DsLoginN1
+left join
+  Estrutura_Comercial c
+  on a.nuanomes = c.nuanomes
+  and a.DsLoginN1CartPDV = c.DsLoginN1
+where a.nuanomes >= 202301
+  and a.nmgrupoprodutometa = 'Motos'
+group by 1,2,3,4,5,6,7,8,9,10,11
+order by 1,2,3,4,5,6,7,8,9,10,11
+;quit;
+
+/*Ajuste na Produção PF para canculo do Seguro AP - a partir de 202502 - MFS não deverá considerar no denominador para produção do AP*/
+proc sql;
+create table TbProducaoNI_Solar as
+select
+	 a.NuAnoMes
+	,b.CdColaborador
+	,b.NmColaborador
+	,COALESCE(b.NmGrupoCargoColaborador,a.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,a.DsLoginN1CartPDV
+	,a.NmGrupoProdutoMeta
+	,'' as StVeiculo
+	,a.NmCanalEstruturaComercial
+	,a.DsTipoCanalProducao
+	,a.CdFilial
+	,a.DtAtualizacao
+	,count(*) as QtContrato format 18.0
+	,sum(a.VrProducao) as VrProducao format 18.2
+	,sum(a.VrProducaoProjetado) as VrProducaoProjetado format 18.2
+	,sum(CASE
+			WHEN A.TPPESSOA = 'F' THEN VrProducao ELSE 0
+		END) as VrProducaoSeguros format 18.2
+
+	,sum(CASE
+			WHEN A.TPPESSOA = 'F' THEN VrProducaoProjetado ELSE 0
+		END) as VrProducaoProjetadoSeguros format 18.2
+
+	,sum(CASE
+			WHEN A.NuAnomes >= 202506 and A.TPPESSOA = 'F' and FlPlacaSolarEleg = 1 THEN VrProducao
+			ELSE 0
+		END) as VrProducaoSeguros_PlacaSolar format 18.2
+
+	,sum(CASE
+			WHEN A.NuAnomes >= 202506 and A.TPPESSOA = 'F' and FlPlacaSolarEleg = 1 THEN VrProducaoProjetado
+			ELSE 0
+		END) as VrProducaoProjetadoSeguros_Placa format 18.2
+	,sum(CASE
+			WHEN A.NuAnomes >= 202502 and A.TPPESSOA = 'F' and FlCapEleg = 1 THEN VrProducao
+			When A.NuAnomes <  202502 and A.TPPESSOA = 'F' Then VrProducao
+			ELSE 0
+		END) as VrProducaoSeguros_AP format 18.2
+
+	,sum(CASE
+			WHEN A.NuAnomes >= 202502 and A.TPPESSOA = 'F' and FlCapEleg = 1 THEN VrProducaoProjetado
+		 	WHEN A.NuAnomes <  202502 and A.TPPESSOA = 'F' THEN VrProducaoProjetado
+			ELSE 0
+		END) as VrProducaoProjetadoSeguros_AP format 18.2
+
+	,sum(a.VrMargem) as VrMargem format 18.2
+	,sum(a.VrMargemProjetado) as VrMargemProjetado format 18.2
+
+	,sum(a.FlBVMais) as QtBVMais
+	,sum(a.FlCap) as QtCap
+	,sum(a.FlPlacaSolar) as QtPlacaSolar
+	,sum(a.FlDemais) as QtDemais
+	,sum(a.FlCompleto) as QtAutoTotal
+
+	,sum(a.VrBVMais) as VrBVMais
+	,sum(a.VrCap) as VrCap
+	,sum(a.VrPlacaSolar) as VrPlacaSolar
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMax else VrDemais end) as VrDemais
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMax end) as VrSegurosAuto
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompleto end) as VrAutoTotal
+
+	,sum(VrBVMaisProjetado) as VrBVMaisProjetado
+	,sum(VrCapProjetado) as VrCapProjetado
+	,sum(VrPlacaSolarProjetado) as VrPlacaSolarProjetado
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMaxProjetado else VrDemaisProjetado end) as VrDemaisProjetado
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMaxProjetado end) as VrSegurosAutoProjetado
+
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompletoProjetado end) as VrAutoTotalProjetado
+
+	,sum(FlBVMaisEleg) as QtBVMaisEleg
+	,sum(FlCapEleg) as QtCapEleg
+	,sum(FlPlacaSolarEleg) as FlPlacaSolarEleg
+	,sum(FlCompletoEleg) as QtAutoTotalEleg
+	,sum(FlDemaisEleg) as QtDemaisEleg
+from tmp.TbProducao a
+left join
+  LoginDsN1 b
+  on a.nuanomes = b.nuanomes
+  and a.DsLoginN1CartPDV = b.DsLoginN1
+where a.nuanomes >= 202401
+  and a.nmgrupoprodutometa = 'Solar'
+group by 1,2,3,4,5,6,7,8,9,10,11
+order by 1,2,3,4,5,6,7,8,9,10,11
+;quit;
+
+proc sql;
+create table TbProducaoNI_Pesados as
+select
+	 a.NuAnoMes
+	,COALESCE(b.CdColaborador, C.CdColaborador) as CdColaborador
+	,COALESCE(b.NmColaborador, C.NmColaborador) as NmColaborador
+	,COALESCE(b.NmGrupoCargoColaborador,a.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,a.DsLoginN1CartPDV
+	,a.NmGrupoProdutoMeta
+	,case when a.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as StVeiculo
+	,a.NmCanalEstruturaComercial
+	,a.DsTipoCanalProducao
+	,a.CdFilial
+	,a.DtAtualizacao
+	,count(*) as QtContrato format 18.0
+	,sum(a.VrProducao) as VrProducao format 18.2
+	,sum(a.VrProducaoProjetado) as VrProducaoProjetado format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducao ELSE 0 END) as VrProducaoSeguros format 18.2
+	,sum(CASE WHEN A.TPPESSOA = 'F' THEN VrProducaoProjetado ELSE 0 END) as VrProducaoProjetadoSeguros format 18.2
+	,sum(a.VrMargem) as VrMargem format 18.2
+	,sum(a.VrMargemProjetado) as VrMargemProjetado format 18.2
+
+	,sum(a.FlBVMais) as QtBVMais
+	,sum(a.FlCap) as QtCap
+	,sum(a.FlDemais) as QtDemais
+	,sum(a.FlCompleto) as QtAutoTotal
+
+	,sum(a.VrBVMais) as VrBVMais
+	,sum(a.VrCap) as VrCap
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMax else VrDemais end) as VrDemais
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMax end) as VrSegurosAuto
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompleto end) as VrAutoTotal
+
+	,sum(VrBVMaisProjetado) as VrBVMaisProjetado
+	,sum(VrCapProjetado) as VrCapProjetado
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrDemaisSemCompletoMaxProjetado else VrDemaisProjetado end) as VrDemaisProjetado
+	,sum(case when DsTipoCanalProducao not in ('CANAL PRIVADO','NEGOCIOS CENTRALIZADOS','PROMOTORA') and a.NuAnoMes >= 202201 then VrDemaisComCompletoMaxProjetado end) as VrSegurosAutoProjetado
+
+	,sum(case when DsTipoCanalProducao not in ('LOJA CANAL NEGOCIOS','PROMOTORA','CANAL PRIVADO') and a.NuAnoMes >= 202101 then VrCompletoProjetado end) as VrAutoTotalProjetado
+
+	,sum(FlBVMaisEleg) as QtBVMaisEleg
+	,sum(FlCapEleg) as QtCapEleg
+	,sum(FlCompletoEleg) as QtAutoTotalEleg
+	,sum(FlDemaisEleg) as QtDemaisEleg
+from tmp.TbProducao a
+left join
+  LoginDsN1 b
+  on a.nuanomes = b.nuanomes
+  and a.DsLoginN1CartPDV = b.DsLoginN1
+left join
+  Estrutura_Comercial c
+  on a.nuanomes = c.nuanomes
+  and a.DsLoginN1CartPDV = c.DsLoginN1
+where a.nuanomes >= 202501
+  and a.nmgrupoprodutometa = 'Pesados'
+group by 1,2,3,4,5,6,7,8,9,10,11
+order by 1,2,3,4,5,6,7,8,9,10,11
+;quit;
+
+data TbProducaoNI;
+set TbProducaoNI_Leves
+	TbProducaoNI_Motos
+	TbProducaoNI_Pesados
+	TbProducaoNI_Solar;
+;run;
+
+proc sort data=TbProducaoNI; by NuAnoMes CdColaborador NmColaborador NmGrupoCargoColaborador DsLoginN1CartPDV NmGrupoProdutoMeta StVeiculo NmCanalEstruturaComercial DsTipoCanalProducao CdFilial DtAtualizacao;run;
+
+proc transpose data=TbProducaoNI out=TbProducaoNIUnpivot
+(drop=_LABEL_ rename=_NAME_=TpValor rename=COL1=VrMedida where=(coalesce(VrMedida,0)<>0));
+by
+	 NuAnoMes
+	 CdColaborador
+	 NmColaborador
+	 NmGrupoCargoColaborador
+	 DsLoginN1CartPDV
+	 NmGrupoProdutoMeta
+	 StVeiculo
+	 NmCanalEstruturaComercial
+	 DsTipoCanalProducao
+	 CdFilial
+	 DtAtualizacao
+;run;
+
+proc sql;
+delete from TbProducaoNIUnpivot where (TpValor in ('QtAutoTotal','VrAutoTotal','QtAutoTotalEleg','VrAutoTotalProjetado') and NuAnoMes < 202101);
+delete from TbProducaoNIUnpivot where (TpValor in ('QtAutoTotal','VrAutoTotal','QtAutoTotalEleg','VrAutoTotalProjetado') and DsTipoCanalProducao in ('LOJA CANAL NEGOCIOS','PROMOTORA'));
+delete from TbProducaoNIUnpivot where (NuAnoMes >= 202201 and TpValor in (
+	 'VrAutoTotal'
+	,'VrAutoTotalProjetado'
+	,'QtDemais'
+	,'QtDemaisEleg'
+	,'VrDemais'
+	,'VrDemaisProjetado'
+	,'QtBVMais'
+	));
+
+/*Alteração realizada em 18/01/2023 verificar a explicação no caminho abaixo.
+N:\DVMD\Planejamento Varejo\MIS Varejo\Processos\011. Historico de Alterações\TbProducao*/
+delete from TbProducaoUnpivot where (NuAnoMes BETWEEN 202201 AND 202212 and TpValor in (
+	 'QtAutoTotal'
+	,'QtAutoTotalEleg'
+	));
+
+delete from TbProducaoNIUnpivot where (NuAnoMes >= 202201 and TpValor in ('QtCap','VrCap','VrCapProjetado','QtCapEleg','QtDemaisEleg','QtAutoTotalEleg') and DsTipoCanalProducao in ('NEGOCIOS CENTRALIZADOS'));
+delete from TbProducaoNIUnpivot where (NuAnoMes >= 202201 and TpValor in ('QtDemaisEleg','QtAutoTotalEleg') and DsTipoCanalProducao in ('CANAL PRIVADO'));
+;run;
+
+proc sql;
+create table TbProducaoNISeguros01 as
+select
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1CartPDV
+	,NmGrupoProdutoMeta
+	,case
+		when NmGrupoProdutoMeta = 'Leves' and TpValor in ('VrProducao','VrProducaoProjetado','VrMargem','VrMargemProjetado','VrProducaoSeguros', 'VrProducaoProjetadoSeguros') then StVeiculo
+		when NmCanalEstruturaComercial = 'Canal Veiculos' and NmGrupoProdutoMeta = 'Leves' and TpValor in ('VrBVMais', 'VrBVMaisProjetado', 'VrCap', 'VrCapProjetado', 'VrSegurosAuto', 'VrSegurosAutoProjetado') and NuAnoMes >= 202509 then StVeiculo /*QUEBRA DA PRODUÇÃO DE SEGUROS EM NÃO ISONOMICA*/
+	end as StVeiculo
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,case
+		when TpValor in ('QtContrato','VrProducao','VrProducaoProjetado') then 'VrProducao'
+		when TpValor in ('VrMargem','VrMargemProjetado') then 'VrMargemContribuicao'
+		when TpValor in ('VrProducaoSeguros', 'VrProducaoProjetadoSeguros') then 'VrProducaoSeguros'
+		when TpValor in ('VrProducaoSeguros_AP','VrProducaoProjetadoSeguros_AP') then 'VrProducaoSeguros_AP'
+		when TpValor in ('VrProducaoSeguros_PlacaSolar','VrProducaoProjetadoSeguros_Placa') then 'VrProducaoSeguros_PlacaSolar'
+
+		when NuAnoMes >= 202506 and DsTipoCanalProducao in ('CANAL SOLAR') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrAP'
+				when TpValor = 'QtCapEleg'  					then 'VrAP'
+				when TpValor = 'VrCap'  						then 'VrAP'
+				when TpValor = 'VrCapProjetado'					then 'VrAP'
+
+				when TpValor = 'QtPlacaSolar'  					then 'VrPlacaSolar'
+				when TpValor = 'QtPlacaSolarEleg'  				then 'VrPlacaSolar'
+				when TpValor = 'VrPlacaSolar'  					then 'VrPlacaSolar'
+				when TpValor = 'VrPlacaSolarProjetado'			then 'VrPlacaSolar'
+			end
+
+		when NuAnoMes >= 202201 and DsTipoCanalProducao not in ('NEGOCIOS CENTRALIZADOS','CANAL PRIVADO') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrAP'
+				when TpValor = 'QtCapEleg'  					then 'VrAP'
+				when TpValor = 'VrCap'  						then 'VrAP'
+				when TpValor = 'VrCapProjetado'					then 'VrAP'
+
+				when TpValor = 'QtAutoTotal'     				then 'VrSegurosAuto'
+				when TpValor = 'QtAutoTotalEleg'        		then 'VrSegurosAuto'
+				when TpValor = 'VrSegurosAuto'  				then 'VrSegurosAuto'
+				when TpValor = 'VrSegurosAutoProjetado'  		then 'VrSegurosAuto'
+			end
+
+		when NuAnoMes >= 202201 and DsTipoCanalProducao in ('NEGOCIOS CENTRALIZADOS') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+			end
+
+		when NuAnoMes >= 202201 and DsTipoCanalProducao in ('CANAL PRIVADO') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrAP'
+				when TpValor = 'QtCapEleg'  					then 'VrAP'
+				when TpValor = 'VrCap'  						then 'VrAP'
+				when TpValor = 'VrCapProjetado'					then 'VrAP'
+			end
+
+		when NuAnoMes >= 202105 and DsTipoCanalProducao not in ('NEGOCIOS CENTRALIZADOS') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'PcSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'PcSPF'
+				when TpValor = 'VrBVMais'  						then 'PcSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'PcSPF'
+
+				when TpValor = 'QtCap'  						then 'PcCap'
+				when TpValor = 'QtCapEleg'  					then 'PcCap'
+				when TpValor = 'VrCap'  						then 'PcCap'
+				when TpValor = 'VrCapProjetado'					then 'PcCap'
+
+				when TpValor = 'QtDemais'  						then 'VrDemais'
+				when TpValor = 'QtDemaisEleg'  					then 'VrDemais'
+				when TpValor = 'VrDemais'  						then 'VrDemais'
+				when TpValor = 'VrDemaisProjetado'				then 'VrDemais'
+
+				when TpValor = 'QtAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'QtAutoTotalEleg'  				then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotalProjetado' 			then 'VrAutoTotal'
+			end
+
+		when NuAnoMes >= 202105 and DsTipoCanalProducao in ('NEGOCIOS CENTRALIZADOS') then
+			 case
+				when TpValor = 'QtBVMais' 						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg'  					then 'VrSPF'
+				when TpValor = 'VrBVMais'  						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado'				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrCap'
+				when TpValor = 'QtCapEleg'  					then 'VrCap'
+				when TpValor = 'VrCap'  						then 'VrCap'
+				when TpValor = 'VrCapProjetado'					then 'VrCap'
+
+				when TpValor = 'QtDemais'  						then 'VrDemais'
+				when TpValor = 'QtDemaisEleg'  					then 'VrDemais'
+				when TpValor = 'VrDemais'  						then 'VrDemais'
+				when TpValor = 'VrDemaisProjetado'				then 'VrDemais'
+
+				when TpValor = 'QtAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'QtAutoTotalEleg'  				then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotalProjetado' 			then 'VrAutoTotal'
+			end
+
+		when NuAnoMes >= 202001 then
+			 case
+				when TpValor = 'QtBVMais'						then 'VrSPF'
+				when TpValor = 'QtBVMaisEleg' 					then 'VrSPF'
+				when TpValor = 'VrBVMais' 						then 'VrSPF'
+				when TpValor = 'VrBVMaisProjetado' 				then 'VrSPF'
+
+				when TpValor = 'QtCap'  						then 'VrCap'
+				when TpValor = 'QtCapEleg'  					then 'VrCap'
+				when TpValor = 'VrCap'  						then 'VrCap'
+				when TpValor = 'VrCapProjetado'					then 'VrCap'
+
+				when TpValor = 'QtDemais'  						then 'VrDemais'
+				when TpValor = 'QtDemaisEleg'  					then 'VrDemais'
+				when TpValor = 'VrDemais'  						then 'VrDemais'
+				when TpValor = 'VrDemaisProjetado' 				then 'VrDemais'
+
+				when TpValor = 'QtAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'QtAutoTotalEleg'  				then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotal'  					then 'VrAutoTotal'
+				when TpValor = 'VrAutoTotalProjetado' 			then 'VrAutoTotal'
+			 end
+		when NuAnoMes >= 201801 then
+			 case
+				when TpValor = 'QtBVMais' 				then 'PcSPF'
+				when TpValor = 'QtBVMaisEleg'  			then 'PcSPF'
+				when TpValor = 'VrBVMais'  				then 'PcSPF'
+				when TpValor = 'VrBVMaisProjetado'		then 'PcSPF'
+
+				when TpValor = 'QtCap'  				then 'PcCap'
+				when TpValor = 'QtCapEleg'  			then 'PcCap'
+				when TpValor = 'VrCap'  				then 'PcCap'
+				when TpValor = 'VrCapProjetado'			then 'PcCap'
+
+				when TpValor = 'QtDemais'  				then 'PcDemais'
+				when TpValor = 'QtDemaisEleg'  			then 'PcDemais'
+				when TpValor = 'VrDemais'  				then 'PcDemais'
+				when TpValor = 'VrDemaisProjetado'		then 'PcDemais'
+			 end
+
+	 end as TpValor
+	,sum(case when TpValor in ('QtContrato','QtBVMais','QtCap','QtPlacaSolar','QtDemais','QtAutoTotal') then VrMedida else 0 end) as QtNumerador
+	,sum(case when TpValor in ('QtBVMaisEleg','QtCapEleg','QtPlacaSolarEleg','QtDemaisEleg','QtAutoTotalEleg')  then VrMedida else 0 end) as QtDenominador
+	,sum(case when TpValor in ('VrProducao','VrMargem','VrBVMais','VrCap','VrPlacaSolar','VrDemais','VrAutoTotal','VrSegurosAuto', 'VrProducaoSeguros', 'VrProducaoSeguros_AP', 'VrProducaoSeguros_PlacaSolar') then VrMedida else 0 end) as VrMedida
+	,sum(case when TpValor in ('VrProducaoProjetado','VrMargemProjetado','VrBVMaisProjetado','VrCapProjetado','VrPlacaSolarProjetado','VrDemaisProjetado','VrAutoTotalProjetado','VrSegurosAutoProjetado', 'VrProducaoProjetadoSeguros', 'VrProducaoProjetadoSeguros_AP','VrProducaoProjetadoSeguros_Placa') then VrMedida else 0 end) as VrMedidaProj
+from TbProducaoNIUnpivot
+group by 1,2,3,4,5,6,7,8,9,10,11
+;run;
+
+/* Trecho adicionado em jan/23 para trazer o VrProducao como VrDenominador para todos os tpvalor de seguros */
+/* para realizar o cálculo de penetração financeira */
+%Macro MinimoSegurosNI(TpSeguro);
+PROC SQL;
+CREATE TABLE VrProducaoNI_&TpSeguro. AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1CartPDV
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"&TpSeguro." AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoNISeguros01
+  WHERE
+    TpValor = 'VrProducao'
+	AND NuAnoMes >= 202301 and NuAnoMes <= 202302
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+PROC SQL;
+CREATE TABLE VrProducaoSegNI_&TpSeguro. AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1CartPDV
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"&TpSeguro." AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoNISeguros01
+  WHERE
+    TpValor = 'VrProducaoSeguros'
+	AND NuAnoMes >= 202303
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+DATA VrProducaoNI_&TpSeguro.;
+SET VrProducaoNI_&TpSeguro.
+	VrProducaoSegNI_&TpSeguro.;
+;RUN;
+
+%Mend;
+
+DATA _null_;
+SET TpSeguro;
+  CALL EXECUTE('%MinimoSegurosNI('||tpvalor||')');
+RUN;
+
+PROC SQL;
+CREATE TABLE VrProducaoNI_VrAP AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1CartPDV
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"VrAP" AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoNISeguros01
+  WHERE
+    TpValor = 'VrProducao'
+	AND NuAnoMes >= 202301 and NuAnoMes <= 202302
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+/*Gerando a base do AP separada devido a regra no Solar ser diferente - não considera a produção do MFS para o denominador*/
+PROC SQL;
+CREATE TABLE VrProducaoSegNI_VrAP AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1CartPDV
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"VrAP" AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoNISeguros01
+  WHERE
+    TpValor = 'VrProducaoSeguros'
+	AND NuAnoMes >= 202303 and NuAnoMes <= 202501
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+/*Incluindo a nova regra do Solar - Produção PF sem MFS que não pode vender o AP*/
+PROC SQL;
+CREATE TABLE VrProducaoSegNI2_VrAP AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1CartPDV
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"VrAP" AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoNISeguros01
+  WHERE
+    TpValor = 'VrProducaoSeguros_AP'
+	AND NuAnoMes >= 202502
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+/*Inclusão do Seguro Placa Solar a partir de Jun-25*/
+PROC SQL;
+CREATE TABLE VrProducaoSegNI_VrPlacaSolar AS
+  SELECT
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1CartPDV
+	,NmGrupoProdutoMeta
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,"VrPlacaSolar" AS TpValor
+    ,SUM(VrMedida) AS VrProducao
+  FROM
+    TbProducaoNISeguros01
+  WHERE
+    TpValor = 'VrProducaoSeguros_PlacaSolar'
+	AND NuAnoMes >= 202501
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10;
+RUN;
+
+DATA VrProducaoNI_VrAP;
+SET 	VrProducaoNI_VrAP
+		VrProducaoSegNI_VrAP
+		VrProducaoSegNI2_VrAP
+;RUN;
+
+PROC SQL;
+CREATE TABLE VrProducaoNI AS
+  SELECT * FROM VrProducaoNI_VrSegurosAuto
+  OUTER UNION CORRESPONDING
+  SELECT * FROM VrProducaoNI_VrSPF
+  OUTER UNION CORRESPONDING
+  SELECT * FROM VrProducaoNI_VrAP
+  OUTER UNION CORRESPONDING
+  SELECT * FROM VrProducaoSegNI_VrPlacaSolar;
+;
+RUN;
+
+/*****************************************************************/
+/*****************************************************************/
+
+PROC SQL;
+CREATE TABLE TbEncarteiramentoNI AS
+  SELECT DISTINCT
+    MetaNaoisonomica.NuAnoMes
+	,MetaNaoisonomica.DsLoginN1
+	,MetaNaoisonomica.CdParceiroComercial
+	,MetaNaoisonomica.Produto
+	,LoginDsN1.NmGrupoCargoColaborador
+  FROM
+    BASEGRC.TbMetaNaoisonomica MetaNaoisonomica
+		LEFT JOIN LoginDsN1 LoginDsN1
+			ON 	MetaNaoisonomica.DsLoginN1 = LoginDsN1.DsLoginN1
+  WHERE
+    MetaNaoisonomica.DsLoginN1 IS NOT NULL;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbProducaoNICart_Leves AS
+SELECT
+A.NUANOMES,
+A.CdColaborador,
+A.NmColaborador,
+COALESCE(CARTNI.NmGrupoCargoColaborador,A.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador,
+A.DsLoginN1CartPDV,
+A.NmGrupoProdutoMeta,
+A.DsTipoCanalProducao,
+A.CdFilial,
+A.DtAtualizacao,
+'VrProducao' as TpValor,
+
+SUM(A.VRPRODUCAO) AS PROD FORMAT COMMAX20.2,
+sum(A.VrProducaoProjetado) as ProdProj FORMAT COMMAX20.2,
+COUNT(A.NUCONTRATO) AS QTD
+
+FROM TMP.TBPRODUCAO A
+
+	INNER JOIN TBENCARTEIRAMENTONI CARTNI
+	    ON A.NUANOMES = CARTNI.NUANOMES
+		AND A.CDPARCEIROCOMERCIAL = CARTNI.CDPARCEIROCOMERCIAL
+		and a.NmGrupoProdutoMeta = CARTNI.Produto
+/*		AND A.DsLoginN1 = cartni.DsLoginN1*/
+
+WHERE
+	A.NUANOMES >= 202302
+	AND A.NmGrupoProdutoMeta in ('Leves')
+and FxIdade <> 'ZeroKM'
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10
+order by 5
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbProducaoNICart_Motos AS
+SELECT
+A.NUANOMES,
+A.CdColaborador,
+A.NmColaborador,
+COALESCE(CARTNI.NmGrupoCargoColaborador,A.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador,
+A.DsLoginN1CartPDV,
+A.NmGrupoProdutoMeta,
+A.DsTipoCanalProducao,
+A.CdFilial,
+A.DtAtualizacao,
+'VrProducao' as TpValor,
+
+SUM(A.VRPRODUCAO) AS PROD FORMAT COMMAX20.2,
+sum(A.VrProducaoProjetado) as ProdProj FORMAT COMMAX20.2,
+COUNT(A.NUCONTRATO) AS QTD
+
+FROM TMP.TBPRODUCAO A
+
+	INNER JOIN TBENCARTEIRAMENTONI CARTNI
+	    ON A.NUANOMES = CARTNI.NUANOMES
+		AND A.CDPARCEIROCOMERCIAL = CARTNI.CDPARCEIROCOMERCIAL
+		and a.NmGrupoProdutoMeta = CARTNI.Produto
+/*		AND A.DsLoginN1 = cartni.DsLoginN1*/
+
+WHERE
+	A.NUANOMES >= 202302
+	AND A.NmGrupoProdutoMeta in ('Motos')
+/*and FxIdade <> 'ZeroKM'*/
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10
+order by 5
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbProducaoNICart_Solar AS
+SELECT
+A.NUANOMES,
+A.CdColaborador,
+A.NmColaborador,
+COALESCE(CARTNI.NmGrupoCargoColaborador,A.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador,
+A.DsLoginN1CartPDV,
+A.NmGrupoProdutoMeta,
+A.DsTipoCanalProducao,
+A.CdFilial,
+A.DtAtualizacao,
+'VrProducao' as TpValor,
+
+SUM(A.VRPRODUCAO) AS PROD FORMAT COMMAX20.2,
+sum(A.VrProducaoProjetado) as ProdProj FORMAT COMMAX20.2,
+COUNT(A.NUCONTRATO) AS QTD
+
+FROM TMP.TBPRODUCAO A
+
+	INNER JOIN TBENCARTEIRAMENTONI CARTNI
+	    ON A.NUANOMES = CARTNI.NUANOMES
+		AND A.CDPARCEIROCOMERCIAL = CARTNI.CDPARCEIROCOMERCIAL
+		and a.NmGrupoProdutoMeta = CARTNI.Produto
+/*		AND A.DsLoginN1 = cartni.DsLoginN1*/
+
+WHERE
+	A.NUANOMES >= 202401
+	AND A.NmGrupoProdutoMeta in ('Solar')
+/*and FxIdade <> 'ZeroKM'*/
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10
+order by 5
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbProducaoNICart_Pesados AS
+SELECT
+A.NUANOMES,
+A.CdColaborador,
+A.NmColaborador,
+COALESCE(CARTNI.NmGrupoCargoColaborador,A.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador,
+A.DsLoginN1CartPDV,
+A.NmGrupoProdutoMeta,
+A.DsTipoCanalProducao,
+A.CdFilial,
+A.DtAtualizacao,
+'VrProducao' as TpValor,
+
+SUM(A.VRPRODUCAO) AS PROD FORMAT COMMAX20.2,
+sum(A.VrProducaoProjetado) as ProdProj FORMAT COMMAX20.2,
+COUNT(A.NUCONTRATO) AS QTD
+
+FROM TMP.TBPRODUCAO A
+
+	INNER JOIN TBENCARTEIRAMENTONI CARTNI
+	    ON A.NUANOMES = CARTNI.NUANOMES
+		AND A.CDPARCEIROCOMERCIAL = CARTNI.CDPARCEIROCOMERCIAL
+		and a.NmGrupoProdutoMeta = CARTNI.Produto
+/*		AND A.DsLoginN1 = cartni.DsLoginN1*/
+
+WHERE
+	A.NUANOMES >= 202302
+	AND A.NmGrupoProdutoMeta in ('Pesados')
+
+GROUP BY 1,2,3,4,5,6,7,8,9,10
+order by 5
+;RUN;
+
+DATA TbProducaoNICart;
+SET TbProducaoNICart_Leves
+	TbProducaoNICart_Motos
+	TbProducaoNICart_Pesados
+	TbProducaoNICart_Solar;
+;run;
+
+/*****************************************************************/
+/*****************************************************************/
+
+PROC SQL;
+CREATE TABLE TbProducaoSegurosNI AS
+  SELECT
+  	 COALESCE(A.NuAnoMes,B.NuAnoMes) AS NuAnoMes
+	,COALESCE(A.CdColaborador,B.CdColaborador) AS CdColaborador
+	,COALESCE(A.NmColaborador,B.NmColaborador) AS NmColaborador
+	,COALESCE(A.NmGrupoCargoColaborador,B.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,COALESCE(A.DsLoginN1CartPDV,B.DsLoginN1CartPDV) AS DsLoginN1CartPDV
+	,COALESCE(A.NmGrupoProdutoMeta,B.NmGrupoProdutoMeta) AS NmGrupoProdutoMeta
+	/*,COALESCE(A.StVeiculo,B.StVeiculo) as StVeiculo*/
+	,A.StVeiculo as StVeiculo
+	,COALESCE(A.DsTipoCanalProducao,B.DsTipoCanalProducao) AS DsTipoCanalProducao
+	,COALESCE(A.CdFilial,B.CdFilial) AS CdFilial
+	,COALESCE(A.DtAtualizacao,B.DtAtualizacao) AS DtAtualizacao
+	,COALESCE(A.TpValor,B.TpValor) AS TpValor
+	,SUM(A.QtNumerador) AS QtNumerador
+	,SUM(A.QtDenominador) AS QtDenominador
+	,SUM(B.VrProducao) AS VrDenominador
+	,SUM(A.VrMedida) AS VrMedida
+	,SUM(A.VrMedidaProj) AS VrMedidaProj
+  FROM
+    TbProducaoNISeguros01 A
+  FULL OUTER JOIN
+    VrProducaoNI B
+	ON A.NuAnoMes = B.NuAnoMes
+	AND A.CdColaborador = B.CdColaborador
+	AND A.NmColaborador = B.NmColaborador
+	AND A.NmGrupoCargoColaborador = B.NmGrupoCargoColaborador
+	AND A.DsLoginN1CartPDV = B.DsLoginN1CartPDV
+	AND A.NmGrupoProdutoMeta = B.NmGrupoProdutoMeta
+	AND A.DsTipoCanalProducao = B.DsTipoCanalProducao
+	AND A.CdFilial = B.CdFilial
+	AND A.DtAtualizacao = B.DtAtualizacao
+	AND A.TpValor = B.TpValor
+	/*where (a.NuAnoMes = 202301 and a.DsLoginN1CartPDV = 'aarao.souza' and a.TpValor = 'VrProducao')*/
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11;
+RUN;
+
+/* Unificar base de produção normal com produção NI*/
+PROC SQL;
+CREATE TABLE TbProducaoSeguros AS
+
+  SELECT
+  	 COALESCE(A.NuAnoMes,B.NuAnoMes) AS NuAnoMes
+	,COALESCE(A.CdColaborador,B.CdColaborador) AS CdColaborador
+	,COALESCE(A.NmColaborador,B.NmColaborador) AS NmColaborador
+	,COALESCE(A.NmGrupoCargoColaborador,B.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,coalesce(A.DsLoginN1,b.dsloginn1cartpdv) AS DsLoginN1
+	,COALESCE(A.NmGrupoProdutoMeta,B.NmGrupoProdutoMeta) AS NmGrupoProdutoMeta
+	,COALESCE(A.StVeiculo,B.StVeiculo) AS StVeiculo
+	,COALESCE(A.DsTipoCanalProducao,B.DsTipoCanalProducao) AS DsTipoCanalProducao
+	,COALESCE(A.CdFilial,B.CdFilial) AS CdFilial
+	,COALESCE(A.DtAtualizacao,B.DtAtualizacao) AS DtAtualizacao
+	,COALESCE(A.TpValor,B.TpValor) AS TpValor
+	,SUM(A.QtNumerador) AS QtNumerador
+	,SUM(A.QtDenominador) AS QtDenominador
+	,SUM(A.VrDenominador) AS VrDenominador
+	,SUM(A.VrMedida) AS VrMedida
+	,SUM(A.VrMedidaProj) AS VrMedidaProj
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.QtNumerador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtNumerador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtNumerador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar'
+			  THEN B.QtNumerador
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Pesados', 'Solar')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.QtNumerador
+			  ELSE 0
+			  END
+    ) AS QtNumeradorNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.QtDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar'
+			  THEN B.QtDenominador
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 20212 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.QtDenominador
+			  ELSE 0
+			  END
+    ) AS QtDenominadorNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.VrDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar'
+			  THEN B.VrDenominador
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.VrDenominador
+			  ELSE 0
+			  END
+    ) AS VrDenominadorNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.VrMedida
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos' AND A.NuAnoMes >= 202308
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedida
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados' AND A.NuAnoMes >= 202501
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedida
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes >= 202404
+			  THEN B.VrMedida
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE PESADOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.VrMedida
+			  ELSE 0
+			  END
+    ) AS VrMedidaNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.VrMedidaProj
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos' AND A.NuAnoMes >= 202308
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedidaProj
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados' AND A.NuAnoMes >= 202501
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedidaProj
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes >= 202404
+	   	   	  THEN B.VrMedidaProj
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE PESADOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.VrMedidaProj
+			  ELSE 0
+			  END
+    ) AS VrMedidaProjNI
+
+  FROM
+    TbProducaoSeguros A
+  	FULL OUTER JOIN
+    TbProducaoSegurosNI B
+	ON A.NuAnoMes = B.NuAnoMes
+	AND A.CdColaborador = B.CdColaborador
+	AND A.NmColaborador = B.NmColaborador
+	AND A.NmGrupoCargoColaborador = B.NmGrupoCargoColaborador
+	AND A.DsLoginN1 = B.DsLoginN1CartPDV
+	AND A.NmGrupoProdutoMeta = B.NmGrupoProdutoMeta
+	AND A.StVeiculo = B.StVeiculo
+ 	AND A.DsTipoCanalProducao = B.DsTipoCanalProducao
+	AND A.CdFilial = B.CdFilial
+	AND A.DtAtualizacao = B.DtAtualizacao
+	AND A.TpValor = B.TpValor
+
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11;
+RUN;
+
+Data TbProducaoSeguros;
+Set TbProducaoSeguros;
+IF TpValor = 'VrProducaoSeguros_AP' Then DELETE ;
+IF TpValor = 'VrProducaoSeguros_PlacaSolar' Then DELETE ;
+IF TpValor = '' Then DELETE ;
+Run;
+
+PROC SQL;
+CREATE TABLE bases.TbProducaoSeguros AS
+
+  SELECT
+  	 COALESCE(A.NuAnoMes,B.NuAnoMes) AS NuAnoMes
+	,COALESCE(A.CdColaborador,B.CdColaborador) AS CdColaborador
+	,COALESCE(A.NmColaborador,B.NmColaborador) AS NmColaborador
+	,COALESCE(A.NmGrupoCargoColaborador,B.NmGrupoCargoColaborador) AS NmGrupoCargoColaborador
+	,COALESCE(A.DsLoginN1,b.dsloginn1cartpdv) AS DsLoginN1
+	,COALESCE(A.NmGrupoProdutoMeta,B.NmGrupoProdutoMeta) AS NmGrupoProdutoMeta
+	,COALESCE(A.StVeiculo,B.StVeiculo) AS StVeiculo
+	,COALESCE(A.DsTipoCanalProducao,B.DsTipoCanalProducao) AS DsTipoCanalProducao
+	,COALESCE(A.CdFilial,B.CdFilial) AS CdFilial
+	,COALESCE(A.DtAtualizacao,B.DtAtualizacao) AS DtAtualizacao
+	,COALESCE(A.TpValor,B.TpValor) AS TpValor
+	,SUM(A.QtNumerador) AS QtNumerador
+	,SUM(A.QtDenominador) AS QtDenominador
+	,SUM(A.VrDenominador) AS VrDenominador
+
+	,SUM(A.VrMedida) AS VrMedida
+	,SUM(A.VrMedidaProj) AS VrMedidaProj
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.QtNumerador
+
+			  WHEN B.NmGrupoProdutoMeta =  'Motos'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtNumerador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtNumerador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar'
+			  THEN B.QtNumerador
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE PESADOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.QtNumerador
+			  ELSE 0
+			  END
+    ) AS QtNumeradorNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.QtDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.QtDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar'
+			  THEN B.QtDenominador
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE PESADOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.QtDenominador
+			  ELSE 0
+			  END
+    ) AS QtDenominadorNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.VrDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados'
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrDenominador
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar' THEN B.VrDenominador
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.VrDenominador
+			  ELSE 0
+			  END
+    ) AS VrDenominadorNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.VrMedida
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos' AND A.NuAnoMes >= 202308
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedida
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados' AND A.NuAnoMes >= 202308
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedida
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes >= 202404
+			  THEN B.VrMedida
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.VrMedida
+			  ELSE 0
+			  END
+    ) AS VrMedidaNI
+
+	,SUM(CASE WHEN /*B.DsLoginN1CartPDV is not null
+				   AND */B.NmGrupoProdutoMeta = 'Leves'
+				   AND B.StVeiculo = 'Usados'
+				   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+              THEN B.VrMedidaProj
+
+			  WHEN B.NmGrupoProdutoMeta = 'Motos' AND A.NuAnoMes >= 202308
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedidaProj
+
+			  WHEN B.NmGrupoProdutoMeta = 'Pesados' AND A.NuAnoMes >= 202308
+			   	   AND B.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS')
+			  THEN B.VrMedidaProj
+
+			  WHEN B.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes >= 202404
+	   	   	  THEN B.VrMedidaProj
+
+			  WHEN A.NmGrupoProdutoMeta NOT IN ('Leves', 'Motos', 'Solar', 'Pesados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo <> 'Usados')
+				   OR (A.NmGrupoProdutoMeta = 'Leves' AND A.StVeiculo = 'Usados' AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS'))
+				   OR (A.NmGrupoProdutoMeta in ('Motos', 'Pesados') AND A.DsTipoCanalProducao not in ('CONCESSIONARIAS','MULTIMARCAS')) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS CANAIS QUE NÃO TEM META NI*/
+				   OR (A.NmGrupoProdutoMeta = 'Motos' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202307 ) /*MARCACAO DA PRODUCAO DE MOTOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Pesados' AND A.DsTipoCanalProducao in ('CONCESSIONARIAS','MULTIMARCAS') AND A.NuAnoMes <= 202412 ) /*MARCACAO DA PRODUCAO DE PESADOS PARA OS DEMAIS MESES*/
+				   OR (A.NmGrupoProdutoMeta = 'Solar' AND A.NuAnoMes <= 202403 ) /*MARCACAO DA PRODUCAO DE SOLAR PARA OS DEMAIS MESES*/
+			  THEN A.VrMedidaProj
+			  ELSE 0
+			  END
+    ) AS VrMedidaProjNI
+
+  FROM
+    TbProducaoSeguros A
+  FULL OUTER JOIN
+    TbProducaoSegurosNI B
+	ON A.NuAnoMes = B.NuAnoMes
+	AND A.CdColaborador = B.CdColaborador
+	AND A.NmColaborador = B.NmColaborador
+	AND A.NmGrupoCargoColaborador = B.NmGrupoCargoColaborador
+	AND A.DsLoginN1 = B.DsLoginN1CartPDV
+	AND A.NmGrupoProdutoMeta = B.NmGrupoProdutoMeta
+	AND A.StVeiculo = B.StVeiculo
+ 	AND A.DsTipoCanalProducao = B.DsTipoCanalProducao
+	AND A.CdFilial = B.CdFilial
+	AND A.DtAtualizacao = B.DtAtualizacao
+	AND A.TpValor = B.TpValor
+
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11;
+RUN;
+
+PROC SQL;
+DELETE FROM BASES.TbProducaoSeguros WHERE (TpValor in ('VrProducaoSeguros_AP', 'VrProducaoSeguros_PlacaSolar', ''));
+QUIT;
+
+PROC SQL;
+DELETE FROM BASES.TbProducaoSeguros WHERE (TpValor = 'VrSegurosAuto' AND NmGrupoProdutoMeta IN ('Solar','Privado','FGTS'));
+QUIT;
+
+PROC SQL;
+DELETE FROM work.TbProducaoSeguros WHERE (TpValor in ('VrPlacaSolar') and NmGrupoProdutoMeta <> 'Solar');
+QUIT;
+
+PROC SQL;
+DELETE FROM work.TbProducaoSeguros WHERE (TpValor in ('VrPlacaSolar') and NuAnoMes < 202501);
+QUIT;

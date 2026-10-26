@@ -1,0 +1,215 @@
+START_METADATA
+PROJECT: Rodas__csat
+FILE_SAS: csat_simulacao_app.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 151
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: dt_max, dt_merge, dt_merge_bq
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BV-PDBD-PRD.DVRY_CLIE_EXPDIGITAL.NAVEGACAO_APPWEB_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: LEADSDIG
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CLIE_EXPDIGITAL.NAVEGACAO_APPWEB_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], LEADSDIG.CSAT_CONTRATACAO_APP [PROC EXPORT - DATA=; PROC SQL - FROM], LEADSDIG.CSAT_SIMULACAO_APP [PROC EXPORT - DATA=; PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): LEADSDIG.CSAT_CONTRATACAO_APP, LEADSDIG.CSAT_SIMULACAO_APP
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): LEADSDIG.CSAT_CONTRATACAO_APP, LEADSDIG.CSAT_SIMULACAO_APP
+APPEND_ONLY_OUTPUTS: LEADSDIG.CSAT_CONTRATACAO_APP, LEADSDIG.CSAT_SIMULACAO_APP
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): LEADSDIG.CSAT_CONTRATACAO_APP, LEADSDIG.CSAT_SIMULACAO_APP
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/csat_contratacao_app.csv, /riscosbvf/BA/processos/output/csat_simulacao_app.csv
+TEMP/DISCARDED OUTPUTS: CONTRATACAO, CSAT, SIMULACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 VALIDVARNAME=ANY;
+OPTIONS COMPRESS=BINARY REUSE=YES;
+%include '/infogrc/utils/all-includes.sas';
+
+proc sql; select max(dt_evento) format date9. into:dt_max from leadsdig.csat_simulacao_app; run;
+proc sql; select max(dt_evento) format date9. into:dt_maxc from leadsdig.csat_contratacao_app; run;
+
+data _null_;
+dt_merge = intnx('day',"&dt_max."d,-5);
+dt_merge_bq  = "'"||put(year(dt_merge),4.)||"-"||put(month(dt_merge),z2.)||"-"||put(day(dt_merge),z2.)||"'";
+
+call symputx('dt_merge_bq',dt_merge_bq);
+call symputx('dt_merge',put(dt_merge, date9.));
+;run;
+
+/*%let dt_merge = '01may2025'd;*/
+/*%let dt_merge_bq = '2025-05-01';*/
+
+%put &dt_merge;
+%put &dt_merge_bq;
+
+proc sql;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage);
+create table csat as
+select * from connection to perm(
+SELECT
+  * EXCEPT(ROW)
+FROM (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY dt_evento, cd_bv, simulacao ORDER BY comentario DESC, pesquisa DESC) ROW
+  FROM (
+    SELECT
+      dt_evento,
+      dm_evento,
+      cd_pseudo_id,
+      cd_bv,
+      COALESCE(simulacao, simulacao2) AS simulacao,
+      COALESCE(pesquisa, pesquisa2) AS pesquisa,
+      COALESCE(comentario, comentario2) AS comentario,
+      origem
+    FROM (
+      SELECT
+        dt_evento,
+        dm_evento,
+        cd_pseudo_id,
+        cd_bv,
+        simulacao,
+        simulacao2,
+        CASE
+          WHEN pesquisa = "Muito insatisfeito" THEN "Péssima"
+          WHEN pesquisa = "Insatisfeito" THEN "Ruim"
+          WHEN pesquisa = "Neutro" THEN "Regular"
+          WHEN pesquisa = "Satisfeito" THEN "Boa"
+          WHEN pesquisa = "Muito satisfeito" THEN "Ótima"
+          ELSE pesquisa
+      END
+        AS pesquisa,
+        CASE
+          WHEN pesquisa2 = "Muito insatisfeito" THEN "Péssima"
+          WHEN pesquisa2 = "Insatisfeito" THEN "Ruim"
+          WHEN pesquisa2 = "Neutro" THEN "Regular"
+          WHEN pesquisa2 = "Satisfeito" THEN "Boa"
+          WHEN pesquisa2 = "Muito satisfeito" THEN "Ótima"
+          ELSE pesquisa2
+      END
+        AS pesquisa2,
+        comentario,
+        comentario2,
+        origem
+      FROM (
+        SELECT
+          DISTINCT dt_evento,
+          dm_evento,
+          cd_pseudo_id,
+          cd_bv,
+          nm_tela,
+          CASE
+            WHEN nm_tela LIKE "%bd|financiamentoVeiculo|contratacao|%" THEN 'contratacao'
+            ELSE 'simulacao'
+        END
+          origem,
+          (
+          SELECT
+            te_parametro_evento
+          FROM
+            UNNEST(ar_parametros_evento)
+          WHERE
+            nm_parametro_evento = "simulationId") AS simulacao,
+          (
+          SELECT
+            te_parametro_evento
+          FROM
+            UNNEST(ar_parametros_evento)
+          WHERE
+            nm_parametro_evento = "simulation_id") AS simulacao2,
+          (
+          SELECT
+            te_parametro_evento
+          FROM
+            UNNEST(ar_parametros_evento)
+          WHERE
+            nm_parametro_evento = "pesquisa_satisfacao") AS pesquisa,
+          (
+          SELECT
+            te_parametro_evento
+          FROM
+            UNNEST(ar_parametros_evento)
+          WHERE
+            nm_parametro_evento = "survey_answer") AS pesquisa2,
+          (
+          SELECT
+            te_parametro_evento
+          FROM
+            UNNEST(ar_parametros_evento)
+          WHERE
+            nm_parametro_evento = "textComments") AS comentario,
+          (
+          SELECT
+            te_parametro_evento
+          FROM
+            UNNEST(ar_parametros_evento)
+          WHERE
+            nm_parametro_evento = "text_comment") AS comentario2
+        FROM
+          `bv-pdbd-prd.dvry_clie_expdigital.navegacao_appweb_fato`
+        WHERE
+          1=1
+          AND dt_particao >= &dt_merge_bq
+          AND tp_plataforma = 'APP'
+          AND nm_evento = 'buttonClick'
+          AND (nm_tela LIKE '%bd|financiamentoVeiculo|contratacao|%'
+            OR nm_tela LIKE '%bd|financiamentoVeiculos|simulador|%') )) ))
+WHERE
+  ROW = 1
+  AND pesquisa IS NOT null
+);
+   disconnect from perm;
+quit;
+
+data contratacao; set csat (where=(origem="contratacao" and dt_evento ne . and (pesquisa ne '' or comentario ne ''))); drop origem;run;
+
+data simulacao; set csat (where=(origem="simulacao" and dt_evento ne . and (pesquisa ne '' or comentario ne ''))); drop origem;run;
+
+/*data leadsdig.csat_contratacao_app; set contratacao; run;*/
+/*data leadsdig.csat_simulacao_app; set simulacao; run;*/
+
+proc sql; delete from leadsdig.csat_simulacao_app where dt_evento >= "&dt_merge."d; run;
+proc sql; insert into leadsdig.csat_simulacao_app select * from simulacao; run;
+
+proc sql; delete from leadsdig.csat_contratacao_app where dt_evento >= "&dt_merge."d; run;
+proc sql; insert into leadsdig.csat_contratacao_app select * from contratacao; run;
+
+PROC EXPORT DATA=leadsdig.csat_simulacao_app
+	FILE="/riscosbvf/BA/processos/output/csat_simulacao_app.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+PROC EXPORT DATA=leadsdig.csat_contratacao_app
+	FILE="/riscosbvf/BA/processos/output/csat_contratacao_app.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

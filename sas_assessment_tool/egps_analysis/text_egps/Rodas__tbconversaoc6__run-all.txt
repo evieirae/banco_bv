@@ -1,0 +1,175 @@
+START_METADATA
+PROJECT: Rodas__tbconversaoc6
+FILE_SAS: run-all.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: html
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), FILENAME  (2x | +24), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 105
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, ODSTEXT, REPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_dur, W_fim, W_ini
+DETECTED_MACROS_USED: DUtil, Mes, W_dur, W_fim, W_ini, safraM0, safraM1, safraM2, safraM3, safraM4, safraM5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/tbconversaoc6/codigo/tbconversaoc6_Tbsimulacao.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/TBCONVERSAOC6/CODIGO/TBCONVERSAOC6_TBSIMULACAO.SAS [SAS/Local], DWBI_DIME.TBDIMTEMPODATA [DBCON], SOLITMP.TBCONVERSAOC6 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: IGELOG
+IMPORTED FILES (Requires Ingestion): /infogrc/tbconversaoc6/codigo/tbconversaoc6_Tbsimulacao.sas
+TABLE_READ_PROVENANCE (Flow): DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], SOLITMP.TBCONVERSAOC6 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/tbconversaoc6/codigo/tbconversaoc6_Tbsimulacao.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): IGELOG.LOGEXECUCAOPROCESSOS
+APPEND_ONLY_OUTPUTS: IGELOG.LOGEXECUCAOPROCESSOS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): IGELOG.LOGEXECUCAOPROCESSOS
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: DATA_ATUALIZA, LOGEXE, TOP10, TOTAIS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/tbconversaoc6/codigo/tbconversaoc6_Tbsimulacao.sas
+
+END_METADATA
+================================================================================
+options validvarname=any;
+options nofmterr;
+
+/* Marcar horário de início da atualização */
+%LET W_ini = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("inf-gerenciais@bv.com.br")
+SUBJECT="Base de conversão C6 | Início da atualização";
+
+DATA _NULL_;
+    FILE MAIL_INI;
+        PUT "Processamento das bases do Funil Comercial iniciado.";
+        PUT "Este processo gerará as seguintes bases:";
+        PUT " - AUXL.TbConversaoC6";
+        PUT " - ConversaoC6_DadosCliente.csv";
+RUN;
+
+/* Execução dos processos */
+%include '/infogrc/tbconversaoc6/codigo/tbconversaoc6_Tbsimulacao.sas';
+
+/* Calcular tempo de processamento total */
+%LET W_fim = %SYSFUNC(datetime());
+%LET W_dur = %SYSFUNC(intck(SECOND, &W_ini, &W_fim), tod8.);
+
+/* Enviar e-mail de finalização da atualização */
+PROC SQL;
+%CONECTADB(server=BI);
+SELECT NuDiaUtilMes, Mes INTO :DUtil,:Mes
+     FROM connection to dbcon (
+  SELECT TOP 1 MONTH(DtTempo) AS Mes, NuDiaUtilMes FROM DWBI_DIME.TbDimTempoData
+  WHERE DtTempo <= TODAY() AND NuDiaUtilMes > 0
+  ORDER BY DtTempo DESC
+);
+RUN;
+
+PROC SQL OUTOBS=10;
+CREATE TABLE TOP10 AS
+  SELECT Banco, COUNT(DISTINCT NuCpfCnpj) AS Qtd FROM SOLITMP.TbConversaoC6
+  WHERE NuAnoMes = (CASE WHEN MONTH(TODAY()) <> &Mes. OR &DUtil < 2 THEN &safraM1. ELSE &safraM0. END)
+  GROUP BY Banco
+  ORDER BY calculated Qtd DESC;
+RUN;
+
+PROC SQL;
+CREATE TABLE TOTAIS AS
+  SELECT
+    COUNT(DISTINCT (CASE WHEN NuAnoMes = &safraM5. THEN NuCpfCnpj END)) AS "&safraM5."n,
+    COUNT(DISTINCT (CASE WHEN NuAnoMes = &safraM4. THEN NuCpfCnpj END)) AS "&safraM4."n,
+    COUNT(DISTINCT (CASE WHEN NuAnoMes = &safraM3. THEN NuCpfCnpj END)) AS "&safraM3."n,
+    COUNT(DISTINCT (CASE WHEN NuAnoMes = &safraM2. THEN NuCpfCnpj END)) AS "&safraM2."n,
+    COUNT(DISTINCT (CASE WHEN NuAnoMes = &safraM1. THEN NuCpfCnpj END)) AS "&safraM1."n,
+    COUNT(DISTINCT (CASE WHEN NuAnoMes = &safraM0. THEN NuCpfCnpj END)) AS "&safraM0."n
+  FROM
+    SOLITMP.TbConversaoC6;
+RUN;
+
+PROC SQL;
+CREATE TABLE DATA_ATUALIZA AS
+  SELECT
+    CASE WHEN B.Banco IS NULL THEN 'OUTROS' ELSE UPPER(A.Banco) END AS Banco,
+    COUNT(DISTINCT (CASE WHEN A.NuAnoMes = &safraM5. THEN A.NuCpfCnpj END)) / MIN(C."&safraM5."n) AS "&safraM5."n FORMAT=PERCENT10.1,
+    COUNT(DISTINCT (CASE WHEN A.NuAnoMes = &safraM4. THEN A.NuCpfCnpj END)) / MIN(C."&safraM4."n) AS "&safraM4."n FORMAT=PERCENT10.1,
+    COUNT(DISTINCT (CASE WHEN A.NuAnoMes = &safraM3. THEN A.NuCpfCnpj END)) / MIN(C."&safraM3."n) AS "&safraM3."n FORMAT=PERCENT10.1,
+    COUNT(DISTINCT (CASE WHEN A.NuAnoMes = &safraM2. THEN A.NuCpfCnpj END)) / MIN(C."&safraM2."n) AS "&safraM2."n FORMAT=PERCENT10.1,
+    COUNT(DISTINCT (CASE WHEN A.NuAnoMes = &safraM1. THEN A.NuCpfCnpj END)) / MIN(C."&safraM1."n) AS "&safraM1."n FORMAT=PERCENT10.1,
+    COUNT(DISTINCT (CASE WHEN A.NuAnoMes = &safraM0. THEN A.NuCpfCnpj END)) / MIN(C."&safraM0."n) AS "&safraM0."n FORMAT=PERCENT10.1
+  FROM
+    SOLITMP.TbConversaoC6 A
+  LEFT JOIN
+    TOP10 B ON A.Banco = B.Banco
+  LEFT JOIN
+    TOTAIS C ON 1=1
+  GROUP BY
+    1
+  ORDER BY
+    (CASE WHEN MONTH(TODAY()) <> &Mes. OR &DUtil < 2 THEN calculated "&safraM1."n ELSE calculated "&safraM0."n END) DESC;
+RUN;
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("inf-gerenciais@bv.com.br")
+    TYPE="text/html"
+    SUBJECT="Base de conversão C6 | Fim da atualização";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+PROC REPORT DATA=DATA_ATUALIZA nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 9pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 9pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 9pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS Banco "&safraM5."n "&safraM4."n "&safraM3."n "&safraM2."n "&safraM1."n "&safraM0."n;
+RUN;
+
+PROC ODSTEXT;
+   p "Prezados,";
+   p "";
+   p "As bases de Conversão C6 foram atualizadas.";
+   p "A geração das bases demorou &W_dur. para ser concluída.";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+
+DATA LOGEXE;
+  IdProcesso = 'TBCONVC6';
+  LENGTH Processo $40.;
+  Processo = 'Conversão C6';
+  FORMAT Inicio Final DATETIME18.;
+  Inicio = &W_ini.;
+  Final = &W_fim.;
+  Duracao = "&W_dur.";
+RUN;
+
+PROC APPEND DATA=LOGEXE BASE=IGELOG.LogExecucaoProcessos; RUN;

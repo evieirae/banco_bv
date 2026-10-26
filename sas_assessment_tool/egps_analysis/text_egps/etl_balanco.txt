@@ -1,0 +1,834 @@
+START_METADATA
+PROJECT: SAS_UC4__etl_balanco
+FILE_SAS: etl_balanco.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:53 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -28
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20), PROC DATASETS (1x | +20), ARRAY (1x | +15), RETAIN (1x | +10), PROC TRANSPOSE (1x | +10), %MACRO (4x | +20)
+----------------------------------------
+LINES_OF_CODE: 652
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (10x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: MIDDLE = /projetos/ctrcredito/modelos/historico/balanco
+DETECTED_MACROS_DEFINED: LISTA
+DETECTED_MACROS_USED: AGRUP, LISTA, agrup, conex_moncred, dt_fim, dt_ini, dtbase, dtbasem1, dtbasem2
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: AGRUP
+CONNECTION_LIBS: SYBASE
+INCLUDED SCRIPTS (Dependencies): /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/CTRCREDITO/MODELOS/SCRIPTS/MONTA_CONEXAO.SAS [SAS/Local], DBO.TBCOMPOSICAOCLIENTEMONITOR [SYBASE], DBO.TBCONTACONTABILMONITOR [SYBASE], DBO.TBDEMONSTRATIVOCONTABILMONITOR [SYBASE], DBO.TBDEMONSTRATIVOCONTAMONITOR [SYBASE], DBO.TBPESSOAMONITORAVEL [SYBASE]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: MIDDLE
+IMPORTED FILES (Requires Ingestion): /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+TABLE_READ_PROVENANCE (Flow): DBO.TBCOMPOSICAOCLIENTEMONITOR [Pass-Through Native (SYBASE) - JOIN], DBO.TBCONTACONTABILMONITOR [Pass-Through Native (SYBASE) - FROM], DBO.TBDEMONSTRATIVOCONTABILMONITOR [Pass-Through Native (SYBASE) - FROM], DBO.TBDEMONSTRATIVOCONTAMONITOR [Pass-Through Native (SYBASE) - JOIN], DBO.TBPESSOAMONITORAVEL [Pass-Through Native (SYBASE) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): MIDDLE.TOT_BAL_&AGRUP._&DTBASE
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE0, BASE1_&AGRUP, BASE2_&AGRUP, BASE_COMPLETA, BASE_TRANSP1_1&AGRUP, BASE_TRANSP2_&AGRUP, BASE_TRANSP2_1, BASE_TRANSP2_2, BASE_TRANSP2_3, BASE_TRANSP2_4, BASE_TRANSP2_5, BASE_TRANSP3, BASE_TRANSP_&AGRUP, TBCONTACONTABILMONITOR, TBPESSOAMONITORAVEL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+
+END_METADATA
+================================================================================
+/* LIBNAMES - DESENV */
+
+%include '/projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas';
+
+/* Saida */
+LIBNAME MIDDLE '/projetos/ctrcredito/modelos/historico/balanco';
+
+options symbolgen;
+options validvarname=any;
+
+%put &conex_moncred.;
+
+/************* PARAMETRIZAÇÃO AUTOMATICA - NÃO ALTERAR DADOS ***********/
+/* Parametrização das safras a serem executudas */
+DATA _NULL_;
+	dt=today();
+	dt_Inicio=intnx('month',dt,-1);
+
+	/*Datas abaixo são fixas em relação ao dt_Inicio não alterar dados*/
+	dt_ant=intnx('month',dt_inicio,-1);
+	dt_ant2=intnx('month',dt_inicio,-2);
+
+	dt_fim=intnx('month',dt_Inicio,0,'end');
+	dt_ini=intnx('month',dt_Inicio,0);
+
+	dtbase=year(dt_inicio)*100 + month(dt_inicio);
+	dtbasem1=year(dt_ant)*100 + month(dt_ant);
+	dtbasem2=year(dt_ant2)*100 + month(dt_ant2);
+
+	call symput('dt_ini',cats("'",put(dt_ini  ,date9.),"'"));
+	call symput('dt_fim',cats("'",put(dt_fim  ,date9.),"'"));
+	call symput('dtbase',put(dtbase,6.));
+	call symput('dtbasem1',put(dtbasem1,6.));
+	call symput('dtbasem2',put(dtbasem2,6.));
+
+	format dt dt_Inicio date9.;
+	format dt dt_fim  date9.;
+	format dt dt_ini  date9.;
+RUN;
+
+%put ############ dt_ini=&dt_ini;
+%put ############ dt_fim=&dt_fim;
+%put ############ dtbasem1=&dtbasem1;
+%put ############ dtbase=&dtbase;
+%put ############ dtbasem2=&dtbasem2;
+
+/***********************************************************************************/
+/******************************** INICIO DO PROGRAMA *******************************/
+/***********************************************************************************/
+
+PROC SQL NOPRINT;
+	CONNECT TO SYBASE (&conex_moncred.);
+	CREATE TABLE BASE_COMPLETA AS SELECT  * FROM CONNECTION TO SYBASE
+	(
+	          SELECT DISTINCT
+	                t1.*,
+	                t2.VrConta,
+	                t2.VrContaPlanilhamento,
+	                t2.CdContaContabilMonitor,
+					t3.CdPessoaMonitoravel,
+				    t3.FlControlador
+
+	          FROM dbo.TbDemonstrativoContabilMonitor AS t1
+	                INNER JOIN dbo.TbDemonstrativoContaMonitor AS t2
+	                ON (t1.CdDemonstrativoContabilMonitor=t2.CdDemonstrativoContabilMonitor)
+				LEFT JOIN dbo.TbComposicaoClienteMonitor AS t3
+					ON (t1.CdDemonstrativoContabilMonitor=t3.CdDemonstrativoContabilMonitor)
+			  WHERE DTCADASTRO <= &dt_fim.
+	); disconnect from sybase;
+QUIT;
+
+PROC SQL NOPRINT;
+	CONNECT TO SYBASE (&conex_moncred.);
+	CREATE TABLE TbContaContabilMonitor AS SELECT  * FROM CONNECTION TO SYBASE
+    (
+			SELECT	NuConta,
+					DsConta,
+					CdContaContabilMonitor
+			FROM dbo.TbContaContabilMonitor
+	); disconnect from sybase;
+QUIT;
+
+PROC SQL NOPRINT;
+	CONNECT TO SYBASE (&conex_moncred.);
+	CREATE TABLE TbPessoaMonitoravel AS SELECT  * FROM CONNECTION TO SYBASE
+    (
+		    SELECT 	CdPessoa,
+					NuCpfCnpjRaiz,
+					NuCpfCnpjComplemento,
+					NmPessoaMonitoravel,
+					CdGrupoEconomico,
+					CdPessoaMonitoravel
+			FROM dbo.TbPessoaMonitoravel
+	);disconnect from sybase;
+QUIT;
+
+PROC SQL;
+CREATE TABLE BASE0  AS SELECT
+t1.*,
+(CASE WHEN CdAgrupamentoDemonstrativoMntr=1 THEN "NORM"
+      WHEN CdAgrupamentoDemonstrativoMntr=2 THEN "CONS"
+      WHEN CdAgrupamentoDemonstrativoMntr=3 THEN "COMB" END) AS AgrupamentoDemonstrativoMntr,
+
+(CASE WHEN CdSegmentoMercado=2 THEN "MID"
+      WHEN CdSegmentoMercado=3 OR CdSegmentoMercado=4 THEN "CORP" END) AS SegmentoMercado,
+
+(CASE WHEN CdTipoDemonstrativo=1 THEN "Balanço"
+      WHEN CdTipoDemonstrativo=2 THEN "Balancete" END) AS TipoDemonstrativo,
+
+(CASE WHEN CdOrigemDemonstrativo=1 THEN "Serasa"
+      WHEN CdOrigemDemonstrativo=2 THEN "Serasa Alterado"
+      WHEN CdOrigemDemonstrativo=3 THEN "BV" END) AS OrigemDemonstrativo
+
+FROM BASE_COMPLETA AS t1;
+
+QUIT;
+
+%MACRO AGRUP(AGRUP);
+
+	%Macro MM ();
+	%Mend MM;
+
+	PROC SQL NOPRINT;
+		CREATE TABLE BASE1_&AGRUP AS
+			SELECT		t1.CdPessoaMonitoravel,
+						t1.CdContaContabilMonitor,
+						t1.DtDemonstrativo,
+						t1.DtCadastro,
+						t1.FlFinalizado,
+						t1.FlPlanilhamento,
+						t1.TpMoeda,
+						t1.SegmentoMercado,
+						t1.TipoDemonstrativo,
+						t1.OrigemDemonstrativo,
+						t1.AgrupamentoDemonstrativoMntr,
+						t1.CdMoeda,
+						t1.VrConta,
+						t2.NuConta,
+						t2.DsConta
+
+						FROM BASE0 AS t1
+ 			INNER JOIN TbContaContabilMonitor AS t2 ON
+                        (t1.CdContaContabilMonitor=t2.CdContaContabilMonitor)
+             WHERE  AgrupamentoDemonstrativoMntr="&AGRUP." ;
+
+	QUIT;
+
+	PROC SORT DATA=BASE1_&AGRUP.;
+		BY	CdPessoaMonitoravel
+			DtDemonstrativo
+			DtCadastro
+			AgrupamentoDemonstrativoMntr
+			CdContaContabilMonitor
+			CdMoeda
+			OrigemDemonstrativo
+			SegmentoMercado
+			TipoDemonstrativo
+			FlFinalizado
+			FlPlanilhamento
+			TpMoeda;
+	RUN;
+
+	DATA BASE2_&AGRUP.;
+		SET  BASE1_&AGRUP.;
+		Conta=CATS(NuConta,'_',DsConta);
+	RUN;
+
+	PROC TRANSPOSE DATA= BASE2_&AGRUP.
+		OUT= BASE_TRANSP_&AGRUP. (DROP= _NAME_ _LABEL_);
+		BY	CdPessoaMonitoravel
+			DtDemonstrativo
+			DtCadastro
+			AgrupamentoDemonstrativoMntr
+			CdContaContabilMonitor
+			CdMoeda
+			OrigemDemonstrativo
+			SegmentoMercado
+			TipoDemonstrativo
+			FlFinalizado
+			FlPlanilhamento
+			TpMoeda;
+		VAR VrConta;
+		ID Conta;
+	RUN;
+
+	PROC SQL NOPRINT;
+		CREATE TABLE BASE_TRANSP1_1&AGRUP. AS
+			SELECT 	t1.*,
+					t2.CdPessoa,
+					t2.NuCpfCnpjRaiz,
+					t2.NuCpfCnpjComplemento,
+					t2.NmPessoaMonitoravel,
+					t2.CdGrupoEconomico
+			FROM BASE_TRANSP_&AGRUP. AS t1
+
+				LEFT JOIN TbPessoaMonitoravel   AS t2
+				ON (t1.CdPessoaMonitoravel=t2.CdPessoaMonitoravel);
+	QUIT;
+
+	   DATA  BASE_TRANSP1_1&AGRUP.;
+		SET  BASE_TRANSP1_1&AGRUP.;
+
+			CNPJ=INPUT(NuCpfCnpjRaiz, 8.);
+			FORMAT CNPJ BEST8.;
+			FORMAT DtDemonstrativo DATETIME16.;
+			FORMAT DtCadastro DATETIME16.;
+	RUN;
+
+%MEND;
+
+%AGRUP(NORM);
+%AGRUP(CONS);
+%AGRUP(COMB);
+
+/***********************************************************************************/
+/*************************** INICIO DA MACRO BASE_UNICA ***************************/
+
+%MACRO BASE_UNICA(AGRUP);
+	%Macro MM (); %Mend MM ;
+
+	PROC SQL;
+		CREATE TABLE BASE_TRANSP2_&agrup. AS
+			SELECT DISTINCT
+					CdPessoaMonitoravel,
+          DtDemonstrativo,
+		  DtCadastro,
+          OrigemDemonstrativo,
+		  SegmentoMercado,
+          CdPessoa,
+          CdGrupoEconomico,
+		  CNPJ,
+          NuCpfCnpjRaiz,
+          NuCpfCnpjComplemento,
+          NmPessoaMonitoravel,
+          AgrupamentoDemonstrativoMntr,
+          CdMoeda,
+          TipoDemonstrativo,
+          FlFinalizado,
+          FlPlanilhamento,
+          TpMoeda,
+
+          (COALESCE(SUM('1010199999999_Disponivel'n),
+               SUM('1010199999999_Caixa e Equivalent'n))) FORMAT=20.2 AS 'AC_Disponivel'n,
+          (SUM('1010399999999_Contas a Receber -'n)) FORMAT=20.2 AS 'cl_Clientes'n,
+          (SUM('1010499999999_( - ) Provisao Dev'n)) FORMAT=20.2 AS 'cl_PDD'n,
+          (SUM('1010399999999_Clientes(-PDD)'n)) FORMAT=20.2 AS 'AC_Clientes(-PDD)'n,
+
+          (COALESCE(SUM('1010699999999_Adto. Fornecedores'n),
+               SUM('1010699999999_Adiantamento'n))) FORMAT=20.2 AS 'AC_Adto. Fornecedores'n,
+          (SUM('1010799999999_Impostos a Recuper'n)) FORMAT=20.2 AS 'AC_Impostos a Recuperar'n,
+          (SUM('1010899999999_Estoques'n)) FORMAT=20.2 AS 'AC_Estoques'n,
+          (SUM('1010900000000_IR e CS Diferido'n)) FORMAT=20.2 AS 'AC_IR e CS Diferido'n,
+          (COALESCE(SUM('1010999999999_Partes Relacionada'n),
+               SUM('1011099999999_Partes Relacionada'n))) FORMAT=20.2 AS 'AC_Partes Relacionadas'n,
+          (COALESCE(SUM('1011099999999_Outros Creditos Op'n),
+               SUM('1010999999999_Outros Créditos Op'n),
+               SUM('1010999999999_Outros Creditos Op'n))) FORMAT=20.2 AS 'AC_Outros Créditos Op.'n,
+          (SUM('1011299999999_Despesas Antecipad'n)) FORMAT=20.2 AS 'AC_Despesas Antecipadas'n,
+          (COALESCE(SUM('1011399999999_Outros Créditos Nã'n),
+               SUM('1011399999999_Outros Creditos Na'n))) FORMAT=20.2 AS 'AC_Outros Créditos Não Op.'n,
+
+          (COALESCE(SUM('1020199999999_Clientes L.P.'n),
+               SUM('1020299999999_Contas a Receber -'n))) FORMAT=20.2 AS 'rlp_Contas a Receber'n,
+          (COALESCE(SUM('1020299999999_Aplicacoes Finance'n),
+               SUM('1020199999999_Titulos e Valores'n))) FORMAT=20.2 AS 'rlp_Titulos e Valores'n,
+          (COALESCE(SUM('1020399999999_Impostos a Recuper'n),
+               SUM('1020599999999_Imposto de Renda e'n))) FORMAT=20.2 AS 'rlp_Imp. Renda e Cont. Soc. Dif'n,
+          (SUM('1020499999999_Partes Relacionada'n)) FORMAT=20.2 AS 'rlp_Partes Relacionadas'n,
+          (COALESCE(SUM('1020599999999_Deposito / Caucoes'n),
+               SUM('1020399999999_Depositos Judiciai'n))) FORMAT=20.2 AS 'rlp_Depositos Judiciais'n,
+          (COALESCE(SUM('1020699999999_Outros Creditos Op'n),
+               SUM('1020699999999_Outros Creditos a'n))) FORMAT=20.2 AS 'rlp_Outros Créditos Op.'n,
+          (SUM('1021699999999_Outros Creditos Na'n)) FORMAT=20.2 AS 'rlp_Outros Créditos Não Op.'n,
+
+          (COALESCE(SUM('1030199999999_Part. Controladas'n),
+               SUM('1040199999999_Participacao Sdes.'n))) FORMAT=20.2 AS 'i_Participações'n,
+          (COALESCE(SUM('1030599999999_Outros Investiment'n),
+               SUM('1040299999999_Outros Investiment'n))) FORMAT=20.2 AS 'i_Outros Investimentos'n,
+
+          (SUM('1040199999999_Imobilizado'n)) FORMAT=20.2 AS 'il_Imobilizado'n,
+          (SUM('1040299999999_(-) Depreciacao Ac'n)) FORMAT=20.2 AS 'il_(-) Depreciação Acumulada'n,
+          (SUM('1030399999999_Outro Imobilizado'n)) FORMAT=20.2 AS 'il_Outro Imobilizado'n,
+          (SUM('1030499999999_Imobilizado em and'n)) FORMAT=20.2 AS 'il_Imobilizado em andamento'n,
+          (SUM('1030599999999_( - ) Amortizacao'n)) FORMAT=20.2 AS 'il_(-) Amortização Acum.'n,
+
+          (SUM('1050299999999_Diferido'n)) FORMAT=20.2 AS 'dl_Diferido'n,
+          (SUM('1051299999999_( - ) Amortizacao'n)) FORMAT=20.2 AS 'dl_( - ) Amortização Acumulada'n,
+
+          (SUM('1050199999999_Goodwill'n)) FORMAT=20.2 AS 'AP_Goodwill'n,
+          (SUM('1050399999999_Intangivel'n)) FORMAT=20.2 AS 'AP_Intangivel'n,
+
+          (COALESCE(SUM('1030599999999_( - ) Amortizacao'n),
+           SUM('1051299999999_( - ) Amortizacao'n))) FORMAT=20.2 AS 'Amortização Acumulada'n,
+          (SUM('2000000009999_Bancos C.P.'n)) FORMAT=20.2 AS 'PC_Bancos C.P.'n,
+          (SUM('2000001999995_Duplicatas Descont'n)) FORMAT=20.2 AS 'PC_Duplicatas Descontadas C.P.'n,
+          (SUM('2000000019999_+ Financiamento Ba'n)) FORMAT=20.2 AS 'efcp_+ Financiamento Bancário'n,
+          (SUM('2000000039999_+ Debentures'n)) FORMAT=20.2 AS 'efcp_+ Debêntures'n,
+          (SUM('2000001999999_Fornecedores'n)) FORMAT=20.2 AS 'PC_Fornecedores'n,
+          (SUM('2000002999999_Impostos e Obrigac'n)) FORMAT=20.2 AS 'PC_Imp. e Obrig. Soc.'n,
+          (SUM('2000002999999_Obrigacoes Sociais'n)) FORMAT=20.2 AS 'PC_Obrigações Sociais'n,
+          (SUM('2000003000000_Impostos a Pagar'n)) FORMAT=20.2 AS 'PC_Impostos a pagar'n,
+          (COALESCE(SUM('2000003999999_Adto. Clientes'n),
+                SUM('2000003999999_Adiantamento de Cl'n))) FORMAT=20.2 AS 'PC_Adto. Clientes'n,
+          (COALESCE(SUM('2000004999999_Partes Relacionada'n),
+                SUM('2000005999999_Partes Relacionada'n))) FORMAT=20.2 AS 'PC_Partes Relacionadas'n,
+          (COALESCE(SUM('2000005999999_Outras Obrigacoes'n),
+                SUM('2000004999999_Outras Obrigacoes'n))) FORMAT=20.2 AS 'PC_Outras Obrigações Op.'n,
+          (SUM('2000006999999_Outras Obrigacoes'n)) FORMAT=20.2 AS 'PC_Outras Obrig. Não Op.'n,
+          (SUM('2000006999999_Provisoes'n)) FORMAT=20.2 AS 'PC_Provisões'n,
+          (SUM('2000007999999_Credores Diversos'n)) FORMAT=20.2 AS 'PC_Credores Diversos'n,
+
+          (SUM('2000100999999_Bancos L.P.'n)) FORMAT=20.2 AS 'elp_Bancos L.P.'n,
+          (SUM('2000101999990_Duplicatas Descont'n)) FORMAT=20.2 AS 'elp_Duplicatas Descontadas L.P'n,
+          (SUM('2000100009999_+ Debentures'n)) FORMAT=20.2 AS 'eflp_+ Debêntures'n,
+          (SUM('2000100019999_Financiamento Banc'n)) FORMAT=20.2 AS 'eflp_+ Financiamento Bancário'n,
+          (SUM('2000101999995_Fornecedores de L.'n)) FORMAT=20.2 AS 'elp_Fornecedores de L.P.'n,
+          (COALESCE(SUM('2000101999996_Adto. Clientes L.P'n),
+                SUM('2000103999999_Adiantamento de Cl'n))) FORMAT=20.2 AS 'elp_Adiantamento de Clientes'n,
+          (COALESCE(SUM('2000101999997_Impostos Parcelado'n),
+                SUM('2000102999999_Impostos Parcelado'n))) FORMAT=20.2 AS 'elp_Impostos Parcelados'n,
+          (SUM('2000101999999_Partes Relacionada'n)) FORMAT=20.2 AS 'elp_Partes Relacionadas'n,
+          (COALESCE(SUM('2000104999999_Outras Obrigacoes'n),
+                SUM('2000106999999_Outras Obrigacoes'n))) FORMAT=20.2 AS 'elp_Outras Obrigações lp'n,
+          (SUM('2000104999999_I. R. / Contribuic'n)) FORMAT=20.2 AS 'elp_I. R. / Contrib. Diferidos'n,
+          (SUM('2000105999999_Provisoes'n)) FORMAT=20.2 AS 'elp_Provisões'n,
+
+          (SUM('2019999999999_RESULTADO EXERCICI'n)) FORMAT=20.2 AS 'RESULTADO EXERCÍCIOS FUTUROS'n,
+          (SUM('2029999999999_PARTICIPACOES MINO'n)) FORMAT=20.2 AS 'PARTICIPAÇÕES MINORITARIAS'n,
+          (SUM('2030099999999_Capital Social'n)) FORMAT=20.2 AS 'PL_Capital Social'n,
+          (COALESCE(SUM('2030199999999_Reservas'n),
+                SUM('2030199999999_Reservas de Capita'n))) FORMAT=20.2 AS 'PL_Reservas'n,
+          (SUM('2030699999999_Outras Reservas'n)) FORMAT=20.2 AS 'PL_Outras Reservas'n,
+          (COALESCE(SUM('2030799999999_Lucros / Prejuizos'n),
+                SUM('2030799999999_Lucros (Prejuizos)'n))) FORMAT=20.2 AS 'PL_Lucros / Prejuizos Acumulados'n,
+
+          (SUM('2999999999999_Total Ativo - Tota'n)) FORMAT=20.2 AS 'Total Ativo - Total Passivo'n,
+
+          (SUM('3000000000000_Venda / Receita Op'n)) FORMAT=20.2 AS 'RB_Venda/Receita Op. Bruta'n,
+          (SUM('3000000000001_Receita de Vendas'n)) FORMAT=20.2 AS 'vrob_Receita de Vendas'n,
+          (SUM('3000000000003_Prestacoes de Serv'n)) FORMAT=20.2 AS 'vrob_Prestações de Serviços'n,
+          (COALESCE(SUM('3000000000005_(-) Impostos /  De'n),
+                SUM('3000000000005_(-) Deducoes da Re'n))) FORMAT=20.2 AS 'RB_(-) Imp./Dev. S/ Rec. Op. Br.'n,
+          (SUM('3000000000299_(-) Custos dos Pro'n)) FORMAT=20.2 AS '(-)Cust. Prod. Vendidos'n,
+          (SUM('3000000000101_CMV / CPV'n)) FORMAT=20.2 AS 'RB_CMV / CPV'n,
+          (SUM('3000000000104_Custos dos Produto'n)) FORMAT=20.2 AS 'RB_Custos Prod./Merc. Vendidas'n,
+
+          (COALESCE(SUM('3000000019999_Despesas de Vendas'n),
+                SUM('3000000019999_(-) Despesas de Ve'n))) FORMAT=20.2 AS 'ra_Despesas de Vendas'n,
+          (COALESCE(SUM('3000000020099_Despesas Gerais e'n),
+                SUM('3000000020099_(-) Despesas Gerai'n))) FORMAT=20.2 AS 'ra_Despesas Gerais e Adm.'n,
+          (COALESCE(SUM('3000000039999_Outras Receitas/De'n),
+                SUM('3000000039999_Outras Receitas (D'n))) FORMAT=20.2 AS 'ra_Outras Rec./Desp. Op.'n,
+
+          (COALESCE(SUM('3000001019999_Despesas Financeir'n),
+                SUM('3000001019999_(-) Despesas finan'n))) FORMAT=20.2 AS 'rfl_Despesas Financeiras'n,
+          (COALESCE(SUM('3000001029999_Receitas Financeir'n),
+                SUM('3000001019999_(-) Despesas finan'n))) FORMAT=20.2 AS 'rfl_Receitas Financeiras'n,
+          (COALESCE(SUM('3000001039999_Variacao Cambial A'n),
+                SUM('3000001039999_Variacao Cambial A'n))) FORMAT=20.2 AS 'rfl_Variação Cambial Ativa'n,
+          (COALESCE(SUM('3000001049999_Variacao Cambial P'n),
+                SUM('3000001049999_(-) Variacao Cambi'n))) FORMAT=20.2 AS 'rfl_Variação Cambial Passiva'n,
+
+          (SUM('3000100999999_Dividendos Recebid'n)) FORMAT=20.2 AS 'RNO_Dividendos Recebidos'n,
+          (SUM('3000101999999_Resultado de Equiv'n)) FORMAT=20.2 AS 'RNO_Resultado de Equiv. Pat.'n,
+          (COALESCE(SUM('3000102999999_Receitas/(Despesas'n),
+                SUM('3000102999999_Receitas (Despesas'n))) FORMAT=20.2 AS 'RNO_Receitas/(Despesas) Não Op.'n,
+          (SUM('3000103999999_(-) Despesas nao o'n)) FORMAT=20.2 AS 'RNO_Despesas não operacionais'n,
+
+          (SUM('3019999999999_Imposto de Renda'n)) FORMAT=20.2 AS 'LPE_Imposto de Renda'n,
+          (SUM('3029999999999_Contribuicao Socia'n)) FORMAT=20.2 AS 'LPE_Contrib. Social Sobre Lucro'n,
+          (SUM('3019999999999_(-) IR e CSSLL Cor'n)) FORMAT=20.2 AS 'LPE_(-) IR e CSSLL Corrente'n,
+          (SUM('3029999999999_IR e CSSLL Diferid'n)) FORMAT=20.2 AS 'LPE_IR e CSSLL Diferido'n,
+          (COALESCE(SUM('3039999999999_Participacoes/ Con'n),
+                SUM('3039999999999_(-) Participacao d'n))) FORMAT=20.2 AS 'LPE_Particip./ Contr.Estatutar.'n,
+          (SUM('3049999999999_Reversao Juros s/'n)) FORMAT=20.2 AS 'LPE_Rever. Juros s/ Cap. Próp.'n,
+
+          MONTH(DATEPART(DtDemonstrativo)) AS  'Quantidade de Meses - Período'n,
+          (COALESCE(SUM('6012345678901_Depreciacao (Infor'n),
+                SUM('6012345678901_Depreciacao (Valid'n))) FORMAT=20.2 AS 'Depreciação (Informado)'n
+
+      FROM BASE_TRANSP1_1&AGRUP.
+	        GROUP BY CdPessoaMonitoravel, DtDemonstrativo, DtCadastro, OrigemDemonstrativo;
+QUIT;
+
+%LET LISTA= 'AC_Disponivel'n
+'cl_Clientes'n
+'cl_PDD'n
+'AC_Clientes(-PDD)'n
+'AC_Adto. Fornecedores'n
+'AC_Impostos a Recuperar'n
+'AC_Estoques'n
+'AC_IR e CS Diferido'n
+'AC_Partes Relacionadas'n
+'AC_Outros Créditos Op.'n
+'AC_Despesas Antecipadas'n
+'AC_Outros Créditos Não Op.'n
+'rlp_Contas a Receber'n
+'rlp_Titulos e Valores'n
+'rlp_Imp. Renda e Cont. Soc. Dif'n
+'rlp_Partes Relacionadas'n
+'rlp_Depositos Judiciais'n
+'rlp_Outros Créditos Op.'n
+'rlp_Outros Créditos Não Op.'n
+'i_Participações'n
+'i_Outros Investimentos'n
+'il_Imobilizado'n
+'il_(-) Depreciação Acumulada'n
+'il_Outro Imobilizado'n
+'il_Imobilizado em andamento'n
+'il_(-) Amortização Acum.'n
+'dl_Diferido'n
+'dl_( - ) Amortização Acumulada'n
+'AP_Goodwill'n
+'AP_Intangivel'n
+'Amortização Acumulada'n
+'PC_Bancos C.P.'n
+'PC_Duplicatas Descontadas C.P.'n
+'efcp_+ Financiamento Bancário'n
+'efcp_+ Debêntures'n
+'PC_Fornecedores'n
+'PC_Imp. e Obrig. Soc.'n
+'PC_Obrigações Sociais'n
+'PC_Impostos a pagar'n
+'PC_Adto. Clientes'n
+'PC_Partes Relacionadas'n
+'PC_Outras Obrigações Op.'n
+'PC_Outras Obrig. Não Op.'n
+'PC_Provisões'n
+'PC_Credores Diversos'n
+'elp_Bancos L.P.'n
+'elp_Duplicatas Descontadas L.P'n
+'eflp_+ Debêntures'n
+'eflp_+ Financiamento Bancário'n
+'elp_Fornecedores de L.P.'n
+'elp_Adiantamento de Clientes'n
+'elp_Impostos Parcelados'n
+'elp_Partes Relacionadas'n
+'elp_Outras Obrigações Op.'n
+'elp_Outras Obrigações lp'n
+'elp_I. R. / Contrib. Diferidos'n
+'elp_Provisões'n
+'RESULTADO EXERCÍCIOS FUTUROS'n
+'PARTICIPAÇÕES MINORITARIAS'n
+'PL_Capital Social'n
+'PL_Reservas'n
+'PL_Outras Reservas'n
+'PL_Lucros / Prejuizos Acumulados'n
+'Total Ativo - Total Passivo'n
+'RB_Venda/Receita Op. Bruta'n
+'vrob_Receita de Vendas'n
+'vrob_Prestações de Serviços'n
+'RB_(-) Imp./Dev. S/ Rec. Op. Br.'n
+'(-)Cust. Prod. Vendidos'n
+'RB_CMV / CPV'n
+'RB_Custos Prod./Merc. Vendidas'n
+'ra_Despesas de Vendas'n
+'ra_Despesas Gerais e Adm.'n
+'ra_Outras Rec./Desp. Op.'n
+'rfl_Despesas Financeiras'n
+'rfl_Receitas Financeiras'n
+'rfl_Variação Cambial Ativa'n
+'rfl_Variação Cambial Passiva'n
+'RNO_Dividendos Recebidos'n
+'RNO_Resultado de Equiv. Pat.'n
+'RNO_Receitas/(Despesas) Não Op.'n
+'RNO_Despesas não operacionais'n
+'LPE_Imposto de Renda'n
+'LPE_Contrib. Social Sobre Lucro'n
+'LPE_(-) IR e CSSLL Corrente'n
+'LPE_IR e CSSLL Diferido'n
+'LPE_Particip./ Contr.Estatutar.'n
+'LPE_Rever. Juros s/ Cap. Próp.'n
+'Quantidade de Meses - Período'n
+'Depreciação (Informado)'n;
+
+DATA BASE_TRANSP2_&agrup. (DROP=i);
+		SET BASE_TRANSP2_&agrup.;
+		ARRAY V(*) &LISTA;
+		DO i=1 to 90;
+		IF V(i)=. THEN V(i)=0;
+		END;
+RUN;
+
+DATA BASE_TRANSP2_1;
+SET BASE_TRANSP2_&agrup.;
+
+if 'AC_Clientes(-PDD)'n = 0 then 'AC_Clientes(-PDD)'n = ('cl_Clientes'n - 'cl_PDD'n);
+
+'AC_Outros Créditos'n = ('AC_Outros Créditos Op.'n + 'AC_IR e CS Diferido'n +
+'AC_Despesas Antecipadas'n + 'AC_Outros Créditos Não Op.'n);
+
+'ATIVO CIRCULANTE'n = ('AC_Disponivel'n + 'AC_Clientes(-PDD)'n +
+'AC_Adto. Fornecedores'n + 'AC_Impostos a Recuperar'n + 'AC_Estoques'n +
+'AC_IR e CS Diferido'n + 'AC_Outros Créditos Op.'n + 'AC_Partes Relacionadas'n +
+'AC_Despesas Antecipadas'n + 'AC_Outros Créditos Não Op.'n);
+
+'Realizavel A L.P.'n = ('rlp_Titulos e Valores'n + 'rlp_Contas a Receber'n +
+'rlp_Depositos Judiciais'n + 'rlp_Partes Relacionadas'n + 'rlp_Imp. Renda e Cont. Soc. Dif'n +
+'rlp_Outros Créditos Op.'n + 'rlp_Outros Créditos Não Op.'n);
+
+'Investimentos'n = ('i_Participações'n + 'i_Outros Investimentos'n);
+
+'Imobilizado, Líquido'n = ('il_Outro Imobilizado'n + 'il_Imobilizado em andamento'n -
+'il_(-) Amortização Acum.'n + 'il_Imobilizado'n - 'il_(-) Depreciação Acumulada'n);
+
+'Diferido, Líquido'n = ('dl_Diferido'n - 'dl_( - ) Amortização Acumulada'n);
+
+'Empréstimos e Financiamentos cp'n = ('PC_Bancos C.P.'n + 'PC_Duplicatas Descontadas C.P.'n +
+'efcp_+ Financiamento Bancário'n + 'efcp_+ Debêntures'n);
+
+'PC_Outras Obrigações Não Op.'n = ( 'PC_Outras Obrig. Não Op.'n + 'PC_Provisões'n +
+'PC_Credores Diversos'n );
+
+'PC_Impostos e Obrigações Sociais'n = ('PC_Obrigações Sociais'n + 'PC_Impostos a pagar'n +
+'PC_Imp. e Obrig. Soc.'n);
+
+'PASSIVO CIRCULANTE'n = ('Empréstimos e Financiamentos cp'n + 'PC_Fornecedores'n +
+'PC_Impostos e Obrigações Sociais'n + 'PC_Adto. Clientes'n + 'PC_Outras Obrigações Op.'n +
+'PC_Partes Relacionadas'n + 'PC_Outras Obrigações Não Op.'n);
+
+'Empréstimos e Financiamentos lp'n = ('elp_Bancos L.P.'n + 'elp_Duplicatas Descontadas L.P'n +
+'eflp_+ Debêntures'n + 'eflp_+ Financiamento Bancário'n);
+
+'elp_Outras Obrigações Não Op.'n = ('elp_Provisões'n + 'elp_I. R. / Contrib. Diferidos'n);
+
+'elp_Impostos Diferidos'n = ('elp_Impostos Parcelados'n + 'elp_I. R. / Contrib. Diferidos'n);
+
+'Exigivel A L.P.'n = ('Empréstimos e Financiamentos lp'n + 'elp_Fornecedores de L.P.'n +
+'elp_Partes Relacionadas'n + 'elp_Impostos Parcelados'n + 'elp_Adiantamento de Clientes'n +
+'elp_Outras Obrigações Não Op.'n + 'elp_Outras Obrigações lp'n );
+
+'PATRIMONIO LÍQUIDO'n = ('PL_Capital Social'n + 'PL_Reservas'n + 'PL_Outras Reservas'n +
+'PL_Lucros / Prejuizos Acumulados'n);
+
+'Venda/Receita Op. Bruta'n = ('RB_Venda/Receita Op. Bruta'n + 'vrob_Receita de Vendas'n +
+'vrob_Prestações de Serviços'n);
+
+'Venda/Receita Op. Liq.'n = ('Venda/Receita Op. Bruta'n - 'RB_(-) Imp./Dev. S/ Rec. Op. Br.'n);
+
+'(-)Custos Prod. Vendidos'n = ('(-)Cust. Prod. Vendidos'n);
+
+'RA_Receitas Financeiras'n = ('rfl_Receitas Financeiras'n + 'rfl_Variação Cambial Ativa'n);
+
+'RA_Despesas Financeiras'n = ('rfl_Despesas Financeiras'n + 'rfl_Variação Cambial Passiva'n);
+
+'Resultado Financeiro Liquido'n = (- 'rfl_Despesas Financeiras'n + 'rfl_Receitas Financeiras'n +
+'rfl_Variação Cambial Ativa'n - 'rfl_Variação Cambial Passiva'n);
+
+'( = ) RESULTADO NÃO OPERACIONAL'n = ('RNO_Dividendos Recebidos'n + 'RNO_Resultado de Equiv. Pat.'n +
+'RNO_Receitas/(Despesas) Não Op.'n - 'RNO_Despesas não operacionais'n);
+
+RUN;
+
+	DATA BASE_TRANSP2_2;
+		SET BASE_TRANSP2_1;
+
+		'ATIVO PERMANENTE'n = ('Investimentos'n + 'Imobilizado, Líquido'n + 'Diferido, Líquido'n +
+		'AP_Goodwill'n + 'AP_Intangivel'n);
+
+		'Exigivel Total'n = ('PASSIVO CIRCULANTE'n + 'Exigivel A L.P.'n);
+
+		'(=) RESULTADO BRUTO'n = ('Venda/Receita Op. Liq.'n - '(-)Custos Prod. Vendidos'n);
+	RUN;
+
+		DATA BASE_TRANSP2_3;
+		SET BASE_TRANSP2_2;
+
+		'TOTAL ATIVO'n = ('ATIVO CIRCULANTE'n + 'Realizavel A L.P.'n + 'ATIVO PERMANENTE'n);
+
+		'TOTAL PASSIVO'n = ('Exigivel Total'n + 'RESULTADO EXERCÍCIOS FUTUROS'n +
+		'PARTICIPAÇÕES MINORITARIAS'n + 'PATRIMONIO LÍQUIDO'n);
+
+		if 'Total Ativo - Total Passivo'n = 0 then 'Total Ativo - Total Passivo'n = 'TOTAL ATIVO'n - 'TOTAL PASSIVO'n;
+
+		'Resultado da Atividade (EBIT)'n = ('(=) RESULTADO BRUTO'n - 'ra_Despesas de Vendas'n -
+		'ra_Despesas Gerais e Adm.'n + 'ra_Outras Rec./Desp. Op.'n);
+
+		RUN;
+
+			DATA BASE_TRANSP2_4;
+			SET BASE_TRANSP2_3;
+
+			'(=) LUCRO OPERACIONAL'n = ('Resultado da Atividade (EBIT)'n + 'Resultado Financeiro Liquido'n);
+
+			RUN;
+
+			/***/
+
+			DATA BASE_TRANSP2_5;
+			SET BASE_TRANSP2_4;
+
+			'RESULT. ANTES TRIBUT./PART.'n = ('(=) LUCRO OPERACIONAL'n + '( = ) RESULTADO NÃO OPERACIONAL'n);
+
+			RUN;
+
+			/***/
+
+			DATA BASE_TRANSP3;
+			SET BASE_TRANSP2_5;
+
+			'LPE_IR + CSSLL'n = ('LPE_Imposto de Renda'n + 'LPE_Contrib. Social Sobre Lucro'n +
+			'LPE_(-) IR e CSSLL Corrente'n );
+
+			'LUCRO (PREJUÍZO) EXERCÍCIO'n = ('RESULT. ANTES TRIBUT./PART.'n - 'LPE_IR + CSSLL'n
+			+ 'LPE_IR e CSSLL Diferido'n - 'LPE_Particip./ Contr.Estatutar.'n +
+			'LPE_Rever. Juros s/ Cap. Próp.'n);
+
+			RUN;
+
+		DATA MIDDLE.TOT_BAL_&AGRUP._&dtbase.;
+		RETAIN
+		CdPessoaMonitoravel
+		DtDemonstrativo
+		DtCadastro
+		OrigemDemonstrativo
+		SegmentoMercado
+		CdPessoa
+		CdGrupoEconomico
+		CNPJ
+		NuCpfCnpjRaiz
+		NuCpfCnpjComplemento
+		NmPessoaMonitoravel
+		AgrupamentoDemonstrativoMntr
+		CdMoeda
+		TipoDemonstrativo
+		FlFinalizado
+		FlPlanilhamento
+		TpMoeda
+
+		'AC_Disponivel'n
+		'cl_Clientes'n
+		'cl_PDD'n
+		'AC_Clientes(-PDD)'n
+		'AC_Adto. Fornecedores'n
+		'AC_Impostos a Recuperar'n
+		'AC_Estoques'n
+		'AC_IR e CS Diferido'n
+		'AC_Partes Relacionadas'n
+		'AC_Outros Créditos Op.'n
+		'AC_Despesas Antecipadas'n
+		'AC_Outros Créditos Não Op.'n
+		'AC_Outros Créditos'n
+		'ATIVO CIRCULANTE'n
+
+		'rlp_Contas a Receber'n
+		'rlp_Titulos e Valores'n
+		'rlp_Imp. Renda e Cont. Soc. Dif'n
+		'rlp_Partes Relacionadas'n
+		'rlp_Depositos Judiciais'n
+		'rlp_Outros Créditos Op.'n
+		'rlp_Outros Créditos Não Op.'n
+		'Realizavel A L.P.'n
+
+		'i_Participações'n
+		'i_Outros Investimentos'n
+		'Investimentos'n
+
+		'il_Imobilizado'n
+		'il_(-) Depreciação Acumulada'n
+		'il_Outro Imobilizado'n
+		'il_Imobilizado em andamento'n
+		'il_(-) Amortização Acum.'n
+		'Imobilizado, Líquido'n
+
+		'dl_Diferido'n
+		'dl_( - ) Amortização Acumulada'n
+		'Diferido, Líquido'n
+
+		'AP_Goodwill'n
+		'AP_Intangivel'n
+		'Amortização Acumulada'n
+
+		'ATIVO PERMANENTE'n
+		'TOTAL ATIVO'n
+
+		'PC_Bancos C.P.'n
+		'PC_Duplicatas Descontadas C.P.'n
+		'efcp_+ Financiamento Bancário'n
+		'efcp_+ Debêntures'n
+		'Empréstimos e Financiamentos cp'n
+		'PC_Fornecedores'n
+		'PC_Imp. e Obrig. Soc.'n
+		'PC_Obrigações Sociais'n
+		'PC_Impostos a pagar'n
+		'PC_Impostos e Obrigações Sociais'n
+		'PC_Adto. Clientes'n
+		'PC_Partes Relacionadas'n
+		'PC_Outras Obrigações Op.'n
+		'PC_Outras Obrig. Não Op.'n
+		'PC_Provisões'n
+		'PC_Credores Diversos'n
+		'PC_Outras Obrigações Não Op.'n
+		'PASSIVO CIRCULANTE'n
+
+		'elp_Bancos L.P.'n
+		'elp_Duplicatas Descontadas L.P'n
+		'eflp_+ Debêntures'n
+		'eflp_+ Financiamento Bancário'n
+		'Empréstimos e Financiamentos lp'n
+		'elp_Fornecedores de L.P.'n
+		'elp_Adiantamento de Clientes'n
+		'elp_Impostos Parcelados'n
+		'elp_Partes Relacionadas'n
+		'elp_Outras Obrigações Op.'n
+		'elp_Outras Obrigações lp'n
+		'elp_I. R. / Contrib. Diferidos'n
+		'elp_Provisões'n
+		'elp_Impostos Diferidos'n
+		'elp_Outras Obrigações Não Op.'n
+		'Exigivel A L.P.'n
+
+		'Exigivel Total'n
+
+		'RESULTADO EXERCÍCIOS FUTUROS'n
+		'PARTICIPAÇÕES MINORITARIAS'n
+
+		'PL_Capital Social'n
+		'PL_Reservas'n
+		'PL_Outras Reservas'n
+		'PL_Lucros / Prejuizos Acumulados'n
+		'PATRIMONIO LÍQUIDO'n
+
+		'TOTAL PASSIVO'n
+
+		'Total Ativo - Total Passivo'n
+
+		'RB_Venda/Receita Op. Bruta'n
+		'vrob_Receita de Vendas'n
+		'vrob_Prestações de Serviços'n
+		'RB_(-) Imp./Dev. S/ Rec. Op. Br.'n
+		'(-)Cust. Prod. Vendidos'n
+		'RB_CMV / CPV'n
+		'RB_Custos Prod./Merc. Vendidas'n
+		'Venda/Receita Op. Bruta'n
+		'Venda/Receita Op. Liq.'n
+		'(-)Custos Prod. Vendidos'n
+		'(=) RESULTADO BRUTO'n
+
+		'ra_Despesas de Vendas'n
+		'ra_Despesas Gerais e Adm.'n
+		'ra_Outras Rec./Desp. Op.'n
+		'Resultado da Atividade (EBIT)'n
+
+		'rfl_Despesas Financeiras'n
+		'rfl_Receitas Financeiras'n
+		'rfl_Variação Cambial Ativa'n
+		'rfl_Variação Cambial Passiva'n
+		'Resultado Financeiro Liquido'n
+		'RA_Receitas Financeiras'n
+		'RA_Despesas Financeiras'n
+		'(=) LUCRO OPERACIONAL'n
+
+		'RNO_Dividendos Recebidos'n
+		'RNO_Resultado de Equiv. Pat.'n
+		'RNO_Receitas/(Despesas) Não Op.'n
+		'RNO_Despesas não operacionais'n
+		'( = ) RESULTADO NÃO OPERACIONAL'n
+
+		'RESULT. ANTES TRIBUT./PART.'n
+
+		'LPE_Imposto de Renda'n
+		'LPE_Contrib. Social Sobre Lucro'n
+		'LPE_(-) IR e CSSLL Corrente'n
+		'LPE_IR e CSSLL Diferido'n
+		'LPE_IR + CSSLL'n
+		'LPE_Particip./ Contr.Estatutar.'n
+		'LPE_Rever. Juros s/ Cap. Próp.'n
+		'LUCRO (PREJUÍZO) EXERCÍCIO'n
+
+		'Quantidade de Meses - Período'n
+		'Depreciação (Informado)'n;
+
+		SET BASE_TRANSP3;
+		RUN;
+
+%MEND;
+%BASE_UNICA(NORM);
+%BASE_UNICA(CONS);
+%BASE_UNICA(COMB);
+
+PROC DATASETS LIB=WORK
+KILL;
+RUN;

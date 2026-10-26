@@ -1,0 +1,188 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 003- producao-carteira-rito.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 125
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM0, safraM12, safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], BV-PDBD-PRD.DVRY_CORP_CREDITO.CARTEIRA_VAREJO_DIARIA_AGGR [BIGQUERY], TBTEMPODATA [DBCON], TMP.TBPOTENCIALRODAS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBOVERCARTEIRARITO, WORK.TBPRODUCAORITO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBOVERCARTEIRARITO, WORK.TBPRODUCAORITO
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - JOIN], BV-PDBD-PRD.DVRY_CORP_CREDITO.CARTEIRA_VAREJO_DIARIA_AGGR [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], TBTEMPODATA [Pass-Through Native (DBCON) - FROM], TMP.TBPOTENCIALRODAS [PROC SQL - FROM], TMP.TBPRODUCAO [DATA Step - SET], WORK.TBOVERCARTEIRARITO [PROC SQL - JOIN], WORK.TBPRODUCAORITO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBBASEINICIALRITO, TBCARTEIRA_RODAS_GCP, TBDIASUTEIS02, TBOVERCARTEIRARITO, TBPRODUCAO, TBPRODUCAORITO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 1, sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+/*Verifica se a base TbProducao já está atualizada*/
+options compress=binary;
+%include '/infogrc/utils/all-includes.sas';
+options dldmgaction=repair;
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tbproducao.sas7bdat,60,150);
+
+DATA tbproducao;
+SET tmp.tbproducao;
+run;
+
+/* Verifica última data disponível do Potencial Rodas */
+PROC SQL;
+  SELECT MAX(DtAtualizacao)  INTO :DtAtCetip FROM TMP.TBPOTENCIALRODAS;
+RUN;
+
+/******************/
+/*BASE DE PRODUÇÃO*/
+/******************/
+PROC SQL;
+CREATE TABLE TbProducaoRito AS
+SELECT
+A.NuAnoMes,
+A.CdParceiroComercial,
+A.FxIdade,
+coalesce(SUM(A.VpSpread),0) AS VpSpread FORMAT=numx18.2,
+coalesce(SUM(A.VrProducao),0) AS VrProducao FORMAT=numx18.2,
+coalesce(COUNT(A.NuContrato),0) AS Qtd_Contratos FORMAT=numx18.2,
+coalesce(SUM(A.VrProducaoProjetado),0) AS VrProducaoProjetado FORMAT=numx18.2,
+coalesce(SUM(CASE WHEN doc.NuContratoGestao IS NOT NULL THEN 1 ELSE 0 END), 0) AS QtdProducaoRG
+FROM TBPRODUCAO A
+	LEFT JOIN TipoDoc as doc
+		on doc.NuContratoGestao = a.NuContrato and tipodocumento = 'RG'
+WHERE A.NuAnoMes between &safraM6. and &safraM0.
+AND A.NmGrupoProdutoMeta in ('Leves')
+AND A.NmCanalEstruturaComercial = 'Canal Negocios'
+/*AND NmSubEstruturaComercialC = 'Canal Rodas e EGV I - Regional I'
+AND NmAreaEstruturaComercialC = 'Canal Freguesia'
+and FlAtivo = 'ATIVO'*/
+and NmTipoParceiroComercial in ('Loja','Concessionaria')
+and FxIdade <> 'ZeroKM'
+GROUP BY 1,2,3/*,4,5,6,7,8,9,10*/
+;RUN;
+
+/*******************************/
+/*BASE DE OVER SOBRE A CARTEIRA*/
+/*******************************/
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table tbCarteira_Rodas_GCP as
+   select * from connection to perm
+     (
+		SELECT a.dt_safra, a.dt_processamento, a.cd_contrato, a.vr_saldo_carteira,
+		       a.vr_saldo_atraso_contrato_30_dias AS Over30,
+		       a.vr_saldo_atraso_contrato_60_dias AS Over60,
+		       a.vr_saldo_atraso_contrato_90_dias AS Over90,
+		       a.qt_dias_atraso_parcela
+		FROM `bv-pdbd-prd.dvry_corp_credito.carteira_varejo_diaria_aggr` a
+		INNER JOIN (
+		    SELECT Dt_Referencia, MAX(dt_processamento) AS dt_processamento
+		    FROM `bv-pdbd-prd.dvry_corp_credito.carteira_varejo_diaria_aggr`
+		    Where Dt_Referencia >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
+		    Group by Dt_Referencia
+					) b
+		ON a.dt_processamento = b.dt_processamento
+		WHERE a.ds_produto = 'leves'
+  );
+   disconnect from perm;
+quit;
+
+Proc Sql;
+Create Table TbOverCarteiraRito as
+Select
+(YEAR(Cart.dt_processamento) * 100) + MONTH(Cart.dt_processamento) as NuAnomes
+,Prod.CdParceiroComercial
+,Prod.FxIdade
+/*,Input(Cart.cd_contrato, 14.) as NuContrato format best32.*/
+,Sum(Coalesce(Cart.vr_saldo_carteira,0)) as VrSaldo FORMAT=numx18.2
+,Sum(Coalesce(Cart.Over30,0)) as Over30 FORMAT=numx18.2
+,Sum(Coalesce(Cart.Over60,0)) as Over60 FORMAT=numx18.2
+,Sum(Coalesce(Cart.Over90,0)) as Over90 FORMAT=numx18.2
+
+From tbCarteira_Rodas_GCP as Cart
+  Left join Bases.TbProducao as Prod On Input(Cart.cd_contrato, 14.) = Prod.NuContrato
+  Where Prod.DtLiquidacaoEfetiva = . and Prod.DtCancelamento = . and Prod.NmGrupoprodutometa = 'Leves'
+Group by 1,2,3
+;Quit;
+
+PROC SQL;
+CREATE TABLE TbBaseInicialRito AS
+SELECT
+*
+FROM
+WORK.TbProducaoRito A
+	LEFT JOIN WORK.TbOverCarteiraRito E
+		ON A.CdParceiroComercial = E.CdParceiroComercial
+		AND A.NuAnoMes = E.NuAnoMes
+		AND A.FxIdade = E.FxIdade
+Where 1=1
+	and A.CdParceiroComercial is not null
+group by 1,2,3
+order by 2
+;RUN;
+
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDiasUteis02 AS SELECT * FROM connection to dbcon
+(
+WITH
+TbTempoData AS (
+  SELECT
+    NuAnoMes,
+    CASE WHEN DtTempo BETWEEN '20211227' AND '20211230' THEN NuDiaUtilMes - 1
+         WHEN DtTempo IN ('20211224','20211231') THEN -3
+         ELSE NuDiaUtilMes END AS NuDiaUtilMes,
+    NuSemanaAno,
+    DtTempo,
+    DdData,
+    NuDiaSemana
+  FROM DWBI_DIME.TbDimTempoData
+)
+  SELECT
+    NuAnoMes,
+    MAX(NuDiaUtilMes) AS TotalDiaUtilMes,
+    MAX(CASE WHEN DtTempo < TODAY() THEN NuDiaUtilMes END) AS TotalDiaUtilPrd
+  FROM TbTempoData
+  WHERE
+    NuAnoMes >= &safraM12.
+    AND NuAnoMes <= &safraM0.
+  GROUP BY NuAnoMes
+);
+RUN;

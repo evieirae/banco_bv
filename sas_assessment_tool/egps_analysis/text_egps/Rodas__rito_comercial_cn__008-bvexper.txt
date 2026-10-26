@@ -1,0 +1,144 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_cn
+FILE_SAS: 008-bvexper.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 81
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM0, safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): EXP_BU.BVEXPER_BASEUNICA_RESUMO_TOTAL [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): EXP_BU.BVEXPER_BASEUNICA_RESUMO_TOTAL [PROC SQL - FROM], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BVEXPER_FILIAL, BVEXPER_GR, BVEXPER_REGIONAL, TBRITOPDV_D001
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*****REGIONAL*****/
+proc sql;
+create table BvExper_Regional as
+select distinct
+NuAnoMes,
+NmSubEstruturaComercialA as Regional,
+NmElegAcelerador as Apto,
+FAIXA_PONTOS_TURBO as Cluster,
+PONTOS_TURBO as Pontos
+from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+where 1=1
+and TpBase = 'Pontos'
+/*and NmSubEstruturaComercialA like '%Canal Rodas%'*/
+and TpNivel = 'Re'
+and NuAnoMes between &safraM6. and &safraM0.
+and NmCanalEstruturaComercial = 'Canal Negocios';
+;run;
+
+/*****Filial*****/
+proc sql;
+create table BvExper_Filial as
+select distinct
+NuAnoMes,
+NmAreaEstruturaComercial as Filial,
+NmElegAcelerador as Apto,
+FAIXA_PONTOS_TURBO as Cluster,
+PONTOS_TURBO as Pontos
+from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+where 1=1
+and TpBase = 'Pontos'
+/*and NmSubEstruturaComercialA like '%Canal Rodas%'*/
+and TpNivel = 'Fi'
+and NuAnoMes between &safraM6. and &safraM0.
+and NmCanalEstruturaComercial = 'Canal Negocios';
+run;
+
+/*****GR*****/
+proc sql;
+create table BvExper_GR as
+select distinct
+NuAnoMes,
+NmColaborador as GR,
+NmElegAcelerador as Apto,
+FAIXA_PONTOS_TURBO as Cluster,
+PONTOS_TURBO as Pontos
+from exp_bu.BVEXPER_BASEUNICA_RESUMO_TOTAL
+where 1=1
+and TpBase = 'Pontos'
+/*and NmSubEstruturaComercialA like '%Canal Rodas%'*/
+and TpNivel = 'GR'
+and NuAnoMes between &safraM6. and &safraM0.
+and NmCanalEstruturaComercial = 'Canal Negocios';
+run;
+
+/*Inclusao de Bv Exper*/
+
+proc sql;
+create table TbRitoPDV_D001 as
+select distinct
+a.*
+
+,B.Apto as Apto_Regional
+,B.Cluster as Cluster_Regional
+,B.Pontos as Pontos_Regional
+,C.Apto as Apto_Filial
+,C.Cluster as Cluster_Filial
+,C.Pontos as Pontos_Filial
+,D.Apto as Apto_Gr
+,D.Cluster as Cluster_Gr
+,D.Pontos as POntos_Gr
+
+from TbAbandonoSumarizadaMes03 as A
+
+/*	left join TbAbandonoSumarizadaMes03 as ab*/
+/*		on ab.CdParceiroComercial = a.CdParceiroComercial*/
+/*		and a.nuanomes = aB.nuanomes*/
+
+	left join tmp.TBPARCEIROCOMERCIAL as a2
+		on a2.CdParceiroComercial = a.CdParceiroComercial
+
+	Left join BvExper_Regional AS B
+	on a2.NmSubEstruturaComercialC = B.Regional
+	and a.nuanomes = B.nuanomes
+
+	Left join BvExper_Filial as C
+	on a2.NmAreaEstruturaComercialC = C.Filial
+	and a.nuanomes = C.nuanomes
+
+	Left join BvExper_GR as D
+	on a2.NmColaboradorC = D.GR
+	and a.nuanomes = D.nuanomes
+
+;run;

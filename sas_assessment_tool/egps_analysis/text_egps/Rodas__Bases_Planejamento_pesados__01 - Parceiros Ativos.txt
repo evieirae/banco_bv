@@ -1,0 +1,206 @@
+START_METADATA
+PROJECT: Rodas__Bases_Planejamento_pesados
+FILE_SAS: 01 - Parceiros Ativos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 126
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SAFRAM0, SAFRAM2
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBCOLABORADOR [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.PARCEIROSATIVOS_P_NAO_2
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BPLAN
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.PARCEIROSATIVOS_P, WORK.PARCEIROSATIVOS_P_NAO, WORK.PARCEIROSATIVOS_P_NAO_2, WORK.PARCEIROSATIVOS_P_SIM
+TABLE_READ_PROVENANCE (Flow): BASES.TBCOLABORADOR [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], WORK.PARCEIROSATIVOS_P [DATA Step - SET], WORK.PARCEIROSATIVOS_P_NAO [DATA Step - SET], WORK.PARCEIROSATIVOS_P_NAO_2 [DATA Step - SET], WORK.PARCEIROSATIVOS_P_SIM [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BPLAN.PARCEIROSATIVOS_PESADOS
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PARCEIROSATIVOS_P_NAO_2, WORK.PARCEIROSATIVOS_P, WORK.PARCEIROSATIVOS_P_NAO, WORK.PARCEIROSATIVOS_P_SIM
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**********************************/
+/*BASE DE LOJAS ATIVAS DE VEÍCULOS*/
+/**********************************/
+
+PROC SQL;
+CREATE TABLE WORK.PARCEIROSATIVOS_P_SIM AS
+SELECT
+
+A.CdParceiroComercial,
+A.NuCnpjLoja,
+A.DsAtividadeFinanciamento,
+A.NmFilialC,
+A.NmTipoParceiroComercial,
+A.NmAutoShopping,
+A.NmGrupoConcessionaria,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN A.NmGrupoConcessionaria
+	WHEN A.NmAutoShopping <> '' THEN A.NmAutoShopping
+	WHEN A.NmTipoParceiroComercial <> '' THEN A.NmTipoParceiroComercial
+	ELSE 'Outros'
+END) AS NmClassificacaoGrupoParceiro,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN 'GRANDES GRUPOS'
+	WHEN A.NmAutoShopping <> '' THEN 'AUTO SHOPPING'
+	WHEN A.NmTipoParceiroComercial <> '' THEN UPCASE(A.NmTipoParceiroComercial)
+	ELSE 'OUTROS'
+END) AS NmClassificacaoTipoGrupoParceiro,
+
+A.NmParceiroComercial,
+A.CdUf,
+A.CdColaboradorC,
+A.NmColaboradorC,
+A.DsLoginN1C,
+B.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.DtCadastro,
+A.FlAtivo
+
+FROM BASES.TBPARCEIROCOMERCIAL A
+
+LEFT JOIN BASES.TBCOLABORADOR B ON B.DSLOGIN = A.DsLoginN1C AND B.CDCOLABORADOR = A.CdColaboradorC
+
+WHERE
+A.FlAtivo = 'S'
+/*AND A.NmCanalEstruturaComercialC = 'Canal Veiculos' */
+AND A.DsAtividadeFinanciamento = 'VEÍCULO'
+
+/*AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV BALCAO%'*/
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'CA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJAS RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV MESA%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV REMANESCENTE%'
+AND YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) <= &SAFRAM0.
+
+ORDER BY 1
+
+;RUN;
+
+/**********************************/
+/*BASE DE LOJAS INATIVAS DE VEÍCULOS*/
+/**********************************/
+
+PROC SQL;
+CREATE TABLE WORK.PARCEIROSATIVOS_P_NAO AS
+SELECT
+
+A.CdParceiroComercial,
+A.NuCnpjLoja,
+A.DsAtividadeFinanciamento,
+A.NmFilialC,
+A.NmTipoParceiroComercial,
+A.NmAutoShopping,
+A.NmGrupoConcessionaria,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN A.NmGrupoConcessionaria
+	WHEN A.NmAutoShopping <> '' THEN A.NmAutoShopping
+	WHEN A.NmTipoParceiroComercial <> '' THEN A.NmTipoParceiroComercial
+	ELSE 'Outros'
+END) AS NmClassificacaoGrupoParceiro,
+
+PROPCASE(CASE
+	WHEN A.NmGrupoConcessionaria <> '' THEN 'GRANDES GRUPOS'
+	WHEN A.NmAutoShopping <> '' THEN 'AUTO SHOPPING'
+	WHEN A.NmTipoParceiroComercial <> '' THEN UPCASE(A.NmTipoParceiroComercial)
+	ELSE 'OUTROS'
+END) AS NmClassificacaoTipoGrupoParceiro,
+
+A.NmParceiroComercial,
+A.CdUf,
+A.CdColaboradorC,
+A.NmColaboradorC,
+A.DsLoginN1C,
+B.NmGrupoCargoColaborador,
+A.CdFilialC,
+A.NmAreaEstruturaComercialC,
+A.NmSubEstruturaComercialC,
+A.NmCanalEstruturaComercialC,
+A.DtCadastro,
+A.FlAtivo,
+
+datepart(A.DtUltimaAtualizacao) as DtUltimaAtualizacao format date9.,
+(YEAR(CALCULATED DtUltimaAtualizacao) * 100) + MONTH(CALCULATED DtUltimaAtualizacao) as NuAnomes_DtUltAtu,
+&SAFRAM2. as SAFRA_M2,
+&SAFRAM0. as SAFRA_M0,
+
+/*PDVS COM DATA DE INATIVAÇÃO NOS ULTIMOS 90 DIAS ENTRAM PARA O CALCULO DE PONTECIAL - ANDERSON - 28/07/2025*/
+CASE
+	WHEN CALCULATED NuAnomes_DtUltAtu BETWEEN &SAFRAM2. AND &SAFRAM0.
+THEN 'MANTER' ELSE 'EXCLUIR' END AS FlPDVs /**/
+
+FROM BASES.TBPARCEIROCOMERCIAL A
+
+LEFT JOIN BASES.TBCOLABORADOR B ON B.DSLOGIN = A.DsLoginN1C AND B.CDCOLABORADOR = A.CdColaboradorC
+
+WHERE
+A.FlAtivo = 'N'
+/*AND A.NmCanalEstruturaComercialC = 'Canal Veiculos' */
+AND A.DsAtividadeFinanciamento = 'VEÍCULO'
+
+/*AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV BALCAO%'*/
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'CA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJA RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'LOJAS RENEG%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV MESA%'
+AND UPCASE(NMPARCEIROCOMERCIAL) NOT LIKE 'BV REMANESCENTE%'
+AND YEAR(DATEPART(DTCADASTRO))*100 + MONTH(DATEPART(DTCADASTRO)) <= &SAFRAM0.
+
+ORDER BY 1
+
+;RUN;
+
+DATA PARCEIROSATIVOS_P_NAO_2;
+SET WORK.PARCEIROSATIVOS_P_NAO;
+WHERE FlPDVs = 'MANTER';
+drop DtUltimaAtualizacao NuAnomes_DtUltAtu safra_m2 safra_m0 FlPDVs;
+;RUN;
+
+DATA WORK.PARCEIROSATIVOS_P;
+SET WORK.PARCEIROSATIVOS_P_SIM
+	WORK.PARCEIROSATIVOS_P_NAO_2;
+;RUN;
+
+DATA BPLAN.parceirosativos_Pesados;
+set work.PARCEIROSATIVOS_P;
+;run;

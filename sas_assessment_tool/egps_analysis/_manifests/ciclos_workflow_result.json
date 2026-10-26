@@ -1,0 +1,1247 @@
+{
+  "summary": "Investiga e verifica os 13 clusters de dependência cíclica entre EGPs SAS (real vs artefato + como quebrar)",
+  "agentCount": 26,
+  "logs": [
+    "clusters investigados+verificados: 13/13",
+    "vereditos finais: ciclo_real=4 · artefato(total/parcial)=9"
+  ],
+  "result": [
+    {
+      "cluster_id": 1,
+      "resumo": "O SCC de 16 projetos (Atacado/Crédito/Riscos) é fechado quase inteiramente por tabelas de SCHEMAS CORPORATIVOS COMPARTILHADOS (INSIGHT., PME., PLCA., SHAREATA., SIC., MISCRED., GCSERASA.) que vários projetos LEEM e REESCREVEM. O padrão dominante é read-modify-write da MESMA tabela dentro do mesmo projeto: dezenas de tabelas aparecem simultaneamente em INTERNAL READS e PERMANENT OUTPUTS do mesmo .egp (ex.: Base_Bruta lê e grava INSIGHT.TBVNP, PLCA.TBSISTEMAPLCA, SHAREATA.TBRATING_V2, SIC.DMRELATIOLIMITESHIST; Esteira 2 lê e grava INSIGHT.BASE_BACEN_FINAL e PME.BASE_FATURAMENTO_SERASA_PJ; Indicadores lê e grava MONITRCA.NE_DESEMBOLSOS). O grafo conta a leitura dessas tabelas como aresta produtor->consumidor, mas elas são FONTES/áreas de staging comuns, não entregas projeto->projeto. O 'laço que volta pra trás' raiz é INSIGHT.TBBRUTA (5 writers / 16 readers): todos os projetos a leem e alguns a regravam, conectando todo o cluster. Sobram pouquíssimos handoffs reais (intra-área), notadamente o ciclo mútuo Riscos Controle_PMES <-> Indicadores (PDD.INFOS_PME / MONITRCA.NE_DESEMBOLSOS).",
+      "tabelas": [
+        {
+          "tabela": "INSIGHT.TBBRUTA",
+          "classificacao": "fonte_compartilhada",
+          "writers": 5,
+          "readers": 16,
+          "evidencia": "5 writers (Base_Bruta, Base_Carteira_Consolidada, Base_Sinais, Cred Base_Bruta, CIB) e 16 readers; schema INSIGHT compartilhado; cada writer a tem em INTERNAL READS e PERMANENT OUTPUTS (read-modify-write). Base corporativa comum, nao handoff."
+        },
+        {
+          "tabela": "PLCA.TBSISTEMAPLCA",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 12,
+          "evidencia": "Schema PLCA. Base_Bruta a le [PROC SQL - FROM] e grava DATA PLCA.TBSISTEMAPLCA (read-modify-write); 12 readers. Tabela de sistema PLCA, fonte comum."
+        },
+        {
+          "tabela": "INSIGHT.TBVNP",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 5,
+          "evidencia": "Atacado e Credito Base_Bruta a leem e regravam (INSIGHT.TBVNP em INTERNAL READS e PERMANENT OUTPUTS; UPDATE/MERGE INSIGHT.TBVNP). Carga incremental de fonte compartilhada."
+        },
+        {
+          "tabela": "INSIGHT.TBPESSOA",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 4,
+          "evidencia": "CIB a le [PROC SQL - FROM] e grava (CREATE TABLE INSIGHT.TBPESSOA AS ... FROM INSIGHT.TBPESSOA); Base_Bruta a le via &LIB..TbPessoa / DBGLOBAL..TbPessoa. Dimensao de pessoa corporativa, nao entrega CIB->Base_Bruta."
+        },
+        {
+          "tabela": "SHAREATA.TBCARTEIRAGRUPO",
+          "classificacao": "fonte_compartilhada",
+          "writers": 3,
+          "readers": 7,
+          "evidencia": "3 writers (Cred Base_Bruta, CIB, Riscos Base_Unica) e 7 readers; schema SHAREATA compartilhado; CIB a tem em INTERNAL READS e PERMANENT OUTPUTS + backup TBCARTEIRAGRUPO_BACKUP."
+        },
+        {
+          "tabela": "SHAREATA.TBCARTEIRACLIENTE",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 4,
+          "evidencia": "2 writers (CIB, Riscos Base_Unica); CIB grava TBCARTEIRACLIENTE + _BACKUP e exporta para arquivos UC4/RenovaCredito. Carteira compartilhada SHAREATA."
+        },
+        {
+          "tabela": "SHAREATA.TBRATING_V2",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 4,
+          "evidencia": "2 writers (Atacado e Credito Base_Bruta); Base_Bruta a tem em INTERNAL READS e PERMANENT OUTPUTS. Rating compartilhado em SHAREATA."
+        },
+        {
+          "tabela": "SIC.DMRELATIOLIMITESHIST",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 3,
+          "evidencia": "2 writers (Atacado/Credito Base_Bruta); schema SIC; Base_Bruta a le (PROC SORT/SQL FROM/JOIN) e grava. DM de limites historica, fonte comum."
+        },
+        {
+          "tabela": "MISCRED.MATRIZ_SETORES",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 5,
+          "evidencia": "Schema MISCRED; Riscos Base_Unica grava e 5 projetos leem (incl. ela mesma); exportada de planilha MATRIZ_SETORES_RISCO.xlsx. Tabela de referencia setorial compartilhada."
+        },
+        {
+          "tabela": "MISCRED.BASE_CLIENTES",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Schema MISCRED; writer Base_Unica tambem reader (self). Fonte/staging comum, nao handoff dedicado."
+        },
+        {
+          "tabela": "MISCRED.TBCRED_BASE_GLOBAL_202510",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Schema MISCRED com sufixo de data; writer Base_Unica tambem reader. Base global credito compartilhada."
+        },
+        {
+          "tabela": "MISCRED.BASE_UNICA_ATACADO_202408",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Schema MISCRED, snapshot mensal versionado; Base_Unica grava varios BASE_UNICA_ATACADO_AAAAMM e os reusa. Snapshot historico compartilhado, nao entrega viva."
+        },
+        {
+          "tabela": "MISCRED.VNP_CONSOLIDADO",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "Schema MISCRED; VNP_WINSCP grava e Base_Bruta(Atacado/Credito) leem [PROC SQL - FROM]. Base VNP consolidada compartilhada; fecha aresta VNP->Base_Bruta como fonte."
+        },
+        {
+          "tabela": "PME.BASE_HISTORICA_PMUM_SF",
+          "classificacao": "fonte_compartilhada",
+          "writers": 3,
+          "readers": 6,
+          "evidencia": "3 writers (Atacado Motores, Credito Motores, SalesFinance) + 6 readers, schema PME; cada writer a tem em INTERNAL READS e PERMANENT OUTPUTS + _ANT (versao anterior). Base historica PME compartilhada."
+        },
+        {
+          "tabela": "PME.BASE_SCORE_SERASA_PJ",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 6,
+          "evidencia": "Escrita por OMIE e SalesFinance (ambas em INTERNAL READS+PERMANENT OUTPUTS); 6 readers. Tabela de score Serasa PJ no schema PME, enriquecimento de fonte comum."
+        },
+        {
+          "tabela": "PME.BASE_RESTR_SERASA_PJ",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 4,
+          "evidencia": "Escrita por OMIE e SalesFinance; restricoes Serasa PJ no schema PME. Fonte de enriquecimento compartilhada (multi-writer)."
+        },
+        {
+          "tabela": "PME.BASE_SOCIOS_SERASA_PJ",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 4,
+          "evidencia": "Escrita por OMIE e SalesFinance; socios Serasa PJ no schema PME. Multi-writer, fonte compartilhada."
+        },
+        {
+          "tabela": "PME.BASE_HBV8_SERASA_PJ",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 4,
+          "evidencia": "Schema PME (Serasa HBV8); SalesFinance a le e grava (INTERNAL READS+OUTPUTS); 4 readers. Enriquecimento Serasa compartilhado."
+        },
+        {
+          "tabela": "PME.BASE_FATURAMENTO_SERASA_PJ",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 4,
+          "evidencia": "Esteira 2 a tem em INTERNAL READS e PERMANENT OUTPUTS (read-modify-write); 4 readers. Faturamento Serasa PJ no schema PME, fonte comum."
+        },
+        {
+          "tabela": "PME.BASE_CADASTRAL_SERASA_PJ",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "Cadastral Serasa PJ no schema PME; Painel Sales Finance grava, Base_Bruta/Motores leem [PROC SQL - JOIN]. Cadastro Serasa compartilhado, nao entrega dedicada."
+        },
+        {
+          "tabela": "GCSERASA.TBGCDADOSCADASTRAIS",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 4,
+          "evidencia": "2 writers (Atacado/Credito Motores), schema GCSERASA; ambos a leem e regravam. Dados cadastrais Serasa GC, fonte compartilhada."
+        },
+        {
+          "tabela": "PME.BASE_HISTORICA_OMIE_CEDENTES",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (OMIE Sacados) -> reader Credito Motores; schema PME mas especifica do fluxo OMIE. Producao OMIE->Motores genuina."
+        },
+        {
+          "tabela": "PME.BASE_SUSPENSAO_GL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer Atacado Motores -> reader Esteira 2 (alem do self). Suspensoes GL especificas dos Motores; handoff intra-Atacado."
+        },
+        {
+          "tabela": "PME.TBMGCANALITICA",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Atacado Motores grava PME.TBMGCANALITICA -> reader Painel Sales Finance. Saida analitica MGC; handoff intra-Atacado."
+        },
+        {
+          "tabela": "_INSIGHT.TBMGCANALITICA",
+          "classificacao": "colisao_nome",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Libref com prefixo '_' (alias de INSIGHT). Credito Motores e Atacado Motores AMBOS leem _INSIGHT.TBMGCANALITICA e gravam PME.TBMGCANALITICA; os dois Motores sao quase-clones. Aresta Credito->Atacado via _INSIGHT e artefato de alias de libref, nao entrega real."
+        },
+        {
+          "tabela": "INSIGHT.BASE_BACEN_FINAL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Esteira 2 grava INSIGHT.BASE_BACEN_FINAL (tambem self read-modify-write) -> reader Base_Sinais. Saida BACEN especifica da Esteira; handoff intra-Atacado."
+        },
+        {
+          "tabela": "INSIGHT.TBPMEANALITICA",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Esteira 2 grava -> Painel Sales Finance le. Analitica PME da Esteira; handoff intra-Atacado."
+        },
+        {
+          "tabela": "INSIGHT.BASE_DIREITOS_CREDITORIOS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Project_semiUpper grava -> Esteira 2 le. Direitos creditorios; handoff intra-Atacado (fecha mutual com PME.BASE_FATURAMENTO)."
+        },
+        {
+          "tabela": "INSIGHT.TB_GARANTIAS_ANALITICO",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 4,
+          "evidencia": "Credito Base_Bruta grava -> readers Atacado (Base_Sinais, Esteira 2, Project_semiUpper). Garantias analitico; handoff Credito->Atacado genuino (cross-area)."
+        },
+        {
+          "tabela": "ATUAL.CLIENTES_ATUAL_2025",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Base_Carteira_Consolidada grava -> CIB le. Fecha 2-cycle com INSIGHT.TBPESSOA; lado A->B e handoff real, lado B->A (TBPESSOA) e fonte compartilhada."
+        },
+        {
+          "tabela": "ATUAL.CLIENTES_ATUAL_2026",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Base_Carteira_Consolidada grava -> Painel Sales Finance le. Lista de clientes do ano; handoff intra-Atacado."
+        },
+        {
+          "tabela": "INSIGHT.TBBRUTA_20250731",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Snapshot datado de INSIGHT.TBBRUTA; Base_Carteira grava, Controle_PMES le via lib.member dinamico (%LET). Snapshot da base bruta compartilhada, nao entrega viva."
+        },
+        {
+          "tabela": "PDD.INFOS_PME",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "Controle_PMES grava PDD.INFOS_PME (+_BKP) e Indicadores/Base_Unica leem. Handoff Riscos real; metade do 2-cycle Controle<->Indicadores."
+        },
+        {
+          "tabela": "MONITRCA.NE_DESEMBOLSOS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Indicadores grava MONITRCA.NE_DESEMBOLSOS -> Controle_PMES le [PROC SQL - FROM]. Outra metade do 2-cycle Riscos real (Indicadores->Controle)."
+        },
+        {
+          "tabela": "SME.BASE_HISTORICA_SME_PJ",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Controle_PMES grava (tambem self) -> Base_Unica le. Base historica SME PJ; handoff intra-Riscos."
+        },
+        {
+          "tabela": "MISCRED.BASE_UNICA_ATACADO_202408 (dup)",
+          "classificacao": "incerto",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Ja classificada como fonte_compartilhada; mantida por completude. Snapshot MISCRED versionado."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "A grande maioria das 35 tabelas que fecham o SCC sao FONTES/STAGING de schemas corporativos compartilhados (INSIGHT., PME., PLCA., SHAREATA., SIC., MISCRED., GCSERASA.) lidas e regravadas por multiplos projetos — confirmado pelo padrao read-modify-write (mesma tabela em INTERNAL READS e PERMANENT OUTPUTS do mesmo projeto) e pelos multi-writers. Elas inflam o grafo com pseudo-arestas e respondem pela esmagadora conectividade do cluster (INSIGHT.TBBRUTA sozinha liga 16 readers). Removendo essas como sources externas unicas, o SCC de 16 projetos colapsa. Porem NAO e artefato total: ha handoffs genuinos e pelo menos um ciclo real residual — o par mutuo intra-Riscos Controle_PMES_v19 <-> Indicadores_PMEs (PDD.INFOS_PME no sentido Controle->Indicadores e MONITRCA.NE_DESEMBOLSOS no sentido Indicadores->Controle), ambos handoffs reais que formam dependencia circular verdadeira. Logo: artefato parcial, com um nucleo ciclico pequeno e real a quebrar manualmente.",
+      "arestas_a_quebrar": [
+        {
+          "de": "(fonte)",
+          "para": "TODOS os 16 projetos",
+          "via": "INSIGHT.TBBRUTA",
+          "acao": "Externalizar como SOURCE unica. Materializar a base bruta uma vez (projeto/modelo dedicado) e fazer todos os outros consumirem via source()/ref unico; proibir regravacao por multiplos projetos. Remove a aresta que sozinha conecta 16 readers."
+        },
+        {
+          "de": "(fonte)",
+          "para": "12 readers",
+          "via": "PLCA.TBSISTEMAPLCA, INSIGHT.TBVNP, INSIGHT.TBPESSOA, SHAREATA.TBCARTEIRAGRUPO, SHAREATA.TBCARTEIRACLIENTE, SHAREATA.TBRATING_V2, SIC.DMRELATIOLIMITESHIST",
+          "acao": "Tratar todos os objetos dos schemas PLCA./SHAREATA./SIC./DBGLOBAL. como sources externas (ingestao corporativa). Quebrar o read-modify-write de Base_Bruta/CIB: separar 'refresh da fonte' de 'consumo'. Elimina as arestas CIB->Base_Bruta, Base_Bruta->(quase tudo)."
+        },
+        {
+          "de": "(fonte)",
+          "para": "Motores/Painel/esteiras",
+          "via": "PME.BASE_SCORE_SERASA_PJ, PME.BASE_RESTR_SERASA_PJ, PME.BASE_SOCIOS_SERASA_PJ, PME.BASE_HBV8_SERASA_PJ, PME.BASE_CADASTRAL_SERASA_PJ, PME.BASE_FATURAMENTO_SERASA_PJ, PME.BASE_HISTORICA_PMUM_SF, GCSERASA.TBGCDADOSCADASTRAIS",
+          "acao": "Consolidar o enriquecimento Serasa (schemas PME./GCSERASA.) num unico pipeline de ingestao Serasa e expor como sources. As esteiras OMIE/SalesFinance hoje gravam as MESMAS tabelas (multi-writer) — unificar para um so writer por tabela. Quebra as arestas das esteiras->Painel/Motores."
+        },
+        {
+          "de": "(fonte)",
+          "para": "Base_Unica e outros",
+          "via": "MISCRED.MATRIZ_SETORES, MISCRED.BASE_CLIENTES, MISCRED.TBCRED_BASE_GLOBAL_*, MISCRED.BASE_UNICA_ATACADO_*, MISCRED.VNP_CONSOLIDADO",
+          "acao": "Schema MISCRED. vira camada de sources/snapshots; snapshots datados (BASE_UNICA_ATACADO_AAAAMM, TBBRUTA_20250731) nao devem ser arestas vivas. Remove arestas Base_Unica->* e VNP->Base_Bruta."
+        },
+        {
+          "de": "Crédito__[Gestão_de_Carteira] Motores",
+          "para": "Atacado__[Gestão_de_Carteira] Motores",
+          "via": "_INSIGHT.TBMGCANALITICA",
+          "acao": "Colisao de libref: '_INSIGHT' e alias de INSIGHT e os dois Motores sao quase-clones que gravam PME.TBMGCANALITICA. Desambiguar o libref e tratar como fonte INSIGHT compartilhada; nao e entrega Credito->Atacado. Considerar fundir os dois Motores num unico modelo parametrizado por area."
+        },
+        {
+          "de": "Riscos__Indicadores_PMEs_PPT_V3",
+          "para": "Riscos__Controle_PMES_v19__v2",
+          "via": "MONITRCA.NE_DESEMBOLSOS",
+          "acao": "CICLO REAL intra-Riscos. Quebrar esta aresta de retorno: materializar NE_DESEMBOLSOS de uma versao/snapshot anterior (defasagem temporal) OU extrair o calculo de NE_DESEMBOLSOS para um modelo upstream comum consumido pelos dois, eliminando a dependencia mutua com PDD.INFOS_PME."
+        }
+      ],
+      "recomendacao": "Acao 1 (resolve ~90% do cluster): promover os schemas corporativos compartilhados (INSIGHT., PME., PLCA., SHAREATA., SIC., MISCRED., GCSERASA., DBGLOBAL.) a SOURCES EXTERNAS UNICAS no dbt, com exatamente UM produtor por tabela. Hoje varios projetos fazem read-modify-write da mesma tabela (ela aparece em INTERNAL READS e PERMANENT OUTPUTS do mesmo .egp) e ha tabelas multi-writer (INSIGHT.TBBRUTA com 5 writers; PME Serasa e SHAREATA com 2-3) — isso e o que inventa as arestas ciclicas. INSIGHT.TBBRUTA isolada ja desconecta 16 readers. Acao 2: separar 'refresh da fonte' do 'consumo' em Base_Bruta e CIB para matar o 2-cycle Base_Carteira_Consolidada<->CIB (lado INSIGHT.TBPESSOA e fonte; so ATUAL.CLIENTES_ATUAL_2025 e handoff real). Acao 3: desambiguar o libref _INSIGHT.TBMGCANALITICA e avaliar fundir os dois projetos [Gestão_de_Carteira] Motores (Atacado/Crédito), que sao quase-clones. Acao 4 (unico ciclo realmente intrinseco): quebrar manualmente o par mutuo Riscos Controle_PMES_v19 <-> Indicadores_PMEs cortando a aresta de retorno MONITRCA.NE_DESEMBOLSOS (consumir snapshot/versao anterior ou extrair o calculo para um modelo upstream comum). Apos isso o cluster deixa de ser SCC e migra em ondas por dependencia normal; manter como handoffs reais apenas: TB_GARANTIAS_ANALITICO (Crédito->Atacado), as saidas intra-Atacado da Esteira 2/Project_semiUpper/Painel/Base_Carteira, e PDD.INFOS_PME/SME.BASE_HISTORICA_SME_PJ (intra-Riscos).",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 1,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Concordo com artefato_parcial; o veredito resiste a verificacao adversarial. Confirmei no codigo o nucleo que SUSTENTA o \"nao e artefato total\": o ciclo mutuo real intra-Riscos Controle_PMES_v19 <-> Indicadores_PMEs. Controle escreve PDD.INFOS_PME (DATA PDD.INFOS_PME, linha ~2047; 1 writer) e le MONITRCA.NE_DESEMBOLSOS (PROC SQL FROM + %LET subquery linhas 55/184); Indicadores escreve MONITRCA.NE_DESEMBOLSOS (DATA MONITRCA.NE_DESEMBOLSOS linha 1239; 1 writer, PERMANENT OUTPUTS) e le PDD.INFOS_PME (PROC SQL JOIN linhas 119/143/421). Dois lados single-writer, producer->consumer entre dois projetos distintos = dependencia circular genuina. Tese principal tambem confirmada: INSIGHT.TBBRUTA e de fato read-modify-write em Atacado Base_Bruta (SET+FROM e PERMANENT OUTPUT) e multi-writer (Base_Carteira tambem grava + dezenas de snapshots TBBRUTA_AAAAMMDD), e o grupo Serasa PME (BASE_RESTR/SCORE/SOCIOS) aparece em INTERNAL READS E PERMANENT OUTPUTS do OMIE Sacados, com 2 writers (OMIE+SalesFinance) — pseudo-arestas confirmadas. CORRECOES (refinamentos, nao refutacoes): (1) O investigador trata Controle<->Indicadores como o UNICO ciclo real residual, mas o two_cycle Esteira2 <-> Project_semiUpper tambem tem handoff single-writer nos DOIS lados: semiUpper PRODUZ INSIGHT.BASE_DIREITOS_CREDITORIOS (CREATE TABLE linha 670, 1 writer, consumido por Esteira2) E Esteira2 produz PME.BASE_FATURAMENTO_SERASA_PJ (1 writer, consumido por semiUpper). O investigador rotulou DIREITOS como handoff_real mas FATURAMENTO como fonte_compartilhada, sendo que FATURAMENTO tem EXATAMENTE 1 writer — viola a propria regra (fonte_compartilhada = multi-writer/source de BD clara). Ha portanto um segundo ciclo mutuo intra-Atacado genuino sub-contado (ressalva: a escrita de FATURAMENTO em Esteira2 e parcialmente read-modify-write da PME.BASE_FATURAMENTO, tornando esse lado menos limpo que DIREITOS). (2) Mesma inconsistencia em INSIGHT.TBPESSOA (1 writer = CIB) rotulado fonte_compartilhada — defensavel como dimensao, mas tecnicamente produtor unico. Essas correcoes tornam o cluster LIGEIRAMENTE MAIS ciclico do que o alegado, o que reforca (nao enfraquece) artefato_parcial sobre artefato_total.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 2,
+      "resumo": "Cluster de 9 projetos, todos da area Cobranças, girando em torno da biblioteca SAS compartilhada CONTATOS (caminho fisico identico em todos: /riscosbv/cobranca/rribeiro/contatos) e da config TCONFIG (/riscosbv/cobranca/rribeiro/config_trilha_geral). O 'ciclo' nao e um pipeline circular real de negocio: e a consequencia de tratar leitura/escrita numa CAMADA DE DADOS PERSISTENTE COMPARTILHADA (tabelas MDM/AUX de contatos) como se fosse handoff ponto-a-ponto projeto->projeto. O projeto-hub Project_Atualiza_Bases_Auxiliares_GCP_Inc_Desconto_ORAHASH e o verdadeiro job de construcao da camada: le das tabelas de producao BigQuery (BV-PDBD-PRD.*) e CRIA a maioria das CONTATOS.AUX_*/COB_MDM_* (62 refs a AUX_BASE_CYBER, faz o unico CREATE TABLE). Os demais projetos em sua maioria so LEEM essas tabelas; alguns fazem UPDATE incremental na MESMA tabela fisica (ex.: D0 e Eventos_Whats dao UPDATE CONTATOS.AUX_BASE_CYBER), o que o inventario contou como 'writer' e gerou arestas de retorno falsas. Soma-se colisao de nome temporario (darkpost faz PROC SORT OUT=COB_MDM_TELEFONE sem libref = WORK.COB_MDM_TELEFONE, mas so LE a CONTATOS.COB_MDM_TELEFONE real). Restam poucos handoffs incrementais genuinos em volta do hub (AUX_SYNAPSE_MDM_TEL, AUX_QUARENTENA_TEL, AUX_HIST_INTERACAO_WHATS, AUX_BASE_CYBER_D0, AUX_BASE_HASH) que formam um laco de atualizacao mutua real, porem pequeno.",
+      "tabelas": [
+        {
+          "tabela": "CONTATOS.AUX_BASE_CYBER",
+          "classificacao": "fonte_compartilhada",
+          "writers": 4,
+          "readers": 6,
+          "evidencia": "CONTATOS = /riscosbv/cobranca/rribeiro/contatos (mesmo path fisico em todos). So o hub ORAHASH faz CREATE TABLE CONTATOS.AUX_BASE_CYBER (linha 1161); D0 (l.257) e Eventos_Whats (l.1126) so dao UPDATE na mesma tabela. Lida por 22 projetos da area inteira (grep), bem alem dos 6 do cluster: tabela master de contatos, nao handoff."
+        },
+        {
+          "tabela": "CONTATOS.COB_MDM_TELEFONE",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 4,
+          "evidencia": "Unico CREATE real e do hub ORAHASH. darkpost so LE (l.85,382) e cria um WORK.COB_MDM_TELEFONE temp (PROC SORT OUT=COB_MDM_TELEFONE sem libref, l.386) - colisao de nome contada como writer. Tabela MDM lida por ~19 projetos da area."
+        },
+        {
+          "tabela": "CONTATOS.COB_MDM_EMAIL",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 3,
+          "evidencia": "Mesmo padrao do COB_MDM_TELEFONE: tabela MDM da lib compartilhada CONTATOS, criada pelo hub e lida por muitos; writers extra sao UPDATE/temp."
+        },
+        {
+          "tabela": "CONTATOS.AUX_SYNAPSE_MDM_TEL",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 4,
+          "evidencia": "CREATE unico no hub ORAHASH (1 writer). Lida por 12 projetos da area (grep), so 4 no cluster: tabela de referencia MDM/Synapse compartilhada. Alimenta darkpost/D0/Eventos = fan-out de fonte unica, nao handoff dedicado."
+        },
+        {
+          "tabela": "CONTATOS.AUX_BASE_HASH",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (Project_Atualiza_Base_Hash_BV faz o CREATE) -> lido por Acesso_Site_App_GCP e pelo hub. Producao genuina projeto->projeto (gera o hash que os outros consomem)."
+        },
+        {
+          "tabela": "CONTATOS.AUX_BASE_CYBER_D0",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (Project_Atualiza_Base_D0: INSERT INTO / DELETE FROM, l.154/163, e PERMANENT OUTPUT) -> lido pelo hub ORAHASH. Recorte D0 da base cyber produzido pelo D0 para o hub."
+        },
+        {
+          "tabela": "CONTATOS.AUX_HIST_INTERACAO_WHATS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (Project_Controle_Envios_HSM cria) -> lido pelo hub ORAHASH (e por si mesmo). Historico de interacao WhatsApp produzido pelo HSM e consumido pelo hub."
+        },
+        {
+          "tabela": "CONTATOS.AUX_QUARENTENA_TEL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (Project_Atualiza_Base_Eventos_Whats cria, e PERMANENT OUTPUT) -> lido pelo hub ORAHASH. Quarentena de telefones produzida pelo Eventos e consumida pelo hub (lado A->B do 2-cycle real)."
+        },
+        {
+          "tabela": "CONTATOS.AUX_HIST_ACESSO_APP",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "1 writer (Acesso_Site_App_GCP cria) -> 1 reader (hub ORAHASH). Handoff limpo de historico de acesso app."
+        },
+        {
+          "tabela": "CONTATOS.AUX_HIST_ACESSO_SITE",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "1 writer (Acesso_Site_App_GCP) -> 1 reader (hub ORAHASH). Handoff limpo de historico de acesso site."
+        },
+        {
+          "tabela": "CONTATOS.AUX_CYBER_ALCADAS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (hub ORAHASH) -> lido por darkpost (e pelo hub). Derivado da base cyber produzido pelo hub para o darkpost."
+        },
+        {
+          "tabela": "CONTATOS.AUX_IQ_ACAO_CONTRA",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (hub ORAHASH) -> lido por darkpost (e pelo hub). Handoff hub->darkpost."
+        },
+        {
+          "tabela": "CONTATOS.AUX_SYNAPSE_MDM_EMAIL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (hub ORAHASH) -> lido por darkpost (e pelo hub). Par email do AUX_SYNAPSE_MDM_TEL; producao do hub consumida pelo darkpost."
+        },
+        {
+          "tabela": "CONTATOS.AUX_BASE_HASH ",
+          "classificacao": "incerto",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "(linha duplicada conceitualmente coberta acima por AUX_BASE_HASH - sem evidencia adicional)"
+        },
+        {
+          "tabela": "TCONFIG.CONFIG_TPENTRADA",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "TCONFIG = /riscosbv/cobranca/rribeiro/config_trilha_geral (lib de config compartilhada). Tabela de configuracao/lookup lida por 16 projetos da area (grep), so 3 no cluster. E o lado de retorno (TCONFIG.CONFIG_TPENTRADA) das duas-cycles com darkpost/ORAHASH - claramente config comum, nao um produto de pipeline."
+        },
+        {
+          "tabela": "NPS.BA_ESTOQUE_NPSENVIO",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "1 writer (Processo_NPS_UNICO_SEG_DIG) -> lido por ALIMENTAR DASH NPS (e por si). Estoque de envios NPS produzido pelo processo NPS e consumido pelo dashboard. Aparece em 6 arquivos no total."
+        },
+        {
+          "tabela": "CONTATOS.COB_MDM_TELEFONE_BKPD3",
+          "classificacao": "fonte_compartilhada",
+          "writers": 2,
+          "readers": 2,
+          "evidencia": "Backup D-3 da tabela MDM telefone na lib compartilhada CONTATOS; aparece em 6 arquivos. Dois 'writers' (NPSdash e hub) indicam reescrita/backup da mesma fisica, nao handoff dedicado."
+        },
+        {
+          "tabela": "RATINHO.RATINHO_UNIFICADO",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Lib RATINHO separada; nao foi encontrado CREATE/INSERT no cluster (provavel fonte externa/ingestao em outra lib). Lida pelo hub e pelo HSM - tabela unificada compartilhada, candidata a source externa unica."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "A maior parte das arestas que fecham o ciclo desaparece quando as tabelas da lib compartilhada CONTATOS (AUX_BASE_CYBER, COB_MDM_TELEFONE, COB_MDM_EMAIL, AUX_SYNAPSE_MDM_TEL/EMAIL, BKPD3), de TCONFIG (CONFIG_TPENTRADA, lida por 16 projetos) e de RATINHO (RATINHO_UNIFICADO) viram SOURCES unicas: sao camadas de dados/config persistentes e compartilhadas pela area Cobranças inteira (path fisico identico, leitura por 12-22 projetos), nao handoffs ponto-a-ponto. Varios 'writers' extra sao UPDATE incremental na mesma tabela fisica ou colisao de nome temporario (WORK.COB_MDM_TELEFONE no darkpost). POReM nao e artefato total: existe um laco de atualizacao mutua GENUiNO em volta do hub ORAHASH, que CRIA grande parte da camada mas tambem DEPENDE de recortes produzidos por outros projetos no mesmo ciclo de execucao (Eventos->hub via AUX_QUARENTENA_TEL e hub->Eventos via AUX_SYNAPSE_MDM_TEL; D0->hub via AUX_BASE_CYBER_D0; HSM->hub via AUX_HIST_INTERACAO_WHATS; Hash_BV->Acesso->hub via AUX_BASE_HASH/AUX_HIST_ACESSO_*). Esse nucleo de incrementais precisa de ordenacao manual.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Cobranças__ALIMENTAR DASH - NPSv10 - copia",
+          "para": "Cobranças__20250918_darkpost_v15",
+          "via": "TCONFIG.CONFIG_TPENTRADA",
+          "acao": "Externalizar: TCONFIG.CONFIG_TPENTRADA e config compartilhada (lida por 16 projetos). Vira source/seed unica (dbt source ou seed). Remove o lado de retorno do 2-cycle darkpost<->NPSdash."
+        },
+        {
+          "de": "Cobranças__ALIMENTAR DASH - NPSv10 - copia",
+          "para": "Cobranças__Project_Atualiza_Bases_Auxiliares_GCP_Inc_Desconto_ORAHASH",
+          "via": "TCONFIG.CONFIG_TPENTRADA",
+          "acao": "Mesma source unica TCONFIG.CONFIG_TPENTRADA; nenhum projeto deve 'produzir' essa config para o hub."
+        },
+        {
+          "de": "Cobranças__20250918_darkpost_v15",
+          "para": "Cobranças__ALIMENTAR DASH - NPSv10 - copia",
+          "via": "CONTATOS.COB_MDM_TELEFONE",
+          "acao": "Falso writer: darkpost so LE CONTATOS.COB_MDM_TELEFONE e cria WORK.COB_MDM_TELEFONE temp (PROC SORT OUT= sem libref). Corrigir o inventario para nao marcar darkpost como writer; o unico produtor e o hub ORAHASH. Aresta deixa de existir."
+        },
+        {
+          "de": "Cobranças__20250918_darkpost_v15",
+          "para": "Cobranças__Project_Atualiza_Base_D0",
+          "via": "CONTATOS.COB_MDM_EMAIL | CONTATOS.COB_MDM_TELEFONE",
+          "acao": "Idem: COB_MDM_EMAIL/TELEFONE sao MDM produzidos pelo hub. Reapontar leitores para a versao do hub (source/ref do hub); remover atribuicao de writer ao darkpost."
+        },
+        {
+          "de": "Cobranças__Project_Atualiza_Base_D0",
+          "para": "Cobranças__Project_Atualiza_Bases_Auxiliares_GCP_Inc_Desconto_ORAHASH",
+          "via": "CONTATOS.AUX_BASE_CYBER (UPDATE)",
+          "acao": "Separar responsabilidade de escrita: o hub CRIA AUX_BASE_CYBER; D0/Eventos apenas dao UPDATE incremental. Modelar AUX_BASE_CYBER como tabela canonica do hub e mover os UPDATEs para colunas/modelos derivados proprios (ex.: AUX_BASE_CYBER_D0 ja existe), evitando 2+ projetos escreverem a mesma fisica."
+        },
+        {
+          "de": "Cobranças__Project_Atualiza_Bases_Auxiliares_GCP_Inc_Desconto_ORAHASH",
+          "para": "Cobranças__Project_Atualiza_Base_Eventos_Whats",
+          "via": "CONTATOS.AUX_SYNAPSE_MDM_TEL",
+          "acao": "AUX_SYNAPSE_MDM_TEL e tabela de referencia MDM com fan-out (4 leitores, 12 na area). Externalizar como source/ref unica do hub; Eventos passa a ref() o modelo do hub. Quebra o lado hub->Eventos do 2-cycle real."
+        },
+        {
+          "de": "Cobranças__Project_Atualiza_Base_Eventos_Whats",
+          "para": "Cobranças__Project_Atualiza_Bases_Auxiliares_GCP_Inc_Desconto_ORAHASH",
+          "via": "CONTATOS.AUX_QUARENTENA_TEL",
+          "acao": "Handoff incremental genuino (Eventos produz quarentena, hub consome). Manter como ref() Eventos->hub e ORDENAR manualmente Eventos ANTES do hub. Se o hub tambem alimentar dado que Eventos precisa, dividir o hub em duas etapas (pre-MDM e pos-incrementais) para romper a mutualidade."
+        },
+        {
+          "de": "Cobranças__Project_Controle_Envios_HSM",
+          "para": "Cobranças__Project_Atualiza_Bases_Auxiliares_GCP_Inc_Desconto_ORAHASH",
+          "via": "CONTATOS.AUX_HIST_INTERACAO_WHATS",
+          "acao": "Handoff real HSM->hub. Manter ref() HSM->hub e quebrar o retorno hub->HSM (via RATINHO.RATINHO_UNIFICADO) externalizando RATINHO_UNIFICADO como source unica."
+        },
+        {
+          "de": "Cobranças__Project_Atualiza_Bases_Auxiliares_GCP_Inc_Desconto_ORAHASH",
+          "para": "Cobranças__Project_Controle_Envios_HSM",
+          "via": "RATINHO.RATINHO_UNIFICADO",
+          "acao": "RATINHO_UNIFICADO nao tem CREATE no cluster (fonte externa). Declarar como source unica; HSM le source, nao 'depende' do hub. Quebra o 2-cycle hub<->HSM."
+        }
+      ],
+      "recomendacao": "Tratar o cluster como uma CAMADA COMPARTILHADA + um nucleo de incrementais, nao como ciclo de negocio. Passos: (1) Promover a SOURCES/seeds unicos todas as tabelas de fonte/config compartilhada: TCONFIG.CONFIG_TPENTRADA (config, 16 leitores), RATINHO.RATINHO_UNIFICADO (sem produtor no cluster), e as MDM CONTATOS.COB_MDM_TELEFONE/COB_MDM_EMAIL/AUX_SYNAPSE_MDM_TEL/AUX_SYNAPSE_MDM_EMAIL/COB_MDM_TELEFONE_BKPD3/AUX_BASE_CYBER - todas produzidas pelo hub ORAHASH e lidas pela area inteira; cada leitor passa a ref()/source() a versao canonica do hub em vez de 'depender' de quem por acaso escreveu por ultimo. Isso sozinho elimina as 2-cycles darkpost<->NPSdash e a maioria das arestas de retorno. (2) Corrigir falsos writers no inventario 06: PROC SORT/DATA OUT= sem libref cria WORK.* (ex.: darkpost WORK.COB_MDM_TELEFONE) e nao deve contar como writer da tabela CONTATOS; UPDATE de tabela compartilhada (D0/Eventos em AUX_BASE_CYBER) tambem nao e 'producao' e deve ser desambiguado. (3) Para o nucleo de handoffs incrementais reais em volta do hub (AUX_QUARENTENA_TEL Eventos->hub, AUX_BASE_CYBER_D0 D0->hub, AUX_HIST_INTERACAO_WHATS HSM->hub, AUX_BASE_HASH/AUX_HIST_ACESSO_* Hash_BV/Acesso->hub), definir ordem topologica manual: Hash_BV -> Acesso_Site_App -> (D0, Eventos_Whats, HSM produzem seus recortes) -> hub ORAHASH (consolida) -> darkpost/NPSdash/Processo_NPS (consomem). Se persistir mutualidade hub<->Eventos, DIVIDIR o hub ORAHASH em duas etapas (hub_pre: constroi MDM a partir de BV-PDBD-PRD; hub_pos: consolida os incrementais), quebrando o laco sem alterar logica de negocio. Resultado esperado: cluster colapsa de 9 nos ciclicos para um DAG com 1 source layer + 1 hub em 2 etapas + leitores downstream.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 2,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Concordo com o veredito artefato_parcial; o investigador acertou no nucleo e na maioria das evidencias, mas cometeu UM erro factual relevante e fez uma simplificacao a registrar.\n\n(1) ERRO FACTUAL - RATINHO.RATINHO_UNIFICADO: o investigador afirma que \"nao foi encontrado CREATE/INSERT no cluster (provavel fonte externa)\" e recomenda externaliza-la como source unica para quebrar o 2-cycle hub<->HSM. ISSO ESTA ERRADO. O hub ORAHASH GENUINAMENTE escreve RATINHO.RATINHO_UNIFICADO: aparece em EXPORTED_LIBNAMES (l.31) e em PERMANENT OUTPUTS (l.39) do hub, e table_flow lista n_writers=1 = o proprio hub. O HSM le RATINHO.RATINHO_UNIFICADO (l.193, JOIN; EXTERNAL INPUTS l.28) e escreve CONTATOS.AUX_HIST_INTERACAO_WHATS (l.560, CREATE TABLE), que o hub le (l.6214/6315). Portanto o 2-cycle hub<->HSM e um laco MUTUO REAL nas duas pontas, NAO um caso de fonte externa. Externalizar RATINHO_UNIFICADO como source esconderia uma aresta intra-cluster real; o correto e ref() hub->HSM + ordenacao topologica (ou split do hub), reforcando ainda mais que NAO e artefato total.\n\n(2) Classificacao de AUX_SYNAPSE_MDM_TEL como \"fonte_compartilhada\": defensavel (1 writer = hub, 4 leitores), mas rotular como source nao faz a dependencia hub->Eventos/D0 desaparecer - ela e real (hub CRIA, l.1384; Eventos le, l.1105; D0 le, l.298). O investigador trata isso corretamente na acao (ref ao modelo canonico do hub + ordem manual + possivel split do hub), entao nao muda o veredito - apenas reforca que a mutualidade hub<->Eventos e genuina.\n\nEvidencias que CONFIRMAM o investigador (verifiquei no codigo):\n- darkpost FALSO writer de COB_MDM_TELEFONE/EMAIL: PROC SORT OUT=COB_MDM_TELEFONE sem libref = WORK (l.386/399); so LE CONTATOS.COB_MDM_* (l.382/395). Extrator marcou erroneamente como PERMANENT OUTPUT (l.39).\n- NPSdash FALSO writer de TCONFIG.CONFIG_TPENTRADA: \"data CONFIG_TPENTRADA; set TCONFIG.CONFIG_TPENTRADA\" (l.5234/5280/13102) = copia WORK lendo a real; extrator marcou como PERMANENT OUTPUT por colisao de nome. Logo o 2-cycle darkpost<->NPSdash e ARTEFATO TOTAL (ambas pontas falsas) - investigador acertou.\n- Hub e o produtor real: CREATE TABLE CONTATOS.AUX_BASE_CYBER (l.1161), COB_MDM_TELEFONE (l.1621), COB_MDM_EMAIL (l.1962), AUX_SYNAPSE_MDM_TEL (l.1384).\n- D0/Eventos contados como writers de AUX_BASE_CYBER sao UPDATE in-place (D0 l.257; Eventos l.1126) - inflam n_writers=4. Correto.\n- Handoffs incrementais REAIS confirmados: D0 INSERT INTO CONTATOS.AUX_BASE_CYBER_D0 (l.154) -> hub le (l.3992); Eventos INSERT/DELETE CONTATOS.AUX_Quarentena_Tel (l.485/493) -> hub le (l.1487/6986); Hash_BV CREATE CONTATOS.AUX_BASE_HASH (l.495) -> hub/Acesso leem; Acesso CREATE CONTATOS.AUX_HIST_ACESSO_APP/SITE (l.173/184) -> hub le.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 3,
+      "resumo": "Cluster de 8 projetos SAS_UC4 (todos compartilham as MESMAS libnames físicas BASES/BASEGRC/TMP/AUXL via include comum /projetos/MISV/sas-misv-base-lib/scripts/libname.sas — logo, tabelas com prefixo são tabelas físicas reais, não colisões). O laço NÃO é por uma única tabela, mas por uma teia de handoffs físicos genuínos entre marts derivados. Laços principais: (1) producao <-> resultadogerencial: producao escreve TMP.TBPRODUCAO -> resultadogerencial lê para calcular BASES.TBRESULTADOGERENCIAL -> producao RE-LÊ BASES.TBRESULTADOGERENCIAL (left join, linha 1083) para enriquecer sua própria saída (feedback de período anterior). (2) parceirocomercial -> {originacao, producao, pdvs, prospeccao} via TMP.TBPARCEIROCOMERCIAL e BASES.BASE_DSLOGIN_ORIGINADOR; e volta: prospeccao escreve BASEGRC.TBPRIVADOCONVENIOFUNCIONARIOS que parceirocomercial lê, e tbpotencialrodas escreve TMP.TBPOTENCIALRODAS que parceirocomercial lê -> fecha o anel parceiro->rodas->parceiro e parceiro->prospeccao->parceiro. (3) taxamercado produz BASES.TBDIMTAXAMERCADO lido por originacao e producao; e producao escreve BASEGRC.TBPROPOSTAMULTIBANCO/TBRASTREADOR lidos por originacao. A única aresta FALSA é originacao->taxamercado via TBDATACORTE: é colisão de nome (WORK temp em originacao vs CTE local dentro de passthrough DBCON em taxamercado). Removê-la não desfaz o ciclo; o SCC continua real.",
+      "tabelas": [
+        {
+          "tabela": "BASEGRC.TBPRIVADOCONVENIOFUNCIONARIOS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "prospeccaoprivado declara PERMANENT OUTPUT; parceirocomercial linha 774 'left join basegrc.TbPrivadoConvenioFuncionarios' (PROC SQL JOIN). Mart físico em lib compartilhada, 1 produtor->1 consumidor."
+        },
+        {
+          "tabela": "BASEGRC.TBPROPOSTAMULTIBANCO",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "producao escreve via proc append/DATA (PERMANENT OUTPUT); originacao linha 714 'left join basegrc.Tbpropostamultibanco' on nuproposta. Handoff producao->originacao genuíno."
+        },
+        {
+          "tabela": "BASEGRC.TBRASTREADOR",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "producao: linha 299 'proc append base=basegrc.TbRastreador'; originacao linha 710 'left join basegrc.TbRastreador'. Produção -> consumo cross-projeto real."
+        },
+        {
+          "tabela": "BASES.BASE_DSLOGIN_ORIGINADOR",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "parceirocomercial é o único writer (PERMANENT OUTPUT BASES.BASE_DSLOGIN_ORIGINADOR); originacao (linha 720 'left join Bases.Base_DsLogin_Originador') e producao leem. 1 writer -> 2 readers = handoff (fan-out), não fonte multi-writer."
+        },
+        {
+          "tabela": "BASES.TBDIMTAXAMERCADO",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "taxamercado tem como ÚNICA saída BASES.TBDIMTAXAMERCADO (PERMANENT OUTPUT); originacao (linha 684 join) e producao leem. É dimensão derivada produzida por 1 projeto-membro, não fonte externa pré-existente; 1 writer dentro do cluster."
+        },
+        {
+          "tabela": "BASES.TBRESULTADOGERENCIAL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "resultadogerencial: 'data bases.TbResultadoGerencial' (linhas 161-183, PERMANENT OUTPUT, escreve/atualiza); producao linha 1083 'left join bases.TbResultadoGerencial'. Fecha 2-cycle com TMP.TBPRODUCAO."
+        },
+        {
+          "tabela": "TBDATACORTE",
+          "classificacao": "colisao_nome",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "originacao: 'DATA TbDataCorte;' não-qualificada = WORK temp (listada em TEMP/DISCARDED OUTPUTS). taxamercado: 'TbDataCorte AS' é CTE local dentro de 'select * from TbDataCorte' em passthrough DBCON (linhas 101/239/257). Objetos locais distintos com nome genérico 'data de corte' — NÃO é a mesma tabela física. Única tabela sem prefixo de lib. ARESTA FALSA."
+        },
+        {
+          "tabela": "TMP.TBEXTPROPOSTA",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "originacao PERMANENT OUTPUT TMP.TBEXTPROPOSTA; tbpotencialrodas a lê. TMP é lib física compartilhada (não WORK), handoff real originacao->rodas."
+        },
+        {
+          "tabela": "TMP.TBORIGINACAO",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "originacao PERMANENT OUTPUT TMP.TBORIGINACAO; tbpotencialrodas a lê. Tabela física em /projetos/MISV/data/bases/tmp/tboriginacao.sas7bdat (citada nos paths externos). Handoff genuíno."
+        },
+        {
+          "tabela": "TMP.TBPARCEIROCOMERCIAL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 4,
+          "evidencia": "parceirocomercial é único writer (PERMANENT OUTPUT); lida por originacao/producao/pdvs/prospeccao via 'tmp.TbParceiroComercial' (ex.: originacao linhas 201/675). Fan-out de 1 produtor para 4 — handoff central do cluster, não fonte multi-writer."
+        },
+        {
+          "tabela": "TMP.TBPOTENCIALPDVS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "tbpotencialpdvs único PERMANENT OUTPUT TMP.TBPOTENCIALPDVS; tbpotencialrodas a lê. 1->1."
+        },
+        {
+          "tabela": "TMP.TBPOTENCIALRODAS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "tbpotencialrodas PERMANENT OUTPUT TMP.TBPOTENCIALRODAS; parceirocomercial linha 831 'FROM TMP.TBPOTENCIALRODAS A'. Back-edge que fecha o anel rodas->parceiro."
+        },
+        {
+          "tabela": "TMP.TBPRODUCAO",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "producao PERMANENT OUTPUT TMP.TBPRODUCAO; lida por resultadogerencial (join), tbpotencialrodas e prospeccao. Fan-out 1->3; núcleo do 2-cycle com BASES.TBRESULTADOGERENCIAL."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "A grande maioria das arestas são handoffs físicos reais (TMP/BASES/BASEGRC são libs físicas compartilhadas via libname.sas comum, confirmado por reads em PROC SQL JOIN / proc append / data step no código). Há um SCC real: producao<->resultadogerencial é mútuo genuíno (TMP.TBPRODUCAO ida, BASES.TBRESULTADOGERENCIAL volta), e parceirocomercial está num anel real com rodas/prospeccao. Portanto NÃO é artefato total. Porém há 1 artefato confirmado: a aresta originacao->taxamercado via TBDATACORTE é colisão de nome (WORK temp vs CTE de passthrough), falsa. Removê-la elimina o 2-cycle originacao<->taxamercado, mas o SCC permanece (taxamercado ainda alimenta originacao/producao via TBDIMTAXAMERCADO, e producao volta a originacao via TBPROPOSTAMULTIBANCO/TBRASTREADOR). Logo: ciclo real com um artefato parcial.",
+      "arestas_a_quebrar": [
+        {
+          "de": "SAS_UC4__ext_originacao",
+          "para": "SAS_UC4__ext_taxamercado",
+          "via": "TBDATACORTE",
+          "acao": "REMOVER aresta do grafo — colisão de nome (WORK temp em originacao vs CTE local em passthrough DBCON em taxamercado). Não é dependência; corrigir o inventário 06 para não casar nomes não-qualificados/CTEs."
+        },
+        {
+          "de": "SAS_UC4__ext_resultadogerencial",
+          "para": "SAS_UC4__ext_producao",
+          "via": "BASES.TBRESULTADOGERENCIAL",
+          "acao": "QUEBRAR o 2-cycle: producao re-lê BASES.TBRESULTADOGERENCIAL (left join linha 1083) que resultadogerencial produz a partir de TMP.TBPRODUCAO. Em dbt, materializar TBRESULTADOGERENCIAL e fazer producao referenciar o SNAPSHOT do período/run ANTERIOR (source/snapshot), não o ref do mesmo run. Assim a dependência cíclica vira temporal e o DAG fica acíclico."
+        },
+        {
+          "de": "SAS_UC4__ext_producao",
+          "para": "SAS_UC4__ext_originacao",
+          "via": "BASEGRC.TBPROPOSTAMULTIBANCO | BASEGRC.TBRASTREADOR",
+          "acao": "Avaliar se producao deve ser DIVIDIDA: a geração de TBPROPOSTAMULTIBANCO/TBRASTREADOR (proc append, dimensões de proposta/rastreador) é upstream de originacao, mas producao também depende de originacao/parceiro/taxa. Extrair o bloco que materializa TBPROPOSTAMULTIBANCO/TBRASTREADOR para um modelo/projeto staging próprio (ex. stg_proposta_multibanco) que originacao consome — quebra a aresta producao->originacao sem tocar no resto."
+        }
+      ],
+      "recomendacao": "Sequência recomendada para tornar o DAG acíclico: 1) Corrigir o inventário: remover a aresta originacao->taxamercado (TBDATACORTE é colisão WORK/CTE) — único artefato. 2) Externalizar como SOURCE/snapshot a leitura de retorno BASES.TBRESULTADOGERENCIAL dentro de ext_producao: producao só RE-LÊ o gerencial do período anterior para enriquecer; tratar como source de snapshot (run anterior) quebra o 2-cycle producao<->resultadogerencial sem perda funcional. 3) Dividir ext_producao: mover a materialização de BASEGRC.TBPROPOSTAMULTIBANCO e BASEGRC.TBRASTREADOR (dimensões de proposta upstream de originacao) para um staging dedicado; isso corta a aresta producao->originacao. Com (2)+(3) o anel grande producao->originacao->...->producao se abre. 4) As demais tabelas (TMP.TBPARCEIROCOMERCIAL fan-out 4, TMP.TBPRODUCAO fan-out 3, TBDIMTAXAMERCADO, BASE_DSLOGIN_ORIGINADOR, TBPOTENCIALRODAS, TBPRIVADOCONVENIOFUNCIONARIOS) são handoffs legítimos 1-writer; manter como refs dbt normais e ordenar pela topologia resultante. NÃO transformar TBPARCEIROCOMERCIAL nem TBPRODUCAO em source: têm 1 writer dentro do cluster, são marts derivados, e o fan-out sozinho não cria ciclo. Ordem de execução final esperada: parceirocomercial+taxamercado (raízes) -> originacao -> producao -> resultadogerencial / pdvs -> rodas -> prospeccao, com as 2 arestas de retorno (gerencial e potencialrodas->parceiro) resolvidas via snapshot de período anterior.",
+      "confianca": "media",
+      "verificacao": {
+        "cluster_id": 3,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Verdito e classificacoes corretos e bem evidenciados; confirmei no codigo: (a) TBDATACORTE e de fato colisao de nome/aresta falsa — em originacao e WORK temp ('DATA TbDataCorte;' linhas 397/733, listada em TEMP/DISCARDED OUTPUTS), em taxamercado e uma CTE dentro de passthrough 'connection to dbcon (...)' (TbDataCorte AS (SELECT ... FROM DWBI_DIME.TbDimTempoData), linha 101) que o extrator marcou erroneamente como input DBCON externo; (b) as 13 tabelas sao todas 1-writer handoffs (flow_summary: 0 multi_writer), nenhuma classificacao de tabela errada; (c) ha SCC real — 2-cycles mutuos genuinos com handoff dos dois lados: producao<->resultadogerencial (TMP.TBPRODUCAO ida / BASES.TBRESULTADOGERENCIAL re-leitura via left join linha 1083) e parceirocomercial<->prospeccaoprivado (TMP.TBPARCEIROCOMERCIAL ida / BASEGRC.TBPRIVADOCONVENIOFUNCIONARIOS volta), mais rodas->parceiro via TMP.TBPOTENCIALRODAS. Recalculei o SCC removendo a aresta TBDATACORTE e sobra um SCC de 7 nos — confirma que remover o artefato NAO desfaz o ciclo. Unica imprecisao na justificativa do investigador (nao altera o verdito): ele diz que 'taxamercado ainda alimenta o SCC'; na verdade, removida a aresta TBDATACORTE, taxamercado fica SEM nenhuma aresta de entrada vinda do ciclo e SAI do SCC — vira raiz pura (so produz TBDIMTAXAMERCADO). O SCC sobrevivente sao os outros 7 projetos, mantido vivo por producao->originacao (TBPROPOSTAMULTIBANCO/TBRASTREADOR) e pelas back-edges rodas/prospeccao->parceiro e resultadogerencial->producao.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 4,
+      "resumo": "Ciclo 100% interno à área Crédito entre 4 projetos de manutenção/redução de limite de cartão. Fluxo principal em cadeia: BASE_CONTROLE_TOTAL_VF escreve MANUTLIM.CONTROLE_MANUTENCAO_TOTAL → BASE MANUTENCAO TOTAL a lê e escreve MANUTLIM.MANUTENCAO_TOTAL → Reducao_Em_Dia a lê. O ciclo se fecha por DUAS arestas de volta que apontam para o início da cadeia: (1) Reducao_Em_Dia escreve MANUTLIM._BASE_LOG_RED_EMDIA_20251124 que BASE_CONTROLE_TOTAL_VF lê de volta; (2) RED_LIMITE_PUBLICO_EM_ATRASO escreve MANUTLIM._BASE_LOG_RED_ATRASO_20251124 que BASE_CONTROLE_TOTAL_VF lê de volta. Há ainda um par MÚTUO real A<->B entre RED_LIMITE_PUBLICO_EM_ATRASO e Reducao_Em_Dia: RED_ATRASO escreve _BASE_LOG_RED_ATRASO_20251124 (lido por Reducao_Em_Dia) e Reducao_Em_Dia escreve GALDINO.BASE_PARTIDA_REDUCAOCARGA_202511 (lido por RED_ATRASO). Ou seja, os dois projetos de redução (em-dia e em-atraso) consomem saídas um do outro, e ambos os logs de redução voltam para realimentar a base de controle total. Todas as tabelas-via são datasets SAS/Local (libs pessoais/de time MANUTLIM e GALDINO), não fontes de banco corporativas; são artefatos intermediários gravados pelos próprios projetos.",
+      "tabelas": [
+        {
+          "tabela": "MANUTLIM.CONTROLE_MANUTENCAO_TOTAL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Escrita só por BASE_CONTROLE_TOTAL_VF (PERMANENT OUTPUTS); lida por BASE MANUTENCAO TOTAL (EXTERNAL INPUTS + provenance DATA Step-SET). 1 writer real -> consumidor distinto. (leitor extra é auto-leitura do proprio writer)."
+        },
+        {
+          "tabela": "MANUTLIM.MANUTENCAO_TOTAL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Escrita só por BASE MANUTENCAO TOTAL (PERMANENT OUTPUTS); lida por Reducao_Em_Dia (EXTERNAL INPUTS + provenance PROC SQL-FROM). Handoff genuino; outro reader é o proprio writer."
+        },
+        {
+          "tabela": "MANUTLIM._BASE_LOG_RED_ATRASO_20251124",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "Escrita só por RED_LIMITE_PUBLICO_EM_ATRASO (PERMANENT OUTPUTS); lida por BASE_CONTROLE_TOTAL_VF e por Reducao_Em_Dia (ambos em EXTERNAL INPUTS + provenance). 1 writer alimentando 2 consumidores reais -> aresta de retorno do ciclo."
+        },
+        {
+          "tabela": "MANUTLIM._BASE_LOG_RED_EMDIA_20251124",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Escrita só por Reducao_Em_Dia (PERMANENT OUTPUTS); lida por BASE_CONTROLE_TOTAL_VF (EXTERNAL INPUTS + provenance). Outra aresta de retorno do ciclo; reader extra é auto-leitura."
+        },
+        {
+          "tabela": "GALDINO.BASE_PARTIDA_REDUCAOCARGA_202511",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Escrita só por Reducao_Em_Dia (PERMANENT OUTPUTS); lida por RED_LIMITE_PUBLICO_EM_ATRASO (EXTERNAL INPUTS + provenance DATA Step-SET). É a via_ba do par mutuo A<->B; reader extra é auto-leitura do writer."
+        }
+      ],
+      "veredito": "ciclo_real",
+      "veredito_justificativa": "As 5 tabelas-via são handoffs reais de writer único: cada uma tem exatamente 1 produtor dentro do cluster e é lida por outro(s) projeto(s) do cluster, confirmado tanto em PERMANENT OUTPUTS do produtor quanto em EXTERNAL INPUTS+TABLE_READ_PROVENANCE dos consumidores. Nenhuma é fonte de banco corporativa (todas são SAS/Local nas libs MANUTLIM/GALDINO) nem colisão de nome temporário (nomes datados/específicos, mesma área Crédito). Existe um laço mútuo genuíno (RED_LIMITE_PUBLICO_EM_ATRASO <-> Reducao_Em_Dia) e duas arestas de retorno reais que realimentam BASE_CONTROLE_TOTAL_VF. Logo, é dependência cíclica genuína, não artefato de inventário.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Crédito__RED_LIMITE_PUBLICO_EM_ATRASO_20251124",
+          "para": "Crédito__Reducao_Em_Dia_20251124",
+          "via": "MANUTLIM._BASE_LOG_RED_ATRASO_20251124",
+          "acao": "Quebrar o par mútuo: externalizar _BASE_LOG_RED_ATRASO_20251124 como source única (snapshot da rodada anterior) consumida por Reducao_Em_Dia, removendo a leitura ao vivo do output de RED_ATRASO."
+        },
+        {
+          "de": "Crédito__Reducao_Em_Dia_20251124",
+          "para": "Crédito__RED_LIMITE_PUBLICO_EM_ATRASO_20251124",
+          "via": "GALDINO.BASE_PARTIDA_REDUCAOCARGA_202511",
+          "acao": "Determinar quem produz a base de partida da campanha: extrair BASE_PARTIDA_REDUCAOCARGA_202511 para um modelo/stg compartilhado (upstream comum aos dois) e fazer Reducao_Em_Dia e RED_ATRASO lerem desse modelo, em vez de Reducao_Em_Dia escrever e RED_ATRASO ler. Isso desfaz o ciclo de 2 nós."
+        },
+        {
+          "de": "Crédito__Reducao_Em_Dia_20251124",
+          "para": "Crédito__20250924 - BASE_CONTROLE_TOTAL_VF",
+          "via": "MANUTLIM._BASE_LOG_RED_EMDIA_20251124",
+          "acao": "Aresta de retorno: BASE_CONTROLE_TOTAL_VF é um agregador histórico que faz SET de TODOS os logs de redução; converter _BASE_LOG_RED_EMDIA_20251124 (e os demais _BASE_LOG_RED_*) em fonte append-only/incremental lida por BASE_CONTROLE_TOTAL_VF como snapshot, não como output ao vivo da rodada corrente."
+        },
+        {
+          "de": "Crédito__RED_LIMITE_PUBLICO_EM_ATRASO_20251124",
+          "para": "Crédito__20250924 - BASE_CONTROLE_TOTAL_VF",
+          "via": "MANUTLIM._BASE_LOG_RED_ATRASO_20251124",
+          "acao": "Mesma estratégia da aresta acima: BASE_CONTROLE_TOTAL_VF deve depender de uma camada de logs consolidados (incremental), não diretamente do output da rodada de RED_ATRASO; assim o agregador fica downstream estável e não realimenta o ciclo."
+        }
+      ],
+      "recomendacao": "É ciclo REAL, exige quebra manual (compatível com a marcação 'Onda 3'). Recomendação em duas frentes. (A) Camada temporal/incremental para a base de controle: BASE_CONTROLE_TOTAL_VF é um agregador que faz SET de dezenas de logs históricos de redução/aumento (incl. _BASE_LOG_RED_ATRASO_* e _BASE_LOG_RED_EMDIA_* de várias datas). Em dbt, modelar os logs MANUTLIM._BASE_LOG_RED_* como uma tabela incremental/append-only e fazer BASE_CONTROLE_TOTAL_VF referenciar a versão consolidada (snapshot da rodada anterior, não a corrente). Isso elimina as duas arestas de retorno (_BASE_LOG_RED_EMDIA_20251124 e _BASE_LOG_RED_ATRASO_20251124) sem alterar a lógica de negócio (ele já agrega histórico). (B) Quebrar o par mútuo RED_ATRASO<->Reducao_Em_Dia: extrair GALDINO.BASE_PARTIDA_REDUCAOCARGA_202511 (a 'base de partida' da campanha de redução de carga) para um modelo upstream compartilhado, do qual AMBOS os projetos descendem, em vez de um escrever e o outro ler; e tratar o consumo cruzado de _BASE_LOG_RED_ATRASO_20251124 por Reducao_Em_Dia como snapshot da rodada anterior. Após (A)+(B) a cadeia vira DAG linear: BASE_PARTIDA(comum) -> RED_ATRASO e Reducao_Em_Dia -> logs consolidados -> BASE_CONTROLE_TOTAL_VF -> BASE MANUTENCAO TOTAL. Validar com o time de Crédito (libs MANUTLIM/GALDINO) se BASE_PARTIDA_REDUCAOCARGA é insumo comum (provável) e se as leituras de log são da rodada corrente ou histórica — ponto decisivo para confirmar a estratégia de snapshot.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 4,
+        "concorda": true,
+        "veredito_final": "ciclo_real",
+        "correcoes": "nenhuma. Verifiquei as 5 tabelas-via no código (text_egps/) e todas batem com table_flow (n_writers=1 cada; flow_summary multi_writer=0). (1) MANUTLIM.CONTROLE_MANUTENCAO_TOTAL: escrita por BASE_CONTROLE_TOTAL_VF (DATA ... várias vezes + PERMANENT OUTPUTS), lida por BASE MANUTENCAO TOTAL (SET, linhas 4873/5746). (2) MANUTLIM.MANUTENCAO_TOTAL: escrita por BASE MANUTENCAO TOTAL (DATA ... + PERMANENT OUTPUTS), lida por Reducao_Em_Dia (FROM, linha 1170). (3) MANUTLIM._BASE_LOG_RED_ATRASO_20251124: escrita por RED_ATRASO (DATA, linhas 821/1624), lida por BASE_CONTROLE_TOTAL_VF (SET, 2050/4367/4923) e por Reducao_Em_Dia (LEFT JOIN, 2180/2246/4052); o 3o reader em table_flow é a auto-leitura do próprio RED_ATRASO — explicação do investigador correta. (4) MANUTLIM._BASE_LOG_RED_EMDIA_20251124: escrita por Reducao_Em_Dia (DATA, 1895/3860), lida por BASE_CONTROLE_TOTAL_VF (SET, 2037). (5) GALDINO.BASE_PARTIDA_REDUCAOCARGA_202511 (via_ba do laço mútuo): escrita por Reducao_Em_Dia (DATA, 121/172), lida por RED_ATRASO (SET, 439). O laço mútuo A<->B é genuíno nos DOIS sentidos (A->B via _BASE_LOG_RED_ATRASO; B->A via BASE_PARTIDA), cada um com produtor único distinto — não é colisão de nome temporário. Todas as vias são SAS/Local em libs pessoais/de time (GALDINO=/riscosbvf/pol_empcr/GALDINO, MANUTLIM=/riscosbvf/pol_empcr/MANUT_LIMITES), nenhuma é fonte corporativa de BD (as corporativas BV-PDBD-PRD.* BigQuery e SYBASEIQ não participam de nenhuma aresta do ciclo). Veredito ciclo_real plenamente sustentado.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 5,
+      "resumo": "Ciclo de 3 projetos da area Atacado (Compilados_v27, Consolidado_V68, consultas_v8) que compartilham duas bibliotecas SAS fisicas: EXTRATO e PASSIVOS. O laco principal nao e um handoff projeto-a-projeto limpo: e uma ZONA DE STAGING/SNAPSHOT MENSAL compartilhada (biblioteca EXTRATO) onde varios projetos LEEM e ESCREVEM tabelas de extrato datadas (EXTRATO.EXTRATO_YYYYMM, EXTRATO.EXTRATO_AAAA_ENCARTEIRAMENTO23). Dado que volta pra tras: (1) Consolidado escreve os snapshots mensais EXTRATO.EXTRATO_202404 / _2019_ENCARTEIRAMENTO23 / _2021_ENCARTEIRAMENTO23 / _202308 / _202402 que Compilados e consultas leem; (2) consultas escreve EXTRATO.EXTRATO_ENCART24_2023 que Consolidado le; (3) Compilados escreve EXTRATO.CLIENTES_ATIVOS e PASSIVOS.BOOK_PASSIVO_ANTERIOR/ATUAL que Consolidado le. Agravante: EXTRATO.EXTRATO_202404 e lido E reescrito no mesmo lugar (DATA EXTRATO.EXTRATO_202404; SET EXTRATO.EXTRATO_202404 - padrao restate/carimba), reforcando a aparencia de loop. So (3) e claramente handoff de produto de negocio; o resto e uso de uma fonte/area comum mensal.",
+      "tabelas": [
+        {
+          "tabela": "EXTRATO.CLIENTES_ATIVOS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Compilados escreve de verdade (CREATE TABLE EXTRATO.CLIENTES_ATIVOS / DATA EXTRATO.CLIENTES_ATIVOS, linhas 725/735/744); Consolidado le via DATA Step SET (TABLE_READ_PROVENANCE: EXTRATO.CLIENTES_ATIVOS [DATA Step - SET]). Produto genuino Compilados->Consolidado."
+        },
+        {
+          "tabela": "PASSIVOS.BOOK_PASSIVO_ANTERIOR",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Compilados escreve (DATA PASSIVOS.BOOK_PASSIVO_ANTERIOR linha 2129; CREATE TABLE linha 2189); Consolidado le (PASSIVOS.BOOK_PASSIVO_ANTERIOR [PROC SQL - FROM]). Handoff real de book de passivos."
+        },
+        {
+          "tabela": "PASSIVOS.BOOK_PASSIVO_ATUAL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Compilados escreve (DATA PASSIVOS.BOOK_PASSIVO_ATUAL linha 1946); Consolidado le (PASSIVOS.BOOK_PASSIVO_ATUAL [PROC SQL - FROM]). Handoff real."
+        },
+        {
+          "tabela": "EXTRATO.EXTRATO_202404",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Snapshot mensal na biblioteca compartilhada EXTRATO, lido por 2 projetos (Compilados + consultas). Em Consolidado aparece em PERMANENT OUTPUTS mas tambem em EXTERNAL INPUTS e e reescrito sobre si mesmo (DATA EXTRATO.EXTRATO_202404; SET EXTRATO.EXTRATO_202404 linhas 13398-13399, 26231-26232) - padrao restate/area comum, nao handoff dedicado. Em Compilados entra como EXTERNAL INPUT [SAS/Local]."
+        },
+        {
+          "tabela": "EXTRATO.EXTRATO_2019_ENCARTEIRAMENTO23",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Snapshot historico de extrato na lib EXTRATO. Consolidado o cria (PERMANENT OUTPUTS; DATA EXTRATO.EXTRATO_2019_ENCARTEIRAMENTO23 linhas 10902/11715/30528) mas tambem le (SET na mesma linha 11716/30529); consultas le. Tabela de base mensal/historica comum, nao produto de negocio dedicado."
+        },
+        {
+          "tabela": "EXTRATO.EXTRATO_2021_ENCARTEIRAMENTO23",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Mesma natureza: extrato historico na lib compartilhada EXTRATO criado por Consolidado (linhas 9712/13180) e lido por consultas. Base historica comum."
+        },
+        {
+          "tabela": "EXTRATO.EXTRATO_202308",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Snapshot mensal EXTRATO; Consolidado escreve e tambem le no mesmo lugar (data extrato.EXTRATO_202308; set extrato.EXTRATO_202308 linhas 13210-13211); consultas le. Area comum de extratos."
+        },
+        {
+          "tabela": "EXTRATO.EXTRATO_202402",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Snapshot mensal; DATA EXTRATO.EXTRATO_202402; SET EXTRATO.EXTRATO_202402 (linhas 13375-13376) em Consolidado (restate in place); consultas le. Fonte mensal compartilhada."
+        },
+        {
+          "tabela": "EXTRATO.EXTRATO_ENCART24_2023",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "consultas escreve de fato (DATA EXTRATO.EXTRATO_ENCART24_2023 linhas 3440/9785; consta em PERMANENT OUTPUTS de consultas) e Consolidado le (so SET/FROM, esta em EXTERNAL INPUTS de Consolidado, nao em seus outputs). Embora tenha 1 writer/1 reader, e mais uma base de encarteiramento na lib comum EXTRATO do que um produto de negocio entregue; classificada como fonte compartilhada por viver na mesma zona de staging mensal e fechar o laco artificial."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "Existe dependencia REAL e direcional Compilados->Consolidado via 3 produtos de negocio genuinos (EXTRATO.CLIENTES_ATIVOS, PASSIVOS.BOOK_PASSIVO_ANTERIOR, PASSIVOS.BOOK_PASSIVO_ATUAL - escritas confirmadas no codigo de Compilados). Porem o FECHAMENTO do ciclo (Consolidado/consultas -> de volta) acontece somente atraves de tabelas de snapshot mensal/historico que vivem na biblioteca SAS compartilhada EXTRATO (EXTRATO.EXTRATO_YYYYMM e EXTRATO.EXTRATO_*_ENCARTEIRAMENTO23), varias delas lidas-e-reescritas no mesmo lugar (restate/carimba). Essas nao sao handoffs dedicados e sim uma area de dados comum mensal. Logo o grafo so vira ciclo porque trata a lib EXTRATO como um no unico compartilhado entre projetos - artefato parcial: ha 1 aresta real (Compilados->Consolidado) e o retorno e artefato de fonte compartilhada.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Atacado__Consolidado_V68",
+          "para": "Atacado__Compilados_v27",
+          "via": "EXTRATO.EXTRATO_202404",
+          "acao": "Externalizar: promover os snapshots mensais EXTRATO.EXTRATO_YYYYMM a uma camada/source unica de extratos (ex. source/staging stg_atacado_extrato_mensal). Compilados passa a referenciar essa source, nao o output de Consolidado. Quebra a aresta de retorno Consolidado->Compilados."
+        },
+        {
+          "de": "Atacado__Consolidado_V68",
+          "para": "Atacado__consultas_v8",
+          "via": "EXTRATO.EXTRATO_2019_ENCARTEIRAMENTO23 | EXTRATO.EXTRATO_2021_ENCARTEIRAMENTO23 | EXTRATO.EXTRATO_202308 | EXTRATO.EXTRATO_202402 | EXTRATO.EXTRATO_202404",
+          "acao": "Mesma medida: tratar todos os extratos mensais/historicos da lib EXTRATO como source compartilhada. consultas le da source, nao do Consolidado. Resolver o padrao read-modify-write (DATA X; SET X) extraindo a producao desses snapshots para um modelo de staging unico e idempotente."
+        },
+        {
+          "de": "Atacado__consultas_v8",
+          "para": "Atacado__Consolidado_V68",
+          "via": "EXTRATO.EXTRATO_ENCART24_2023",
+          "acao": "Definir UM unico produtor de EXTRATO.EXTRATO_ENCART24_2023 (hoje consultas escreve, Consolidado so le): mover a producao para a camada de staging de encarteiramento e Consolidado consome via source/ref, eliminando o vinculo direto consultas->Consolidado."
+        }
+      ],
+      "recomendacao": "Quebrar o ciclo externalizando a biblioteca EXTRATO como uma camada de SOURCE/STAGING unica de extratos mensais e de encarteiramento (EXTRATO.EXTRATO_YYYYMM, EXTRATO.EXTRATO_*_ENCARTEIRAMENTO23, EXTRATO.EXTRATO_ENCART24_2023). Passos concretos: (1) Criar uma fonte/modelo de staging unico para os snapshots mensais de extrato, com produtor unico e materializacao idempotente - isso elimina os padroes read-modify-write (DATA EXTRATO.EXTRATO_202404; SET EXTRATO.EXTRATO_202404) que falsificam o loop. (2) Reapontar Compilados e consultas para LER essa source em vez do output direto do outro projeto; isso corta as duas arestas de retorno (Consolidado->Compilados e Consolidado->consultas) e a aresta consultas->Consolidado. (3) Manter como UNICA dependencia direcional real Compilados_v27 -> Consolidado_V68 via EXTRATO.CLIENTES_ATIVOS, PASSIVOS.BOOK_PASSIVO_ANTERIOR e PASSIVOS.BOOK_PASSIVO_ATUAL (handoffs genuinos) - apos externalizar EXTRATO, o grafo vira aciclico e Compilados pode migrar antes de Consolidado. Ordem de migracao sugerida: source de extratos -> Compilados -> Consolidado/consultas. Nao e necessario dividir projetos; basta isolar a zona EXTRATO como fonte comum.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 5,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Concordo com o veredito artefato_parcial e com a recomendacao. A tese central foi confirmada no codigo, mas faltaram/erraram alguns pontos. (1) EVIDENCIA MAIS FORTE QUE FALTOU: os projetos consumidores declaram as snapshots EXTRATO nos seus PROPRIOS headers EXTERNAL INPUTS (Requires Ingestion) [SAS/Local]. Compilados lista EXTRATO.EXTRATO_202404 como input externo (linha 28); consultas lista EXTRATO_202404, EXTRATO_202308, EXTRATO_202402, EXTRATO_2019_ENCARTEIRAMENTO23 e EXTRATO_2021_ENCARTEIRAMENTO23 todas como EXTERNAL INPUTS [SAS/Local] (linha 28). Isso e prova mais limpa que o argumento de restate: os proprios consumidores tratam essas tabelas como fonte SAS a ingerir, nao como produto entregue por Consolidado. As arestas de retorno so existem porque Consolidado tambem carimba os mesmos snapshots in-place e os lista em PERMANENT OUTPUTS. (2) ERRO DE EVIDENCIA: para EXTRATO_2019_ENCARTEIRAMENTO23 e EXTRATO_2021_ENCARTEIRAMENTO23, Consolidado GENUINAMENTE CONSTROI essas tabelas a partir de OUTRA fonte (DATA EXTRATO.EXTRATO_2019_ENCARTEIRAMENTO23; SET EXTRATO.EXTRATO_19 na linha 10902; e SET EXTRATO.EXTRATO_2021 na linha 9712, com enriquecimento SETOR_CNAE/MACRO_SETOR) - NAO e read-modify-write como o investigador alegou ('le na mesma linha 11716'); ele confundiu a construcao real (linha 10902) com o carimba in-place posterior (linhas 11715-11716/30528). Mesmo assim a classificacao fonte_compartilhada se sustenta porque vivem na lib comum EXTRATO e consultas as declara como input externo. (3) Confirmado que EXTRATO_202404/202308/202402 em Consolidado e EXTRATO_ENCART24_2023 em consultas sao puro restate-in-place (DATA X; SET X para ajustar rotulos OFFICER/GRUPO/SEGMENTO), reforcando os edges artificiais. (4) Confirmado: a unica aresta real e direcional e Compilados->Consolidado via EXTRATO.CLIENTES_ATIVOS (CREATE/DATA linhas 725/735/744), PASSIVOS.BOOK_PASSIVO_ANTERIOR (linha 2129/2189) e PASSIVOS.BOOK_PASSIVO_ATUAL (linha 1946) - todas em PERMANENT OUTPUTS de Compilados e NAO em seus EXTERNAL INPUTS, e lidas por Consolidado. Nenhum dos two_cycles tem handoff real dos dois lados, entao nao ha ciclo mutuo genuino.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 6,
+      "resumo": "Cluster de 3 projetos da area Rodas (todos Onda 8). O laco que fecha o ciclo e o par mutuo Parceiros_digitais <-> Funil_EGV: (1) Parceiros 'produz' as tabelas de-para AUXL.EGV_DEPARABALCAODIGITAL e AUXL.EGV_DEPARAPARCEIROSDIGITAIS, lidas por Funil; (2) Funil produz/atualiza TRIBO.EGV_PAP (CREATE + DELETE + append via DATA SET), lida por Parceiros (__4, PROC SQL FROM). Esse mutuo ja basta para o SCC. O terceiro projeto (filtrocvg) so alonga o caminho: ele tambem le as DEPARA da Parceiros e escreve BASEGRC.TBFILTROCVG, lida por Funil. O dado que 'volta pra tras' de verdade e o EGV_PAP (Funil -> Parceiros). As tabelas DEPARA voltando para Parceiros sao um artefato: na pratica sao seeds CSV estaticos que a Parceiros apenas carrega.",
+      "tabelas": [
+        {
+          "tabela": "AUXL.EGV_DEPARABALCAODIGITAL",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "Parceiros __2 nao deriva: importa CSV estatico (filename balcao '/infogrc/IGE_NEW/EGV/Parceiros_Digitais/DePara/EGV_DeParaBalcaoDigital.csv'; data AUXL.EGV_DeParaBalcaoDigital). Funil __1 e filtrocvg __01 a usam em JOIN/IN(SELECT) como lookup (filtrocvg L229 LEFT JOIN AUXL.EGV_DEPARABALCAODIGITAL). E tabela de referencia, nao handoff derivado."
+        },
+        {
+          "tabela": "AUXL.EGV_DEPARAPARCEIROSDIGITAIS",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 3,
+          "evidencia": "Parceiros __1 importa CSV estatico (filename csvEGV '/infogrc/.../EGV_DeParaParceirosDigitais.csv'; data AUXL.EGV_DeParaParceirosDigitais). Lida como lookup por Funil __1 (PROC SQL JOIN) e filtrocvg (IN (select distinct INPUT(Codigos,BEST.) from AUXL.EGV_DEPARAPARCEIROSDIGITAIS)). Tambem aparece fora do cluster (tbpropostas-hh). Seed compartilhado."
+        },
+        {
+          "tabela": "TRIBO.EGV_PAP",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Funil __1 e o unico produtor: 'create table EGV_PAP', 'DELETE * FROM TRIBO.EGV_PAP WHERE...', 'data TRIBO.EGV_PAP; set TRIBO.EGV_PAP EGV_PAP' (append historico). Parceiros __4 le no fluxo (PROC SQL FROM TRIBO.EGV_PAP where nuproposta is not null). Producao genuina Funil -> Parceiros (o 1 reader extra e auto-leitura do proprio Funil no append)."
+        },
+        {
+          "tabela": "BASEGRC.TBFILTROCVG",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "filtrocvg __01 e o unico writer (data BASEGRC.TbFiltroCVG; set FiltroCVG; PERMANENT OUTPUTS: BASEGRC.TBFILTROCVG). Funil __1 le (L449 left join basegrc.tbfiltrocvg b on a.nuproposta=b.nuproposta). Handoff real filtrocvg->Funil DENTRO do cluster, porem e tabela BASEGRC. publicada e consumida por 10+ projetos fora do cluster (inad, originacao-solar, qdv_cubo etc.) - candidata a mart/source compartilhada."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "Das 4 tabelas, 2 (as AUXL.EGV_DEPARA*) sao seeds CSV estaticos que a Parceiros apenas carrega - nao sao producao derivada, sao fonte compartilhada. Elas causam as arestas Parceiros->Funil e Parceiros->filtrocvg. Removendo-as (virando source/seed unica), essas arestas somem e o SCC quebra: sobra um DAG limpo filtrocvg -> Funil -> Parceiros (Funil produz TRIBO.EGV_PAP lida por Parceiros; filtrocvg produz BASEGRC.TBFILTROCVG lida por Funil), os 3 lendo os seeds. Como TRIBO.EGV_PAP e BASEGRC.TBFILTROCVG sao handoffs reais (mas em um sentido so), o ciclo nao e 100% artefato: e artefato_parcial - so a perna das DEPARA e espuria, e e justamente ela que fecha o laco mutuo.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Rodas__IGE_NEW_EGV_Parceiros_digitais",
+          "para": "Rodas__IGE_NEW_Funil_EGV",
+          "via": "AUXL.EGV_DEPARABALCAODIGITAL | AUXL.EGV_DEPARAPARCEIROSDIGITAIS",
+          "acao": "Externalizar as duas tabelas DEPARA como seed/source unica (CSV em /infogrc/IGE_NEW/EGV/Parceiros_Digitais/DePara/) referenciada via source() por todos. A 'producao' pela Parceiros e so um PROC IMPORT; deixa de ser dependencia de projeto. Aresta deixa de existir."
+        },
+        {
+          "de": "Rodas__IGE_NEW_EGV_Parceiros_digitais",
+          "para": "Rodas__filtrocvg",
+          "via": "AUXL.EGV_DEPARABALCAODIGITAL | AUXL.EGV_DEPARAPARCEIROSDIGITAIS",
+          "acao": "Mesma acao: filtrocvg passa a ler os seeds DEPARA via source() em vez de depender do output da Parceiros. Aresta eliminada - filtrocvg deixa de estar abaixo da Parceiros."
+        }
+      ],
+      "recomendacao": "Quebrar o ciclo externalizando os dois de-para como dbt seeds/sources unicos (a partir dos CSV originais em /infogrc/IGE_NEW/EGV/Parceiros_Digitais/DePara/EGV_DeParaBalcaoDigital.csv e EGV_DeParaParceirosDigitais.csv): NAO modele AUXL.EGV_DEPARA* como output da Parceiros que alimenta Funil/filtrocvg; modele como source compartilhada que os tres referenciam. Isso elimina as arestas Parceiros->Funil e Parceiros->filtrocvg e dissolve o SCC. Sobra um DAG aciclico: filtrocvg (produz BASEGRC.TBFILTROCVG) -> Funil_EGV (produz TRIBO.EGV_PAP) -> Parceiros_digitais; os tres consomem os seeds DEPARA. Nao e preciso cortar nenhum handoff real (EGV_PAP e TBFILTROCVG ficam como ref() normais) nem dividir projetos. Recomendacao adicional: tratar BASEGRC.TBFILTROCVG como mart/source publicada (e lida por 10+ projetos fora do cluster), garantindo que filtrocvg seja migrado/materializado antes dos consumidores. Migrar nesta ordem: seeds DEPARA -> filtrocvg -> Funil_EGV -> Parceiros_digitais.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 6,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Praticamente nenhuma de fundo - a investigacao esta correta e bem evidenciada no codigo. Verifiquei: (1) Parceiros __1/__2 produzem AUXL.EGV_DEPARAPARCEIROSDIGITAIS e AUXL.EGV_DEPARABALCAODIGITAL via DATA step puro de ingestao de CSV (`data AUXL.EGV_DeParaX; infile <csv> dlm=';'; input ...; run;`), de arquivo mantido manualmente (\"Arquivo gerado manualmente\"), sem qualquer derivacao de tabela de projeto - sao seeds estaticos; (2) Funil __1 e filtrocvg __01 os leem so como lookup (JOIN / IN(select)); (3) TRIBO.EGV_PAP e handoff real Funil->Parceiros (Funil: create table EGV_PAP + DELETE + append `set TRIBO.EGV_PAP EGV_PAP`; Parceiros __4: PROC SQL FROM TRIBO.EGV_PAP) - n_readers=2 inclui auto-leitura do Funil, como o investigador notou; (4) BASEGRC.TBFILTROCVG e handoff real filtrocvg->Funil (filtrocvg: `data BASEGRC.TbFiltroCVG; set FiltroCVG`; Funil L449: left join basegrc.tbfiltrocvg). O manifest marca two_cycles (mutuo Parceiros<->Funil), mas o teste e: handoff real dos DOIS lados? Nao - so o lado Funil->Parceiros (EGV_PAP) e real; o lado Parceiros->Funil (DEPARA) e espurio porque a \"producao\" e apenas carregar um CSV externo. Logo o laco mutuo se desfaz externalizando os seeds, restando DAG aciclico filtrocvg->Funil->Parceiros. artefato_parcial e exatamente correto. Unica correcao de precisao: as duas DEPARA tem n_writers=1 e nao sao source de BD, entao a rotulagem \"fonte_compartilhada\" nao bate ao pe da letra com a definicao (varios writers OU source de BD); o mais preciso seria \"seed/source estatica externa carregada por 1 writer trivial\". A substancia (comportam-se como fonte compartilhada e nao como producao derivada) esta certa e nao altera o veredito.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 7,
+      "resumo": "Laço mútuo A↔B entre dois projetos de Finanças no fechamento mensal (sufixo NOV25D). Tesouraria_sem_porta GRAVA PLANCTRL.BASE_TESOURARIA (resultado/VR mesa caixa da tesouraria) e Book_Diario_Acumulado a LÊ para ratear tesouraria por linha. Na volta, Book_Diario GRAVA SAIDASIC.REGRAS_SEGMENTAR_TEMP_NOV25D_D3 (regras de segmentação/risk-sharing do mês corrente) e Tesouraria a LÊ para segmentar sua base. Ou seja: resultado de tesouraria vai do Tesouraria->Book, e as regras de segmentação voltam do Book->Tesouraria, dentro do mesmo ciclo mensal -> dependência circular real.",
+      "tabelas": [
+        {
+          "tabela": "PLANCTRL.BASE_TESOURARIA",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Tesouraria_sem_porta é o único writer: 'delete from PLANCTRL.BASE_TESOURARIA' (l.2232) + 'insert into PLANCTRL.BASE_TESOURARIA' (l.2235) = full refresh. Book_Diario consome em l.3308 ('from PLANCTRL.BASE_TESOURARIA' filtrando por dataref) para WORK.TES_VRMESCAIXA. O 2o reader (a própria Tesouraria, em INTERNAL READS/PROC SQL FROM) é leitura do próprio estado anterior antes do refresh, não handoff. PLANCTRL=/riscosbv/ctrnegocios/Bases_Unica_Financas é libname compartilhado, mas esta tabela tem 1 writer e produto genuíno."
+        },
+        {
+          "tabela": "SAIDASIC.REGRAS_SEGMENTAR_TEMP_NOV25D_D3",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Book_Diario é único writer do mês corrente: 'Create table SAIDASIC.REGRAS_SEGMENTAR_TEMP&DtBase.' com %Let DtBase=_NOV25D_D3 (l.2694) + Proc Append base=...&DtBase (l.2778). Tesouraria LÊ exatamente _NOV25D_D3 (PROC SORT/PROC SQL FROM) = handoff real. O 2o reader (o próprio Book em l.5616) usa &BaseRef=_FEV19D_D3, mês HISTÓRICO diferente (SAIDASIC.REGRAS_SEGMENTAR_TEMP_FEV19D_D3 está em EXTERNAL INPUTS) -> esse self-read é colisão de nome por sufixo, não a mesma tabela física do mês."
+        }
+      ],
+      "veredito": "ciclo_real",
+      "veredito_justificativa": "As duas arestas são handoffs genuínos com exatamente 1 writer cada, em sentidos opostos, dentro do mesmo ciclo de fechamento mensal: Tesouraria->Book via PLANCTRL.BASE_TESOURARIA e Book->Tesouraria via SAIDASIC.REGRAS_SEGMENTAR_TEMP_NOV25D_D3. Não é artefato de fonte compartilhada nem colisão (os self-reads que inflam n_readers para 2 são, num caso, leitura-antes-de-reescrever e, no outro, um mês histórico diferente). Logo é dependência cíclica real, coerente com a marcação 'Onda 5 - quebrar manualmente'.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Finanças__Book_Diario_Acumulado",
+          "para": "Finanças__Tesouraria_sem_porta",
+          "via": "SAIDASIC.REGRAS_SEGMENTAR_TEMP_NOV25D_D3",
+          "acao": "Extrair a construção das regras de segmentação/risk-sharing (REGRAS_SEGMENTAR_TEMP) para um modelo dbt independente, upstream de ambos os projetos. Tanto Book quanto Tesouraria passam a referenciá-lo via ref()/source, eliminando a aresta Book->Tesouraria e quebrando o ciclo."
+        },
+        {
+          "de": "Finanças__Tesouraria_sem_porta",
+          "para": "Finanças__Book_Diario_Acumulado",
+          "via": "PLANCTRL.BASE_TESOURARIA",
+          "acao": "Manter como aresta linear: BASE_TESOURARIA vira um modelo/mart de Tesouraria e Book o consome via ref(). Não cortar esta; é o handoff natural Tesouraria->Book uma vez removida a outra aresta."
+        }
+      ],
+      "recomendacao": "Quebrar pela aresta das regras de segmentação (a mais barata). Promover SAIDASIC.REGRAS_SEGMENTAR_TEMP_NOV25D_D3 a um modelo dbt próprio (ex.: int_regras_segmentar_financas), pois é uma tabela de regras/segmentação determinística construída cedo no fluxo do Book a partir de TB001_SEGMENTACAO/TBCLIENTE/risk-sharing, não dependente da tesouraria do mesmo dia. Com esse modelo upstream compartilhado, a ordem fica: REGRAS_SEGMENTAR -> Tesouraria (BASE_TESOURARIA) -> Book_Diario, virando um DAG acíclico. Cuidado na migração: parametrizar o sufixo de mês (&DtBase vs &BaseRef) por variável dbt para não colidir Book com seu próprio histórico FEV19D. Verificar se o cálculo de REGRAS no Book não usa colunas derivadas de BASE_TESOURARIA (pela leitura do código não usa — l.2694 monta a partir de segmentação/risk-sharing); confirmar com o time de Finanças antes de fixar o corte.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 7,
+        "concorda": true,
+        "veredito_final": "ciclo_real",
+        "correcoes": "Nenhuma correção material. Todas as alegações de carga foram verificadas no código e confirmam o veredito. (1) BASE_TESOURARIA: Tesouraria é writer único (delete l.2232 + insert l.2235 = full refresh; em PERMANENT OUTPUTS); Book nunca grava (grep de insert/create/delete/append vazio), só lê em l.3308 para WORK.TES_VRMESCAIXA. O 2o reader é o self-read da própria Tesouraria (read-before-rewrite) — handoff_real confirmado. (2) REGRAS_SEGMENTAR_TEMP_NOV25D_D3: Book é writer único (l.2694 Create table ...&DtBase com %Let DtBase=_NOV25D_D3 na l.171; em PERMANENT OUTPUTS); Tesouraria nunca grava REGRAS (grep vazio) e lê o MESMO sufixo físico _NOV25D_D3 (l.2437 PROC SORT e l.2604 PROC SQL FROM, com %LET BaseRef=_NOV25D_D3 nas l.55/2298), constando como EXTERNAL INPUT de Tesouraria. A inflação para n_readers=2 é, de fato, o self-read do Book em l.5616 que usa &BaseRef resolvido para _FEV19D_D3 (definido logo antes em l.5605) — mês histórico distinto, presente nos EXTERNAL INPUTS do Book. Logo a colisão de nome por sufixo é real e foi corretamente excluída pelo investigador. Two-cycle com handoff genuíno de writer único nos dois sentidos = ciclo real, não artefato. Observação menor (não corretiva): a evidência decisiva é a resolução das macros (%Let), que o investigador descreveu corretamente.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 8,
+      "resumo": "Ciclo mútuo A↔B de tamanho 2 entre \"Bases Solar Allan_v40\" (Negócios Transacionais Varejo) e \"Dados médios acompanhamento Pricing\" (Solar). O grafo aponta: A escreve HOML.TBORIGINACAO e B a lê (A→B); B escreve TUYRA.SOLAR_REBATE_1024 e A a lê (B→A). Na prática NENHUM dos dois dados volta pra trás: ao ler o código, AMBAS as tabelas são apenas LIDAS pelos dois projetos (FROM/JOIN/SET), e nenhuma das duas é de fato produzida (CREATE/DATA) por nenhum dos projetos dentro do cluster. HOML.TBORIGINACAO é uma tabela-fonte corporativa (libname HOML/HOMOLOG2 = mesmo path físico /projetos/MISV/data/bases, lib de homologação/ODS) consumida pelos dois. TUYRA.SOLAR_REBATE_1024 é uma tabela de referência de rebate carregada manualmente de um Excel (solar_rebate_1024.xlsx em Downloads) e só lida pelos dois. Logo, o \"laço\" é um par de arestas espúrias geradas por má-atribuição de writer no inventário; não há dado realimentando para trás.",
+      "tabelas": [
+        {
+          "tabela": "HOML.TBORIGINACAO",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "table_flow marca A como writer, mas no código de A todas as ~30 referencias sao FROM/JOIN (read): TABLE_READ_PROVENANCE 'HOML.TBORIGINACAO [PROC SQL - FROM; PROC SQL - JOIN]' e nenhum 'create table/data HOML.TBORIGINACAO' existe (unica escrita real de A e ALE.ENCART_SOLAR_PDV, linhas 2191/2305/10490). 'PERMANENT OUTPUTS: HOML.TBORIGINACAO' veio do heuristico EXPORTED_LIBNAMES: HOML. Em A e B o libname HOML='/projetos/MISV/data/bases' (=HOMOLOG2, mesmo path), lib de homologacao/ODS corporativo. B tambem so le (HOML.TBORIGINACAO [PROC SQL - FROM; PROC SQL - JOIN]). Fonte upstream comum, nao handoff."
+        },
+        {
+          "tabela": "TUYRA.SOLAR_REBATE_1024",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "table_flow marca B como writer, mas em B nao existe 'data tuyra.solar_rebate_1024' nem 'create table tuyra.solar_rebate_1024' (grep vazio); provenance mostra 'TUYRA.SOLAR_REBATE_1024 [DATA Step - SET]' = LEITURA ('set tuyra.solar_rebate_1024' linhas 1396/47589). A tabela WORK.solar_rebate_1024 (linha 46345) e um import temporario de C:\\Users\\barbara.oliva\\Downloads\\solar_rebate_1024.xlsx. O 'PERMANENT OUTPUTS: TUYRA.SOLAR_REBATE_1024' de B e falso (colisao de nome com o WORK + EXPORTED_LIBNAMES: TUYRA). A so le (left join tuyra.solar_rebate_1024 ... on TABELA/PRAZO, ~30x). Tabela de referencia de rebate (preco) compartilhada, alimentada por planilha manual, lida pelos dois."
+        }
+      ],
+      "veredito": "artefato_total",
+      "veredito_justificativa": "Nenhuma das 2 tabelas do ciclo e handoff real. Verificacao no codigo: (1) HOML.TBORIGINACAO so e LIDA por A e por B (FROM/JOIN); A nunca a cria — sua unica saida permanente real e ALE.ENCART_SOLAR_PDV. (2) TUYRA.SOLAR_REBATE_1024 so e LIDA por A e por B; B nunca executa 'data/create table tuyra.solar_rebate_1024' (o provenance 'DATA Step - SET' e leitura, e WORK.solar_rebate_1024 vem de Excel manual). Ambas as arestas do 2-cycle dependem de writers inexistentes, atribuidos pelo heuristico EXPORTED_LIBNAMES (HOML, TUYRA) e por colisao de nome com tabela WORK importada de planilha. Removidos os writers espurios, as duas tabelas viram sources puras lidas por ambos os projetos — sem ciclo. flow_summary diz 'handoff_limpo: 2', mas isso e exatamente o falso positivo: o inventario confiou no campo PERMANENT OUTPUTS sem validar que ha statement de escrita.\"",
+      "arestas_a_quebrar": [
+        {
+          "de": "Negócios Transacionais Varejo e NaPista__Bases Solar Allan_v40__v2",
+          "para": "Solar__Dados médios acompanhamento Pricing-NBK5DQM5T3",
+          "via": "HOML.TBORIGINACAO",
+          "acao": "Eliminar a aresta: A nao escreve HOML.TBORIGINACAO (so FROM/JOIN). Modelar HOML.TBORIGINACAO (=HOMOLOG2.TBORIGINACAO, path /projetos/MISV/data/bases) como source externa unica de homologacao/ODS, referenciada via source() pelos dois projetos. Corrigir o inventario 06 removendo HOML.TBORIGINACAO dos PERMANENT OUTPUTS de A (falso positivo do EXPORTED_LIBNAMES)."
+        },
+        {
+          "de": "Solar__Dados médios acompanhamento Pricing-NBK5DQM5T3",
+          "para": "Negócios Transacionais Varejo e NaPista__Bases Solar Allan_v40__v2",
+          "via": "TUYRA.SOLAR_REBATE_1024",
+          "acao": "Eliminar a aresta: B nao escreve TUYRA.SOLAR_REBATE_1024 (apenas 'set' = leitura; WORK.solar_rebate_1024 e import de planilha). Modelar TUYRA.SOLAR_REBATE_1024 como source de referencia de rebate (seed/source alimentada pelo upload manual solar_rebate_1024.xlsx) consumida por ambos. Remover TUYRA.SOLAR_REBATE_1024 dos PERMANENT OUTPUTS de B no inventario."
+        }
+      ],
+      "recomendacao": "Tratar como ARTEFATO TOTAL — nao ha dependencia ciclica real, logo nao precisa de quebra manual de fluxo nem reordenacao de ondas. Acoes: (1) Externalizar as duas tabelas como sources unicas no dbt/Databricks: HOML.TBORIGINACAO (=HOMOLOG2.TBORIGINACAO) como source de homologacao/ODS corporativo (path /projetos/MISV/data/bases), e TUYRA.SOLAR_REBATE_1024 como source/seed de referencia de rebate (origem: planilha solar_rebate_1024.xlsx). Ambos os projetos devem referencia-las via source(), nao via dependencia projeto->projeto. (2) Corrigir a causa-raiz no extractor/inventario 06: PERMANENT OUTPUTS nao deve ser derivado de EXPORTED_LIBNAMES nem da colisao com tabelas WORK de mesmo nome — exigir um statement de escrita real (create table LIB.TAB / data LIB.TAB / proc append base=LIB.TAB) e tratar 'DATA Step - SET' como leitura. Isso provavelmente dissolve outros ciclos parecidos no grafo. (3) Apos a correcao, A e B podem migrar em paralelo na mesma onda, sem ordem imposta. Validar HOML.TBORIGINACAO e TUYRA.SOLAR_REBATE_1024 no RepMap/Chameleon para confirmar que ja sao ingestoes/fontes existentes.\"",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 8,
+        "concorda": true,
+        "veredito_final": "artefato_total",
+        "correcoes": "Nenhuma correcao material; o veredito artefato_total esta correto e bem sustentado pelo codigo. Confirmei em text_egps as duas arestas do 2-cycle como espurias: (1) HOML.TBORIGINACAO - projeto A nunca a escreve (zero 'create table HOML./HOMOLOG2.TBORIGINACAO', zero 'data HOML.', zero proc append); sao 36 leituras FROM/JOIN. Unica saida permanente real de A e ALE.ENCART_SOLAR_PDV (linhas 2191/2305/10490). O 'Create table TbOriginacao' (linha 6198) e uma tabela WORK nao-qualificada = colisao de nome, como alegado. HOML e HOMOLOG2 ambos = /projetos/MISV/data/bases (mesma fonte ODS/homolog) - confirmado. B tambem so le (16x FROM/JOIN). (2) TUYRA.SOLAR_REBATE_1024 - B nunca executa 'data tuyra.solar_rebate_1024'; as linhas 1395-1396 e 47588-47589 sao 'data solar_rebate_1024 (WORK); set tuyra.solar_rebate_1024;' = LEITURA da TUYRA para WORK; o import do Excel (linha 46345) aponta para WORK.solar_rebate_1024. A so le (28x left join). Ambos PERMANENT OUTPUTS sao falsos positivos do heuristico EXPORTED_LIBNAMES + colisao com WORK. Pequeno ajuste de enfase (nao altera o veredito): o gatilho preciso do falso positivo do 1024 e a confusao de direcao no padrao 'data WORK; set LIB.tab;' (statement e um SET=read) combinada com EXPORTED_LIBNAMES:TUYRA e com o padrao irmao inverso 'data tuyra.solar_rebate_0725; set solar_rebate_0725;' (esse sim escreve TUYRA). O investigador capturou a causa-raiz corretamente.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 9,
+      "resumo": "Ciclo de 2 projetos da área Riscos que são, na prática, dois estágios da MESMA rotina de Provisão Contábil Trabalhista. Ambos montam o MESMO library físico: `libname TRAB '/riscosbv/MRO/Modelos/ProvContTrab/RotinaCalculo'` (confirmado em ambos os .txt, linha 645 e dezenas de repetições). Por isso os datasets TRAB.* são os MESMOS arquivos em disco, lidos/escritos pelos dois lados. O laço bidirecional: (A→B) ATUALIZACAO_BASES escreve datasets-base mensais que o Calculo consome (ex.: TRAB.HISTORICO_201812, TRAB.BVT_POR_CPF, TRAB.TR_HIST_INDICE); (B→A) o Calculo escreve outros históricos mensais (TRAB.HISTORICO_202008, TRAB.HISTORICO_202011) que o ATUALIZACAO volta a ler. Ou seja, dado de histórico/garantias trabalhista circula nos dois sentidos pelo mesmo diretório compartilhado. Parte das 'arestas' são falsas: LT_INDICE e M_VALOR_INDICE NÃO são handoff — cada projeto faz seu próprio pull do Postgres bv-production (`connect to postgres ... CREATE TABLE M_VALOR_INDICE AS select * from connection to postgres`) numa tabela WORK sem prefixo de mesmo nome (colisão de nome).",
+      "tabelas": [
+        {
+          "tabela": "LT_INDICE",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Sem prefixo de lib; criada em A e B identicamente via pass-through Postgres bv-production (A:29171 'CREATE TABLE LT_INDICE AS select * from connection to postgres (SELECT * FROM LT_INDICE)'; B usa connect to postgres). Header marca 'INTERNAL READS (Temp/Local)'. Cada projeto puxa do mesmo BD externo -> fonte comum, nao handoff."
+        },
+        {
+          "tabela": "M_VALOR_INDICE",
+          "classificacao": "fonte_compartilhada",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Igual a LT_INDICE: A:29160 'CREATE TABLE M_VALOR_INDICE AS select * from connection to postgres (SELECT * FROM M_VALOR_INDICE)' (server 172.22.0.9 bv-production). Pull independente do Postgres em cada EGP, tabela WORK de mesmo nome -> fonte externa compartilhada."
+        },
+        {
+          "tabela": "TRAB.BVT_POR_CPF",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "A escreve: 'create table TRAB.BVT_POR_CPF (compress=yes index=(CPFNum/unique) ...) as' (A:8828). B le: 'left join TRAB.BVT_POR_CPF as mbvt' (B:1807,11856,17161). Mesmo lib fisico TRAB -> handoff A->B genuino."
+        },
+        {
+          "tabela": "TRAB.TR_HIST_INDICE",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "A escreve: 'DATA TRAB.TR_HIST_INDICE;' (A:8627). B le: 'left join TRAB.TR_HIST_INDICE as tini/tfim' (B:1414,1415,1804). Handoff A->B."
+        },
+        {
+          "tabela": "TRAB.HISTORICO_201812",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "A escreve: 'DATA TRAB.HISTORICO_201812 (compress=yes PW=&DS_PASSWORD.);' (A:105555). B le: 'SET TRAB.HISTORICO_201812' (B:231671). Handoff A->B via lib compartilhada."
+        },
+        {
+          "tabela": "TRAB.PARTEPRO_EXCLUSIVO",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Atribuida pelo inventario 06 como writer=A. No corpo nao achei DATA/CREATE bare (provavel geracao via macro/&DSREFMODEL ou %INCLUDE); A a declara em 'INTERNAL READS' e B a consome. Mesmo lib TRAB; tratada como dataset persistente A->B."
+        },
+        {
+          "tabela": "TRAB.PJ_GARANTIAS_PERDAS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Inventario 06: writer=A, readers=A+B. So existem no corpo as variantes mensais TRAB.PJ_GARANTIAS_PERDAS_&DSREFMODEL (write) e a bare na lista de INTERNAL READS; persistida no lib TRAB compartilhado -> handoff A->B (nome bare pode ser ultima safra)."
+        },
+        {
+          "tabela": "TRAB.GARANTIAS",
+          "classificacao": "incerto",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Inventario 06: writer=B. No corpo so achei A LENDO ('set TRAB.GARANTIAS' A:33177,100639) e B escrevendo um nome DIFERENTE 'data TRAB.GARANTIAS_UNIFICADAS_202202' (B:69601). A escrita bare de B nao aparece literal (macro/%INCLUDE) ou pode ser base pre-existente. Dado o lib TRAB compartilhado, e provavel handoff B->A, mas a escrita direta nao foi confirmada."
+        },
+        {
+          "tabela": "TRAB.HISTORICA",
+          "classificacao": "incerto",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Inventario 06: writer=B. No corpo so confirmei A LENDO ('SET TRAB.HISTORICA' A:15803,30134,88109); escrita bare por B nao aparece literal (provavel macro). Provavel base persistente lida por A; direcao de escrita nao confirmada no codigo."
+        },
+        {
+          "tabela": "TRAB.HISTORICO_202008",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "B escreve: 'CREATE TABLE TRAB.HISTORICO_202008 (pw=&DS_PASSWORD.) AS' (B:68279 e repeticoes). A le. Handoff B->A via lib TRAB compartilhado -> fecha o ciclo."
+        },
+        {
+          "tabela": "TRAB.HISTORICO_202011",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "B escreve: 'CREATE TABLE TRAB.HISTORICO_202011 (pw=&DS_PASSWORD.) AS' (B:68231 e repeticoes). A le. Handoff B->A -> outra meia-volta do ciclo."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "Existe dependencia cruzada GENUINA (nao puramente artefato): A->B confirmado em codigo (TRAB.HISTORICO_201812, BVT_POR_CPF, TR_HIST_INDICE escritos por A e lidos por B) e B->A confirmado (TRAB.HISTORICO_202008/202011 escritos por B e lidos por A), todos via o MESMO library fisico TRAB '/riscosbv/MRO/Modelos/ProvContTrab/RotinaCalculo'. Porem o ciclo esta inflado por arestas falsas: LT_INDICE e M_VALOR_INDICE sao pull independente do Postgres bv-production em cada projeto (fonte externa + colisao de nome WORK), nao handoff. A causa-raiz e organizacional: os dois EGPs sao dois estagios da mesma rotina ProvContTrab partilhando um diretorio SAS comum, trocando datasets mensais nos dois sentidos. E quebravel, mas precisa intervencao manual de modelagem (nao some so removendo as fontes compartilhadas).",
+      "arestas_a_quebrar": [
+        {
+          "de": "Riscos__ATUALIZACAO_BASES v09",
+          "para": "Riscos__Calculo Provisão Trabalhista 2025 Prov AE - v01 - Cloud",
+          "via": "LT_INDICE | M_VALOR_INDICE",
+          "acao": "Remover do grafo de dependencia projeto->projeto: nao sao handoff. Externalizar como UMA source unica dbt (origem Postgres bv-production: M_VALOR_INDICE, LT_INDICE). Ambos os projetos passam a referenciar a mesma source de indices, eliminando o vinculo aparente."
+        },
+        {
+          "de": "Riscos__ATUALIZACAO_BASES v09",
+          "para": "Riscos__Calculo Provisão Trabalhista 2025 Prov AE - v01 - Cloud",
+          "via": "TRAB.BVT_POR_CPF | TRAB.TR_HIST_INDICE | TRAB.HISTORICO_201812 | TRAB.PARTEPRO_EXCLUSIVO | TRAB.PJ_GARANTIAS_PERDAS",
+          "acao": "Handoff real A->B: manter como dependencia direcional limpa. Materializar esses datasets como modelos dbt no projeto ATUALIZACAO_BASES (staging/intermediate da rotina) e o Calculo faz ref() deles. Esta direcao NAO e o problema - so a contra-direcao fecha o ciclo."
+        },
+        {
+          "de": "Riscos__Calculo Provisão Trabalhista 2025 Prov AE - v01 - Cloud",
+          "para": "Riscos__ATUALIZACAO_BASES v09",
+          "via": "TRAB.HISTORICO_202008 | TRAB.HISTORICO_202011 | TRAB.GARANTIAS | TRAB.HISTORICA",
+          "acao": "ESTA e a aresta que cria o ciclo (B->A). Quebrar separando o estagio: os datasets de historico/garantias que A re-le devem virar uma camada COMUM (ex. modelos 'trab_historico_base' / 'trab_garantias') que NAO pertence a nenhum dos dois projetos, mas a um terceiro modulo de base compartilhada referenciado por ambos. Alternativamente, fundir os dois EGPs num unico projeto dbt 'prov_contab_trabalhista' (eles ja compartilham o mesmo lib fisico), eliminando a fronteira projeto-projeto que gera o ciclo."
+        }
+      ],
+      "recomendacao": "1) Reconhecer que os dois EGPs sao a MESMA rotina (libname TRAB aponta para o mesmo path '/riscosbv/MRO/Modelos/ProvContTrab/RotinaCalculo' nos dois). Recomendacao primaria: MIGRAR OS DOIS COMO UM UNICO PROJETO dbt 'prov_contab_trabalhista', onde a ordem A->B->(historicos)->A vira um DAG interno aciclico (cada dataset mensal e um modelo, ref() resolve a ordem). Isso dissolve o ciclo de cara, pois a fronteira projeto-a-projeto deixa de existir. 2) Se precisarem ficar separados: (a) externalizar LT_INDICE e M_VALOR_INDICE como source unica dbt da origem Postgres bv-production (remove 2 arestas falsas); (b) extrair os datasets de historico/garantias re-lidos por A (TRAB.HISTORICO_202008/202011, TRAB.GARANTIAS, TRAB.HISTORICA) para uma camada de base compartilhada (terceiro modulo), quebrando a aresta B->A que fecha o ciclo. 3) Confirmar com o time de Riscos as escritas de TRAB.GARANTIAS e TRAB.HISTORICA por B (marcadas 'incerto' - nao achei DATA/CREATE bare no codigo, possivel macro/%INCLUDE ou base pre-existente) antes de decidir se sao realmente produzidas no ciclo ou sao bases externas estaticas.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 9,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Concordo com o veredito e a tese central. Verifiquei no codigo (caminhos absolutos: /home/lucasmuller_ind/bv/project_sas/egps_analysis/text_egps/Riscos__ATUALIZACAO_BASES v09.txt e .../Riscos__Calculo Provisao Trabalhista 2025 Prov AE - v01 - Cloud.txt):\n\nCONFIRMADO o ciclo mutuo REAL (nao e artefato puro). Ambos os EGPs usam o MESMO libname fisico TRAB '/riscosbv/MRO/Modelos/ProvContTrab/RotinaCalculo' (linha 645 em ambos, dezenas de repeticoes). Handoff A->B confirmado em codigo: A escreve 'create table TRAB.BVT_POR_CPF (compress=yes index=...)' (8828+) e B le 'left join TRAB.BVT_POR_CPF' (1807/11856/17161); A escreve 'DATA TRAB.TR_HIST_INDICE;' (8627+); B le 'SET TRAB.HISTORICO_201812' (231671). Handoff B->A confirmado: B escreve 'CREATE TABLE TRAB.HISTORICO_202008/202011 (pw=&DS_PASSWORD.) AS' (68231/68279+) e A le 'LEFT JOIN TRAB.HISTORICO_202008/202011' (87125, 99162). table_flow bate (n_writers=1 em todas as 11 tabelas). Como ha handoff genuino dos DOIS lados, pela regra adversarial NAO e artefato total.\n\nCONFIRMADAS as 2 arestas falsas: LT_INDICE e M_VALOR_INDICE sao pull independente em cada projeto. Em A: 'CREATE TABLE LT_INDICE/M_VALOR_INDICE AS select * from connection to postgres' (server 172.22.0.9 bv-production, linhas 29160/29171, 99453/99464) - tabela WORK por colisao de nome, nao dataset SAS persistido. Em B essas tabelas aparecem como EXTERNAL INPUTS [SQLSVR] e sao lidas via 'Pass-Through Native (SQLSVR)' - ou seja B faz seu PROPRIO pull externo, nao consome dataset de A. Classificacao fonte_compartilhada correta; o 'writer=A' em table_flow e artefato de colisao de nome WORK.\n\nCORRECOES MENORES (nao alteram o veredito):\n1) Sobre TRAB.GARANTIAS e TRAB.HISTORICA marcadas 'incerto': o investigador subestimou a evidencia. Nao ha 'data/create table TRAB.GARANTIAS' bare no corpo de B (so 'SET TRAB.GARANTIAS' que e leitura), MAS o header de B lista explicitamente TRAB.GARANTIAS e TRAB.HISTORICA em 'PERMANENT OUTPUTS (Target Marts)' (linha 39) - esta e a base concreta da atribuicao writer=B pelo inventario, nao mera inferencia de macro. A le ambas ('SET TRAB.HISTORICA' 15803/30134; usa TRAB.GARANTIAS). De qualquer forma o ciclo B->A NAO depende dessas duas: ja esta fechado de forma solida por HISTORICO_202008/202011. A recomendacao de confirmar com o time continua valida, mas o 'incerto' nao enfraquece o veredito.\n2) A causa-raiz organizacional (dois estagios da mesma rotina ProvContTrab compartilhando diretorio SAS) e a recomendacao primaria (migrar como UNICO projeto dbt 'prov_contab_trabalhista', dissolvendo a fronteira projeto-a-projeto) estao bem fundamentadas e sao a acao correta.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 10,
+      "resumo": "Ciclo mútuo A<->B de 2 EGPs da MESMA área (Riscos), que na verdade são dois estágios de UM ÚNICO pipeline mensal do cubo regulatório PEPR/RWA (Resolução 229), persistido na biblioteca compartilhada _PEPR_RA (path físico idêntico nos dois projetos: /riscosbv/ctrcredito/pepr/results/). O laço: RWAcpad ESCREVE _PEPR_RA.BASECUBO202509._4040_V229 (linha 8466: SET do próprio V229 + EXTRACAO.BASE_OPERACOES_RWAMPAD, ou seja consolida carimbos/ops manuais); Base_Origem LÊ esse _4040_V229 (linhas 106/2599) para gerar BASE_POPULAR/BASE_OUTROS e ESCREVE _PEPR_RA.BASECUBO202509._4040_VCARIMBOS (linha 4269, derivado do seu cubo local _4040); RWAcpad volta a LER _4040_VCARIMBOS (linha 9404) para montar o cubo 4060 (CUBO_4060_ATACADO/VAREJO). Ou seja: o dado que 'volta pra trás' é a sequência 4040 -> V229 -> VCARIMBOS -> 4060, com os dois EGPs intercalando etapas da construção da mesma base. A dependência temporal é genuína (VCARIMBOS depende de V229 já existir; o 4060 depende de VCARIMBOS), mas o ciclo só existe porque um pipeline lógico único foi partido em dois EGPs no ponto errado.",
+      "tabelas": [
+        {
+          "tabela": "_PEPR_RA.BASECUBO202509._4040_V229",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Writer unico=RWAcpad (linha 8466 DATA _PEPR_RA...4040_v229; SET self + EXTRACAO.BASE_OPERACOES_RWAMPAD). Reader=Base_Origem (linhas 106/2599 SET _PEPR_RA...4040_V229 -> BASE_POPULAR/BASE_OUTROS). Tabela fisica persistente em _PEPR_RA=/riscosbv/ctrcredito/pepr/results/ (mesmo path nos 2 EGPs); nao e WORK/temp. Handoff producao->consumo genuino."
+        },
+        {
+          "tabela": "_PEPR_RA.BASECUBO202509._4040_VCARIMBOS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "Writer unico=Base_Origem (linha 4269 DATA _PEPR_RA...4040_VCarimbos; SET BASECUBO..._4040 local + ajustes manuais COAMO). Reader=RWAcpad (linha 9404 SET _PEPR_RA...4040_VCARIMBOS -> CUBO_4060_ATACADO/VAREJO). Mesma lib persistente _PEPR_RA. Handoff genuino projeto->projeto."
+        }
+      ],
+      "veredito": "ciclo_real",
+      "veredito_justificativa": "As duas tabelas do ciclo sao handoffs reais (1 writer + 1 reader cada, ambas em biblioteca persistente compartilhada _PEPR_RA com path fisico identico nos dois EGPs, nao WORK/temp e nao colisao de nome). Confirmado no codigo: RWAcpad produz _4040_V229 que Base_Origem consome, e Base_Origem produz _4040_VCARIMBOS que RWAcpad consome. Existe dependencia de dados temporal real e cruzada, logo o SCC nao e artefato de fonte compartilhada nem de colisao de staging. E uma dependencia ciclica genuina que precisa de quebra manual. Causa raiz: e na pratica UM pipeline (cubo PEPR 4040->V229->VCARIMBOS->4060) fatiado em 2 EGPs no ponto errado, criando ida-e-volta.\"",
+      "arestas_a_quebrar": [
+        {
+          "de": "Riscos__Base_Origem_FPR_85_202509_Res_229_V2_SRP",
+          "para": "Riscos__RWAcpad_202509_vIFRS9_V22_batimento4060_SRP",
+          "via": "_PEPR_RA.BASECUBO202509._4040_VCARIMBOS",
+          "acao": "Manter como aresta unidirecional (esta e a direcao 'final' do fluxo: VCARIMBOS alimenta o cubo 4060). Modelar _4040_VCARIMBOS como model dbt unico de owner Base_Origem (camada intermediate) e RWAcpad referencia via ref()/source. Esta aresta NAO precisa ser cortada."
+        },
+        {
+          "de": "Riscos__RWAcpad_202509_vIFRS9_V22_batimento4060_SRP",
+          "para": "Riscos__Base_Origem_FPR_85_202509_Res_229_V2_SRP",
+          "via": "_PEPR_RA.BASECUBO202509._4040_V229",
+          "acao": "ESTA e a aresta que fecha o ciclo e deve ser quebrada. Extrair a producao de _4040_V229 (RWAcpad linha 8466, que so consolida _4040 base + carimbos manuais de EXTRACAO.BASE_OPERACOES_RWAMPAD) para um model/EGP de ESTAGIO INICIAL, a montante de Base_Origem. Assim a ordem vira: [V229 builder] -> Base_Origem (le V229, escreve VCARIMBOS) -> RWAcpad (le VCARIMBOS, escreve 4060). Sem volta."
+        }
+      ],
+      "recomendacao": "Quebrar pela aresta _4040_V229 (RWAcpad->Base_Origem), que e o elo que fecha o laço. O cubo _PEPR_RA.BASECUBO202509 e uma base regulatoria unica construida em estagios 4040 -> V229 -> VCARIMBOS -> 4060; o ciclo so surge porque o estagio inicial (montar _4040_V229 a partir de _4040 + carimbos manuais de EXTRACAO.BASE_OPERACOES_RWAMPAD) hoje mora dentro do RWAcpad, que tambem e o estagio FINAL (4060). Acao concreta: (1) Dividir o RWAcpad em dois — separar o bloco que escreve _4040_V229 (linhas ~8460-8600) num model/no de montante (ex.: 'cubo_4040_v229') e deixar no RWAcpad apenas a etapa 4060 que consome VCARIMBOS. (2) Materializar cada particao do cubo como UM model dbt com owner unico e dependencias via ref(): cubo_4040_v229 (owner novo no/RWAcpad-stage1) -> base_origem_vcarimbos (owner Base_Origem) -> rwacpad_4060 (owner RWAcpad-stage2). (3) Tratar _PEPR_RA.BASECUBO202509._4040 (base raiz, lida pelos dois e sem writer dentro do cluster) como source externa unica. Resultado: DAG linear, ciclo eliminado sem perda de logica. Atencao: ha leituras cross-mes (BASECUBO202508/202507_4040_V229/VCARIMBOS) que sao snapshots historicos — modelar como sources versionadas por _DATA_REFERENCIA_, nao como dependencia do mes corrente.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 10,
+        "concorda": true,
+        "veredito_final": "ciclo_real",
+        "correcoes": "Veredito correto e bem evidenciado; confirmei tudo no codigo. Apenas duas imprecisoes menores que NAO alteram a topologia nem os contadores writer/reader: (1) Na linha 8466 o write de _4040_V229 faz SET DELE MESMO (SET _PEPR_RA...._4040_v229 + EXTRACAO.BASE_OPERACOES_RWAMPAD), nao um SET do _4040 base — ou seja a producao de V229 ja pressupoe um _4040_V229 previo existir (derivado de _4040). A descricao do investigador de que 'so consolida _4040 base + carimbos' e ligeiramente imprecisa quanto a fonte do SET, mas o owner/writer continua sendo unicamente RWAcpad. (2) O write de VCARIMBOS (linha 4269) faz SET BASECUBO._4040 (cubo local), confirmado — correto. Confirmacoes positivas: cabecalho de Base_Origem lista _4040_V229 [BIGQUERY/GCP] como EXTERNAL INPUT (le, nao escreve) e _4040_VCARIMBOS como PERMANENT OUTPUT (escreve); cabecalho de RWAcpad lista _4040_V229 em PERMANENT OUTPUTS+INTERNAL READS (escreve) e _4040_VCARIMBOS em EXTERNAL INPUTS (le). Leituras 9404 (VCARIMBOS->CUBO_4060_ATACADO/VAREJO, no '1101_Base_4060') e 106/2599 (V229->Base_Origem) sao do mes corrente &_DATA_REFERENCIA_=202509. As leituras 202508/202507 sao snapshots historicos, fora do ciclo — corretamente identificado. table_flow (1 writer + 1 reader em cada tabela, lib persistente compartilhada _PEPR_RA) bate 100%. Laco mutuo genuino, nao artefato.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 11,
+      "resumo": "O cluster tem 2 projetos da area Riscos/PLD (Matriz Onboarding CIB e Matriz Renovacao Continua v29) ligados pela lib compartilhada PLD = /riscosbvf/pld. O grafo aponta um laco mutuo A<->B via duas tabelas: Onboarding->Renovacao por PLD.BASE_ONBOARDING_RESULTADOS, e Renovacao->Onboarding por PLD.BS_MIDIA_AML. Na pratica so existe UM sentido real: Onboarding produz PLD.BASE_ONBOARDING_RESULTADOS (DATA PLD.BASE_ONBOARDING_RESULTADOS; SET ... BASE_ONBOARDING_INI) e Renovacao a le (PROC SQL FROM). Ja PLD.BS_MIDIA_AML NAO e escrita por ninguem dentro do cluster: os dois projetos apenas fazem SET PLD.BS_MIDIA_AML (leitura) carregando para uma WORK homonima; ela e uma tabela de origem comum da lib PLD. A aresta de volta (Renovacao->Onboarding) e falsa, gerada por erro de atribuicao de writer no inventario. Sem essa aresta, o laco desaparece.",
+      "tabelas": [
+        {
+          "tabela": "PLD.BASE_ONBOARDING_RESULTADOS",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Onboarding CIB linha 1142-1143: 'DATA PLD.BASE_ONBOARDING_RESULTADOS; SET PLD.BASE_ONBOARDING_RESULTADOS BASE_ONBOARDING_INI;' (escrita persistente + self-append). Renovacao v29 a le como 'PLD.BASE_ONBOARDING_RESULTADOS [PROC SQL - FROM]' e NAO a tem em PERMANENT OUTPUTS. Handoff genuino Onboarding->Renovacao; o 2o reader (n_readers=2) e o proprio Onboarding (auto-append)."
+        },
+        {
+          "tabela": "PLD.BS_MIDIA_AML",
+          "classificacao": "fonte_compartilhada",
+          "writers": 0,
+          "readers": 2,
+          "evidencia": "Nenhum projeto escreve: nao ha 'DATA PLD.BS_MIDIA_AML' nem 'CREATE TABLE PLD.BS_MIDIA_AML' em nenhum dos dois (grep=0). Ambos so leem via SET: Onboarding L546 'SET PLD.BS_MIDIA_AML' -> DATA BS_MIDIA_AML (WORK); Renovacao L1650/12952/17873 'SET PLD.BS_MIDIA_AML' -> WORK BS_MIDIA_AML_TOTAL. O inventario lista BS_MIDIA_AML em PERMANENT OUTPUTS de Renovacao por colisao: tratou o DATA da WORK homonima como escrita na lib PLD. E fonte comum da lib PLD = /riscosbvf/pld, lida por ambos -> nao deveria gerar aresta."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "Das 2 tabelas do laco, apenas PLD.BASE_ONBOARDING_RESULTADOS e handoff real (Onboarding->Renovacao). A aresta de retorno (Renovacao->Onboarding via PLD.BS_MIDIA_AML) e artefato: BS_MIDIA_AML nao e escrita por nenhum dos projetos (so SET/leitura), e o writer atribuido a Renovacao no inventario 06 e falso-positivo por colisao de nome WORK x lib PLD. Removendo a aresta falsa, sobra dependencia unidirecional Onboarding->Renovacao, sem ciclo. Logo nao e ciclo_real, mas tambem nao e artefato_total (uma aresta e legitima): e artefato_parcial.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Riscos__Matriz Renovacao Continua v29",
+          "para": "Riscos__Matriz Onboarding CIB",
+          "via": "PLD.BS_MIDIA_AML",
+          "acao": "Eliminar esta aresta: e falsa. Reclassificar PLD.BS_MIDIA_AML como source externa unica (lib PLD = /riscosbvf/pld), lida tanto por Onboarding quanto por Renovacao. Corrigir o inventario 06 removendo BS_MIDIA_AML dos PERMANENT OUTPUTS de Renovacao (writer fantasma por colisao com a WORK homonima criada via SET)."
+        }
+      ],
+      "recomendacao": "Quebra: nao e preciso refatorar logica nem dividir projeto. (1) Modelar PLD.BS_MIDIA_AML como source/dbt source unico (origem da lib PLD), referenciada por ambos via source(); isso ja remove a unica aresta de retorno e mata o ciclo. (2) Tambem modelar PLD.BASE_ONBOARDING_RESULTADOS como entregavel de Onboarding (um model dbt em Onboarding) que Renovacao consome via ref() cross-project -> dependencia DAG limpa Onboarding -> Renovacao. (3) Atencao na conversao: PLD.BASE_ONBOARDING_RESULTADOS faz auto-append (SET dela mesma + BASE_ONBOARDING_INI), padrao acumulativo/historico -> tratar como model incremental em Onboarding, nao como full-refresh. (4) Corrigir o extractor/inventario para nao marcar como writer da lib PLD um 'DATA <nome>' que cria WORK homonima a uma tabela PLD lida por SET (fonte da colisao de writer). Ordem de migracao: Onboarding antes de Renovacao.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 11,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Nenhuma correcao material; a analise do investigador esta correta e bem fundamentada no codigo. Confirmei por grep no codigo SAS dos dois projetos: (1) Aresta Onboarding->Renovacao via PLD.BASE_ONBOARDING_RESULTADOS e REAL: Onboarding tem write qualificado 'DATA PLD.BASE_ONBOARDING_RESULTADOS;' (linha 1142, com self-append 'SET PLD.BASE_ONBOARDING_RESULTADOS BASE_ONBOARDING_INI' linha 1143) e a tem em PERMANENT OUTPUTS; Renovacao apenas a le via PROC SQL FROM (linhas 1551/17774/20768), listada em EXTERNAL INPUTS e NAO em PERMANENT OUTPUTS. n_writers=1 e correto. (2) Aresta de volta Renovacao->Onboarding via PLD.BS_MIDIA_AML e FALSA: NAO existe nenhum write qualificado 'DATA PLD.BS_MIDIA_AML' nem 'CREATE TABLE PLD.BS_MIDIA_AML' em nenhum dos dois projetos (grep retornou vazio). Todos os 'DATA BS_MIDIA_AML'/'CREATE TABLE BS_MIDIA_AML' escrevem tabelas WORK homonimas (sem prefixo PLD), enquanto 'PLD.BS_MIDIA_AML' so aparece como fonte de SET (leitura) nos dois projetos (Onboarding L546; Renovacao L1650/12952/17873). Logo o writer atribuido a Renovacao no inventario (PERMANENT OUTPUTS linha 39) e um falso-positivo por colisao de nome WORK x lib PLD, exatamente como o investigador descreveu. Observacao importante: o campo table_flow do JSON (que o prompt chama de autoritativo) reporta PLD.BS_MIDIA_AML com n_writers=1 (writer=Renovacao) - mas esse proprio numero e o artefato propagado; o codigo mostra zero writers reais qualificados, entao foi correto contradizer o table_flow com evidencia de codigo. Removida a aresta fantasma, sobra dependencia unidirecional limpa Onboarding->Renovacao, sem ciclo. Recomendacoes do investigador (source unico para BS_MIDIA_AML, ref() cross-project para BASE_ONBOARDING_RESULTADOS, model incremental por causa do auto-append, e correcao do extractor para nao marcar DATA de WORK homonima como writer da lib) sao todas pertinentes.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 12,
+      "resumo": "Ciclo de 2 projetos: SAS_UC4__tbmetaproducao (area SAS_UC4) e Rodas__campanha_ativabv (area Rodas). O grafo aponta duas arestas opostas. (1) SAS_UC4 -> Rodas via BASES.TBMETAPRODUCAOFINAL: real - SAS_UC4 produz essa tabela permanente (PERMANENT OUTPUT) e a versao BKP do Rodas a le (from bases.TBMETAPRODUCAOFINAL, linha 993). (2) Rodas -> SAS_UC4 via /projetos/MISV/data/bases/tmp/tbpotencialrodas.sas7bdat (TMP.TBPOTENCIALRODAS): NAO e handoff - os DOIS projetos LEEM esse arquivo .sas7bdat como insumo externo (SAS_UC4 via %VerificaAtualizacao + FROM TMP.TBPOTENCIALRODAS; Rodas via set tmp.TbPotencialRodas), e NENHUM dos dois o grava como saida permanente. E uma fonte TMP comum pre-existente. O 'dado que volta pra tras' (TBPOTENCIALRODAS) na verdade nao volta: e uma origem compartilhada. So a aresta TBMETAPRODUCAOFINAL e uma dependencia verdadeira.",
+      "tabelas": [
+        {
+          "tabela": "BASES.TBMETAPRODUCAOFINAL",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "tbmetaproducao.txt L39 PERMANENT OUTPUTS lista BASES.TBMETAPRODUCAOFINAL (criada via CREATE TABLE TbMetaProducaoFinal + serie de UPDATEs, L3203+). Rodas BKP L993 'from bases.TBMETAPRODUCAOFINAL as a' (PROC SQL FROM). 1 writer (SAS_UC4) -> 1 reader (Rodas). Producao genuina SAS_UC4 -> Rodas."
+        },
+        {
+          "tabela": "/PROJETOS/MISV/DATA/BASES/TMP/TBPOTENCIALRODAS.SAS7BDAT",
+          "classificacao": "fonte_compartilhada",
+          "writers": 0,
+          "readers": 0,
+          "evidencia": "table_flow: 0 writers / 0 readers no cluster (aresta so existe pelo path normalizado). Ambos os projetos LEEM TMP.TBPOTENCIALRODAS como EXTERNAL INPUT: SAS_UC4 tbmetaproducao.txt L72 %VerificaAtualizacao(.../tbpotencialrodas.sas7bdat) + L179 FROM TMP.TBPOTENCIALRODAS; Rodas L190 set tmp.TbPotencialRodas. Nenhum dos dois grava o arquivo TMP permanente (em Rodas, TBPOTENCIALRODAS aparece so em TEMP/DISCARDED OUTPUTS = copia WORK em memoria, nao a fonte). Logo e uma fonte .sas7bdat comum pre-existente, nao um handoff Rodas->SAS_UC4. Deve virar source externa unica."
+        }
+      ],
+      "veredito": "artefato_parcial",
+      "veredito_justificativa": "Uma das duas arestas e real (SAS_UC4 -> Rodas via BASES.TBMETAPRODUCAOFINAL: 1 writer + 1 reader confirmados em codigo) e a outra e artefato (Rodas -> SAS_UC4 via TMP.TBPOTENCIALRODAS: 0/0 no table_flow, fonte .sas7bdat lida pelos dois e gravada por nenhum). Removendo a aresta falsa, o cluster vira um DAG limpo SAS_UC4 -> Rodas, sem ciclo verdadeiro. Por isso artefato_parcial e nao ciclo_real nem artefato_total.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Rodas__campanha_ativabv",
+          "para": "SAS_UC4__tbmetaproducao",
+          "via": "/projetos/MISV/data/bases/tmp/tbpotencialrodas.sas7bdat (TMP.TBPOTENCIALRODAS)",
+          "acao": "Quebrar: externalizar TMP.TBPOTENCIALRODAS como source/seed unica (origem .sas7bdat pre-existente). Ambos projetos a consomem como leitura; Rodas nao a produz de forma permanente. Reapontar as duas leituras (SAS_UC4 e Rodas) para a mesma source externa em vez de tratar Rodas como produtor."
+        }
+      ],
+      "recomendacao": "Quebrar a aresta Rodas -> SAS_UC4 modelando /projetos/MISV/data/bases/tmp/tbpotencialrodas.sas7bdat (TMP.TBPOTENCIALRODAS) como UMA source/ingestion externa unica, consumida por ref/source pelos dois projetos - ela nao e gerada por nenhum dos dois dentro do cluster (0 writers no table_flow; em Rodas so existe como copia WORK descartavel). Manter apenas a aresta verdadeira: SAS_UC4__tbmetaproducao produz BASES.TBMETAPRODUCAOFINAL e Rodas__campanha_ativabv (script CampanhaPDV_BKP) a le. Ordem de migracao resultante: ingerir TMP.TBPOTENCIALRODAS (+ TMP.TBPARCEIROCOMERCIAL, TMP.TBPRODUCAO, que tem o mesmo padrao) como sources; migrar SAS_UC4__tbmetaproducao antes de Rodas__campanha_ativabv. Nao e necessario dividir nenhum projeto. Verificar tambem TMP.TBPARCEIROCOMERCIAL e TMP.TBPRODUCAO: aparecem como leitura nos dois e podem gerar arestas-fantasma identicas em outros clusters.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 12,
+        "concorda": true,
+        "veredito_final": "artefato_parcial",
+        "correcoes": "Substancialmente nenhuma; a analise se sustenta sob escrutinio adversarial. Edge SAS_UC4 -> Rodas (BASES.TBMETAPRODUCAOFINAL) e real: SAS_UC4 lista em PERMANENT OUTPUTS (tbmetaproducao.txt L39) e tem CREATE TABLE TbMetaProducaoFinal em L3203/L3819/L5194; Rodas BKP le via PROC SQL FROM (L33 TABLE_READ_PROVENANCE) - bate com table_flow 1w/1r. Edge Rodas -> SAS_UC4 (TMP.TBPOTENCIALRODAS) e artefato: table_flow 0w/0r confirmado, NENHUM projeto grava no libname tmp (zero 'create table tmp.', 'data tmp.', 'out=tmp.' nos tres arquivos; nenhum 'libname tmp'); ambos so LEEM o .sas7bdat pre-existente. Em Rodas, 'Data TbPotencialRodas; set tmp.TbPotencialRodas' grava WORK (TEMP/DISCARDED OUTPUTS L40), nao o tmp. Pequena lacuna: o investigador citou apenas o arquivo Rodas BKP, mas o arquivo Rodas principal (CampanhaPDV.txt) exibe o MESMO padrao (le tmp.TbPotencialRodas, descarta copia WORK, nao grava tmp), reforcando a conclusao. A observacao sobre TMP.TBPARCEIROCOMERCIAL e TMP.TBPRODUCAO esta correta: ambas aparecem como EXTERNAL INPUTS nos tres arquivos sem writer permanente. Removendo a aresta-fantasma o cluster vira DAG limpo SAS_UC4 -> Rodas, sem ciclo verdadeiro.",
+        "confianca": "alta"
+      }
+    },
+    {
+      "cluster_id": 13,
+      "resumo": "Laço mútuo A↔B entre dois projetos da área Rodas. Rodas__inad escreve a mart permanente INAD.INADHISTORICA (lib INAD, no script 04-base-final), que Rodas__qualidadedevendas_cubo_estudo lê em 06-inad como insumo de inadimplência histórica. Na direção oposta, qualidadedevendas_cubo_estudo escreve AUXL.PROPOSTAS_ESG (lib AUXL, no script 02-base-esg, a partir de tabelas DBA via pass-through) que Rodas__inad lê em 02-tb-modelomolicar para derivar TbModeloMolicar. Cada projeto produz um insumo permanente que o outro consome: dado de inadimplência vai inad→QDV, e a base de propostas ESG/molicar vai QDV→inad. Os dois lados são tabelas físicas distintas em libs permanentes diferentes (INAD. e AUXL.), com exatamente 1 produtor cada — não há colisão de temporária nem fonte multi-writer.",
+      "tabelas": [
+        {
+          "tabela": "INAD.INADHISTORICA",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 2,
+          "evidencia": "Rodas__inad/04-base-final.sas: EXPORTED_LIBNAMES INAD, 'CREATE TABLE INAD.InadHistorica AS' (mart permanente). Lida por Rodas__inad/05-finalizacao (self) e por QDV/06-inad ('SELECT * FROM INAD.InadHistorica WHERE NuAnoMes>=201701'). Mart de lib permanente INAD, 1 writer: handoff genuino inad->QDV."
+        },
+        {
+          "tabela": "AUXL.PROPOSTAS_ESG",
+          "classificacao": "handoff_real",
+          "writers": 1,
+          "readers": 1,
+          "evidencia": "QDV/02-base-esg.sas: EXPORTED_LIBNAMES AUXL, 'PROC SORT ... OUT=AUXL.PROPOSTAS_ESG NODUPKEY' construida a partir de DBA.TbProposta/TbPropGarantiaMaqEquip/TbMolicar (pass-through). Lida por Rodas__inad/02-tb-modelomolicar.sas ('FROM AUXL.PROPOSTAS_ESG PRP') para montar TbModeloMolicar. Lib AUXL permanente, 1 writer: handoff genuino QDV->inad. Importante: AUXL.PROPOSTAS_ESG NAO depende de nenhuma saida de inad (so de DBA)."
+        }
+      ],
+      "veredito": "ciclo_real",
+      "veredito_justificativa": "As duas arestas sao handoffs reais e independentes: INAD.INADHISTORICA (inad->QDV) e AUXL.PROPOSTAS_ESG (QDV->inad). Ambas sao tabelas fisicas distintas em libs permanentes proprias (INAD., AUXL.), cada uma com exatamente 1 produtor no cluster; nao sao schemas de origem comum (sem prefixos tipo INSIGHT./PME./PLCA.) nem temporarias homonimas. Portanto a dependencia ciclica e genuina e precisa de quebra manual. Porem o ciclo e facilmente quebravel porque AUXL.PROPOSTAS_ESG e auto-contida (so consome tabelas DBA, nada de inad), entao a aresta QDV->inad nao reflete dependencia logica real sobre as saidas de inad.",
+      "arestas_a_quebrar": [
+        {
+          "de": "Rodas__qualidadedevendas_cubo_estudo",
+          "para": "Rodas__inad",
+          "via": "AUXL.PROPOSTAS_ESG",
+          "acao": "Externalizar AUXL.PROPOSTAS_ESG em um modelo standalone/shared (fora de ambos os projetos), pois sua logica (QDV/02-base-esg) so depende de DBA.TbProposta, DBA.TbPropGarantiaMaqEquip e DBA.TbMolicar. Tanto inad/02-tb-modelomolicar quanto QDV passam a referenciar esse modelo unico como source/ref, removendo a aresta QDV->inad e quebrando o ciclo."
+        }
+      ],
+      "recomendacao": "Quebrar pela aresta AUXL.PROPOSTAS_ESG (mais barata e logicamente correta). Extrair a construcao de AUXL.PROPOSTAS_ESG (hoje em Rodas__qualidadedevendas_cubo_estudo/02-base-esg.sas, alimentada apenas por DBA.TbProposta/TbPropGarantiaMaqEquip/TbMolicar) para um modelo dbt independente e compartilhado. Ambos os projetos (inad/02-tb-modelomolicar e QDV) o consomem via ref(), eliminando a dependencia QDV->inad. Observacao: inad/02-tb-modelomolicar e QDV/02-base-esg derivam o mesmo TbModeloMolicar de forma quase identica a partir de PROPOSTAS_ESG + AUXL.BASE_MODELOS_ESG — candidato a consolidar tambem TbModeloMolicar como modelo compartilhado para evitar duplicacao. Manter intacto o handoff real inad->QDV via INAD.INADHISTORICA: nesse sentido inad (produtor da inadimplencia) deve ser materializado antes de QDV. Apos extrair PROPOSTAS_ESG, a ordem de execucao fica: modelo PROPOSTAS_ESG (DBA) -> inad -> QDV, sem ciclo.",
+      "confianca": "alta",
+      "verificacao": {
+        "cluster_id": 13,
+        "concorda": true,
+        "veredito_final": "ciclo_real",
+        "correcoes": "nenhuma. Verifiquei adversarialmente os dois lados no codigo e tudo confere. (1) INAD.INADHISTORICA: Rodas__inad/04-base-final L116 'CREATE TABLE INAD.InadHistorica AS' construida a partir de inputs proprios do inad (RISCOS, TMP.TBORIGINACAO/TBPRODUCAO, BASES, CONTRATO, FUNIL) — NAO depende de nenhuma saida de QDV; lida por QDV/06-inad L252 ('SELECT * FROM INAD.InadHistorica WHERE NuAnoMes>=201701'). table_flow: 1 writer / 2 readers = handoff_real correto. (2) AUXL.PROPOSTAS_ESG: QDV/02-base-esg L87 'PROC SORT DATA=PropostasESG ... OUT=AUXL.PROPOSTAS_ESG NODUPKEY', alimentada SOMENTE por DBA.TbProposta/TbPropGarantiaMaqEquip/TbMolicar via pass-through (L50-85), de fato auto-contida; lida por inad/02-tb-modelomolicar L67. table_flow: 1 writer / 1 reader = handoff_real correto. Laco mutuo genuino (two_cycles) com handoff real dos dois lados => nao e artefato. Nenhum dos lados e source de BD compartilhado (INAD. e AUXL. sao libs SAS permanentes escritas dentro do cluster; sem prefixos INSIGHT./PME./PLCA., sem temporaria homonima, sem multi-writer). Checagem extra de aresta oculta: TMP.TBORIGINACAO/TBPRODUCAO sao LIDAS por ambos os projetos mas ESCRITAS por nenhum (QDV/05 so exporta BASEGRC.TBBASELEILAO) — sao inputs externos compartilhados, nao um handoff cross-projeto; corretamente excluidos. A recomendacao de quebra (externalizar PROPOSTAS_ESG por ser DBA-only, mantendo o handoff inad->QDV via INADHISTORICA; ordem PROPOSTAS_ESG->inad->QDV) e logicamente correta e foi confirmada no codigo.",
+        "confianca": "alta"
+      }
+    }
+  ]
+}

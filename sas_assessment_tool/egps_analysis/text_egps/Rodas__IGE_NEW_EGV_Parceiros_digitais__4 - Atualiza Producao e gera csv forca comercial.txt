@@ -1,0 +1,337 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_EGV_Parceiros_digitais
+FILE_SAS: 4 - Atualiza Producao e gera csv forca comercial.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 40
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 262
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISV_TMP = /projetos/MISV/data/bases/tmp; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: a1dt, dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], AUXL.EGV_DEPARABALCAODIGITAL [SAS/Local], AUXL.EGV_DEPARAPARCEIROSDIGITAIS [SAS/Local], MISV_TMP.TBEXTPROPOSTA [SAS/Local], MISV_TMP.TBORIGINACAO [SAS/Local], MISV_TMP.TBPRODUCAO [SAS/Local], TRIBO.BASE_MOTIVORECUSATARGETEGV [SAS/Local], TRIBO.EGV_PAP [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBPROPOSTAS_EXECUTIVO
+IMPORTED_LIBNAMES: MISV_TMP, TRIBO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBPROPOSTAS_EXECUTIVO
+TABLE_READ_PROVENANCE (Flow): AUXL.EGV_DEPARABALCAODIGITAL [PROC SQL - JOIN], AUXL.EGV_DEPARAPARCEIROSDIGITAIS [PROC SQL - JOIN], MISV_TMP.TBEXTPROPOSTA [PROC SQL - JOIN], MISV_TMP.TBORIGINACAO [PROC SQL - FROM], MISV_TMP.TBPRODUCAO [PROC SQL - JOIN], TRIBO.BASE_MOTIVORECUSATARGETEGV [PROC SQL - JOIN], TRIBO.EGV_PAP [PROC SQL - FROM], WORK.TBPROPOSTAS_EXECUTIVO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): MISV_TMP.TBEXTPROPOSTA, MISV_TMP.TBORIGINACAO, MISV_TMP.TBPRODUCAO, TRIBO.BASE_MOTIVORECUSATARGETEGV, TRIBO.EGV_PAP
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./EGV_BaseAnalitica_RecusaTarget.csv, &dir_csv./EGV_ONEPAGE_PARCEIROS_DIGITAIS_SUM.csv, &dir_csv./EGV_RecusaTargetEnvioEmail_CN.csv, &dir_csv./EGV_RecusaTargetEnvioEmail_Tlmkt.csv, &dir_csv./EGV_dParceiroComercial.csv
+TEMP/DISCARDED OUTPUTS: EGV_DPARCEIROCOMERCIAL, EGV_RECUSATARGETENVIOEMAIL_CN, EGV_RECUSATARGETENVIOEMAIL_TLMKT, PARCEIROS_DIGITAIS_SUM, TBPROPOSTAS_EXECUTIVO, WORK.BASEANALITICA_RECUSATARGETEGV
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	4 - Atualiza Producao e gera csv forca comercial.sas														| */
+/* | Descricao: Programa para atualziar a produção do produto e gera csv forca comercial					| */
+/* | Objetivo: 	Apuração do Dash EGV Parceiras 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname MISV_TMP '/projetos/MISV/data/bases/tmp';
+
+/* ======================================================================================*/
+/* =====================Atualiza Producao e gera csv forca comercial=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+CREATE TABLE TbPropostas_Executivo AS
+SELECT
+	Originacao.NuAnoMes
+	,Originacao.DtEntradaProposta format ddmmyy10.
+	,Originacao.NuProposta
+	,Originacao.StProposta
+	,Producao.NuContrato
+	,Producao.DtContrato
+	,Originacao.NmTipoCobranca
+	,Originacao.CdParceiroComercial
+	,Originacao.NuCnpjLoja
+	,case
+		when Originacao.NmParceiroComercial in ("CP GARAN FINANZERO","FINANZERO BRASIL")
+			then "FINANZERO"
+		else Originacao.NmParceiroComercial
+	end
+	as NmParceiroComercial
+	,Originacao.NmTipoParceiroComercial
+	,Originacao.NmPessoa
+	,Originacao.TpPessoa
+	,Originacao.CdUfPessoa
+	,Originacao.NmCidadePessoa
+    ,Originacao.NuCpfCnpj
+	,Originacao.DsTipoCanalProducao
+	,Originacao.NmCanalEstruturaComercial
+	,Originacao.NmAreaEstruturaComercial
+	,Originacao.NmSubEstruturaComercialA
+	,Originacao.NmGrupoProdutoMeta as NmGrupoSubProduto
+	,Originacao.QtAnosIdade
+	,Originacao.FxIdade
+	,Originacao.QtParcelas
+	,Originacao.CdMarca
+	,Originacao.CdModelo
+	,Originacao.AaModelo
+	,Originacao.AaFabricacao
+	,Originacao.FlPropostaOriginada
+    ,Originacao.FlPropostaNegada
+    ,Originacao.FlPropostaAprovada
+    ,Originacao.FlPropostaAPNP
+    ,Originacao.FlPropostaBipartida
+    ,Originacao.FlPropostaUtilizacaoFgts
+	,Originacao.FlPropostaEfetivada
+	,case
+		when Producao.VrCliente < Producao.VrProducao
+			then 1
+				else 0
+	END
+	AS FlContratoDesdobro
+	,CASE WHEN PARCDIG.CODIGOS IS NOT NULL THEN 'S' ELSE 'N' END AS FlParceiroDigital
+	,CASE WHEN BALCAODIG.CDPARCEIRO IS NOT NULL THEN 'S' ELSE 'N' END AS FlBalcaoDigital
+	,BALCAODIG.FILIAL AS FilialBalcaoDigital
+	,BALCAODIG.NOME AS NomeBalcaoDIgital
+	,Originacao.VrPropostaOriginada format commax18.2
+	,Originacao.VrPropostaAprovada format commax18.2
+	,Originacao.VrLiberado format commax18.2
+	,Originacao.VrEntrada format commax18.2
+	,Originacao.VrFinanciamento format commax18.2
+	,Originacao.VrPrestacao format commax18.2
+	,Producao.VrProducao format commax18.2
+	,Producao.VrCliente format commax18.2
+	,Producao.VrComissaoTotal format commax18.2
+	,Originacao.QtCorridosDiaUtilMes
+	,Originacao.DtAtualizacao
+	,Originacao.TsProcessamento
+	,originacao.cdColaborador
+	,originacao.nmColaborador
+	,MRT.ds_motivo_recusa
+	,MRT.Motivo_Selecao
+	,case when Originacao.StProposta = "AP" AND MRT.Motivo_Selecao = 1 then 1 else 0 end as FlConvMotRecusa
+	,PAP.FLPAP
+
+FROM MISV_TMP.TbOriginacao Originacao
+	left JOIN MISV_TMP.TBEXTPROPOSTA PRO
+	ON ORIGINACAO.NUPROPOSTA = PRO.NUPROPOSTA
+
+	LEFT JOIN
+		(select DISTINCT
+			nuproposta,
+			flpap
+			from TRIBO.EGV_PAP
+			where nuproposta is not null
+	) PAP
+	ON Originacao.NUPROPOSTA = PAP.NUPROPOSTA
+
+	LEFT JOIN MISV_TMP.TbProducao Producao
+		ON Originacao.NuProposta = Producao.NuProposta
+
+		LEFT JOIN TRIBO.base_MotivoRecusaTargetEgv MRT
+		ON Originacao.NuProposta = MRT.Nu_Proposta
+
+			LEFT JOIN AUXL.EGV_DEPARAPARCEIROSDIGITAIS PARCDIG
+/*			on CASE WHEN Originacao.NmGrupoProdutoMeta CONTAINS 'CVG' THEN 'EGV' ELSE Originacao.NmGrupoProdutoMeta END = */
+/*			PARCDIG.PRODUTO AND Originacao.CdParceiroComercial = input(PARCDIG.CODIGOS,best.)*/
+			on Originacao.CdParceiroComercial = input(PARCDIG.CODIGOS,best.)
+			LEFT JOIN AUXL.EGV_DEPARABALCAODIGITAL BALCAODIG
+/*			on CASE WHEN Originacao.NmGrupoProdutoMeta CONTAINS 'CVG' THEN 'EGV' ELSE Originacao.NmGrupoProdutoMeta END = */
+/*			PARCDIG.PRODUTO AND Originacao.CdParceiroComercial = input(PARCDIG.CODIGOS,best.)*/
+			on Originacao.CdParceiroComercial = input(BALCAODIG.CDPARCEIRO,best.)
+
+WHERE Originacao.DtEntradaProposta >= "&a1dt."d
+/*and Originacao.NuCnpjLoja in ('14439116000136','23722194000134','34697707000110','31392500000140','34656383000172','28812324000143','41149615000161','18249116000124','44391578000191')*/
+and Originacao.NmGrupoProdutoMeta
+	and Originacao.NmGrupoProdutoMeta
+	in (
+	'CP',
+	'CP DESENROLA',
+	'CVG Leves',
+	'CVG Pesados',
+	'Leves',
+	'Leves-BVO',
+	'Leves-Multibanco',
+	'Motos',
+	'Pesados'
+/*	'FGTS',*/
+/*	'Privado',*/
+/*	'Saude'*/
+	)
+and Originacao.StProposta in ('A','AP','CA','PA','N')
+;QUIT;
+
+/* ======================================================================================*/
+/* =====================Gera csv força comercial tlmk=========================*/
+/* ======================================================================================*/
+Proc sql;
+
+/*lidi*/
+Create table EGV_RecusaTargetEnvioEmail_Tlmkt as
+Select *
+From TbPropostas_Executivo
+Where 1=1
+AND NmGrupoSubProduto in ('CVG Leves','CVG Pesados')
+AND FlParceiroDigital = 'S'
+AND Motivo_selecao = 1
+AND NmCanalEstruturaComercial IS NULL
+AND YEAR(DtEntradaProposta) = YEAR(TODAY())
+;quit;
+
+PROC EXPORT
+	DATA= EGV_RecusaTargetEnvioEmail_Tlmkt
+	FILE="&dir_csv./EGV_RecusaTargetEnvioEmail_Tlmkt.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+/* ======================================================================================*/
+/* =====================Gera csv força comercial cn =========================*/
+/* ======================================================================================*/
+
+Proc sql;
+/*Ewerton*/
+Create table EGV_RecusaTargetEnvioEmail_CN as
+Select *
+From TbPropostas_Executivo
+Where 1=1
+AND NmGrupoSubProduto in ('CVG Leves','CVG Pesados')
+AND FlParceiroDigital = 'S'
+AND Motivo_selecao = 1
+AND NmCanalEstruturaComercial = 'Canal Negocios'
+AND YEAR(DtEntradaProposta) = YEAR(TODAY())
+;quit;
+PROC EXPORT
+	DATA= EGV_RecusaTargetEnvioEmail_CN
+	FILE="&dir_csv./EGV_RecusaTargetEnvioEmail_CN.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+/* ======================================================================================*/
+/* =====================Fim csv=========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+
+CREATE TABLE EGV_dParceiroComercial as
+select Distinct
+compress(case when NmGrupoSubProduto contains 'CVG' THEN 'EGV' ELSE UPPER(NmGrupoSubProduto) END||"-"||put(CdParceiroComercial,best.)) AS KeyProduto
+,NmGrupoSubProduto
+,CdParceiroComercial
+,NmParceiroComercial
+,FlParceiroDigital
+,FlBalcaoDigital
+from TbPropostas_Executivo;quit;
+
+PROC EXPORT
+	DATA= EGV_dParceiroComercial
+	FILE="&dir_csv./EGV_dParceiroComercial.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+PROC SQL;
+   CREATE TABLE WORK.BaseAnalitica_RecusaTargetEgv AS
+   SELECT *
+   from TbPropostas_Executivo
+   where 1=1
+/*	AND NuAnoMes =  year(today())*100+month(today()) */
+	AND ds_motivo_recusa IS NOT NULL
+;quit;
+
+PROC EXPORT
+	DATA= BaseAnalitica_RecusaTargetEgv
+	FILE="&dir_csv./EGV_BaseAnalitica_RecusaTarget.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;
+
+PROC SQL;
+   CREATE TABLE PARCEIROS_DIGITAIS_SUM AS
+   SELECT
+			NuAnoMes,
+			DtEntradaProposta,
+			DtContrato,
+			NmGrupoSubProduto,
+			CdParceiroComercial,
+			NmParceiroComercial,
+			DsTipoCanalProducao,
+			Ds_motivo_recusa,
+			NmCanalEstruturaComercial,
+			NmAreaEstruturaComercial,
+			FlParceiroDigital,
+			FlBalcaoDigital,
+			FilialBalcaoDigital,
+			NomeBalcaoDIgital,
+			FLPAP,
+            (SUM(FlPropostaOriginada)) AS FlPropostaOriginada,
+            (SUM(FlPropostaNegada)) AS FlPropostaNegada,
+            (SUM(FlPropostaAprovada)) AS FlPropostaAprovada,
+            (SUM(FlPropostaAPNP)) AS FlPropostaAPNP,
+            (SUM(FlPropostaEfetivada)) AS FlPropostaEfetivada,
+			(SUM(Motivo_Selecao)) AS FlPropostaMotRecusa,
+			(SUM(FlConvMotRecusa)) AS FlConvMotRecusa,
+            (SUM(FlPropostaBipartida)) FORMAT=6. AS FlPropostaBipartida,
+            (SUM(FlPropostaUtilizacaoFgts)) FORMAT=6. AS FlPropostaUtilizacaoFgts,
+            (SUM(FlContratoDesdobro)) AS FlContratoDesdobro,
+            (SUM(VrPropostaOriginada)) FORMAT=COMMAX18.2 AS VrPropostaOriginada,
+            (SUM(VrPropostaAprovada)) FORMAT=COMMAX18.2 AS VrPropostaAprovada,
+            (SUM(VrProducao)) FORMAT=COMMAX18.2 AS VrProducao
+      FROM WORK.TbPropostas_Executivo
+		GROUP BY
+			NuAnoMes,
+			DtEntradaProposta,
+			DtContrato,
+			NmGrupoSubProduto,
+			CdParceiroComercial,
+			NmParceiroComercial,
+			DsTipoCanalProducao,
+			Ds_motivo_recusa,
+			NmCanalEstruturaComercial,
+			NmAreaEstruturaComercial,
+			FlParceiroDigital,
+			FlBalcaoDigital,
+			FilialBalcaoDigital,
+			NomeBalcaoDIgital,
+			FLPAP
+;
+QUIT;
+
+PROC EXPORT
+	DATA= PARCEIROS_DIGITAIS_SUM
+	FILE="&dir_csv./EGV_ONEPAGE_PARCEIROS_DIGITAIS_SUM.csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

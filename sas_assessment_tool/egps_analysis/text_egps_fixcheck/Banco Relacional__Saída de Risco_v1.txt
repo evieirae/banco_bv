@@ -1,0 +1,264 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Banco Relacional__Saída de Risco_v1
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-06-18 17:52:29 UTC
+BUSINESS_AREA: Banco Relacional
+TARGET_ARCH: DATABRICKS (Score: 90)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 191
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: FREQ, PRINT, SORT, SQL
+HAS_DATA_STEP: Yes (6x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safra
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASE [BIGQUERY], TARGETSAFRAREF [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DVMD\Cartões\00 - Estrut.Arquivamento\Ger. Comercial Cartões\Fidelização\38 - Tabela de Preço\Processo de Bonificação\00 - Arquivos importados (Bonificação)\BonificaçãoCampanha.xls[SHEET='CampProd'], N:\DVMD\Cartões\00 - Estrut.Arquivamento\Ger. Comercial Cartões\Fidelização\38 - Tabela de Preço\Processo de Bonificação\00 - Arquivos importados (Bonificação)\DEPARA_taxaBAU_campanha.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.CampProd <- N:\DVMD\Cartões\00 - Estrut.Arquivamento\Ger. Comercial Cartões\Fidelização\38 - Tabela de Preço\Processo de Bonificação\00 - Arquivos importados (Bonificação)\BonificaçãoCampanha.xls[SHEET='CampProd'], WORK.DEPARA_taxaBAU_campanha <- N:\DVMD\Cartões\00 - Estrut.Arquivamento\Ger. Comercial Cartões\Fidelização\38 - Tabela de Preço\Processo de Bonificação\00 - Arquivos importados (Bonificação)\DEPARA_taxaBAU_campanha.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_FMT, WORK.BASE_SAIDA_RISCO, WORK.BASE_SAIDA_RISCO_1, WORK.DEPARA_CLEAN, WORK.DEPARA_TAXABAU_CAMPANHA, WORK.FREQ_NAO_MAP, WORK.GCP_BASE_SAIDA_RISCO, WORK.NAO_MAPEADOS, WORK._COUNTS_CAMP, WORK._WITH_SEQ
+TABLE_READ_PROVENANCE (Flow): BASE [Pass-Through Native (BIGQUERY) - FROM], TARGETSAFRAREF [Pass-Through Native (BIGQUERY) - FROM], WORK.BASE_FMT [PROC SQL - FROM], WORK.BASE_SAIDA_RISCO [PROC FREQ - DATA=], WORK.BASE_SAIDA_RISCO_1 [DATA Step - MERGE; PROC SORT - DATA=; PROC SQL - FROM], WORK.DEPARA_CLEAN [PROC SQL - FROM; PROC SQL - JOIN], WORK.DEPARA_TAXABAU_CAMPANHA [DATA Step - SET], WORK.FREQ_NAO_MAP [PROC PRINT - DATA=], WORK.GCP_BASE_SAIDA_RISCO [DATA Step - SET], WORK.NAO_MAPEADOS [PROC FREQ - DATA=], WORK._COUNTS_CAMP [DATA Step - MERGE], WORK._WITH_SEQ [DATA Step - SET; PROC SORT - DATA=]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SAIDA_RISCO_&SAFRA, WORK.BASE_FMT, WORK.BASE_SAIDA_RISCO, WORK.BASE_SAIDA_RISCO_1, WORK.DEPARA_CLEAN, WORK.FREQ_NAO_MAP, WORK.GCP_BASE_SAIDA_RISCO, WORK.NAO_MAPEADOS, WORK._COUNTS_CAMP, WORK._WITH_SEQ
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: GCP:base_saida_risco */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 19 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: GCP:base_saida_risco */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-4VUiFPSYas8yPZxL/code.sas */
+/* =========================INÍCIO TASK========================= */
+DATA _null_;
+	hoje = today();
+	call symput('safra', put(hoje,  yymmddn8.));
+RUN;
+
+PROC SQL;
+
+  CONNECT TO bigquery AS perm (project='bv-sase-dtm' credfile='/projetos/acessos/bq/e/sase-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+  CREATE TABLE work.GCP_base_saida_risco AS
+    SELECT
+      CdDimContaCartao,
+      Class,
+      CampParcFat,
+      SafraRef
+    FROM connection to perm
+  (
+    with Base AS (
+      select
+        cast(cd_dim_conta_cartao as int64) as CdDimContaCartao,
+        ds_class_reneg_adim           as Class,
+        vr_nova_tx_juros              as CampParcFat,
+        ts_inclusao_analitico         as SafraRef
+      from `bv-pdbd-prd.dvry_corp_credito.visaocliente_saidaderisco_dime`
+      where ds_produto = 'CARTOES'
+        and vr_nova_tx_juros in (6.99,10.99,9.99,9.49,8.99,13.99,7.99,12.99)
+    ),
+
+    ContaRowsSafraRef AS (
+      select
+        SafraRef,
+        count(*) as QTDRows
+      from Base
+      group by SafraRef
+      having QTDRows >= 80000
+    ),
+
+    TargetSafraRef AS (
+      select max(SafraRef) as SafraRef
+      from ContaRowsSafraRef
+    )
+    select
+      CdDimContaCartao,
+      Class,
+      CampParcFat,
+      SafraRef
+    from Base
+    where SafraRef = (select SafraRef from TargetSafraRef)
+  );
+
+  DISCONNECT FROM perm;
+QUIT;
+
+DATA work.depara_clean;
+  length TaxaBAU $6;
+  set work.DEPARA_taxaBAU_campanha;
+  TaxaBAU = strip(put(Taxa_BAU, best5.));
+RUN;
+
+DATA work.base_fmt;
+  length CampParcFat_char $6;
+  set work.GCP_base_saida_risco;
+  CampParcFat_char = strip(put(CampParcFat, best5.));
+RUN;
+
+PROC SQL;
+CREATE TABLE work.base_saida_risco_1 AS
+SELECT
+a.CdDimContaCartao
+,a.Class
+,b.Campanha    							AS CampParcFat
+FROM work.base_fmt a
+INNER JOIN work.depara_clean b
+    on a.CampParcFat_char = b.TaxaBAU;
+QUIT;
+
+PROC SQL;
+  create table work._counts_camp as
+  select CampParcFat, count(*) as cnt
+  from work.base_saida_risco_1
+  group by CampParcFat;
+QUIT;
+
+PROC SORT data=work.base_saida_risco_1; by CampParcFat; run;
+DATA work._with_seq;
+  merge work.base_saida_risco_1(in=a) work._counts_camp(in=b);
+  by CampParcFat;
+  if a;
+  retain seq;
+  if first.CampParcFat then seq = 0;
+  seq + 1;
+  frac_key = seq / cnt;            
+  neg_cnt  = -cnt;                
+RUN;
+
+PROC SORT data=work._with_seq;
+  by frac_key neg_cnt CampParcFat CdDimContaCartao;
+RUN;
+
+DATA work.base_saida_risco;
+  set work._with_seq;
+  drop seq frac_key neg_cnt cnt;
+RUN;
+
+PROC FREQ data=work.base_saida_risco;
+  tables CampParcFat / nocum nopercent;
+RUN;
+
+PROC SQL;
+CREATE TABLE work.nao_mapeados AS
+SELECT
+a.*
+FROM work.base_fmt a
+  where not exists (
+    select 1
+    from work.depara_clean as b
+    where a.CampParcFat_char = b.TaxaBAU
+  );
+QUIT;
+
+PROC FREQ data=work.nao_mapeados noprint;
+  tables CampParcFat_char / out=work.freq_nao_map(rename=(CampParcFat_char=CampParcFat)
+                                                where=(count>0))
+                            nocum nopercent;
+RUN;
+
+PROC PRINT data=work.freq_nao_map noobs label;
+  title 'QTD de não correspondentes no DE/PARA por CampParcFat';
+  var CampParcFat count;
+  label count = 'QTDnaoDEPARA';
+RUN;
+
+DATA base_saida_risco_&safra.;
+  set base_saida_risco(obs=90579); 
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: GCP:base_saida_risco */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.SAFRAREF);
+
+PROC SQL;
+   CREATE TABLE WORK.SAFRAREF AS
+   SELECT DISTINCT t1.SafraRef
+      FROM WORK.GCP_BASE_SAIDA_RISCO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.VALIDACAO_CAMPPARCFAT_2);
+
+PROC SQL;
+   CREATE TABLE WORK.VALIDACAO_CAMPPARCFAT_2 AS
+   SELECT DISTINCT t1.CampParcFat
+      FROM WORK.BASE_SAIDA_RISCO t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.VALIDACAO_CAMPPARCFAT_1);
+
+PROC SQL;
+   CREATE TABLE WORK.VALIDACAO_CAMPPARCFAT_1 AS
+   SELECT DISTINCT t1.CampParcFat
+      FROM WORK.BASE_SAIDA_RISCO_1 t1;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

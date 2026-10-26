@@ -1,0 +1,173 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Funil_EGV_Sales_force
+FILE_SAS: 2 - Import csv GR Full.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 50)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40), INFILE  (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 117
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: PRIVADO = /riscosbv/consignado; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/IGE_NEW/EGV/FUNIL_SALES_FORCE_CN/CSV_SALESFORCE/CONVERSAS_GR_ATIVAS_FULL.CSV [SAS/Local], /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/conversas_GR_ativas_full.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/conversas_GR_ativas_full.csv, /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: WORK.DGT_CTA_GR_RAW
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/conversas_GR_ativas_full.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	2 - Import csv GR Full.sas														| */
+/* | Descricao: Programa para importar arquivo dos atendimentos realizados pelos GRs via salesforce canal de négocios egv.					| */
+/* |		Arquivo extraído manualmente de:						| */
+/* |	 https://bancobv.lightning.force.com/lightning/r/Report/00ODo000002fv0XMAQ/view?queryScope=userFoldersCreatedByMe		| */
+/* | Objetivo: 	Apuração de Funil de egv canal negócios 					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname PRIVADO '/riscosbv/consignado';
+
+/* ======================================================================================*/
+/* =====================Gera Tabela de GRs atualizada=========================*/
+/* ======================================================================================*/
+
+DATA WORK.DGT_CTA_GR_RAW;
+    LENGTH
+        'Chave da plataforma do Messaging'n $ 32
+        'Canal do Messaging: Nome do cana'n $ 46
+        'Conta: Nome do Cliente/Grupo com'n $ 50
+        'Nome do usuário do Messaging'n $ 64
+        'Hora de início'n $ 16
+        'Hora de término'n $ 16
+        'Aceitar tempo'n $ 16
+        'Status de consentimento de mensa'n $ 22
+        'ID do usuário do Messaging'n $ 15
+        'Nome da Sessão do Messaging'n $ 11
+        Mensagem         $ 757
+        'Inserir tipo'n  $ 41
+        'Nome do ator'n  $ 23
+        'Código de status da mensagem'n   8
+        'Oportunidade: CPF/CNPJ'n $ 14
+        'Oportunidade: Volume'''n   8
+        'Oportunidade: Fase'n $ 43
+        'Conta: CPF/CNPJ'n   8
+        Atendente        $ 40
+        Status           $ 8 ;
+    LABEL
+        'Canal do Messaging: Nome do cana'n = "Canal do Messaging: Nome do canal"
+        'Conta: Nome do Cliente/Grupo com'n = "Conta: Nome do Cliente/Grupo comercial"
+        'Status de consentimento de mensa'n = "Status de consentimento de mensagens" ;
+    FORMAT
+        'Chave da plataforma do Messaging'n $CHAR32.
+        'Canal do Messaging: Nome do cana'n $CHAR46.
+        'Conta: Nome do Cliente/Grupo com'n $CHAR50.
+        'Nome do usuário do Messaging'n $CHAR64.
+        'Hora de início'n $CHAR16.
+        'Hora de término'n $CHAR16.
+        'Aceitar tempo'n $CHAR16.
+        'Status de consentimento de mensa'n $CHAR22.
+        'ID do usuário do Messaging'n $CHAR15.
+        'Nome da Sessão do Messaging'n $CHAR11.
+        Mensagem         $CHAR757.
+        'Inserir tipo'n  $CHAR41.
+        'Nome do ator'n  $CHAR23.
+        'Código de status da mensagem'n BEST4.
+        'Oportunidade: CPF/CNPJ'n $CHAR14.
+        'Oportunidade: Volume'''n BEST9.
+        'Oportunidade: Fase'n $CHAR43.
+        'Conta: CPF/CNPJ'n BEST11.
+        Atendente        $CHAR40.
+        Status           $CHAR8. ;
+    INFORMAT
+        'Chave da plataforma do Messaging'n $CHAR32.
+        'Canal do Messaging: Nome do cana'n $CHAR46.
+        'Conta: Nome do Cliente/Grupo com'n $CHAR50.
+        'Nome do usuário do Messaging'n $CHAR64.
+        'Hora de início'n $CHAR16.
+        'Hora de término'n $CHAR16.
+        'Aceitar tempo'n $CHAR16.
+        'Status de consentimento de mensa'n $CHAR22.
+        'ID do usuário do Messaging'n $CHAR15.
+        'Nome da Sessão do Messaging'n $CHAR11.
+        Mensagem         $CHAR757.
+        'Inserir tipo'n  $CHAR41.
+        'Nome do ator'n  $CHAR23.
+        'Código de status da mensagem'n BEST4.
+        'Oportunidade: CPF/CNPJ'n $CHAR14.
+        'Oportunidade: Volume'''n BEST9.
+        'Oportunidade: Fase'n $CHAR43.
+        'Conta: CPF/CNPJ'n BEST11.
+        Atendente        $CHAR40.
+        Status           $CHAR8. ;
+    INFILE '/infogrc/IGE_NEW/EGV/Funil_Sales_Force_CN/csv_salesforce/conversas_GR_ativas_full.csv'
+	FIRSTOBS=2
+        LRECL=2000
+        ENCODING="LATIN1"
+/*        TERMSTR=CRLF*/
+        DLM=';'
+        MISSOVER
+        DSD ;
+    INPUT
+        'Chave da plataforma do Messaging'n : $CHAR32.
+        'Canal do Messaging: Nome do cana'n : $CHAR46.
+        'Conta: Nome do Cliente/Grupo com'n : $CHAR50.
+        'Nome do usuário do Messaging'n : $CHAR64.
+        'Hora de início'n : $CHAR16.
+        'Hora de término'n : $CHAR16.
+        'Aceitar tempo'n : $CHAR16.
+        'Status de consentimento de mensa'n : $CHAR22.
+        'ID do usuário do Messaging'n : $CHAR15.
+        'Nome da Sessão do Messaging'n : $CHAR11.
+        Mensagem         : $CHAR757.
+        'Inserir tipo'n  : $CHAR41.
+        'Nome do ator'n  : $CHAR23.
+        'Código de status da mensagem'n : ?? BEST4.
+        'Oportunidade: CPF/CNPJ'n : $CHAR14.
+        'Oportunidade: Volume'''n : ?? COMMAX9.
+        'Oportunidade: Fase'n : $CHAR43.
+        'Conta: CPF/CNPJ'n : ?? BEST11.
+        Atendente        : $CHAR40.
+        Status           : $CHAR8. ;
+RUN;

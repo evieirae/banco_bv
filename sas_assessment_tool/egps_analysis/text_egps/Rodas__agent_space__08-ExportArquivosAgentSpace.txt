@@ -1,0 +1,1870 @@
+START_METADATA
+PROJECT: Rodas__agent_space
+FILE_SAS: 08-ExportArquivosAgentSpace.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -28
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 1749
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: AUXL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): AUXL.BASEAGENTESPACEFILIAL_GCP, AUXL.BASEAGENTESPACEGR_GCP, AUXL.BASEAGENTESPACEGR_META_GCP, AUXL.BASEAGENTESPACEPDV_GCP
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEAGENTESPACEFILIAL_GCP, BASEAGENTESPACEGR_GCP, BASEAGENTESPACEGR_META_GCP, BASEAGENTESPACEPDV_GCP, TBPARCEIROFILIAL, TBPARCEIROGR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/* |	Atualizacao:	03/02/2026														| */
+/* |	Responsavel: 	Gustavo Domingues (MIS IGE)							| */
+/* |	Alt. Realizada:	Case when filial Sjcampos											| */
+/* ====================================================================================== */
+
+proc sql;
+create table TbparceiroGr as
+select distinct
+NmColaboradorC,
+coalesce(DsLoginN1C,DsLoginColaboradorImediato) as DsLoginN1C,
+/*DsLoginN1C,*/
+DsLoginN2C,
+DsLoginN3C
+
+from tmp.TBPARCEIROCOMERCIAL
+INNER join TbAdmissaoColaborador on DsLogin=DsLoginN1C
+AND DsLoginN2C=DsLoginColaboradorImediato
+where NmColaboradorC <>''
+and flativo = 'S'
+/*AND DsLoginN2C<>''*/
+;run;
+
+PROC SORT DATA=TbparceiroGr NODUPKEY;
+BY NmColaboradorC   ;
+RUN;
+
+proc sql;
+create table BaseAgenteSpacePDV_GCP as
+select distinct
+a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,a.GR
+,a.PDV
+,a.Porte
+,a.Canal
+,b.DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+,B.NmLogradouro
+,B.NuEndereco
+,B.NmBairro
+,B.NmCidade
+,B.CdUf
+,B.CdCep
+,coalesce(a.PartJogo_M6,0) as PartJogo_M6
+,coalesce(a.PartJogo_M5,0) as PartJogo_M5
+,coalesce(a.PartJogo_M4,0) as PartJogo_M4
+,coalesce(a.PartJogo_M2,0) as PartJogo_M2
+,coalesce(a.PartJogo_M1,0) as PartJogo_M1
+,coalesce(a.PartJogo_M0,0) as PartJogo_M0
+,coalesce(a.PartJogo_M3,0) as PartJogo_M3
+,coalesce(a.VirouBV_M6,0) as VirouBV_M6
+,coalesce(a.VirouBV_M5,0) as VirouBV_M5
+,coalesce(a.VirouBV_M4,0) as VirouBV_M4
+,coalesce(a.VirouBV_M2,0) as VirouBV_M2
+,coalesce(a.VirouBV_M1,0) as VirouBV_M1
+,coalesce(a.VirouBV_M0,0) as VirouBV_M0
+,coalesce(a.VirouBV_M3,0) as VirouBV_M3
+,coalesce(a.Share_M6,0) as Share_M6
+,coalesce(a.Share_M5,0) as Share_M5
+,coalesce(a.Share_M4,0) as Share_M4
+,coalesce(a.Share_M2,0) as Share_M2
+,coalesce(a.Share_M1,0) as Share_M1
+,coalesce(a.Share_M0,0) as Share_M0
+,coalesce(a.Share_M3,0) as Share_M3
+,coalesce(a.GravamesMercado_M6,0) as GravamesMercado_M6
+,coalesce(a.GravamesMercado_M5,0) as GravamesMercado_M5
+,coalesce(a.GravamesMercado_M4,0) as GravamesMercado_M4
+,coalesce(a.GravamesMercado_M2,0) as GravamesMercado_M2
+,coalesce(a.GravamesMercado_M1,0) as GravamesMercado_M1
+,coalesce(a.GravamesMercado_M0,0) as GravamesMercado_M0
+,coalesce(a.GravamesMercado_M3,0) as GravamesMercado_M3
+,coalesce(a.GravamesBV_M6,0) as GravamesBV_M6
+,coalesce(a.GravamesBV_M5,0) as GravamesBV_M5
+,coalesce(a.GravamesBV_M4,0) as GravamesBV_M4
+,coalesce(a.GravamesBV_M2,0) as GravamesBV_M2
+,coalesce(a.GravamesBV_M1,0) as GravamesBV_M1
+,coalesce(a.GravamesBV_M0,0) as GravamesBV_M0
+,coalesce(a.GravamesBV_M3,0) as GravamesBV_M3
+,coalesce(a.QtdAPNP_M6,0) as QtdAPNP_M6
+,coalesce(a.QtdAPNP_M5,0) as QtdAPNP_M5
+,coalesce(a.QtdAPNP_M4,0) as QtdAPNP_M4
+,coalesce(a.QtdAPNP_M2,0) as QtdAPNP_M2
+,coalesce(a.QtdAPNP_M1,0) as QtdAPNP_M1
+,coalesce(a.QtdAPNP_M0,0) as QtdAPNP_M0
+,coalesce(a.QtdAPNP_M3,0) as QtdAPNP_M3
+,coalesce(a.QtdCardPositivo_M6,0) as QtdCardPositivo_M6
+,coalesce(a.QtdCardPositivo_M5,0) as QtdCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M4,0) as QtdCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M2,0) as QtdCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M1,0) as QtdCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M0,0) as QtdCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M3,0) as QtdCardPositivo_M3
+,coalesce(a.Spread_M7,0) as Spread_M7
+,coalesce(a.Spread_M5,0) as Spread_M5
+,coalesce(a.Spread_M4,0) as Spread_M4
+,coalesce(a.Spread_M3,0) as Spread_M3
+,coalesce(a.Spread_M2,0) as Spread_M2
+,coalesce(a.Spread_M6,0) as Spread_M6
+,coalesce(a.Spread_M1,0) as Spread_M1
+,coalesce(a.Spread_M0,0) as Spread_M0
+,coalesce(a.QtdSegAp_M7,0) as QtdSegAp_M7
+,coalesce(a.QtdSegAp_M5,0) as QtdSegAp_M5
+,coalesce(a.QtdSegAp_M4,0) as QtdSegAp_M4
+,coalesce(a.QtdSegAp_M3,0) as QtdSegAp_M3
+,coalesce(a.QtdSegAp_M2,0) as QtdSegAp_M2
+,coalesce(a.QtdSegAp_M6,0) as QtdSegAp_M6
+,coalesce(a.QtdSegAp_M1,0) as QtdSegAp_M1
+,coalesce(a.QtdSegAp_M0,0) as QtdSegAp_M0
+,coalesce(a.QtdSegSPF_M7,0) as QtdSegSPF_M7
+,coalesce(a.QtdSegSPF_M5,0) as QtdSegSPF_M5
+,coalesce(a.QtdSegSPF_M4,0) as QtdSegSPF_M4
+,coalesce(a.QtdSegSPF_M3,0) as QtdSegSPF_M3
+,coalesce(a.QtdSegSPF_M2,0) as QtdSegSPF_M2
+,coalesce(a.QtdSegSPF_M6,0) as QtdSegSPF_M6
+,coalesce(a.QtdSegSPF_M1,0) as QtdSegSPF_M1
+,coalesce(a.QtdSegSPF_M0,0) as QtdSegSPF_M0
+,coalesce(a.QtdSegCompleto_M7,0) as QtdSegCompleto_M7
+,coalesce(a.QtdSegCompleto_M5,0) as QtdSegCompleto_M5
+,coalesce(a.QtdSegCompleto_M4,0) as QtdSegCompleto_M4
+,coalesce(a.QtdSegCompleto_M3,0) as QtdSegCompleto_M3
+,coalesce(a.QtdSegCompleto_M2,0) as QtdSegCompleto_M2
+,coalesce(a.QtdSegCompleto_M6,0) as QtdSegCompleto_M6
+,coalesce(a.QtdSegCompleto_M1,0) as QtdSegCompleto_M1
+,coalesce(a.QtdSegCompleto_M0,0) as QtdSegCompleto_M0
+,coalesce(a.QtSegDemais_M7,0) as QtSegDemais_M7
+,coalesce(a.QtSegDemais_M5,0) as QtSegDemais_M5
+,coalesce(a.QtSegDemais_M4,0) as QtSegDemais_M4
+,coalesce(a.QtSegDemais_M3,0) as QtSegDemais_M3
+,coalesce(a.QtSegDemais_M2,0) as QtSegDemais_M2
+,coalesce(a.QtSegDemais_M6,0) as QtSegDemais_M6
+,coalesce(a.QtSegDemais_M1,0) as QtSegDemais_M1
+,coalesce(a.QtSegDemais_M0,0) as QtSegDemais_M0
+,coalesce(a.PercRG_M7,0) as PercRG_M7
+,coalesce(a.PercRG_M5,0) as PercRG_M5
+,coalesce(a.PercRG_M4,0) as PercRG_M4
+,coalesce(a.PercRG_M3,0) as PercRG_M3
+,coalesce(a.PercRG_M2,0) as PercRG_M2
+,coalesce(a.PercRG_M6,0) as PercRG_M6
+,coalesce(a.PercRG_M1,0) as PercRG_M1
+,coalesce(a.PercRG_M0,0) as PercRG_M0
+,a.Banco1_M6
+,a.Banco1_M5
+,a.Banco1_M4
+,a.Banco1_M3
+,a.Banco1_M2
+,a.Banco1_M1
+,a.Banco1_M0
+,a.Banco2_M6
+,a.Banco2_M5
+,a.Banco2_M4
+,a.Banco2_M3
+,a.Banco2_M2
+,a.Banco2_M1
+,a.Banco2_M0
+,a.Banco3_M6
+,a.Banco3_M5
+,a.Banco3_M4
+,a.Banco3_M3
+,a.Banco3_M2
+,a.Banco3_M1
+,a.Banco3_M0
+,coalesce(a.ShareAte40_M6,0) as ShareAte40_M6
+,coalesce(a.ShareAte10_M6,0) as ShareAte10_M6
+,coalesce(a.ShareAte20_M6,0) as ShareAte20_M6
+,coalesce(a.ShareAte20_M5,0) as ShareAte20_M5
+,coalesce(a.ShareAte40_M2,0) as ShareAte40_M2
+,coalesce(a.Maior40_M6,0) as Maior40_M6
+,coalesce(a.Maior40_M5,0) as Maior40_M5
+,coalesce(a.ShareAte10_M5,0) as ShareAte10_M5
+,coalesce(a.ShareAte30_M5,0) as ShareAte30_M5
+,coalesce(a.ShareAte40_M5,0) as ShareAte40_M5
+,coalesce(a.Maior40_M4,0) as Maior40_M4
+,coalesce(a.ShareAte10_M4,0) as ShareAte10_M4
+,coalesce(a.ShareAte20_M4,0) as ShareAte20_M4
+,coalesce(a.ShareAte10_M2,0) as ShareAte10_M2
+,coalesce(a.ShareAte30_M2,0) as ShareAte30_M2
+,coalesce(a.ShareAte40_M4,0) as ShareAte40_M4
+,coalesce(a.Maior40_M2,0) as Maior40_M2
+,coalesce(a.ShareAte10_M1,0) as ShareAte10_M1
+,coalesce(a.ShareAte20_M1,0) as ShareAte20_M1
+,coalesce(a.ShareAte30_M1,0) as ShareAte30_M1
+,coalesce(a.ShareAte20_M2,0) as ShareAte20_M2
+,coalesce(a.ShareAte40_M1,0) as ShareAte40_M1
+,coalesce(a.ShareAte10_M0,0) as ShareAte10_M0
+,coalesce(a.ShareAte20_M0,0) as ShareAte20_M0
+,coalesce(a.ShareAte40_M0,0) as ShareAte40_M0
+,coalesce(a.ShareAte10_M3,0) as ShareAte10_M3
+,coalesce(a.ShareAte40_M3,0) as ShareAte40_M3
+,coalesce(a.ShareAte30_M6,0) as ShareAte30_M6
+,coalesce(a.Maior40_M3,0) as Maior40_M3
+,coalesce(a.Maior40_M1,0) as Maior40_M1
+,coalesce(a.ShareAte30_M0,0) as ShareAte30_M0
+,coalesce(a.ShareAte20_M3,0) as ShareAte20_M3
+,coalesce(a.Maior40_M0,0) as Maior40_M0
+,coalesce(a.ShareAte30_M4,0) as ShareAte30_M4
+,coalesce(a.ShareAte30_M3,0) as ShareAte30_M3
+,coalesce(a.Qtdinad15_M6,0) as Inad15_M6
+,coalesce(a.Qtdinad15_M5,0) as Inad15_M5
+,coalesce(a.Qtdinad15_M4,0) as Inad15_M4
+,coalesce(a.Qtdinad15_M3,0) as Inad15_M3
+,coalesce(a.Qtdinad15_M2,0) as Inad15_M2
+,coalesce(a.Qtdinad15_M1,0) as Inad15_M1
+,coalesce(a.Qtdinad15_M0,0) as Inad15_M0
+,coalesce(a.Qtdinad30_M6,0) as Inad30_M6
+,coalesce(a.Qtdinad30_M5,0) as Inad30_M5
+,coalesce(a.Qtdinad30_M4,0) as Inad30_M4
+,coalesce(a.Qtdinad30_M3,0) as Inad30_M3
+,coalesce(a.Qtdinad30_M2,0) as Inad30_M2
+,coalesce(a.Qtdinad30_M1,0) as Inad30_M1
+,coalesce(a.Qtdinad30_M0,0) as Inad30_M0
+,coalesce(a.EstoqueAPNP_M0,0) as EstoqueAPNP_M0
+,coalesce(a.EstoqueAPNP_M1,0) as EstoqueAPNP_M1
+,coalesce(a.EstoqueAPNP_M2,0) as EstoqueAPNP_M2
+,coalesce(a.EstoqueAPNP_M3,0) as EstoqueAPNP_M3
+,coalesce(a.EstoqueAPNP_M4,0) as EstoqueAPNP_M4
+,coalesce(a.EstoqueAPNP_M5,0) as EstoqueAPNP_M5
+,coalesce(a.EstoqueAPNP_M6,0) as EstoqueAPNP_M6
+,case when nmautoshopping<>'' then 'S' else 'N' end as FlAutoShopping
+,coalesce(a.Foco_M0,'N') as Foco_M0
+,coalesce(a.Foco_M1,'N') as Foco_M1
+,coalesce(a.Foco_M2,'N') as Foco_M2
+,coalesce(a.Foco_M3,'N') as Foco_M3
+,coalesce(a.Foco_M4,'N') as Foco_M4
+,coalesce(a.Foco_M5,'N') as Foco_M5
+,coalesce(a.Foco_M6,'N') as Foco_M6
+,coalesce(a.QtdCardPositivo_M0,0) as QtdPartCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M1,0) as QtdPartCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M2,0) as QtdPartCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M3,0) as QtdPartCardPositivo_M3
+,coalesce(a.QtdCardPositivo_M4,0) as QtdPartCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M5,0) as QtdPartCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M6,0) as QtdPartCardPositivo_M6
+
+from BaseAgenteSpacePDV as a
+left join tmp.tbparceirocomercial as b
+on a.PDV = cats(b.CdParceiroComercial,'-',b.NmParceiroComercial)
+where  1=1
+union all
+select distinct
+a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,a.GR
+,a.PDV
+,a.Porte
+,a.Canal
+,b.DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+
+,B.NmLogradouro
+,B.NuEndereco
+,B.NmBairro
+,B.NmCidade
+,B.CdUf
+,B.CdCep
+,coalesce(a.PartJogo_M6,0) as PartJogo_M6
+,coalesce(a.PartJogo_M5,0) as PartJogo_M5
+,coalesce(a.PartJogo_M4,0) as PartJogo_M4
+,coalesce(a.PartJogo_M2,0) as PartJogo_M2
+,coalesce(a.PartJogo_M1,0) as PartJogo_M1
+,coalesce(a.PartJogo_M0,0) as PartJogo_M0
+,coalesce(a.PartJogo_M3,0) as PartJogo_M3
+,coalesce(a.VirouBV_M6,0) as VirouBV_M6
+,coalesce(a.VirouBV_M5,0) as VirouBV_M5
+,coalesce(a.VirouBV_M4,0) as VirouBV_M4
+,coalesce(a.VirouBV_M2,0) as VirouBV_M2
+,coalesce(a.VirouBV_M1,0) as VirouBV_M1
+,coalesce(a.VirouBV_M0,0) as VirouBV_M0
+,coalesce(a.VirouBV_M3,0) as VirouBV_M3
+,coalesce(a.Share_M6,0) as Share_M6
+,coalesce(a.Share_M5,0) as Share_M5
+,coalesce(a.Share_M4,0) as Share_M4
+,coalesce(a.Share_M2,0) as Share_M2
+,coalesce(a.Share_M1,0) as Share_M1
+,coalesce(a.Share_M0,0) as Share_M0
+,coalesce(a.Share_M3,0) as Share_M3
+,coalesce(a.GravamesMercado_M6,0) as GravamesMercado_M6
+,coalesce(a.GravamesMercado_M5,0) as GravamesMercado_M5
+,coalesce(a.GravamesMercado_M4,0) as GravamesMercado_M4
+,coalesce(a.GravamesMercado_M2,0) as GravamesMercado_M2
+,coalesce(a.GravamesMercado_M1,0) as GravamesMercado_M1
+,coalesce(a.GravamesMercado_M0,0) as GravamesMercado_M0
+,coalesce(a.GravamesMercado_M3,0) as GravamesMercado_M3
+,coalesce(a.GravamesBV_M6,0) as GravamesBV_M6
+,coalesce(a.GravamesBV_M5,0) as GravamesBV_M5
+,coalesce(a.GravamesBV_M4,0) as GravamesBV_M4
+,coalesce(a.GravamesBV_M2,0) as GravamesBV_M2
+,coalesce(a.GravamesBV_M1,0) as GravamesBV_M1
+,coalesce(a.GravamesBV_M0,0) as GravamesBV_M0
+,coalesce(a.GravamesBV_M3,0) as GravamesBV_M3
+,coalesce(a.QtdAPNP_M6,0) as QtdAPNP_M6
+,coalesce(a.QtdAPNP_M5,0) as QtdAPNP_M5
+,coalesce(a.QtdAPNP_M4,0) as QtdAPNP_M4
+,coalesce(a.QtdAPNP_M2,0) as QtdAPNP_M2
+,coalesce(a.QtdAPNP_M1,0) as QtdAPNP_M1
+,coalesce(a.QtdAPNP_M0,0) as QtdAPNP_M0
+,coalesce(a.QtdAPNP_M3,0) as QtdAPNP_M3
+,coalesce(a.QtdCardPositivo_M6,0) as QtdCardPositivo_M6
+,coalesce(a.QtdCardPositivo_M5,0) as QtdCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M4,0) as QtdCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M2,0) as QtdCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M1,0) as QtdCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M0,0) as QtdCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M3,0) as QtdCardPositivo_M3
+,coalesce(a.Spread_M7,0) as Spread_M7
+,coalesce(a.Spread_M5,0) as Spread_M5
+,coalesce(a.Spread_M4,0) as Spread_M4
+,coalesce(a.Spread_M3,0) as Spread_M3
+,coalesce(a.Spread_M2,0) as Spread_M2
+,coalesce(a.Spread_M6,0) as Spread_M6
+,coalesce(a.Spread_M1,0) as Spread_M1
+,coalesce(a.Spread_M0,0) as Spread_M0
+,coalesce(a.QtdSegAp_M7,0) as QtdSegAp_M7
+,coalesce(a.QtdSegAp_M5,0) as QtdSegAp_M5
+,coalesce(a.QtdSegAp_M4,0) as QtdSegAp_M4
+,coalesce(a.QtdSegAp_M3,0) as QtdSegAp_M3
+,coalesce(a.QtdSegAp_M2,0) as QtdSegAp_M2
+,coalesce(a.QtdSegAp_M6,0) as QtdSegAp_M6
+,coalesce(a.QtdSegAp_M1,0) as QtdSegAp_M1
+,coalesce(a.QtdSegAp_M0,0) as QtdSegAp_M0
+,coalesce(a.QtdSegSPF_M7,0) as QtdSegSPF_M7
+,coalesce(a.QtdSegSPF_M5,0) as QtdSegSPF_M5
+,coalesce(a.QtdSegSPF_M4,0) as QtdSegSPF_M4
+,coalesce(a.QtdSegSPF_M3,0) as QtdSegSPF_M3
+,coalesce(a.QtdSegSPF_M2,0) as QtdSegSPF_M2
+,coalesce(a.QtdSegSPF_M6,0) as QtdSegSPF_M6
+,coalesce(a.QtdSegSPF_M1,0) as QtdSegSPF_M1
+,coalesce(a.QtdSegSPF_M0,0) as QtdSegSPF_M0
+,coalesce(a.QtdSegCompleto_M7,0) as QtdSegCompleto_M7
+,coalesce(a.QtdSegCompleto_M5,0) as QtdSegCompleto_M5
+,coalesce(a.QtdSegCompleto_M4,0) as QtdSegCompleto_M4
+,coalesce(a.QtdSegCompleto_M3,0) as QtdSegCompleto_M3
+,coalesce(a.QtdSegCompleto_M2,0) as QtdSegCompleto_M2
+,coalesce(a.QtdSegCompleto_M6,0) as QtdSegCompleto_M6
+,coalesce(a.QtdSegCompleto_M1,0) as QtdSegCompleto_M1
+,coalesce(a.QtdSegCompleto_M0,0) as QtdSegCompleto_M0
+,coalesce(a.QtSegDemais_M7,0) as QtSegDemais_M7
+,coalesce(a.QtSegDemais_M5,0) as QtSegDemais_M5
+,coalesce(a.QtSegDemais_M4,0) as QtSegDemais_M4
+,coalesce(a.QtSegDemais_M3,0) as QtSegDemais_M3
+,coalesce(a.QtSegDemais_M2,0) as QtSegDemais_M2
+,coalesce(a.QtSegDemais_M6,0) as QtSegDemais_M6
+,coalesce(a.QtSegDemais_M1,0) as QtSegDemais_M1
+,coalesce(a.QtSegDemais_M0,0) as QtSegDemais_M0
+,coalesce(a.PercRG_M7,0) as PercRG_M7
+,coalesce(a.PercRG_M5,0) as PercRG_M5
+,coalesce(a.PercRG_M4,0) as PercRG_M4
+,coalesce(a.PercRG_M3,0) as PercRG_M3
+,coalesce(a.PercRG_M2,0) as PercRG_M2
+,coalesce(a.PercRG_M6,0) as PercRG_M6
+,coalesce(a.PercRG_M1,0) as PercRG_M1
+,coalesce(a.PercRG_M0,0) as PercRG_M0
+,a.Banco1_M6
+,a.Banco1_M5
+,a.Banco1_M4
+,a.Banco1_M3
+,a.Banco1_M2
+,a.Banco1_M1
+,a.Banco1_M0
+,a.Banco2_M6
+,a.Banco2_M5
+,a.Banco2_M4
+,a.Banco2_M3
+,a.Banco2_M2
+,a.Banco2_M1
+,a.Banco2_M0
+,a.Banco3_M6
+,a.Banco3_M5
+,a.Banco3_M4
+,a.Banco3_M3
+,a.Banco3_M2
+,a.Banco3_M1
+,a.Banco3_M0
+,coalesce(a.ShareAte40_M6,0) as ShareAte40_M6
+,coalesce(a.ShareAte10_M6,0) as ShareAte10_M6
+,coalesce(a.ShareAte20_M6,0) as ShareAte20_M6
+,coalesce(a.ShareAte20_M5,0) as ShareAte20_M5
+,coalesce(a.ShareAte40_M2,0) as ShareAte40_M2
+,coalesce(a.Maior40_M6,0) as Maior40_M6
+,coalesce(a.Maior40_M5,0) as Maior40_M5
+,coalesce(a.ShareAte10_M5,0) as ShareAte10_M5
+,coalesce(a.ShareAte30_M5,0) as ShareAte30_M5
+,coalesce(a.ShareAte40_M5,0) as ShareAte40_M5
+,coalesce(a.Maior40_M4,0) as Maior40_M4
+,coalesce(a.ShareAte10_M4,0) as ShareAte10_M4
+,coalesce(a.ShareAte20_M4,0) as ShareAte20_M4
+,coalesce(a.ShareAte10_M2,0) as ShareAte10_M2
+,coalesce(a.ShareAte30_M2,0) as ShareAte30_M2
+,coalesce(a.ShareAte40_M4,0) as ShareAte40_M4
+,coalesce(a.Maior40_M2,0) as Maior40_M2
+,coalesce(a.ShareAte10_M1,0) as ShareAte10_M1
+,coalesce(a.ShareAte20_M1,0) as ShareAte20_M1
+,coalesce(a.ShareAte30_M1,0) as ShareAte30_M1
+,coalesce(a.ShareAte20_M2,0) as ShareAte20_M2
+,coalesce(a.ShareAte40_M1,0) as ShareAte40_M1
+,coalesce(a.ShareAte10_M0,0) as ShareAte10_M0
+,coalesce(a.ShareAte20_M0,0) as ShareAte20_M0
+,coalesce(a.ShareAte40_M0,0) as ShareAte40_M0
+,coalesce(a.ShareAte10_M3,0) as ShareAte10_M3
+,coalesce(a.ShareAte40_M3,0) as ShareAte40_M3
+,coalesce(a.ShareAte30_M6,0) as ShareAte30_M6
+,coalesce(a.Maior40_M3,0) as Maior40_M3
+,coalesce(a.Maior40_M1,0) as Maior40_M1
+,coalesce(a.ShareAte30_M0,0) as ShareAte30_M0
+,coalesce(a.ShareAte20_M3,0) as ShareAte20_M3
+,coalesce(a.Maior40_M0,0) as Maior40_M0
+,coalesce(a.ShareAte30_M4,0) as ShareAte30_M4
+,coalesce(a.ShareAte30_M3,0) as ShareAte30_M3
+,coalesce(a.Qtdinad15_M6,0) as Inad15_M6
+,coalesce(a.Qtdinad15_M5,0) as Inad15_M5
+,coalesce(a.Qtdinad15_M4,0) as Inad15_M4
+,coalesce(a.Qtdinad15_M3,0) as Inad15_M3
+,coalesce(a.Qtdinad15_M2,0) as Inad15_M2
+,coalesce(a.Qtdinad15_M1,0) as Inad15_M1
+,coalesce(a.Qtdinad15_M0,0) as Inad15_M0
+,coalesce(a.Qtdinad30_M6,0) as Inad30_M6
+,coalesce(a.Qtdinad30_M5,0) as Inad30_M5
+,coalesce(a.Qtdinad30_M4,0) as Inad30_M4
+,coalesce(a.Qtdinad30_M3,0) as Inad30_M3
+,coalesce(a.Qtdinad30_M2,0) as Inad30_M2
+,coalesce(a.Qtdinad30_M1,0) as Inad30_M1
+,coalesce(a.Qtdinad30_M0,0) as Inad30_M0
+,coalesce(a.EstoqueAPNP_M0,0) as EstoqueAPNP_M0
+,coalesce(a.EstoqueAPNP_M1,0) as EstoqueAPNP_M1
+,coalesce(a.EstoqueAPNP_M2,0) as EstoqueAPNP_M2
+,coalesce(a.EstoqueAPNP_M3,0) as EstoqueAPNP_M3
+,coalesce(a.EstoqueAPNP_M4,0) as EstoqueAPNP_M4
+,coalesce(a.EstoqueAPNP_M5,0) as EstoqueAPNP_M5
+,coalesce(a.EstoqueAPNP_M6,0) as EstoqueAPNP_M6
+,case when nmautoshopping<>'' then 'S' else 'N' end as FlAutoShopping
+,coalesce(a.Foco_M0,'N') as Foco_M0
+,coalesce(a.Foco_M1,'N') as Foco_M1
+,coalesce(a.Foco_M2,'N') as Foco_M2
+,coalesce(a.Foco_M3,'N') as Foco_M3
+,coalesce(a.Foco_M4,'N') as Foco_M4
+,coalesce(a.Foco_M5,'N') as Foco_M5
+,coalesce(a.Foco_M6,'N') as Foco_M6
+
+,coalesce(a.QtdCardPositivo_M0,0) as QtdPartCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M1,0) as QtdPartCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M2,0) as QtdPartCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M3,0) as QtdPartCardPositivo_M3
+,coalesce(a.QtdCardPositivo_M4,0) as QtdPartCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M5,0) as QtdPartCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M6,0) as QtdPartCardPositivo_M6
+
+from BaseAgenteSpacePDVMotos as a
+left join tmp.tbparceirocomercial as b
+on a.PDV = cats(b.CdParceiroComercial,'-',b.NmParceiroComercial)
+where  1=1
+
+;run;
+
+data auxl.BaseAgenteSpacePDV_GCP;
+set BaseAgenteSpacePDV_GCP
+;run;
+
+%ExportaCsv(Tb_PDV,BaseAgenteSpacePDV_GCP)
+
+/*88888888888888888888888888888888888888888888888888888888888888888888888888888*/
+
+proc sql;
+create table BaseAgenteSpaceGR_GCP as
+select distinct
+a.GR
+,a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,coalesce(a.Porte_Sem_Porte,0) as Porte_Sem_Porte
+,coalesce(a.Porte_P,0) as Porte_P
+,coalesce(a.Porte_G,0) as Porte_G
+,coalesce(a.Porte_GG,0) as Porte_GG
+,coalesce(a.Porte_M,0) as Porte_M
+,b.DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+
+,coalesce(a.PartJogo_M6,0) as PartJogo_M6
+,coalesce(a.PartJogo_M5,0) as PartJogo_M5
+,coalesce(a.PartJogo_M4,0) as PartJogo_M4
+,coalesce(a.PartJogo_M2,0) as PartJogo_M2
+,coalesce(a.PartJogo_M1,0) as PartJogo_M1
+,coalesce(a.PartJogo_M0,0) as PartJogo_M0
+,coalesce(a.PartJogo_M3,0) as PartJogo_M3
+,coalesce(a.VirouBV_M6,0) as VirouBV_M6
+,coalesce(a.VirouBV_M5,0) as VirouBV_M5
+,coalesce(a.VirouBV_M4,0) as VirouBV_M4
+,coalesce(a.VirouBV_M2,0) as VirouBV_M2
+,coalesce(a.VirouBV_M1,0) as VirouBV_M1
+,coalesce(a.VirouBV_M0,0) as VirouBV_M0
+,coalesce(a.VirouBV_M3,0) as VirouBV_M3
+,coalesce(a.Share_M6,0) as Share_M6
+,coalesce(a.Share_M5,0) as Share_M5
+,coalesce(a.Share_M4,0) as Share_M4
+,coalesce(a.Share_M2,0) as Share_M2
+,coalesce(a.Share_M1,0) as Share_M1
+,coalesce(a.Share_M0,0) as Share_M0
+,coalesce(a.Share_M3,0) as Share_M3
+,coalesce(a.GravamesMercado_M6,0) as GravamesMercado_M6
+,coalesce(a.GravamesMercado_M5,0) as GravamesMercado_M5
+,coalesce(a.GravamesMercado_M4,0) as GravamesMercado_M4
+,coalesce(a.GravamesMercado_M2,0) as GravamesMercado_M2
+,coalesce(a.GravamesMercado_M1,0) as GravamesMercado_M1
+,coalesce(a.GravamesMercado_M0,0) as GravamesMercado_M0
+,coalesce(a.GravamesMercado_M3,0) as GravamesMercado_M3
+,coalesce(a.GravamesBV_M6,0) as GravamesBV_M6
+,coalesce(a.GravamesBV_M5,0) as GravamesBV_M5
+,coalesce(a.GravamesBV_M4,0) as GravamesBV_M4
+,coalesce(a.GravamesBV_M2,0) as GravamesBV_M2
+,coalesce(a.GravamesBV_M1,0) as GravamesBV_M1
+,coalesce(a.GravamesBV_M0,0) as GravamesBV_M0
+,coalesce(a.GravamesBV_M3,0) as GravamesBV_M3
+,coalesce(a.QtdCardPositivo_M6,0) AS QtdPartCardPositivo_M6
+,coalesce(a.QtdCardPositivo_M5,0) AS QtdPartCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M4,0) AS QtdPartCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M2,0) AS QtdPartCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M1,0) AS QtdPartCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M0,0) AS QtdPartCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M3,0) AS QtdPartCardPositivo_M3
+,coalesce(a.QtdAPNP_M6,0) AS QtdParAPNP_M6
+,coalesce(a.QtdAPNP_M5,0) AS QtdParAPNP_M5
+,coalesce(a.QtdAPNP_M4,0) AS QtdParAPNP_M4
+,coalesce(a.QtdAPNP_M2,0) AS QtdParAPNP_M3
+,coalesce(a.QtdAPNP_M1,0) AS QtdParAPNP_M2
+,coalesce(a.QtdAPNP_M0,0) AS QtdParAPNP_M1
+,coalesce(a.QtdAPNP_M3,0) AS QtdParAPNP_M0
+,coalesce(a.Spread_M7,0) AS Spread_M7
+,coalesce(a.Spread_M6,0) AS Spread_M6
+,coalesce(a.Spread_M5,0) AS Spread_M5
+,coalesce(a.Spread_M4,0) AS Spread_M4
+,coalesce(a.Spread_M3,0) AS Spread_M3
+,coalesce(a.Spread_M2,0) AS Spread_M2
+,coalesce(a.Spread_M1,0) AS Spread_M1
+,coalesce(a.Spread_M0,0) AS Spread_M0
+,coalesce(a.QtdSegAp_M7,0) AS QtdSegAp_M7
+,coalesce(a.QtdSegAp_M6,0) AS QtdSegAp_M6
+,coalesce(a.QtdSegAp_M5,0) AS QtdSegAp_M5
+,coalesce(a.QtdSegAp_M4,0) AS QtdSegAp_M4
+,coalesce(a.QtdSegAp_M3,0) AS QtdSegAp_M3
+,coalesce(a.QtdSegAp_M2,0) AS QtdSegAp_M2
+,coalesce(a.QtdSegAp_M1,0) AS QtdSegAp_M1
+,coalesce(a.QtdSegAp_M0,0) AS QtdSegAp_M0
+,coalesce(a.QtdSegSPF_M7,0) AS QtdSegSPF_M7
+,coalesce(a.QtdSegSPF_M6,0) AS QtdSegSPF_M6
+,coalesce(a.QtdSegSPF_M5,0) AS QtdSegSPF_M5
+,coalesce(a.QtdSegSPF_M4,0) AS QtdSegSPF_M4
+,coalesce(a.QtdSegSPF_M3,0) AS QtdSegSPF_M3
+,coalesce(a.QtdSegSPF_M2,0) AS QtdSegSPF_M2
+,coalesce(a.QtdSegSPF_M1,0) AS QtdSegSPF_M1
+,coalesce(a.QtdSegSPF_M0,0) AS QtdSegSPF_M0
+,coalesce(a.QtdSegCompleto_M7,0) AS QtdSegCompleto_M7
+,coalesce(a.QtdSegCompleto_M6,0) AS QtdSegCompleto_M6
+,coalesce(a.QtdSegCompleto_M5,0) AS QtdSegCompleto_M5
+,coalesce(a.QtdSegCompleto_M4,0) AS QtdSegCompleto_M4
+,coalesce(a.QtdSegCompleto_M3,0) AS QtdSegCompleto_M3
+,coalesce(a.QtdSegCompleto_M2,0) AS QtdSegCompleto_M2
+,coalesce(a.QtdSegCompleto_M1,0) AS QtdSegCompleto_M1
+,coalesce(a.QtdSegCompleto_M0,0) AS QtdSegCompleto_M0
+,coalesce(a.QtSegDemais_M7,0) AS QtSegDemais_M7
+,coalesce(a.QtSegDemais_M6,0) AS QtSegDemais_M6
+,coalesce(a.QtSegDemais_M5,0) AS QtSegDemais_M5
+,coalesce(a.QtSegDemais_M4,0) AS QtSegDemais_M4
+,coalesce(a.QtSegDemais_M3,0) AS QtSegDemais_M3
+,coalesce(a.QtSegDemais_M2,0) AS QtSegDemais_M2
+,coalesce(a.QtSegDemais_M1,0) AS QtSegDemais_M1
+,coalesce(a.QtSegDemais_M0,0) AS QtSegDemais_M0
+,coalesce(a.PercRG_M7,0) AS PercRG_M7
+,coalesce(a.PercRG_M6,0) AS PercRG_M6
+,coalesce(a.PercRG_M5,0) AS PercRG_M5
+,coalesce(a.PercRG_M4,0) AS PercRG_M4
+,coalesce(a.PercRG_M3,0) AS PercRG_M3
+,coalesce(a.PercRG_M2,0) AS PercRG_M2
+,coalesce(a.PercRG_M1,0) AS PercRG_M1
+,coalesce(a.PercRG_M0,0) AS PercRG_M0
+,a.Banco1_M6
+,a.Banco2_M6
+,a.Banco3_M6
+,a.Banco1_M5
+,a.Banco2_M5
+,a.Banco1_M4
+,a.Banco2_M4
+,a.Banco1_M3
+,a.Banco1_M2
+,a.Banco1_M1
+,a.Banco3_M5
+,a.Banco2_M3
+,a.Banco3_M3
+,a.Banco2_M2
+,a.Banco3_M2
+,a.Banco2_M1
+,a.Banco3_M1
+,a.Banco1_M0
+,a.Banco2_M0
+,a.Banco3_M4
+,a.Banco3_M0
+,coalesce(a.ShareAte40_M6,0) AS ShareAte40_M6
+,coalesce(a.Maior40_M6,0) AS Maior40_M6
+,coalesce(a.ShareAte10_M6,0) AS ShareAte10_M6
+,coalesce(a.ShareAte20_M6,0) AS ShareAte20_M6
+,coalesce(a.Maior40_M5,0) AS Maior40_M5
+,coalesce(a.ShareAte10_M5,0) AS ShareAte10_M5
+,coalesce(a.ShareAte20_M5,0) AS ShareAte20_M5
+,coalesce(a.ShareAte30_M5,0) AS ShareAte30_M5
+,coalesce(a.ShareAte40_M5,0) AS ShareAte40_M5
+,coalesce(a.Maior40_M4,0) AS Maior40_M4
+,coalesce(a.ShareAte10_M4,0) AS ShareAte10_M4
+,coalesce(a.ShareAte20_M4,0) AS ShareAte20_M4
+,coalesce(a.ShareAte40_M4,0) AS ShareAte40_M4
+,coalesce(a.Maior40_M2,0) AS Maior40_M2
+,coalesce(a.ShareAte10_M2,0) AS ShareAte10_M2
+,coalesce(a.ShareAte30_M2,0) AS ShareAte30_M2
+,coalesce(a.ShareAte40_M2,0) AS ShareAte40_M2
+,coalesce(a.ShareAte10_M1,0) AS ShareAte10_M1
+,coalesce(a.ShareAte20_M1,0) AS ShareAte20_M1
+,coalesce(a.ShareAte30_M1,0) AS ShareAte30_M1
+,coalesce(a.ShareAte30_M6,0) AS ShareAte30_M6
+,coalesce(a.ShareAte30_M4,0) AS ShareAte30_M4
+,coalesce(a.Maior40_M3,0) AS Maior40_M3
+,coalesce(a.ShareAte10_M3,0) AS ShareAte10_M3
+,coalesce(a.ShareAte20_M3,0) AS ShareAte20_M3
+,coalesce(a.ShareAte30_M3,0) AS ShareAte30_M3
+,coalesce(a.ShareAte40_M3,0) AS ShareAte40_M3
+,coalesce(a.ShareAte20_M2,0) AS ShareAte20_M2
+,coalesce(a.Maior40_M1,0) AS Maior40_M1
+,coalesce(a.ShareAte40_M1,0) AS ShareAte40_M1
+,coalesce(a.Maior40_M0,0) AS Maior40_M0
+,coalesce(a.ShareAte10_M0,0) AS ShareAte10_M0
+,coalesce(a.ShareAte20_M0,0) AS ShareAte20_M0
+,coalesce(a.ShareAte30_M0,0) AS ShareAte30_M0
+,coalesce(a.ShareAte40_M0,0) AS ShareAte40_M0
+,coalesce(a.Qtdinad15_M6,0) As Inad15_M6
+,coalesce(a.Qtdinad15_M5,0) As Inad15_M5
+,coalesce(a.Qtdinad15_M4,0) As Inad15_M4
+,coalesce(a.Qtdinad15_M3,0) As Inad15_M3
+,coalesce(a.Qtdinad15_M2,0) As Inad15_M2
+,coalesce(a.Qtdinad15_M1,0) As Inad15_M1
+,coalesce(a.Qtdinad15_M0,0) As Inad15_M0
+,coalesce(a.Qtdinad30_M6,0) As Inad30_M6
+,coalesce(a.Qtdinad30_M5,0) As Inad30_M5
+,coalesce(a.Qtdinad30_M4,0) As Inad30_M4
+,coalesce(a.Qtdinad30_M3,0) As Inad30_M3
+,coalesce(a.Qtdinad30_M2,0) As Inad30_M2
+,coalesce(a.Qtdinad30_M1,0) As Inad30_M1
+,coalesce(a.Qtdinad30_M0,0) As Inad30_M0
+,coalesce(a.EstoqueAPNP_M0,0) As EstoqueAPNP_M0
+,coalesce(a.EstoqueAPNP_M1,0) As EstoqueAPNP_M1
+,coalesce(a.EstoqueAPNP_M2,0) As EstoqueAPNP_M2
+,coalesce(a.EstoqueAPNP_M3,0) As EstoqueAPNP_M3
+,coalesce(a.EstoqueAPNP_M4,0) As EstoqueAPNP_M4
+,coalesce(a.EstoqueAPNP_M5,0) As EstoqueAPNP_M5
+,coalesce(a.EstoqueAPNP_M6,0) As EstoqueAPNP_M6
+,a.DtAdmissaoColaborador  as dtAdmissao format ddmmyy10.
+,a.DtDesligamentoColaborador2 as  DtDesligamento format ddmmyy10.
+,coalesce(a.Foco_M0,'N') as Foco_M0
+,coalesce(a.Foco_M1,'N') as Foco_M1
+,coalesce(a.Foco_M2,'N') as Foco_M2
+,coalesce(a.Foco_M3,'N') as Foco_M3
+,coalesce(a.Foco_M4,'N') as Foco_M4
+,coalesce(a.Foco_M5,'N') as Foco_M5
+,coalesce(a.Foco_M6,'N') as Foco_M6
+
+from BaseAgenteSpaceGR as a
+left join TbparceiroGr as b
+on a.GR = b.NmColaboradorC
+left join TBADMISSAOCOLABORADOR on upcase(GR)=upcase(NmColaborador)
+and NmAreaEstruturaComercial =Filial
+
+where  1=1
+and case when NmAreaEstruturaComercial =Filial then 1 else 0 end=1
+union all
+select distinct
+a.GR
+,a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,coalesce(a.Porte_Sem_Porte,0) as Porte_Sem_Porte
+,coalesce(a.Porte_P,0) as Porte_P
+,coalesce(a.Porte_G,0) as Porte_G
+,coalesce(a.Porte_GG,0) as Porte_GG
+,coalesce(a.Porte_M,0) as Porte_M
+,b.DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+
+,coalesce(a.PartJogo_M6,0) as PartJogo_M6
+,coalesce(a.PartJogo_M5,0) as PartJogo_M5
+,coalesce(a.PartJogo_M4,0) as PartJogo_M4
+,coalesce(a.PartJogo_M2,0) as PartJogo_M2
+,coalesce(a.PartJogo_M1,0) as PartJogo_M1
+,coalesce(a.PartJogo_M0,0) as PartJogo_M0
+,coalesce(a.PartJogo_M3,0) as PartJogo_M3
+,coalesce(a.VirouBV_M6,0) as VirouBV_M6
+,coalesce(a.VirouBV_M5,0) as VirouBV_M5
+,coalesce(a.VirouBV_M4,0) as VirouBV_M4
+,coalesce(a.VirouBV_M2,0) as VirouBV_M2
+,coalesce(a.VirouBV_M1,0) as VirouBV_M1
+,coalesce(a.VirouBV_M0,0) as VirouBV_M0
+,coalesce(a.VirouBV_M3,0) as VirouBV_M3
+,coalesce(a.Share_M6,0) as Share_M6
+,coalesce(a.Share_M5,0) as Share_M5
+,coalesce(a.Share_M4,0) as Share_M4
+,coalesce(a.Share_M2,0) as Share_M2
+,coalesce(a.Share_M1,0) as Share_M1
+,coalesce(a.Share_M0,0) as Share_M0
+,coalesce(a.Share_M3,0) as Share_M3
+,coalesce(a.GravamesMercado_M6,0) as GravamesMercado_M6
+,coalesce(a.GravamesMercado_M5,0) as GravamesMercado_M5
+,coalesce(a.GravamesMercado_M4,0) as GravamesMercado_M4
+,coalesce(a.GravamesMercado_M2,0) as GravamesMercado_M2
+,coalesce(a.GravamesMercado_M1,0) as GravamesMercado_M1
+,coalesce(a.GravamesMercado_M0,0) as GravamesMercado_M0
+,coalesce(a.GravamesMercado_M3,0) as GravamesMercado_M3
+,coalesce(a.GravamesBV_M6,0) as GravamesBV_M6
+,coalesce(a.GravamesBV_M5,0) as GravamesBV_M5
+,coalesce(a.GravamesBV_M4,0) as GravamesBV_M4
+,coalesce(a.GravamesBV_M2,0) as GravamesBV_M2
+,coalesce(a.GravamesBV_M1,0) as GravamesBV_M1
+,coalesce(a.GravamesBV_M0,0) as GravamesBV_M0
+,coalesce(a.GravamesBV_M3,0) as GravamesBV_M3
+,coalesce(a.QtdCardPositivo_M6,0) AS QtdPartCardPositivo_M6
+,coalesce(a.QtdCardPositivo_M5,0) AS QtdPartCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M4,0) AS QtdPartCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M2,0) AS QtdPartCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M1,0) AS QtdPartCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M0,0) AS QtdPartCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M3,0) AS QtdPartCardPositivo_M3
+,coalesce(a.QtdAPNP_M6,0) AS QtdParAPNP_M6
+,coalesce(a.QtdAPNP_M5,0) AS QtdParAPNP_M5
+,coalesce(a.QtdAPNP_M4,0) AS QtdParAPNP_M4
+,coalesce(a.QtdAPNP_M2,0) AS QtdParAPNP_M3
+,coalesce(a.QtdAPNP_M1,0) AS QtdParAPNP_M2
+,coalesce(a.QtdAPNP_M0,0) AS QtdParAPNP_M1
+,coalesce(a.QtdAPNP_M3,0) AS QtdParAPNP_M0
+,coalesce(a.Spread_M7,0) AS Spread_M7
+,coalesce(a.Spread_M6,0) AS Spread_M6
+,coalesce(a.Spread_M5,0) AS Spread_M5
+,coalesce(a.Spread_M4,0) AS Spread_M4
+,coalesce(a.Spread_M3,0) AS Spread_M3
+,coalesce(a.Spread_M2,0) AS Spread_M2
+,coalesce(a.Spread_M1,0) AS Spread_M1
+,coalesce(a.Spread_M0,0) AS Spread_M0
+,coalesce(a.QtdSegAp_M7,0) AS QtdSegAp_M7
+,coalesce(a.QtdSegAp_M6,0) AS QtdSegAp_M6
+,coalesce(a.QtdSegAp_M5,0) AS QtdSegAp_M5
+,coalesce(a.QtdSegAp_M4,0) AS QtdSegAp_M4
+,coalesce(a.QtdSegAp_M3,0) AS QtdSegAp_M3
+,coalesce(a.QtdSegAp_M2,0) AS QtdSegAp_M2
+,coalesce(a.QtdSegAp_M1,0) AS QtdSegAp_M1
+,coalesce(a.QtdSegAp_M0,0) AS QtdSegAp_M0
+,coalesce(a.QtdSegSPF_M7,0) AS QtdSegSPF_M7
+,coalesce(a.QtdSegSPF_M6,0) AS QtdSegSPF_M6
+,coalesce(a.QtdSegSPF_M5,0) AS QtdSegSPF_M5
+,coalesce(a.QtdSegSPF_M4,0) AS QtdSegSPF_M4
+,coalesce(a.QtdSegSPF_M3,0) AS QtdSegSPF_M3
+,coalesce(a.QtdSegSPF_M2,0) AS QtdSegSPF_M2
+,coalesce(a.QtdSegSPF_M1,0) AS QtdSegSPF_M1
+,coalesce(a.QtdSegSPF_M0,0) AS QtdSegSPF_M0
+,coalesce(a.QtdSegCompleto_M7,0) AS QtdSegCompleto_M7
+,coalesce(a.QtdSegCompleto_M6,0) AS QtdSegCompleto_M6
+,coalesce(a.QtdSegCompleto_M5,0) AS QtdSegCompleto_M5
+,coalesce(a.QtdSegCompleto_M4,0) AS QtdSegCompleto_M4
+,coalesce(a.QtdSegCompleto_M3,0) AS QtdSegCompleto_M3
+,coalesce(a.QtdSegCompleto_M2,0) AS QtdSegCompleto_M2
+,coalesce(a.QtdSegCompleto_M1,0) AS QtdSegCompleto_M1
+,coalesce(a.QtdSegCompleto_M0,0) AS QtdSegCompleto_M0
+,coalesce(a.QtSegDemais_M7,0) AS QtSegDemais_M7
+,coalesce(a.QtSegDemais_M6,0) AS QtSegDemais_M6
+,coalesce(a.QtSegDemais_M5,0) AS QtSegDemais_M5
+,coalesce(a.QtSegDemais_M4,0) AS QtSegDemais_M4
+,coalesce(a.QtSegDemais_M3,0) AS QtSegDemais_M3
+,coalesce(a.QtSegDemais_M2,0) AS QtSegDemais_M2
+,coalesce(a.QtSegDemais_M1,0) AS QtSegDemais_M1
+,coalesce(a.QtSegDemais_M0,0) AS QtSegDemais_M0
+,coalesce(a.PercRG_M7,0) AS PercRG_M7
+,coalesce(a.PercRG_M6,0) AS PercRG_M6
+,coalesce(a.PercRG_M5,0) AS PercRG_M5
+,coalesce(a.PercRG_M4,0) AS PercRG_M4
+,coalesce(a.PercRG_M3,0) AS PercRG_M3
+,coalesce(a.PercRG_M2,0) AS PercRG_M2
+,coalesce(a.PercRG_M1,0) AS PercRG_M1
+,coalesce(a.PercRG_M0,0) AS PercRG_M0
+,a.Banco1_M6
+,a.Banco2_M6
+,a.Banco3_M6
+,a.Banco1_M5
+,a.Banco2_M5
+,a.Banco1_M4
+,a.Banco2_M4
+,a.Banco1_M3
+,a.Banco1_M2
+,a.Banco1_M1
+,a.Banco3_M5
+,a.Banco2_M3
+,a.Banco3_M3
+,a.Banco2_M2
+,a.Banco3_M2
+,a.Banco2_M1
+,a.Banco3_M1
+,a.Banco1_M0
+,a.Banco2_M0
+,a.Banco3_M4
+,a.Banco3_M0
+,coalesce(a.ShareAte40_M6,0) AS ShareAte40_M6
+,coalesce(a.Maior40_M6,0) AS Maior40_M6
+,coalesce(a.ShareAte10_M6,0) AS ShareAte10_M6
+,coalesce(a.ShareAte20_M6,0) AS ShareAte20_M6
+,coalesce(a.Maior40_M5,0) AS Maior40_M5
+,coalesce(a.ShareAte10_M5,0) AS ShareAte10_M5
+,coalesce(a.ShareAte20_M5,0) AS ShareAte20_M5
+,coalesce(a.ShareAte30_M5,0) AS ShareAte30_M5
+,coalesce(a.ShareAte40_M5,0) AS ShareAte40_M5
+,coalesce(a.Maior40_M4,0) AS Maior40_M4
+,coalesce(a.ShareAte10_M4,0) AS ShareAte10_M4
+,coalesce(a.ShareAte20_M4,0) AS ShareAte20_M4
+,coalesce(a.ShareAte40_M4,0) AS ShareAte40_M4
+,coalesce(a.Maior40_M2,0) AS Maior40_M2
+,coalesce(a.ShareAte10_M2,0) AS ShareAte10_M2
+,coalesce(a.ShareAte30_M2,0) AS ShareAte30_M2
+,coalesce(a.ShareAte40_M2,0) AS ShareAte40_M2
+,coalesce(a.ShareAte10_M1,0) AS ShareAte10_M1
+,coalesce(a.ShareAte20_M1,0) AS ShareAte20_M1
+,coalesce(a.ShareAte30_M1,0) AS ShareAte30_M1
+,coalesce(a.ShareAte30_M6,0) AS ShareAte30_M6
+,coalesce(a.ShareAte30_M4,0) AS ShareAte30_M4
+,coalesce(a.Maior40_M3,0) AS Maior40_M3
+,coalesce(a.ShareAte10_M3,0) AS ShareAte10_M3
+,coalesce(a.ShareAte20_M3,0) AS ShareAte20_M3
+,coalesce(a.ShareAte30_M3,0) AS ShareAte30_M3
+,coalesce(a.ShareAte40_M3,0) AS ShareAte40_M3
+,coalesce(a.ShareAte20_M2,0) AS ShareAte20_M2
+,coalesce(a.Maior40_M1,0) AS Maior40_M1
+,coalesce(a.ShareAte40_M1,0) AS ShareAte40_M1
+,coalesce(a.Maior40_M0,0) AS Maior40_M0
+,coalesce(a.ShareAte10_M0,0) AS ShareAte10_M0
+,coalesce(a.ShareAte20_M0,0) AS ShareAte20_M0
+,coalesce(a.ShareAte30_M0,0) AS ShareAte30_M0
+,coalesce(a.ShareAte40_M0,0) AS ShareAte40_M0
+,coalesce(a.Qtdinad15_M6,0) As Inad15_M6
+,coalesce(a.Qtdinad15_M5,0) As Inad15_M5
+,coalesce(a.Qtdinad15_M4,0) As Inad15_M4
+,coalesce(a.Qtdinad15_M3,0) As Inad15_M3
+,coalesce(a.Qtdinad15_M2,0) As Inad15_M2
+,coalesce(a.Qtdinad15_M1,0) As Inad15_M1
+,coalesce(a.Qtdinad15_M0,0) As Inad15_M0
+,coalesce(a.Qtdinad30_M6,0) As Inad30_M6
+,coalesce(a.Qtdinad30_M5,0) As Inad30_M5
+,coalesce(a.Qtdinad30_M4,0) As Inad30_M4
+,coalesce(a.Qtdinad30_M3,0) As Inad30_M3
+,coalesce(a.Qtdinad30_M2,0) As Inad30_M2
+,coalesce(a.Qtdinad30_M1,0) As Inad30_M1
+,coalesce(a.Qtdinad30_M0,0) As Inad30_M0
+,coalesce(a.EstoqueAPNP_M0,0) As EstoqueAPNP_M0
+,coalesce(a.EstoqueAPNP_M1,0) As EstoqueAPNP_M1
+,coalesce(a.EstoqueAPNP_M2,0) As EstoqueAPNP_M2
+,coalesce(a.EstoqueAPNP_M3,0) As EstoqueAPNP_M3
+,coalesce(a.EstoqueAPNP_M4,0) As EstoqueAPNP_M4
+,coalesce(a.EstoqueAPNP_M5,0) As EstoqueAPNP_M5
+,coalesce(a.EstoqueAPNP_M6,0) As EstoqueAPNP_M6
+,a.DtAdmissaoColaborador  as dtAdmissao format ddmmyy10.
+,a.DtDesligamentoColaborador2 as  DtDesligamento format ddmmyy10.
+,coalesce(a.Foco_M0,'N') as Foco_M0
+,coalesce(a.Foco_M1,'N') as Foco_M1
+,coalesce(a.Foco_M2,'N') as Foco_M2
+,coalesce(a.Foco_M3,'N') as Foco_M3
+,coalesce(a.Foco_M4,'N') as Foco_M4
+,coalesce(a.Foco_M5,'N') as Foco_M5
+,coalesce(a.Foco_M6,'N') as Foco_M6
+
+from BaseAgenteSpaceGRMotos as a
+left join TbparceiroGr as b
+on a.GR = b.NmColaboradorC
+left join TBADMISSAOCOLABORADOR on upcase(GR)=upcase(NmColaborador)
+and NmAreaEstruturaComercial =Filial
+
+where  1=1
+and case when NmAreaEstruturaComercial =Filial then 1 else 0 end=1
+
+;run;
+
+data auxl.BaseAgenteSpaceGR_GCP;
+set BaseAgenteSpaceGR_GCP
+;run;
+
+%ExportaCsv(Tb_Gr,BaseAgenteSpaceGR_GCP)
+
+/*************************************************************************************/
+
+proc sql;
+create table Tbparceirofilial as
+select distinct
+NmAreaEstruturaComercialC,
+DsLoginN2C,
+DsLoginN3C
+
+from tmp.TBPARCEIROCOMERCIAL
+where NmAreaEstruturaComercialC <>''
+and DsLoginN2C <> ''
+and flativo = 'S'
+;run;
+
+PROC SORT DATA=Tbparceirofilial NODUPKEY;
+BY NmAreaEstruturaComercialC   ;
+RUN;
+
+proc sql;
+create table BaseAgenteSpaceFilial_GCP as
+select distinct
+a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,coalesce(a.Porte_P,0) as Porte_P
+,coalesce(a.Porte_M,0) as Porte_M
+,coalesce(a.Porte_Sem_Porte,0) as Porte_Sem_Porte
+,coalesce(a.Porte_G,0) as Porte_G
+,coalesce(a.Porte_GG,0) as Porte_GG
+,"" as DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+
+,coalesce(a.PartJogo_M6,0) as PartJogo_M6
+,coalesce(a.PartJogo_M5,0) as PartJogo_M5
+,coalesce(a.PartJogo_M4,0) as PartJogo_M4
+,coalesce(a.PartJogo_M2,0) as PartJogo_M2
+,coalesce(a.PartJogo_M1,0) as PartJogo_M1
+,coalesce(a.PartJogo_M0,0) as PartJogo_M0
+,coalesce(a.PartJogo_M3,0) as PartJogo_M3
+,coalesce(a.VirouBV_M6,0) as VirouBV_M6
+,coalesce(a.VirouBV_M5,0) as VirouBV_M5
+,coalesce(a.VirouBV_M4,0) as VirouBV_M4
+,coalesce(a.VirouBV_M2,0) as VirouBV_M2
+,coalesce(a.VirouBV_M1,0) as VirouBV_M1
+,coalesce(a.VirouBV_M0,0) as VirouBV_M0
+,coalesce(a.VirouBV_M3,0) as VirouBV_M3
+,coalesce(a.Share_M6,0) as Share_M6
+,coalesce(a.Share_M5,0) as Share_M5
+,coalesce(a.Share_M4,0) as Share_M4
+,coalesce(a.Share_M2,0) as Share_M2
+,coalesce(a.Share_M1,0) as Share_M1
+,coalesce(a.Share_M0,0) as Share_M0
+,coalesce(a.Share_M3,0) as Share_M3
+,coalesce(a.GravamesMercado_M6,0) as GravamesMercado_M6
+,coalesce(a.GravamesMercado_M5,0) as GravamesMercado_M5
+,coalesce(a.GravamesMercado_M4,0) as GravamesMercado_M4
+,coalesce(a.GravamesMercado_M2,0) as GravamesMercado_M2
+,coalesce(a.GravamesMercado_M1,0) as GravamesMercado_M1
+,coalesce(a.GravamesMercado_M0,0) as GravamesMercado_M0
+,coalesce(a.GravamesMercado_M3,0) as GravamesMercado_M3
+,coalesce(a.GravamesBV_M6,0) as GravamesBV_M6
+,coalesce(a.GravamesBV_M5,0) as GravamesBV_M5
+,coalesce(a.GravamesBV_M4,0) as GravamesBV_M4
+,coalesce(a.GravamesBV_M2,0) as GravamesBV_M2
+,coalesce(a.GravamesBV_M1,0) as GravamesBV_M1
+,coalesce(a.GravamesBV_M0,0) as GravamesBV_M0
+,coalesce(a.GravamesBV_M3,0) as GravamesBV_M3
+,coalesce(a.QtdCardPositivo_M6,0) as QtdPartCardPositivo_M6
+,coalesce(a.QtdCardPositivo_M5,0) as QtdPartCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M4,0) as QtdPartCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M2,0) as QtdPartCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M1,0) as QtdPartCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M0,0) as QtdPartCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M3,0) as QtdPartCardPositivo_M3
+,coalesce(a.QtdAPNP_M6,0) AS QtdParAPNP_M6
+,coalesce(a.QtdAPNP_M5,0) AS QtdParAPNP_M5
+,coalesce(a.QtdAPNP_M4,0) AS QtdParAPNP_M4
+,coalesce(a.QtdAPNP_M2,0) AS QtdParAPNP_M2
+,coalesce(a.QtdAPNP_M1,0) AS QtdParAPNP_M1
+,coalesce(a.QtdAPNP_M0,0) AS QtdParAPNP_M0
+,coalesce(a.QtdAPNP_M3,0) AS QtdParAPNP_M3
+,coalesce(a.Spread_M7,0) AS Spread_M7
+,coalesce(a.Spread_M6,0) AS Spread_M6
+,coalesce(a.Spread_M5,0) AS Spread_M5
+,coalesce(a.Spread_M4,0) AS Spread_M4
+,coalesce(a.Spread_M3,0) AS Spread_M3
+,coalesce(a.Spread_M2,0) AS Spread_M2
+,coalesce(a.Spread_M1,0) AS Spread_M1
+,coalesce(a.Spread_M0,0) AS Spread_M0
+,coalesce(a.QtdSegAp_M7,0) AS QtdSegAp_M7
+,coalesce(a.QtdSegAp_M6,0) AS QtdSegAp_M6
+,coalesce(a.QtdSegAp_M5,0) AS QtdSegAp_M5
+,coalesce(a.QtdSegAp_M4,0) AS QtdSegAp_M4
+,coalesce(a.QtdSegAp_M3,0) AS QtdSegAp_M3
+,coalesce(a.QtdSegAp_M2,0) AS QtdSegAp_M2
+,coalesce(a.QtdSegAp_M1,0) AS QtdSegAp_M1
+,coalesce(a.QtdSegAp_M0,0) AS QtdSegAp_M0
+,coalesce(a.QtdSegSPF_M7,0) AS QtdSegSPF_M7
+,coalesce(a.QtdSegSPF_M6,0) AS QtdSegSPF_M6
+,coalesce(a.QtdSegSPF_M5,0) AS QtdSegSPF_M5
+,coalesce(a.QtdSegSPF_M4,0) AS QtdSegSPF_M4
+,coalesce(a.QtdSegSPF_M3,0) AS QtdSegSPF_M3
+,coalesce(a.QtdSegSPF_M2,0) AS QtdSegSPF_M2
+,coalesce(a.QtdSegSPF_M1,0) AS QtdSegSPF_M1
+,coalesce(a.QtdSegSPF_M0,0) AS QtdSegSPF_M0
+,coalesce(a.QtdSegCompleto_M7,0) AS QtdSegCompleto_M7
+,coalesce(a.QtdSegCompleto_M6,0) AS QtdSegCompleto_M6
+,coalesce(a.QtdSegCompleto_M5,0) AS QtdSegCompleto_M5
+,coalesce(a.QtdSegCompleto_M4,0) AS QtdSegCompleto_M4
+,coalesce(a.QtdSegCompleto_M3,0) AS QtdSegCompleto_M3
+,coalesce(a.QtdSegCompleto_M2,0) AS QtdSegCompleto_M2
+,coalesce(a.QtdSegCompleto_M1,0) AS QtdSegCompleto_M1
+,coalesce(a.QtdSegCompleto_M0,0) AS QtdSegCompleto_M0
+,coalesce(a.QtSegDemais_M7,0) AS QtSegDemais_M7
+,coalesce(a.QtSegDemais_M6,0) AS QtSegDemais_M6
+,coalesce(a.QtSegDemais_M5,0) AS QtSegDemais_M5
+,coalesce(a.QtSegDemais_M4,0) AS QtSegDemais_M4
+,coalesce(a.QtSegDemais_M3,0) AS QtSegDemais_M3
+,coalesce(a.QtSegDemais_M2,0) AS QtSegDemais_M2
+,coalesce(a.QtSegDemais_M1,0) AS QtSegDemais_M1
+,coalesce(a.QtSegDemais_M0,0) AS QtSegDemais_M0
+,coalesce(a.PercRG_M7,0) AS PercRG_M7
+,coalesce(a.PercRG_M6,0) AS PercRG_M6
+,coalesce(a.PercRG_M5,0) AS PercRG_M5
+,coalesce(a.PercRG_M4,0) AS PercRG_M4
+,coalesce(a.PercRG_M3,0) AS PercRG_M3
+,coalesce(a.PercRG_M2,0) AS PercRG_M2
+,coalesce(a.PercRG_M1,0) AS PercRG_M1
+,coalesce(a.PercRG_M0,0) AS PercRG_M0
+,a.Banco1_M6
+,a.Banco2_M6
+,a.Banco3_M6
+,"" as Banco4_M6
+,"" as Banco5_M6
+,"" as Banco6_M6
+,"" as Banco7_M6
+,"" as Banco8_M6
+,a.Banco1_M5
+,a.Banco2_M5
+,a.Banco3_M5
+,"" as Banco4_M5
+,"" as Banco5_M5
+,a.Banco1_M4
+,a.Banco2_M4
+,a.Banco3_M4
+,"" as Banco4_M4
+,a.Banco1_M3
+,a.Banco2_M3
+,a.Banco3_M3
+,"" as Banco4_M3
+,a.Banco1_M2
+,a.Banco2_M2
+,a.Banco3_M2
+,"" as Banco4_M2
+,a.Banco1_M1
+,a.Banco2_M1
+,a.Banco3_M1
+,"" as Banco4_M1
+,a.Banco1_M0
+,a.Banco2_M0
+,"" as Banco6_M5
+,"" as Banco5_M3
+,"" as Banco5_M1
+,a.Banco3_M0
+,"" as Banco9_M6
+,"" as Banco10_M6
+,"" as Banco11_M6
+,"" as Banco7_M5
+,"" as Banco8_M5
+,"" as Banco9_M5
+,"" as Banco10_M5
+,"" as Banco11_M5
+,"" as Banco5_M4
+,"" as Banco6_M4
+,"" as Banco7_M4
+,"" as Banco8_M4
+,"" as Banco9_M4
+,"" as Banco10_M4
+,"" as Banco6_M3
+,"" as Banco7_M3
+,"" as Banco8_M3
+,"" as Banco9_M3
+,"" as Banco10_M3
+,"" as Banco5_M2
+,"" as Banco6_M2
+,"" as Banco7_M2
+,"" as Banco8_M2
+,"" as Banco9_M2
+,"" as Banco10_M2
+,"" as Banco6_M1
+,"" as Banco7_M1
+,"" as Banco8_M1
+,"" as Banco9_M1
+,"" as Banco4_M0
+,"" as Banco5_M0
+,"" as Banco6_M0
+,"" as Banco7_M0
+,"" as Banco8_M0
+,"" as Banco9_M0
+,"" as Banco12_M5
+,"" as Banco10_M1
+,"" as Banco11_M1
+,"" as Banco12_M6
+,"" as Banco11_M4
+,"" as Banco11_M3
+,"" as Banco11_M2
+,"" as Banco10_M0
+,"" as Banco12_M3
+,"" as Banco13_M6
+,"" as Banco12_M4
+,"" as Banco12_M1
+,"" as Banco14_M6
+,"" as Banco13_M5
+,"" as Banco14_M5
+,"" as Banco15_M5
+,"" as Banco13_M4
+,"" as Banco13_M3
+,"" as Banco12_M2
+,"" as Banco13_M1
+,"" as Banco11_M0
+,"" as Banco14_M3
+,"" as Banco13_M2
+,"" as Banco14_M4
+,"" as Banco12_M0
+,"" as Banco14_M2
+,"" as Banco15_M6
+,"" as Banco14_M1
+,"" as Banco13_M0
+,"" as Banco14_M0
+,coalesce(a.ShareAte40_M6,0) AS ShareAte40_M6
+,coalesce(a.Maior40_M6,0) AS Maior40_M6
+,coalesce(a.ShareAte10_M6,0) AS ShareAte10_M6
+,coalesce(a.ShareAte20_M6,0) AS ShareAte20_M6
+,coalesce(a.ShareAte30_M6,0) AS ShareAte30_M6
+,coalesce(a.Maior40_M5,0) AS Maior40_M5
+,coalesce(a.ShareAte10_M5,0) AS ShareAte10_M5
+,coalesce(a.ShareAte20_M5,0) AS ShareAte20_M5
+,coalesce(a.ShareAte30_M5,0) AS ShareAte30_M5
+,coalesce(a.ShareAte40_M5,0) AS ShareAte40_M5
+,coalesce(a.Maior40_M4,0) AS Maior40_M4
+,coalesce(a.ShareAte10_M4,0) AS ShareAte10_M4
+,coalesce(a.ShareAte20_M4,0) AS ShareAte20_M4
+,coalesce(a.ShareAte30_M4,0) AS ShareAte30_M4
+,coalesce(a.ShareAte40_M4,0) AS ShareAte40_M4
+,coalesce(a.Maior40_M3,0) AS Maior40_M3
+,coalesce(a.ShareAte10_M3,0) AS ShareAte10_M3
+,coalesce(a.ShareAte20_M3,0) AS ShareAte20_M3
+,coalesce(a.ShareAte30_M3,0) AS ShareAte30_M3
+,coalesce(a.ShareAte40_M3,0) AS ShareAte40_M3
+,coalesce(a.Maior40_M2,0) AS Maior40_M2
+,coalesce(a.ShareAte10_M2,0) AS ShareAte10_M2
+,coalesce(a.ShareAte20_M2,0) AS ShareAte20_M2
+,coalesce(a.ShareAte30_M2,0) AS ShareAte30_M2
+,coalesce(a.ShareAte40_M2,0) AS ShareAte40_M2
+,coalesce(a.Maior40_M1,0) AS Maior40_M1
+,coalesce(a.ShareAte10_M1,0) AS ShareAte10_M1
+,coalesce(a.ShareAte20_M1,0) AS ShareAte20_M1
+,coalesce(a.ShareAte30_M1,0) AS ShareAte30_M1
+,coalesce(a.ShareAte40_M1,0) AS ShareAte40_M1
+,coalesce(a.Maior40_M0,0) AS Maior40_M0
+,coalesce(a.ShareAte10_M0,0) AS ShareAte10_M0
+,coalesce(a.ShareAte20_M0,0) AS ShareAte20_M0
+,coalesce(a.ShareAte30_M0,0) AS ShareAte30_M0
+,coalesce(a.ShareAte40_M0,0) AS ShareAte40_M0
+,coalesce(a.Qtdinad15_M6,0) AS Inad15_M6
+,coalesce(a.Qtdinad15_M5,0) AS Inad15_M5
+,coalesce(a.Qtdinad15_M4,0) AS Inad15_M4
+,coalesce(a.Qtdinad15_M3,0) AS Inad15_M3
+,coalesce(a.Qtdinad15_M2,0) AS Inad15_M2
+,coalesce(a.Qtdinad15_M1,0) AS Inad15_M1
+,coalesce(a.Qtdinad15_M0,0) AS Inad15_M0
+,coalesce(a.Qtdinad30_M6,0) AS Inad30_M6
+,coalesce(a.Qtdinad30_M5,0) AS Inad30_M5
+,coalesce(a.Qtdinad30_M4,0) AS Inad30_M4
+,coalesce(a.Qtdinad30_M3,0) AS Inad30_M3
+,coalesce(a.Qtdinad30_M2,0) AS Inad30_M2
+,coalesce(a.Qtdinad30_M1,0) AS Inad30_M1
+,coalesce(a.Qtdinad30_M0,0) AS Inad30_M0
+,coalesce(a.EstoqueAPNP_M0,0) AS EstoqueAPNP_M0
+,coalesce(a.EstoqueAPNP_M1,0) AS EstoqueAPNP_M1
+,coalesce(a.EstoqueAPNP_M2,0) AS EstoqueAPNP_M2
+,coalesce(a.EstoqueAPNP_M3,0) AS EstoqueAPNP_M3
+,coalesce(a.EstoqueAPNP_M4,0) AS EstoqueAPNP_M4
+,coalesce(a.EstoqueAPNP_M5,0) AS EstoqueAPNP_M5
+,coalesce(a.EstoqueAPNP_M6,0) AS EstoqueAPNP_M6
+,coalesce(a.AtingConta_M0,0) AS AtingConta_M0
+,coalesce(a.AtingConta_M1,0) AS AtingConta_M1
+,coalesce(a.AtingConta_M2,0) AS AtingConta_M2
+,coalesce(a.AtingConta_M3,0) AS AtingConta_M3
+,coalesce(a.AtingConta_M4,0) AS AtingConta_M4
+,coalesce(a.AtingConta_M5,0) AS AtingConta_M5
+,coalesce(a.AtingConta_M6,0) AS AtingConta_M6
+
+,coalesce(a.AtingProducao_M0) as AtingProducao_M0
+,coalesce(a.AtingProducao_M1) as AtingProducao_M1
+,coalesce(a.AtingProducao_M2) as AtingProducao_M2
+,coalesce(a.AtingProducao_M3) as AtingProducao_M3
+,coalesce(a.AtingProducao_M4) as AtingProducao_M4
+,coalesce(a.AtingProducao_M5) as AtingProducao_M5
+,coalesce(a.AtingProducao_M6) as AtingProducao_M6
+
+,coalesce(a.AtingMC_M0) as AtingMC_M0
+,coalesce(a.AtingMC_M1) as AtingMC_M1
+,coalesce(a.AtingMC_M2) as AtingMC_M2
+,coalesce(a.AtingMC_M3) as AtingMC_M3
+,coalesce(a.AtingMC_M4) as AtingMC_M4
+,coalesce(a.AtingMC_M5) as AtingMC_M5
+,coalesce(a.AtingMC_M6) as AtingMC_M6
+
+,coalesce(a.AtingSPFAP_M0) as AtingSPFAP_M0
+,coalesce(a.AtingSPFAP_M1) as AtingSPFAP_M1
+,coalesce(a.AtingSPFAP_M2) as AtingSPFAP_M2
+,coalesce(a.AtingSPFAP_M3) as AtingSPFAP_M3
+,coalesce(a.AtingSPFAP_M4) as AtingSPFAP_M4
+,coalesce(a.AtingSPFAP_M5) as AtingSPFAP_M5
+,coalesce(a.AtingSPFAP_M6) as AtingSPFAP_M6
+
+,coalesce(a.AtingSegAP_M0) as AtingSegAP_M0
+,coalesce(a.AtingSegAP_M1) as AtingSegAP_M1
+,coalesce(a.AtingSegAP_M2) as AtingSegAP_M2
+,coalesce(a.AtingSegAP_M3) as AtingSegAP_M3
+,coalesce(a.AtingSegAP_M4) as AtingSegAP_M4
+,coalesce(a.AtingSegAP_M5) as AtingSegAP_M5
+,coalesce(a.AtingSegAP_M6) as AtingSegAP_M6
+
+,coalesce(a.AtingSegAuto_M0) as AtingSegAuto_M0
+,coalesce(a.AtingSegAuto_M1) as AtingSegAuto_M1
+,coalesce(a.AtingSegAuto_M2) as AtingSegAuto_M2
+,coalesce(a.AtingSegAuto_M3) as AtingSegAuto_M3
+,coalesce(a.AtingSegAuto_M4) as AtingSegAuto_M4
+,coalesce(a.AtingSegAuto_M5) as AtingSegAuto_M5
+,coalesce(a.AtingSegAuto_M6) as AtingSegAuto_M6
+
+,coalesce(a.AtingNapista_M0) as AtingNapista_M0
+,coalesce(a.AtingNapista_M1) as AtingNapista_M1
+,coalesce(a.AtingNapista_M2) as AtingNapista_M2
+,coalesce(a.AtingNapista_M3) as AtingNapista_M3
+,coalesce(a.AtingNapista_M4) as AtingNapista_M4
+,coalesce(a.AtingNapista_M5) as AtingNapista_M5
+,coalesce(a.AtingNapista_M6) as AtingNapista_M6
+
+/*,1 as AtingMCRodas_M0*/
+/*,1 as AtingMCRodas_M1*/
+/*,1 as AtingMCRodas_M2*/
+/*,1 as AtingMCRodas_M3*/
+/*,1 as AtingMCRodas_M4*/
+/*,1 as AtingMCRodas_M5*/
+/*,1 as AtingMCRodas_M6*/
+
+from BaseAgenteSpaceFilial as a
+left join TbparceiroFilial as b
+on a.filial = b.NmAreaEstruturaComercialC
+where  1=1
+union all
+select distinct
+a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,coalesce(a.Porte_P,0) as Porte_P
+,coalesce(a.Porte_M,0) as Porte_M
+,coalesce(a.Porte_Sem_Porte,0) as Porte_Sem_Porte
+,coalesce(a.Porte_G,0) as Porte_G
+,coalesce(a.Porte_GG,0) as Porte_GG
+,"" as DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+
+,coalesce(a.PartJogo_M6,0) as PartJogo_M6
+,coalesce(a.PartJogo_M5,0) as PartJogo_M5
+,coalesce(a.PartJogo_M4,0) as PartJogo_M4
+,coalesce(a.PartJogo_M2,0) as PartJogo_M2
+,coalesce(a.PartJogo_M1,0) as PartJogo_M1
+,coalesce(a.PartJogo_M0,0) as PartJogo_M0
+,coalesce(a.PartJogo_M3,0) as PartJogo_M3
+,coalesce(a.VirouBV_M6,0) as VirouBV_M6
+,coalesce(a.VirouBV_M5,0) as VirouBV_M5
+,coalesce(a.VirouBV_M4,0) as VirouBV_M4
+,coalesce(a.VirouBV_M2,0) as VirouBV_M2
+,coalesce(a.VirouBV_M1,0) as VirouBV_M1
+,coalesce(a.VirouBV_M0,0) as VirouBV_M0
+,coalesce(a.VirouBV_M3,0) as VirouBV_M3
+,coalesce(a.Share_M6,0) as Share_M6
+,coalesce(a.Share_M5,0) as Share_M5
+,coalesce(a.Share_M4,0) as Share_M4
+,coalesce(a.Share_M2,0) as Share_M2
+,coalesce(a.Share_M1,0) as Share_M1
+,coalesce(a.Share_M0,0) as Share_M0
+,coalesce(a.Share_M3,0) as Share_M3
+,coalesce(a.GravamesMercado_M6,0) as GravamesMercado_M6
+,coalesce(a.GravamesMercado_M5,0) as GravamesMercado_M5
+,coalesce(a.GravamesMercado_M4,0) as GravamesMercado_M4
+,coalesce(a.GravamesMercado_M2,0) as GravamesMercado_M2
+,coalesce(a.GravamesMercado_M1,0) as GravamesMercado_M1
+,coalesce(a.GravamesMercado_M0,0) as GravamesMercado_M0
+,coalesce(a.GravamesMercado_M3,0) as GravamesMercado_M3
+,coalesce(a.GravamesBV_M6,0) as GravamesBV_M6
+,coalesce(a.GravamesBV_M5,0) as GravamesBV_M5
+,coalesce(a.GravamesBV_M4,0) as GravamesBV_M4
+,coalesce(a.GravamesBV_M2,0) as GravamesBV_M2
+,coalesce(a.GravamesBV_M1,0) as GravamesBV_M1
+,coalesce(a.GravamesBV_M0,0) as GravamesBV_M0
+,coalesce(a.GravamesBV_M3,0) as GravamesBV_M3
+,coalesce(a.QtdCardPositivo_M6,0) as QtdPartCardPositivo_M6
+,coalesce(a.QtdCardPositivo_M5,0) as QtdPartCardPositivo_M5
+,coalesce(a.QtdCardPositivo_M4,0) as QtdPartCardPositivo_M4
+,coalesce(a.QtdCardPositivo_M2,0) as QtdPartCardPositivo_M2
+,coalesce(a.QtdCardPositivo_M1,0) as QtdPartCardPositivo_M1
+,coalesce(a.QtdCardPositivo_M0,0) as QtdPartCardPositivo_M0
+,coalesce(a.QtdCardPositivo_M3,0) as QtdPartCardPositivo_M3
+,coalesce(a.QtdAPNP_M6,0) AS QtdParAPNP_M6
+,coalesce(a.QtdAPNP_M5,0) AS QtdParAPNP_M5
+,coalesce(a.QtdAPNP_M4,0) AS QtdParAPNP_M4
+,coalesce(a.QtdAPNP_M2,0) AS QtdParAPNP_M2
+,coalesce(a.QtdAPNP_M1,0) AS QtdParAPNP_M1
+,coalesce(a.QtdAPNP_M0,0) AS QtdParAPNP_M0
+,coalesce(a.QtdAPNP_M3,0) AS QtdParAPNP_M3
+,coalesce(a.Spread_M7,0) AS Spread_M7
+,coalesce(a.Spread_M6,0) AS Spread_M6
+,coalesce(a.Spread_M5,0) AS Spread_M5
+,coalesce(a.Spread_M4,0) AS Spread_M4
+,coalesce(a.Spread_M3,0) AS Spread_M3
+,coalesce(a.Spread_M2,0) AS Spread_M2
+,coalesce(a.Spread_M1,0) AS Spread_M1
+,coalesce(a.Spread_M0,0) AS Spread_M0
+,coalesce(a.QtdSegAp_M7,0) AS QtdSegAp_M7
+,coalesce(a.QtdSegAp_M6,0) AS QtdSegAp_M6
+,coalesce(a.QtdSegAp_M5,0) AS QtdSegAp_M5
+,coalesce(a.QtdSegAp_M4,0) AS QtdSegAp_M4
+,coalesce(a.QtdSegAp_M3,0) AS QtdSegAp_M3
+,coalesce(a.QtdSegAp_M2,0) AS QtdSegAp_M2
+,coalesce(a.QtdSegAp_M1,0) AS QtdSegAp_M1
+,coalesce(a.QtdSegAp_M0,0) AS QtdSegAp_M0
+,coalesce(a.QtdSegSPF_M7,0) AS QtdSegSPF_M7
+,coalesce(a.QtdSegSPF_M6,0) AS QtdSegSPF_M6
+,coalesce(a.QtdSegSPF_M5,0) AS QtdSegSPF_M5
+,coalesce(a.QtdSegSPF_M4,0) AS QtdSegSPF_M4
+,coalesce(a.QtdSegSPF_M3,0) AS QtdSegSPF_M3
+,coalesce(a.QtdSegSPF_M2,0) AS QtdSegSPF_M2
+,coalesce(a.QtdSegSPF_M1,0) AS QtdSegSPF_M1
+,coalesce(a.QtdSegSPF_M0,0) AS QtdSegSPF_M0
+,coalesce(a.QtdSegCompleto_M7,0) AS QtdSegCompleto_M7
+,coalesce(a.QtdSegCompleto_M6,0) AS QtdSegCompleto_M6
+,coalesce(a.QtdSegCompleto_M5,0) AS QtdSegCompleto_M5
+,coalesce(a.QtdSegCompleto_M4,0) AS QtdSegCompleto_M4
+,coalesce(a.QtdSegCompleto_M3,0) AS QtdSegCompleto_M3
+,coalesce(a.QtdSegCompleto_M2,0) AS QtdSegCompleto_M2
+,coalesce(a.QtdSegCompleto_M1,0) AS QtdSegCompleto_M1
+,coalesce(a.QtdSegCompleto_M0,0) AS QtdSegCompleto_M0
+,coalesce(a.QtSegDemais_M7,0) AS QtSegDemais_M7
+,coalesce(a.QtSegDemais_M6,0) AS QtSegDemais_M6
+,coalesce(a.QtSegDemais_M5,0) AS QtSegDemais_M5
+,coalesce(a.QtSegDemais_M4,0) AS QtSegDemais_M4
+,coalesce(a.QtSegDemais_M3,0) AS QtSegDemais_M3
+,coalesce(a.QtSegDemais_M2,0) AS QtSegDemais_M2
+,coalesce(a.QtSegDemais_M1,0) AS QtSegDemais_M1
+,coalesce(a.QtSegDemais_M0,0) AS QtSegDemais_M0
+,coalesce(a.PercRG_M7,0) AS PercRG_M7
+,coalesce(a.PercRG_M6,0) AS PercRG_M6
+,coalesce(a.PercRG_M5,0) AS PercRG_M5
+,coalesce(a.PercRG_M4,0) AS PercRG_M4
+,coalesce(a.PercRG_M3,0) AS PercRG_M3
+,coalesce(a.PercRG_M2,0) AS PercRG_M2
+,coalesce(a.PercRG_M1,0) AS PercRG_M1
+,coalesce(a.PercRG_M0,0) AS PercRG_M0
+,a.Banco1_M6
+,a.Banco2_M6
+,a.Banco3_M6
+,"" as Banco4_M6
+,"" as Banco5_M6
+,"" as Banco6_M6
+,"" as Banco7_M6
+,"" as Banco8_M6
+,a.Banco1_M5
+,a.Banco2_M5
+,a.Banco3_M5
+,"" as Banco4_M5
+,"" as Banco5_M5
+,a.Banco1_M4
+,a.Banco2_M4
+,a.Banco3_M4
+,"" as Banco4_M4
+,a.Banco1_M3
+,a.Banco2_M3
+,a.Banco3_M3
+,"" as Banco4_M3
+,a.Banco1_M2
+,a.Banco2_M2
+,a.Banco3_M2
+,"" as Banco4_M2
+,a.Banco1_M1
+,a.Banco2_M1
+,a.Banco3_M1
+,"" as Banco4_M1
+,a.Banco1_M0
+,a.Banco2_M0
+,"" as Banco6_M5
+,"" as Banco5_M3
+,"" as Banco5_M1
+,a.Banco3_M0
+,"" as Banco9_M6
+,"" as Banco10_M6
+,"" as Banco11_M6
+,"" as Banco7_M5
+,"" as Banco8_M5
+,"" as Banco9_M5
+,"" as Banco10_M5
+,"" as Banco11_M5
+,"" as Banco5_M4
+,"" as Banco6_M4
+,"" as Banco7_M4
+,"" as Banco8_M4
+,"" as Banco9_M4
+,"" as Banco10_M4
+,"" as Banco6_M3
+,"" as Banco7_M3
+,"" as Banco8_M3
+,"" as Banco9_M3
+,"" as Banco10_M3
+,"" as Banco5_M2
+,"" as Banco6_M2
+,"" as Banco7_M2
+,"" as Banco8_M2
+,"" as Banco9_M2
+,"" as Banco10_M2
+,"" as Banco6_M1
+,"" as Banco7_M1
+,"" as Banco8_M1
+,"" as Banco9_M1
+,"" as Banco4_M0
+,"" as Banco5_M0
+,"" as Banco6_M0
+,"" as Banco7_M0
+,"" as Banco8_M0
+,"" as Banco9_M0
+,"" as Banco12_M5
+,"" as Banco10_M1
+,"" as Banco11_M1
+,"" as Banco12_M6
+,"" as Banco11_M4
+,"" as Banco11_M3
+,"" as Banco11_M2
+,"" as Banco10_M0
+,"" as Banco12_M3
+,"" as Banco13_M6
+,"" as Banco12_M4
+,"" as Banco12_M1
+,"" as Banco14_M6
+,"" as Banco13_M5
+,"" as Banco14_M5
+,"" as Banco15_M5
+,"" as Banco13_M4
+,"" as Banco13_M3
+,"" as Banco12_M2
+,"" as Banco13_M1
+,"" as Banco11_M0
+,"" as Banco14_M3
+,"" as Banco13_M2
+,"" as Banco14_M4
+,"" as Banco12_M0
+,"" as Banco14_M2
+,"" as Banco15_M6
+,"" as Banco14_M1
+,"" as Banco13_M0
+,"" as Banco14_M0
+,coalesce(a.ShareAte40_M6,0) AS ShareAte40_M6
+,coalesce(a.Maior40_M6,0) AS Maior40_M6
+,coalesce(a.ShareAte10_M6,0) AS ShareAte10_M6
+,coalesce(a.ShareAte20_M6,0) AS ShareAte20_M6
+,coalesce(a.ShareAte30_M6,0) AS ShareAte30_M6
+,coalesce(a.Maior40_M5,0) AS Maior40_M5
+,coalesce(a.ShareAte10_M5,0) AS ShareAte10_M5
+,coalesce(a.ShareAte20_M5,0) AS ShareAte20_M5
+,coalesce(a.ShareAte30_M5,0) AS ShareAte30_M5
+,coalesce(a.ShareAte40_M5,0) AS ShareAte40_M5
+,coalesce(a.Maior40_M4,0) AS Maior40_M4
+,coalesce(a.ShareAte10_M4,0) AS ShareAte10_M4
+,coalesce(a.ShareAte20_M4,0) AS ShareAte20_M4
+,coalesce(a.ShareAte30_M4,0) AS ShareAte30_M4
+,coalesce(a.ShareAte40_M4,0) AS ShareAte40_M4
+,coalesce(a.Maior40_M3,0) AS Maior40_M3
+,coalesce(a.ShareAte10_M3,0) AS ShareAte10_M3
+,coalesce(a.ShareAte20_M3,0) AS ShareAte20_M3
+,coalesce(a.ShareAte30_M3,0) AS ShareAte30_M3
+,coalesce(a.ShareAte40_M3,0) AS ShareAte40_M3
+,coalesce(a.Maior40_M2,0) AS Maior40_M2
+,coalesce(a.ShareAte10_M2,0) AS ShareAte10_M2
+,coalesce(a.ShareAte20_M2,0) AS ShareAte20_M2
+,coalesce(a.ShareAte30_M2,0) AS ShareAte30_M2
+,coalesce(a.ShareAte40_M2,0) AS ShareAte40_M2
+,coalesce(a.Maior40_M1,0) AS Maior40_M1
+,coalesce(a.ShareAte10_M1,0) AS ShareAte10_M1
+,coalesce(a.ShareAte20_M1,0) AS ShareAte20_M1
+,coalesce(a.ShareAte30_M1,0) AS ShareAte30_M1
+,coalesce(a.ShareAte40_M1,0) AS ShareAte40_M1
+,coalesce(a.Maior40_M0,0) AS Maior40_M0
+,coalesce(a.ShareAte10_M0,0) AS ShareAte10_M0
+,coalesce(a.ShareAte20_M0,0) AS ShareAte20_M0
+,coalesce(a.ShareAte30_M0,0) AS ShareAte30_M0
+,coalesce(a.ShareAte40_M0,0) AS ShareAte40_M0
+,coalesce(a.Qtdinad15_M6,0) AS Inad15_M6
+,coalesce(a.Qtdinad15_M5,0) AS Inad15_M5
+,coalesce(a.Qtdinad15_M4,0) AS Inad15_M4
+,coalesce(a.Qtdinad15_M3,0) AS Inad15_M3
+,coalesce(a.Qtdinad15_M2,0) AS Inad15_M2
+,coalesce(a.Qtdinad15_M1,0) AS Inad15_M1
+,coalesce(a.Qtdinad15_M0,0) AS Inad15_M0
+,coalesce(a.Qtdinad30_M6,0) AS Inad30_M6
+,coalesce(a.Qtdinad30_M5,0) AS Inad30_M5
+,coalesce(a.Qtdinad30_M4,0) AS Inad30_M4
+,coalesce(a.Qtdinad30_M3,0) AS Inad30_M3
+,coalesce(a.Qtdinad30_M2,0) AS Inad30_M2
+,coalesce(a.Qtdinad30_M1,0) AS Inad30_M1
+,coalesce(a.Qtdinad30_M0,0) AS Inad30_M0
+,coalesce(a.EstoqueAPNP_M0,0) AS EstoqueAPNP_M0
+,coalesce(a.EstoqueAPNP_M1,0) AS EstoqueAPNP_M1
+,coalesce(a.EstoqueAPNP_M2,0) AS EstoqueAPNP_M2
+,coalesce(a.EstoqueAPNP_M3,0) AS EstoqueAPNP_M3
+,coalesce(a.EstoqueAPNP_M4,0) AS EstoqueAPNP_M4
+,coalesce(a.EstoqueAPNP_M5,0) AS EstoqueAPNP_M5
+,coalesce(a.EstoqueAPNP_M6,0) AS EstoqueAPNP_M6
+,0 AS AtingConta_M0
+,0 AS AtingConta_M1
+,0 AS AtingConta_M2
+,0 AS AtingConta_M3
+,0 AS AtingConta_M4
+,0 AS AtingConta_M5
+,0 AS AtingConta_M6
+
+,coalesce(a.AtingProducao_M0) as AtingProducao_M0
+,coalesce(a.AtingProducao_M1) as AtingProducao_M1
+,coalesce(a.AtingProducao_M2) as AtingProducao_M2
+,coalesce(a.AtingProducao_M3) as AtingProducao_M3
+,coalesce(a.AtingProducao_M4) as AtingProducao_M4
+,coalesce(a.AtingProducao_M5) as AtingProducao_M5
+,coalesce(a.AtingProducao_M6) as AtingProducao_M6
+
+,coalesce(a.AtingMC_M0) as AtingMC_M0
+,coalesce(a.AtingMC_M1) as AtingMC_M1
+,coalesce(a.AtingMC_M2) as AtingMC_M2
+,coalesce(a.AtingMC_M3) as AtingMC_M3
+,coalesce(a.AtingMC_M4) as AtingMC_M4
+,coalesce(a.AtingMC_M5) as AtingMC_M5
+,coalesce(a.AtingMC_M6) as AtingMC_M6
+
+,coalesce(a.AtingSPFAP_M0) as AtingSPFAP_M0
+,coalesce(a.AtingSPFAP_M1) as AtingSPFAP_M1
+,coalesce(a.AtingSPFAP_M2) as AtingSPFAP_M2
+,coalesce(a.AtingSPFAP_M3) as AtingSPFAP_M3
+,coalesce(a.AtingSPFAP_M4) as AtingSPFAP_M4
+,coalesce(a.AtingSPFAP_M5) as AtingSPFAP_M5
+,coalesce(a.AtingSPFAP_M6) as AtingSPFAP_M6
+
+,coalesce(a.AtingSegAP_M0) as AtingSegAP_M0
+,coalesce(a.AtingSegAP_M1) as AtingSegAP_M1
+,coalesce(a.AtingSegAP_M2) as AtingSegAP_M2
+,coalesce(a.AtingSegAP_M3) as AtingSegAP_M3
+,coalesce(a.AtingSegAP_M4) as AtingSegAP_M4
+,coalesce(a.AtingSegAP_M5) as AtingSegAP_M5
+,coalesce(a.AtingSegAP_M6) as AtingSegAP_M6
+
+,coalesce(a.AtingSegAuto_M0) as AtingSegAuto_M0
+,coalesce(a.AtingSegAuto_M1) as AtingSegAuto_M1
+,coalesce(a.AtingSegAuto_M2) as AtingSegAuto_M2
+,coalesce(a.AtingSegAuto_M3) as AtingSegAuto_M3
+,coalesce(a.AtingSegAuto_M4) as AtingSegAuto_M4
+,coalesce(a.AtingSegAuto_M5) as AtingSegAuto_M5
+,coalesce(a.AtingSegAuto_M6) as AtingSegAuto_M6
+
+,0 as AtingNapista_M0
+,0 as AtingNapista_M1
+,0 as AtingNapista_M2
+,0 as AtingNapista_M3
+,0 as AtingNapista_M4
+,0 as AtingNapista_M5
+,0 as AtingNapista_M6
+
+/*,1 as AtingMCRodas_M0*/
+/*,1 as AtingMCRodas_M1*/
+/*,1 as AtingMCRodas_M2*/
+/*,1 as AtingMCRodas_M3*/
+/*,1 as AtingMCRodas_M4*/
+/*,1 as AtingMCRodas_M5*/
+/*,1 as AtingMCRodas_M6*/
+
+from BaseAgenteSpaceFilial_Motos as a
+left join TbparceiroFilial as b
+on a.filial = b.NmAreaEstruturaComercialC
+where  1=1
+;run;
+
+data auxl.BaseAgenteSpaceFilial_GCP;
+set BaseAgenteSpaceFilial_GCP
+;run;
+
+%ExportaCsv(Tb_Filial,BaseAgenteSpaceFilial_GCP)
+
+/*****************************************/
+/*MÉTRICA ATINGIMENTO DE METAS - VISÃO GR*/
+/*****************************************/
+
+proc sql;
+create table BaseAgenteSpaceGR_Meta_GCP as
+select distinct
+a.GR
+,a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,a.Porte_Sem_Porte
+,a.Porte_P
+,a.Porte_G
+,a.Porte_GG
+,a.Porte_M
+,b.DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+
+,a.AtingConta_M0
+,a.AtingConta_M1
+,a.AtingConta_M2
+,a.AtingConta_M3
+,a.AtingConta_M4
+,a.AtingConta_M5
+,a.AtingConta_M6
+,A.AtingProducao_M0
+,A.AtingProducao_M1
+,A.AtingProducao_M2
+,A.AtingProducao_M3
+,A.AtingProducao_M4
+,A.AtingProducao_M5
+,A.AtingProducao_M6
+
+,A.AtingMCEGV_M0
+,A.AtingMCEGV_M1
+,A.AtingMCEGV_M2
+,A.AtingMCEGV_M3
+,A.AtingMCEGV_M4
+,A.AtingMCEGV_M5
+,A.AtingMCEGV_M6
+
+,A.AtingSPFAP_M0
+,A.AtingSPFAP_M1
+,A.AtingSPFAP_M2
+,A.AtingSPFAP_M3
+,A.AtingSPFAP_M4
+,A.AtingSPFAP_M5
+,A.AtingSPFAP_M6
+
+,A.AtingSegSPF_M0
+,A.AtingSegSPF_M1
+,A.AtingSegSPF_M2
+,A.AtingSegSPF_M3
+,A.AtingSegSPF_M4
+,A.AtingSegSPF_M5
+,A.AtingSegSPF_M6
+
+,A.AtingSegAP_M0
+,A.AtingSegAP_M1
+,A.AtingSegAP_M2
+,A.AtingSegAP_M3
+,A.AtingSegAP_M4
+,A.AtingSegAP_M5
+,A.AtingSegAP_M6
+
+,A.AtingSegAuto_M0
+,A.AtingSegAuto_M1
+,A.AtingSegAuto_M2
+,A.AtingSegAuto_M3
+,A.AtingSegAuto_M4
+,A.AtingSegAuto_M5
+,A.AtingSegAuto_M6
+
+,A.AtingNapista_M0
+,A.AtingNapista_M1
+,A.AtingNapista_M2
+,A.AtingNapista_M3
+,A.AtingNapista_M4
+,A.AtingNapista_M5
+,A.AtingNapista_M6
+
+,A.AtingMCRodas_M0
+,A.AtingMCRodas_M1
+,A.AtingMCRodas_M2
+,A.AtingMCRodas_M3
+,A.AtingMCRodas_M4
+,A.AtingMCRodas_M5
+,A.AtingMCRodas_M6
+
+from BaseAgenteSpaceGR as a
+left join TbparceiroGr as b
+on a.GR = b.NmColaboradorC
+
+where  1=1
+union all
+select distinct
+a.GR
+,a.Regional
+,Case when a.Filial = 'Canal S J Campos' then 'Canal São José dos Campos' else a.Filial end as Filial
+,a.Porte_Sem_Porte
+,a.Porte_P
+,a.Porte_G
+,a.Porte_GG
+,a.Porte_M
+,b.DsLoginN1C
+,b.DsLoginN2C
+,b.DsLoginN3C
+,Case 	when a.Regional = 'Canal Rodas e EGV - Regional I' then 'tatiane.chaves'
+		when a.Regional = 'Canal Rodas e EGV - Regional II' then 'camile.santos'
+		when a.Regional = 'Canal Rodas e EGV - Regional III' then 'ellias.silva'
+		when a.Regional = 'Canal Rodas e EGV - Regional IV' then 'marcelo.moraes1'
+		when a.Regional = 'Canal Rodas e EGV - Regional V' then 'jessica.ferrante'
+		when a.Regional = 'Canal Rodas e EGV - Regional VI' then 'jaquelyne.carlin' end as DsLoginFocal
+
+,a.AtingConta_M0
+,a.AtingConta_M1
+,a.AtingConta_M2
+,a.AtingConta_M3
+,a.AtingConta_M4
+,a.AtingConta_M5
+,a.AtingConta_M6
+,A.AtingProducao_M0
+,A.AtingProducao_M1
+,A.AtingProducao_M2
+,A.AtingProducao_M3
+,A.AtingProducao_M4
+,A.AtingProducao_M5
+,A.AtingProducao_M6
+
+,A.AtingMCEGV_M0
+,A.AtingMCEGV_M1
+,A.AtingMCEGV_M2
+,A.AtingMCEGV_M3
+,A.AtingMCEGV_M4
+,A.AtingMCEGV_M5
+,A.AtingMCEGV_M6
+
+,A.AtingSPFAP_M0
+,A.AtingSPFAP_M1
+,A.AtingSPFAP_M2
+,A.AtingSPFAP_M3
+,A.AtingSPFAP_M4
+,A.AtingSPFAP_M5
+,A.AtingSPFAP_M6
+
+,A.AtingSegSPF_M0
+,A.AtingSegSPF_M1
+,A.AtingSegSPF_M2
+,A.AtingSegSPF_M3
+,A.AtingSegSPF_M4
+,A.AtingSegSPF_M5
+,A.AtingSegSPF_M6
+
+,A.AtingSegAP_M0
+,A.AtingSegAP_M1
+,A.AtingSegAP_M2
+,A.AtingSegAP_M3
+,A.AtingSegAP_M4
+,A.AtingSegAP_M5
+,A.AtingSegAP_M6
+
+,0 as AtingSegAuto_M0
+,0 as AtingSegAuto_M1
+,0 as AtingSegAuto_M2
+,0 as AtingSegAuto_M3
+,0 as AtingSegAuto_M4
+,0 as AtingSegAuto_M5
+,0 as AtingSegAuto_M6
+
+,0 as AtingNapista_M0
+,0 as AtingNapista_M1
+,0 as AtingNapista_M2
+,0 as AtingNapista_M3
+,0 as AtingNapista_M4
+,0 as AtingNapista_M5
+,0 as AtingNapista_M6
+
+,A.AtingMCRodas_M0
+,A.AtingMCRodas_M1
+,A.AtingMCRodas_M2
+,A.AtingMCRodas_M3
+,A.AtingMCRodas_M4
+,A.AtingMCRodas_M5
+,A.AtingMCRodas_M6
+
+from BaseAgenteSpaceGRMotos as a
+left join TbparceiroGr as b
+on a.GR = b.NmColaboradorC
+where  1=1
+;run;
+
+Data auxl.BaseAgenteSpaceGR_Meta_GCP;
+	set BaseAgenteSpaceGR_Meta_GCP
+	;run;
+
+%ExportaCsv(TbGrMeta,BaseAgenteSpaceGR_Meta_GCP)

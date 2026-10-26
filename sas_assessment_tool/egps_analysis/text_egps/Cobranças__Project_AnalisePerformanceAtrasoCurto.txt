@@ -1,0 +1,1165 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_AnalisePerformanceAtrasoCurto
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:00 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 25)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (5x | +25)
+----------------------------------------
+LINES_OF_CODE: 995
+CODE_TASKS_COUNT: 13
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: DANIEL = /riscosbv/cobranca/dvitor/; JOAO = /riscosbv/cobranca/bsilva/; LDUARTE = /riscosbv/cobranca/lduarte
+DETECTED_MACROS_DEFINED: base, libname, path, work
+DETECTED_MACROS_USED: ANOMES, base, data_acionamento, dt_inicio_mes, dt_ref, libname, path, work
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES, BASE, DT_INICIO_MES, DT_REF, LIBNAME
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_COBRANCA.ASSESSORIA_ACIONAMENTOS_COBRANCA_FATO [BIGQUERY], BV-PDBD-PRD.DVRY_CORP_COBRANCA.CARTEIRAGOE_COBRANCA_FATO [BIGQUERY], JOAO.BASE_ESTUDO_PERFORMANCE_MIX [SAS/Local], LDUARTE.PUBLICO_DETERIORADO_COMEX [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ACIONAMENTO, WORK.ALO, WORK.BASE_CARTEIRA, WORK.CPC, WORK.PROMESSA
+IMPORTED_LIBNAMES: JOAO, LDUARTE
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.ACIONAMENTO, WORK.ALO, WORK.BASE_CARTEIRA, WORK.BASE_CARTEIRA_2, WORK.BASE_ESTUDO_PERFORMANCE_MIX, WORK.COLLORI_COMPLETO, WORK.CPC, WORK.PROMESSA, WORK.PUBLICO_DETERIORADO_COMEX
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_COBRANCA.ASSESSORIA_ACIONAMENTOS_COBRANCA_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.DVRY_CORP_COBRANCA.CARTEIRAGOE_COBRANCA_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], JOAO.BASE_ESTUDO_PERFORMANCE_MIX [%DESCOMPACTA macro (x cp/gunzip copy to WORK)], LDUARTE.PUBLICO_DETERIORADO_COMEX [PROC SQL - FROM], WORK.ACIONAMENTO [PROC SQL - JOIN], WORK.ALO [PROC SQL - JOIN], WORK.BASE_CARTEIRA [PROC SQL - FROM], WORK.BASE_CARTEIRA_2 [PROC SQL - FROM], WORK.BASE_ESTUDO_PERFORMANCE_MIX [PROC SQL - FROM], WORK.COLLORI_COMPLETO [PROC SQL - FROM], WORK.CPC [PROC SQL - JOIN], WORK.PROMESSA [PROC SQL - JOIN], WORK.PUBLICO_DETERIORADO_COMEX [PROC SQL - FROM; PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\15. PLANEJAMENTO E CONTROL DESK\4.0 AVALIACOES_PONTUAIS\34.AVALIACAO_PERFORMANCE_ATRASO_CURTO\CUBO_COLORI_ATUA.xlsx
+TEMP/DISCARDED OUTPUTS: &BASE, ACIONAMENTO, ALO, BASE_CARTEIRA, COLLORI_COMPLETO_V1, CPC, PROMESSA, WORK.BASE_CARTEIRA_2, WORK.BASE_ESTUDO_PERFORMANCE_MIX, WORK.COLLORI_COMPLETO, WORK.FUNIL_CUBO_FINALRODAS_&ANOMES, WORK.FUNIL_FINAL_RODAS&ANOMES, WORK.PUBLICO_DETERIORADO_COMEX, WORK.QUERY_FOR_BASE_ESTUDO_PERFORMANC, WORK.QUERY_FOR_COLLORI_COMPLETO, WORK.QUERY_FOR_COLLORI_COMPLETO1, WORK.QUERY_FOR_COLLORI_COMPLETO1_0000, WORK.QUERY_FOR_COLLORI_COMPLETO2, WORK.QUERY_FOR_COLLORI_COMPLETO_0000, WORK.QUERY_FOR_COLLORI_COMPLETO_0001, WORK.QUERY_FOR_PUBLICO_DETERIORADO_CO
+DYNAMIC REFS (Ambiguous): {BASE}.SAS7
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 1.MapLib + Descompacta Cubo */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 1.MapLib + Descompacta Cubo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-3iLKp9zqQfKrMkVP/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME JOAO '/riscosbv/cobranca/bsilva/';
+%macro DESCOMPACTA(libname,base);
+%let path = %sysfunc(pathname(&libname.));%put path = &path.;
+%let work = %sysfunc(pathname(work));%put work = &work.;
+%let libname = %sysfunc(lowcase(&libname.));%put libname= &libname.;
+%let base = %sysfunc(lowcase(&base.));%put base= &base.;
+x cp &path./&base..sas7* &work.;
+x gunzip &work./&base.*;
+%mend;
+%DESCOMPACTA(JOAO, base_estudo_performance_mix);
+
+LIBNAME DANIEL '/riscosbv/cobranca/dvitor/';
+LIBNAME JOAO '/riscosbv/cobranca/bsilva/';
+LIBNAME LDUARTE '/riscosbv/cobranca/lduarte';
+
+
+
+
+
+
+PROC SQL;
+CREATE TABLE WORK.base_estudo_performance_mix AS
+SELECT *
+FROM WORK.BASE_ESTUDO_PERFORMANCE_MIX
+WHERE SAFRA >= 202401
+;QUIT;
+
+%macro compacta_lib_base(libname,base);
+%let path = %sysfunc(pathname(&libname.));
+%put path = &path.;
+%let work = %sysfunc(pathname(work));
+%put work = &work.;
+%let base = %sysfunc(lowcase(&base.));
+%put base= &base.;
+
+x gzip &path./&base.*;
+
+%mend;
+
+%compacta_lib_base(DANIEL, base_estudo_performance_mix);
+
+PROC SQL;
+CREATE TABLE WORK.PUBLICO_DETERIORADO_COMEX AS
+SELECT *
+     , PUT(NUCONTRATO,Z14.) AS NUCONTRATO_2
+FROM LDUARTE.PUBLICO_DETERIORADO_COMEX
+;QUIT;
+
+%macro compacta_lib_base(libname,base);
+%let path = %sysfunc(pathname(&libname.));
+%put path = &path.;
+%let work = %sysfunc(pathname(work));
+%put work = &work.;
+%let base = %sysfunc(lowcase(&base.));
+%put base= &base.;
+
+x gzip &path./&base.*;
+
+%mend;
+
+%compacta_lib_base(DANIEL, PUBLICO_DETERIORADO_COMEX);
+
+PROC SQL;
+CREATE TABLE COLLORI_COMPLETO_V1 AS
+SELECT
+    A.*,
+
+    
+
+    CASE
+        WHEN A.NMPRODUTORISCO = 'LEVES' THEN
+            CASE
+                WHEN A.CART_2 IN ('01. RENEG_EMERG', '02. RENEG_N_EMERG') THEN '1. Reneg'
+                WHEN A.CART_2 = '03. BAD BANK' THEN '2. Bad Bank'
+                WHEN A.CLIENTE_50K = 1 THEN '3. Saldo > 50k'
+                ELSE '4. Geral'
+            END
+
+        WHEN A.NMPRODUTORISCO IN ('CVG_LEVES', 'CVG_PESADOS') THEN
+            CASE
+                WHEN A.CART_2 IN ('01. RENEG_EMERG', '02. RENEG_N_EMERG') THEN '1. Reneg'
+                WHEN A.CLIENTE_50K = 1 THEN '3. Saldo > 50k'
+                ELSE '4. Geral'
+            END
+
+        ELSE
+            CASE
+                WHEN A.CART_2 IN ('01. RENEG_EMERG', '02. RENEG_N_EMERG') THEN '1. Reneg'
+                WHEN A.CART_2 = '03. BAD BANK' THEN '2. Bad Bank'
+                WHEN A.CLIENTE_50K = 1 THEN '3. Saldo > 50k'
+                ELSE '4. Geral'
+            END
+    END AS FLAG_GRUPO
+
+FROM WORK.BASE_ESTUDO_PERFORMANCE_MIX A
+
+
+;QUIT;
+
+PROC SQL ;
+CREATE TABLE WORK.COLLORI_COMPLETO AS
+SELECT A.*
+     , CASE
+        WHEN A.NUCONTRATO = B.NUCONTRATO_2  THEN '00.DETERIORADO' ELSE A.FLAG_GRUPO END AS SEGMENTACAO
+FROM COLLORI_COMPLETO_V1 A
+LEFT JOIN WORK.PUBLICO_DETERIORADO_COMEX B
+   ON A.NUCONTRATO = B.NUCONTRATO_2 AND A.SAFRA = B.SAFRA
+   WHERE A.SAFRA >= 202306
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 1.MapLib + Descompacta Cubo */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 2.IndicadorOperacional */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 16 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 2.IndicadorOperacional */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-CVUlkYN6qYUwMnqU/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME DANIEL '/riscosbv/cobranca/dvitor/';
+
+%Macro ProcessaRodas(dt_inicio_mes,dt_ref,anomes);
+
+%put &dt_ref.;
+%put &dt_inicio_mes.;
+%put &data_acionamento.;
+
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+
+Create table BASE_CARTEIRA as select * from connection to perm
+(
+    SELECT
+        A.DT_CRIACAO_BASE,
+        A.DT_ENVIO_COBRANCA,
+        CASE
+            WHEN A.DT_ENVIO_COBRANCA + 1 > &dt_inicio_mes THEN 'F' ELSE 'E'
+        END AS TP_ENVIO,
+        A.CD_CONTRATO AS NUCONTRATO,
+        A.CD_ASSESSORIA,
+        A.NM_ASSESSORIA,
+        A.DS_PRODUTO_CONTRATO,
+        CASE
+            WHEN A.CD_ASSESSORIA IN ('1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022') AND A.QT_DIAS_ATRASO <= 360 THEN 'CONTENCIOSO'
+            WHEN A.CD_ASSESSORIA IN ('1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022') AND A.QT_DIAS_ATRASO > 360 THEN 'WO'
+            WHEN A.CD_ASSESSORIA IN ('186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628') THEN 'ADM-TRAD'
+            WHEN A.CD_ASSESSORIA IN ('1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040') THEN 'ADM-RENEG'
+            WHEN A.CD_ASSESSORIA IN ('1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041') THEN 'ADM-BOM PAGADOR'
+            WHEN A.CD_ASSESSORIA IN ('1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',	'2017',	'2062',	'2063',	'2064',	'2065',	'2066',	'2067',	'2068') THEN 'ATIVA'
+            WHEN A.CD_ASSESSORIA IN ('1652','1656','2034') THEN 'ATIVA-RENEG'
+            ELSE '99.VALIDAR'
+        END AS TPPRODUTO_2,
+        A.FL_CONTRATO_SUSPENSO,
+        A.QT_DIAS_ATRASO,
+        A.VR_RISCO_CONTRATO
+    FROM
+        `bv-pdbd-prd.dvry_corp_cobranca.carteiragoe_cobranca_fato` AS A
+    WHERE
+        A.DT_CRIACAO_BASE = &dt_ref
+        AND A.CD_ASSESSORIA IN (		'2066',	'2067',	'1652',	'1656',	'2066',	'2067',	'2068',
+'1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',
+'186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628',	'2017',
+'1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040',	'2062',
+'1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041',	'2063',
+'1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022',	'2064',
+'2054',	'2055',	'2056',	'2057',	'2058',	'2059',	'2060',	'2061',	'2065')
+);disconnect from perm;
+quit;
+
+
+PROC SQL;
+  CREATE TABLE WORK.BASE_CARTEIRA_2 AS
+  SELECT A.DT_CRIACAO_BASE
+    , A.DT_ENVIO_COBRANCA
+	, A.TP_ENVIO
+	, A.NUCONTRATO
+	, A.CD_ASSESSORIA
+	, A.DS_PRODUTO_CONTRATO
+	, A.NM_ASSESSORIA
+	, CASE
+		WHEN A.NM_ASSESSORIA LIKE '%HOEPERS%'    	   THEN 'HOEPERS'
+		WHEN A.NM_ASSESSORIA LIKE '%PASCHOALOTTO%'    THEN 'PASCHOALOTTO'
+		WHEN A.NM_ASSESSORIA LIKE '%RN_ADV%' 		   THEN 'PASCHOALOTTO'
+		WHEN A.NM_ASSESSORIA LIKE '%RN%' 		   THEN 'PASCHOALOTTO'
+		WHEN A.NM_ASSESSORIA LIKE '%MONACO%' 		   THEN 'LM_ANGELIS'
+		WHEN A.NM_ASSESSORIA LIKE '%PORTINHO%' 	   THEN 'PORTINHO'
+		WHEN A.NM_ASSESSORIA LIKE '%REALE%' 		   THEN 'REALE'
+		WHEN A.NM_ASSESSORIA LIKE '%MBM%' 			   THEN 'MBM'
+		WHEN A.NM_ASSESSORIA LIKE '%ANASTASSOPOULOS%' THEN 'CONSULCRED'
+		WHEN A.NM_ASSESSORIA LIKE '%SCHULZE%' 		   THEN 'SCHULZE'
+		WHEN A.NM_ASSESSORIA LIKE '%CARDOSO%'		   THEN 'CARDOSO'
+		WHEN A.NM_ASSESSORIA LIKE '%TOLEDO%' 		   THEN 'TOLEDO'
+		WHEN A.NM_ASSESSORIA LIKE '%CARVALHO%' 	   THEN 'CARVALHO'
+		WHEN A.NM_ASSESSORIA LIKE '%OLIVEIRA%' 	   THEN 'RAMOS'
+        WHEN A.NM_ASSESSORIA LIKE '%CRC%' 	         THEN 'MENDES'
+		WHEN A.NM_ASSESSORIA LIKE '%RAMOS%' 	       THEN 'RAMOS'
+		WHEN A.NM_ASSESSORIA LIKE '%MARCONDES%' 	   THEN 'MARCONDES'
+		WHEN A.NM_ASSESSORIA LIKE '%GASPARIM%'		   THEN 'GASPARIM'
+		WHEN A.NM_ASSESSORIA LIKE '%BELINATI%' 	   THEN 'BELLINATI'
+		WHEN A.NM_ASSESSORIA LIKE '%BELLINATI%' 	   THEN 'BELLINATI'
+		WHEN A.NM_ASSESSORIA LIKE '%PASQUALI%' 	   THEN 'PASQUALI'
+		WHEN A.NM_ASSESSORIA LIKE '%MELHADO%' 	   	   THEN 'MELHADO'
+		WHEN A.NM_ASSESSORIA LIKE '%LM_ANGELIS%' 	   THEN 'LM_ANGELIS'
+		WHEN A.NM_ASSESSORIA LIKE '%MENDES%' 	   THEN 'MENDES_E_CUNHA'
+	END AS RAZAO_NOME
+	, CASE
+		WHEN A.QT_DIAS_ATRASO <= 0    THEN 'EM DIA'
+		WHEN A.QT_DIAS_ATRASO <= 14   THEN '0001 A 0014'
+		WHEN A.QT_DIAS_ATRASO <= 30   THEN '0015 A 0030'
+		WHEN A.QT_DIAS_ATRASO <= 60   THEN '0031 A 0060'
+		WHEN A.QT_DIAS_ATRASO <= 70   THEN '0061 A 0070'
+		WHEN A.QT_DIAS_ATRASO <= 90   THEN '0071 A 0090'
+		WHEN A.QT_DIAS_ATRASO <= 120  THEN '0091 A 0120'
+		WHEN A.QT_DIAS_ATRASO <= 150  THEN '0121 A 0150'
+		WHEN A.QT_DIAS_ATRASO <= 180  THEN '0151 A 0180'
+		WHEN A.QT_DIAS_ATRASO <= 210  THEN '0181 A 0210'
+		WHEN A.QT_DIAS_ATRASO <= 240  THEN '0211 A 0240'
+		WHEN A.QT_DIAS_ATRASO <= 270  THEN '0241 A 0270'
+		WHEN A.QT_DIAS_ATRASO <= 300  THEN '0271 A 0300'
+		WHEN A.QT_DIAS_ATRASO <= 330  THEN '0301 A 0330'
+		WHEN A.QT_DIAS_ATRASO <= 360  THEN '0331 A 0360'
+		WHEN A.QT_DIAS_ATRASO <= 540  THEN '0361 A 0540'
+		WHEN A.QT_DIAS_ATRASO <= 720  THEN '0541 A 0720'
+		WHEN A.QT_DIAS_ATRASO >= 721  THEN '0721 A 9999'
+		ELSE 'OUTROS'
+	END AS FAIXA_ATRASO
+	, A.VR_RISCO_CONTRATO
+	, A.TPPRODUTO_2 AS TPPRODUTO
+	, A.FL_CONTRATO_SUSPENSO
+	, A.QT_DIAS_ATRASO
+FROM WORK.BASE_CARTEIRA as A
+WHERE A.NUCONTRATO IS NOT NULL
+ORDER BY A.NUCONTRATO DESC,
+      QT_DIAS_ATRASO ASC
+;QUIT;
+
+
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+
+Create table ACIONAMENTO as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato  AS NUCONTRATO,
+    A.nm_assessoria_bv,
+    A.cd_assessoria,
+    MAX(SAFE_CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (1, 2, 3, 4, 5, 6)
+    AND A.CD_ASSESSORIA IN ('2066',	'2067',	'1652',	'1656',	'2066',	'2067',	'2068',
+'1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',
+'186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628',	'2017',
+'1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040',	'2062',
+'1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041',	'2063',
+'1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022',	'2064',
+'2054',	'2055',	'2056',	'2057',	'2058',	'2059',	'2060',	'2061',	'2065')
+
+    AND A.cd_contrato IS NOT NULL
+GROUP BY
+    A.dt_acionamento,
+    A.cd_contrato,
+    A.cd_assessoria,
+    A.nm_assessoria_bv);
+disconnect from perm;
+quit;
+
+
+
+		proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table ALO as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato AS NUCONTRATO,
+    A.nm_assessoria_bv,
+	A.Cd_assessoria,
+    MAX(CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+	AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (2,3,4,5,6)
+    AND A.CD_ASSESSORIA IN ()
+GROUP BY
+    A.dt_acionamento,
+    A.cd_contrato,
+    A.nm_assessoria_bv,
+A.Cd_assessoria);
+
+
+			proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table CPC as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato AS NUCONTRATO,
+	A.cd_assessoria,
+    A.nm_assessoria_bv,
+    MAX(CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+	AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (4,5,6)
+    AND A.CD_ASSESSORIA IN ()
+GROUP BY
+    A.dt_acionamento,
+	A.cd_assessoria,
+    A.cd_contrato,
+    A.nm_assessoria_bv);
+
+
+			proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table PROMESSA as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato AS NUCONTRATO,
+	A.cd_assessoria,
+    A.nm_assessoria_bv,
+    MAX(CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+	AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (6)
+    AND A.CD_ASSESSORIA IN ('2066',	'2067',	'1652',	'1656',	'2066',	'2067',	'2068',
+'1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',
+'186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628',	'2017',
+'1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040',	'2062',
+'1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041',	'2063',
+'1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022',	'2064',
+'2054',	'2055',	'2056',	'2057',	'2058',	'2059',	'2060',	'2061',	'2065')
+GROUP BY
+    A.dt_acionamento,
+	A.cd_assessoria,
+    A.cd_contrato,
+    A.nm_assessoria_bv);
+
+
+
+PROC SQL;
+    CREATE TABLE WORK.FUNIL_FINAL_RODAS&ANOMES AS
+    SELECT DISTINCT
+        PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) AS DT_CRIACAO_BASE,
+        PUT(A.DT_ENVIO_COBRANCA, YYMMDDD10.) AS DT_ENVIO_COBRANCA,
+        A.TP_ENVIO,
+		A.NUCONTRATO,
+        A.NM_ASSESSORIA,
+        A.RAZAO_NOME,
+		A.CD_ASSESSORIA,
+		A.NMMODALIDADEPRODUTO,
+        A.TPPRODUTO,
+        A.FL_CONTRATO_SUSPENSO,
+        A.QT_DIAS_ATRASO,
+        A.FAIXA_ATRASO,
+        A.VR_RISCO_CONTRATO,
+        COUNT(B.NUCONTRATO) AS QTD_ACIO,
+        COUNT(C.NUCONTRATO) AS QTD_ALO,
+        COUNT(D.NUCONTRATO) AS QTD_CPC,
+        COUNT(E.NUCONTRATO) AS QTD_PROMESSA
+    FROM
+        WORK.BASE_CARTEIRA_2 A
+    LEFT JOIN
+        WORK.ACIONAMENTO B
+        ON A.NUCONTRATO = B.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(B.DTREFERENCIA, YYMMDDD10.)
+    LEFT JOIN
+        WORK.ALO C
+        ON A.NUCONTRATO = C.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(C.DTREFERENCIA, YYMMDDD10.)
+    LEFT JOIN
+        WORK.CPC D
+        ON A.NUCONTRATO = D.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(D.DTREFERENCIA, YYMMDDD10.)
+    LEFT JOIN
+        WORK.PROMESSA E
+        ON A.NUCONTRATO = E.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(E.DTREFERENCIA, YYMMDDD10.)
+    GROUP BY
+        PUT(A.DT_CRIACAO_BASE, YYMMDDD10.),
+        PUT(A.DT_ENVIO_COBRANCA, YYMMDDD10.),
+        A.TP_ENVIO,
+        A.NM_ASSESSORIA,
+		A.NUCONTRATO,
+        A.RAZAO_NOME,
+		A.NMMODALIDADEPRODUTO,
+        A.TPPRODUTO,
+        A.FL_CONTRATO_SUSPENSO,
+        A.QT_DIAS_ATRASO,
+        A.FAIXA_ATRASO,
+        A.VR_RISCO_CONTRATO
+;QUIT;
+
+CUBO
+PROC SQL;
+CREATE TABLE WORK.FUNIL_CUBO_FINALRODAS_&ANOMES AS
+SELECT DT_CRIACAO_BASE
+    , TP_ENVIO
+	, RAZAO_NOME
+	, SG_ESTADO_CLIENTE
+	, TPPRODUTO
+	, NMMODALIDADEPRODUTO
+	, FAIXA_ATRASO
+	, COUNT(NUCONTRATO) AS CARTEIRA
+	, SUM(VR_RISCO_CONTRATO) AS VLR_RISCO
+	, SUM(QTD_ACIO) AS ACIONA
+	, SUM(QTD_ALO) AS ALO
+	, SUM(QTD_CPC) AS CPC
+	, SUM(QTD_PROMESSA) AS PROMESSA
+FROM FUNIL_FINAL_RODAS&ANOMES
+WHERE TPPRODUTO IN ('ADM','ADM RENEG','CONT')
+GROUP BY DT_CRIACAO_BASE
+    , TP_ENVIO
+	, RAZAO_NOME
+	, SG_ESTADO_CLIENTE
+	, TPPRODUTO
+	, NMMODALIDADEPRODUTO
+	, FAIXA_ATRASO
+	;QUIT;
+%Mend;
+
+
+
+%ProcessaRodas('2024-01-02','2024-01-02',202401);
+
+/* =========================FIM TASK=========================== */
+/* TASK: 2.IndicadorOperacional */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL ;
+CREATE TABLE WORK.COLLORI_COMPLETO AS
+SELECT A.*
+     , CASE
+        WHEN A.NUCONTRATO = B.NUCONTRATO_2  THEN '00.DETERIORADO' ELSE A.FLAG_GRUPO END AS SEGMENTACAO
+FROM COLLORI_COMPLETO_V1 A
+LEFT JOIN WORK.PUBLICO_DETERIORADO_COMEX B
+   ON A.NUCONTRATO = B.NUCONTRATO_2 AND A.SAFRA = B.SAFRA
+   WHERE A.SAFRA >= 202306
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ESTUDO_PERFORMANC);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ESTUDO_PERFORMANC AS
+   SELECT t1.SAFRA_ATU,
+          t1.cart_2,
+          t1.tipo_pag_v2,
+          t1.COLLECTION_UTILIZADO,
+          t1.FX_ATRASO_NEW,
+          t1.NmProdutoRisco,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+          
+            (SUM(t1.Carteira)) FORMAT=COMMAX17.2 AS SUM_of_Carteira,
+          
+            (SUM(t1.Risco)) FORMAT=29.4 AS SUM_of_Risco,
+          
+            (SUM(t1.vrcaixa_reg)) AS SUM_of_vrcaixa_reg
+      FROM WORK.BASE_ESTUDO_PERFORMANCE_MIX t1
+      GROUP BY t1.SAFRA_ATU,
+               t1.cart_2,
+               t1.tipo_pag_v2,
+               t1.COLLECTION_UTILIZADO,
+               t1.FX_ATRASO_NEW,
+               t1.NmProdutoRisco;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_PUBLICO_DETERIORADO_CO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PUBLICO_DETERIORADO_CO AS
+   SELECT t1.SEGMENTACAO,
+          
+            (COUNT(t1.NUCONTRATO_2)) AS COUNT_of_NUCONTRATO_2
+      FROM WORK.PUBLICO_DETERIORADO_COMEX t1
+      GROUP BY t1.SEGMENTACAO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_COLLORI_COMPLETO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_COLLORI_COMPLETO AS
+   SELECT t1.SEGMENTACAO,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.COLLORI_COMPLETO t1
+      GROUP BY t1.SEGMENTACAO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_COLLORI_COMPLETO_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_COLLORI_COMPLETO_0000 AS
+   SELECT t1.SAFRA,
+          t1.StOperacao,
+          t1.FX_ATRASO_NEW,
+          t1.GH_ESTOQUE,
+          t1.COLLECTION_UTILIZADO,
+          t1.SEGMENTACAO,
+          t1.NmProdutoRisco,
+          t1.tipo_pag_v2,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+          
+            (SUM(t1.Carteira)) FORMAT=COMMAX17.2 AS SUM_of_Carteira,
+          
+            (SUM(t1.Risco)) FORMAT=29.4 AS SUM_of_Risco,
+          
+            (SUM(t1.vrcaixa_reg)) AS SUM_of_vrcaixa_reg
+      FROM WORK.COLLORI_COMPLETO t1
+      GROUP BY t1.SAFRA,
+               t1.StOperacao,
+               t1.FX_ATRASO_NEW,
+               t1.GH_ESTOQUE,
+               t1.COLLECTION_UTILIZADO,
+               t1.SEGMENTACAO,
+               t1.NmProdutoRisco,
+               t1.tipo_pag_v2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_COLLORI_COMPLETO_0001);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_COLLORI_COMPLETO_0001 AS
+   SELECT t1.StOperacao,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.COLLORI_COMPLETO t1
+      GROUP BY t1.StOperacao;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_COLLORI_COMPLETO1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_COLLORI_COMPLETO1 AS
+   SELECT 
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+          t1.SEGMENTACAO
+      FROM WORK.COLLORI_COMPLETO t1
+      GROUP BY t1.SEGMENTACAO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_COLLORI_COMPLETO1_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_COLLORI_COMPLETO1_0000 AS
+   SELECT t1.SAFRA,
+          t1.StOperacao,
+          t1.FX_ATRASO_NEW,
+          t1.GH_ESTOQUE,
+          t1.COLLECTION_UTILIZADO,
+          t1.SEGMENTACAO,
+          t1.NmProdutoRisco,
+          t1.tipo_pag_v2,
+          
+            (COUNT(t1.NuContrato)) AS QTD_CARTEIRA,
+          
+            (SUM(t1.Carteira)) FORMAT=COMMAX17.2 AS TOTAL_CARTEIRA
+      FROM WORK.COLLORI_COMPLETO t1
+      GROUP BY t1.SAFRA,
+               t1.StOperacao,
+               t1.FX_ATRASO_NEW,
+               t1.GH_ESTOQUE,
+               t1.COLLECTION_UTILIZADO,
+               t1.SEGMENTACAO,
+               t1.NmProdutoRisco,
+               t1.tipo_pag_v2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%Macro ProcessaRodas(dt_inicio_mes,dt_ref,anomes);
+
+%put &dt_ref.;
+%put &dt_inicio_mes.;
+%put &data_acionamento.;
+
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+
+Create table BASE_CARTEIRA as select * from connection to perm
+(
+    SELECT
+        A.DT_CRIACAO_BASE,
+        A.DT_ENVIO_COBRANCA,
+        CASE
+            WHEN A.DT_ENVIO_COBRANCA + 1 > &dt_inicio_mes THEN 'F' ELSE 'E'
+        END AS TP_ENVIO,
+        A.CD_CONTRATO AS NUCONTRATO,
+        A.CD_ASSESSORIA,
+        A.NM_ASSESSORIA,
+        A.DS_PRODUTO_CONTRATO,
+        CASE
+            WHEN A.CD_ASSESSORIA IN ('1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022') AND A.QT_DIAS_ATRASO <= 360 THEN 'CONTENCIOSO'
+            WHEN A.CD_ASSESSORIA IN ('1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022') AND A.QT_DIAS_ATRASO > 360 THEN 'WO'
+            WHEN A.CD_ASSESSORIA IN ('186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628') THEN 'ADM-TRAD'
+            WHEN A.CD_ASSESSORIA IN ('1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040') THEN 'ADM-RENEG'
+            WHEN A.CD_ASSESSORIA IN ('1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041') THEN 'ADM-BOM PAGADOR'
+            WHEN A.CD_ASSESSORIA IN ('1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',	'2017',	'2062',	'2063',	'2064',	'2065',	'2066',	'2067',	'2068') THEN 'ATIVA'
+            WHEN A.CD_ASSESSORIA IN ('1652','1656','2034') THEN 'ATIVA-RENEG'
+            ELSE '99.VALIDAR'
+        END AS TPPRODUTO_2,
+        A.FL_CONTRATO_SUSPENSO,
+        A.QT_DIAS_ATRASO,
+        A.VR_RISCO_CONTRATO
+    FROM
+        `bv-pdbd-prd.dvry_corp_cobranca.carteiragoe_cobranca_fato` AS A
+    WHERE
+        A.DT_CRIACAO_BASE = &dt_ref
+        AND A.CD_ASSESSORIA IN (		'2066',	'2067',	'1652',	'1656',	'2066',	'2067',	'2068',
+'1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',
+'186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628',	'2017',
+'1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040',	'2062',
+'1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041',	'2063',
+'1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022',	'2064',
+'2054',	'2055',	'2056',	'2057',	'2058',	'2059',	'2060',	'2061',	'2065')
+);disconnect from perm;
+quit;
+
+
+PROC SQL;
+  CREATE TABLE WORK.BASE_CARTEIRA_2 AS
+  SELECT A.DT_CRIACAO_BASE
+    , A.DT_ENVIO_COBRANCA
+	, A.TP_ENVIO
+	, A.NUCONTRATO
+	, A.CD_ASSESSORIA
+	, A.DS_PRODUTO_CONTRATO
+	, A.NM_ASSESSORIA
+	, CASE
+		WHEN A.NM_ASSESSORIA LIKE '%HOEPERS%'    	   THEN 'HOEPERS'
+		WHEN A.NM_ASSESSORIA LIKE '%PASCHOALOTTO%'    THEN 'PASCHOALOTTO'
+		WHEN A.NM_ASSESSORIA LIKE '%RN_ADV%' 		   THEN 'PASCHOALOTTO'
+		WHEN A.NM_ASSESSORIA LIKE '%RN%' 		   THEN 'PASCHOALOTTO'
+		WHEN A.NM_ASSESSORIA LIKE '%MONACO%' 		   THEN 'LM_ANGELIS'
+		WHEN A.NM_ASSESSORIA LIKE '%PORTINHO%' 	   THEN 'PORTINHO'
+		WHEN A.NM_ASSESSORIA LIKE '%REALE%' 		   THEN 'REALE'
+		WHEN A.NM_ASSESSORIA LIKE '%MBM%' 			   THEN 'MBM'
+		WHEN A.NM_ASSESSORIA LIKE '%ANASTASSOPOULOS%' THEN 'CONSULCRED'
+		WHEN A.NM_ASSESSORIA LIKE '%SCHULZE%' 		   THEN 'SCHULZE'
+		WHEN A.NM_ASSESSORIA LIKE '%CARDOSO%'		   THEN 'CARDOSO'
+		WHEN A.NM_ASSESSORIA LIKE '%TOLEDO%' 		   THEN 'TOLEDO'
+		WHEN A.NM_ASSESSORIA LIKE '%CARVALHO%' 	   THEN 'CARVALHO'
+		WHEN A.NM_ASSESSORIA LIKE '%OLIVEIRA%' 	   THEN 'RAMOS'
+        WHEN A.NM_ASSESSORIA LIKE '%CRC%' 	         THEN 'MENDES'
+		WHEN A.NM_ASSESSORIA LIKE '%RAMOS%' 	       THEN 'RAMOS'
+		WHEN A.NM_ASSESSORIA LIKE '%MARCONDES%' 	   THEN 'MARCONDES'
+		WHEN A.NM_ASSESSORIA LIKE '%GASPARIM%'		   THEN 'GASPARIM'
+		WHEN A.NM_ASSESSORIA LIKE '%BELINATI%' 	   THEN 'BELLINATI'
+		WHEN A.NM_ASSESSORIA LIKE '%BELLINATI%' 	   THEN 'BELLINATI'
+		WHEN A.NM_ASSESSORIA LIKE '%PASQUALI%' 	   THEN 'PASQUALI'
+		WHEN A.NM_ASSESSORIA LIKE '%MELHADO%' 	   	   THEN 'MELHADO'
+		WHEN A.NM_ASSESSORIA LIKE '%LM_ANGELIS%' 	   THEN 'LM_ANGELIS'
+		WHEN A.NM_ASSESSORIA LIKE '%MENDES%' 	   THEN 'MENDES_E_CUNHA'
+	END AS RAZAO_NOME
+	, CASE
+		WHEN A.QT_DIAS_ATRASO <= 0    THEN 'EM DIA'
+		WHEN A.QT_DIAS_ATRASO <= 14   THEN '0001 A 0014'
+		WHEN A.QT_DIAS_ATRASO <= 30   THEN '0015 A 0030'
+		WHEN A.QT_DIAS_ATRASO <= 60   THEN '0031 A 0060'
+		WHEN A.QT_DIAS_ATRASO <= 70   THEN '0061 A 0070'
+		WHEN A.QT_DIAS_ATRASO <= 90   THEN '0071 A 0090'
+		WHEN A.QT_DIAS_ATRASO <= 120  THEN '0091 A 0120'
+		WHEN A.QT_DIAS_ATRASO <= 150  THEN '0121 A 0150'
+		WHEN A.QT_DIAS_ATRASO <= 180  THEN '0151 A 0180'
+		WHEN A.QT_DIAS_ATRASO <= 210  THEN '0181 A 0210'
+		WHEN A.QT_DIAS_ATRASO <= 240  THEN '0211 A 0240'
+		WHEN A.QT_DIAS_ATRASO <= 270  THEN '0241 A 0270'
+		WHEN A.QT_DIAS_ATRASO <= 300  THEN '0271 A 0300'
+		WHEN A.QT_DIAS_ATRASO <= 330  THEN '0301 A 0330'
+		WHEN A.QT_DIAS_ATRASO <= 360  THEN '0331 A 0360'
+		WHEN A.QT_DIAS_ATRASO <= 540  THEN '0361 A 0540'
+		WHEN A.QT_DIAS_ATRASO <= 720  THEN '0541 A 0720'
+		WHEN A.QT_DIAS_ATRASO >= 721  THEN '0721 A 9999'
+		ELSE 'OUTROS'
+	END AS FAIXA_ATRASO
+	, A.VR_RISCO_CONTRATO
+	, A.TPPRODUTO_2 AS TPPRODUTO
+	, A.FL_CONTRATO_SUSPENSO
+	, A.QT_DIAS_ATRASO
+	, B.NMMODALIDADEPRODUTO
+FROM WORK.BASE_CARTEIRA as A
+LEFT JOIN BASE_CARTEIRA_PROD2 as B
+ON input(A.NUCONTRATO,20.) = B.NUCONTRATO
+WHERE A.NUCONTRATO IS NOT NULL
+ORDER BY A.NUCONTRATO DESC,
+      QT_DIAS_ATRASO ASC
+;QUIT;
+
+
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+
+Create table ACIONAMENTO as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato  AS NUCONTRATO,
+    A.nm_assessoria_bv,
+    A.cd_assessoria,
+    MAX(SAFE_CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (1, 2, 3, 4, 5, 6)
+    AND A.CD_ASSESSORIA IN ('2066',	'2067',	'1652',	'1656',	'2066',	'2067',	'2068',
+'1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',
+'186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628',	'2017',
+'1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040',	'2062',
+'1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041',	'2063',
+'1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022',	'2064',
+'2054',	'2055',	'2056',	'2057',	'2058',	'2059',	'2060',	'2061',	'2065')
+
+    AND A.cd_contrato IS NOT NULL
+GROUP BY
+    A.dt_acionamento,
+    A.cd_contrato,
+    A.cd_assessoria,
+    A.nm_assessoria_bv);
+disconnect from perm;
+quit;
+
+
+
+		proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table ALO as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato AS NUCONTRATO,
+    A.nm_assessoria_bv,
+	A.Cd_assessoria,
+    MAX(CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+	AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (2,3,4,5,6)
+    AND A.CD_ASSESSORIA IN ()
+GROUP BY
+    A.dt_acionamento,
+    A.cd_contrato,
+    A.nm_assessoria_bv,
+A.Cd_assessoria);
+
+
+			proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table CPC as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato AS NUCONTRATO,
+	A.cd_assessoria,
+    A.nm_assessoria_bv,
+    MAX(CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+	AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (4,5,6)
+    AND A.CD_ASSESSORIA IN ()
+GROUP BY
+    A.dt_acionamento,
+	A.cd_assessoria,
+    A.cd_contrato,
+    A.nm_assessoria_bv);
+
+
+			proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table PROMESSA as select * from connection to perm
+( SELECT DISTINCT
+    A.dt_acionamento AS DTREFERENCIA,
+    A.cd_contrato AS NUCONTRATO,
+	A.cd_assessoria,
+    A.nm_assessoria_bv,
+    MAX(CAST(A.tp_resultado_acionamento AS INT64)) AS TPRESULTADO
+FROM
+    `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` AS A
+WHERE
+    A.dt_acionamento = &dt_ref
+	AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IS NOT NULL
+    AND SAFE_CAST(A.tp_resultado_acionamento AS INT64) IN (6)
+    AND A.CD_ASSESSORIA IN ('2066',	'2067',	'1652',	'1656',	'2066',	'2067',	'2068',
+'1624',	'1625',	'1627',	'1646',	'1652',	'1656',	'2005',	'2006',	'2009',
+'186',	'204',	'220',	'258',	'270',	'497',	'1619',	'1628',	'2017',
+'1651',	'1653',	'1654',	'1657',	'1659',	'1660',	'1662',	'2040',	'2062',
+'1575',	'1581',	'1584',	'1588',	'1590',	'1591',	'1621',	'2041',	'2063',
+'1',	'14',	'101',	'133',	'1336',	'1497',	'1618',	'2022',	'2064',
+'2054',	'2055',	'2056',	'2057',	'2058',	'2059',	'2060',	'2061',	'2065')
+GROUP BY
+    A.dt_acionamento,
+	A.cd_assessoria,
+    A.cd_contrato,
+    A.nm_assessoria_bv);
+
+
+
+PROC SQL;
+    CREATE TABLE WORK.FUNIL_FINAL_RODAS&ANOMES AS
+    SELECT DISTINCT
+        PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) AS DT_CRIACAO_BASE,
+        PUT(A.DT_ENVIO_COBRANCA, YYMMDDD10.) AS DT_ENVIO_COBRANCA,
+        A.TP_ENVIO,
+		A.NUCONTRATO,
+        A.NM_ASSESSORIA,
+        A.RAZAO_NOME,
+		A.CD_ASSESSORIA,
+		A.NMMODALIDADEPRODUTO,
+        A.TPPRODUTO,
+        A.FL_CONTRATO_SUSPENSO,
+        A.QT_DIAS_ATRASO,
+        A.FAIXA_ATRASO,
+        A.VR_RISCO_CONTRATO,
+        COUNT(B.NUCONTRATO) AS QTD_ACIO,
+        COUNT(C.NUCONTRATO) AS QTD_ALO,
+        COUNT(D.NUCONTRATO) AS QTD_CPC,
+        COUNT(E.NUCONTRATO) AS QTD_PROMESSA
+    FROM
+        WORK.BASE_CARTEIRA_2 A
+    LEFT JOIN
+        WORK.ACIONAMENTO B
+        ON A.NUCONTRATO = B.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(B.DTREFERENCIA, YYMMDDD10.)
+    LEFT JOIN
+        WORK.ALO C
+        ON A.NUCONTRATO = C.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(C.DTREFERENCIA, YYMMDDD10.)
+    LEFT JOIN
+        WORK.CPC D
+        ON A.NUCONTRATO = D.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(D.DTREFERENCIA, YYMMDDD10.)
+    LEFT JOIN
+        WORK.PROMESSA E
+        ON A.NUCONTRATO = E.NUCONTRATO AND PUT(A.DT_CRIACAO_BASE, YYMMDDD10.) = PUT(E.DTREFERENCIA, YYMMDDD10.)
+    GROUP BY
+        PUT(A.DT_CRIACAO_BASE, YYMMDDD10.),
+        PUT(A.DT_ENVIO_COBRANCA, YYMMDDD10.),
+        A.TP_ENVIO,
+        A.NM_ASSESSORIA,
+		A.NUCONTRATO,
+        A.RAZAO_NOME,
+		A.NMMODALIDADEPRODUTO,
+        A.TPPRODUTO,
+        A.FL_CONTRATO_SUSPENSO,
+        A.QT_DIAS_ATRASO,
+        A.FAIXA_ATRASO,
+        A.VR_RISCO_CONTRATO
+;QUIT;
+
+CUBO
+PROC SQL;
+CREATE TABLE WORK.FUNIL_CUBO_FINALRODAS_&ANOMES AS
+SELECT DT_CRIACAO_BASE
+    , TP_ENVIO
+	, RAZAO_NOME
+	, SG_ESTADO_CLIENTE
+	, TPPRODUTO
+	, NMMODALIDADEPRODUTO
+	, FAIXA_ATRASO
+	, COUNT(NUCONTRATO) AS CARTEIRA
+	, SUM(VR_RISCO_CONTRATO) AS VLR_RISCO
+	, SUM(QTD_ACIO) AS ACIONA
+	, SUM(QTD_ALO) AS ALO
+	, SUM(QTD_CPC) AS CPC
+	, SUM(QTD_PROMESSA) AS PROMESSA
+FROM FUNIL_FINAL_RODAS&ANOMES
+WHERE TPPRODUTO IN ('ADM','ADM RENEG','CONT')
+GROUP BY DT_CRIACAO_BASE
+    , TP_ENVIO
+	, RAZAO_NOME
+	, SG_ESTADO_CLIENTE
+	, TPPRODUTO
+	, NMMODALIDADEPRODUTO
+	, FAIXA_ATRASO
+	;QUIT;
+%Mend;
+
+
+
+%ProcessaRodas('2024-01-02','2024-01-02',202401);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 012 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_COLLORI_COMPLETO2);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_COLLORI_COMPLETO2 AS
+   SELECT t1.SAFRA,
+          t1.StOperacao,
+          t1.FX_ATRASO_NEW,
+          t1.GH_ESTOQUE,
+          t1.COLLECTION_UTILIZADO,
+          t1.SEGMENTACAO,
+          t1.NmProdutoRisco,
+          t1.tipo_pag_v2,
+          
+            (COUNT(t1.NuContrato)) AS QTD,
+          
+            (SUM(t1.Carteira)) FORMAT=COMMAX17.2 AS TOTAL_CARTEIRA,
+          
+            (SUM(t1.Risco)) FORMAT=29.4 AS TOTAL_RISCO,
+          
+            (SUM(t1.vrcaixa_reg)) AS TOTAL_CAIXA_REG
+      FROM WORK.COLLORI_COMPLETO t1
+      GROUP BY t1.SAFRA,
+               t1.StOperacao,
+               t1.FX_ATRASO_NEW,
+               t1.GH_ESTOQUE,
+               t1.COLLECTION_UTILIZADO,
+               t1.SEGMENTACAO,
+               t1.NmProdutoRisco,
+               t1.tipo_pag_v2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 012 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 013 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.QUERY_FOR_COLLORI_COMPLETO_0000
+    OUTFILE='N:\DVMD\Cobrança\Gestao_Operacional\Gestao_Resultados_Rodas\15. PLANEJAMENTO E CONTROL DESK\4.0 AVALIACOES_PONTUAIS\34.AVALIACAO_PERFORMANCE_ATRASO_CURTO\CUBO_COLORI_ATUA.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 013 */
+/* =========================FIM TASK=========================== */

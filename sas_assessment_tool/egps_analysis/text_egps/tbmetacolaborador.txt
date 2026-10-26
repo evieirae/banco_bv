@@ -1,0 +1,267 @@
+START_METADATA
+PROJECT: SAS_UC4__tbmetacolaborador
+FILE_SAS: tbmetacolaborador.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:50 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 60)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -37
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 186
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbmeta.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-INDICADORES-VAREJO/SCRIPTS/TBMETA.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBMETA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBMETACOLABORADOR_00, WORK.TBMETACOLABORADOR_01
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbmeta.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.TBMETACOLABORADOR, WORK.TBMETACOLABORADOR_00, WORK.TBMETACOLABORADOR_01
+TABLE_READ_PROVENANCE (Flow): BASES.TBCOLABORADOR [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBMETA [PROC SQL - FROM], WORK.TBMETACOLABORADOR [DATA Step - SET; PROC SQL - FROM], WORK.TBMETACOLABORADOR_00 [DATA Step - SET], WORK.TBMETACOLABORADOR_01 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbmeta.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBMETACOLABORADOR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBMETACOLABORADOR, TBMETACOLABORADORN1, TBMETACOLABORADORN2, TBMETACOLABORADOR_00, TBMETACOLABORADOR_01, WORK.TBMETACOLABORADOR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbmeta.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* =========================================== */
+/* ================= Meta ==================== */
+/* =========================================== */
+
+%include '/projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbmeta.sas';
+
+/* ======================================================== */
+/* ================= Meta Colaborador  ==================== */
+/* ======================================================== */
+
+proc sql;
+create table TbMetaColaboradorN1 as
+select
+	 MetaProducao.NuAnoMes
+	,COALESCE(Colaborador.CdColaborador,EstruturaComercial.CdColaboradorAtivo) AS CdColaborador
+	,COALESCE(Colaborador.NmColaborador,EstruturaComercial.NmColaborador) AS NmColaborador
+	,MetaProducao.NmGrupoCargo as NmGrupoCargoColaborador
+	,EstruturaComercial.DsLoginN1
+	,MetaProducao.NmGrupoProdutoMeta
+	,MetaProducao.StVeiculo
+	,MetaProducao.DsTipoCanalProducao
+	,MetaProducao.CdFilial
+	,EstruturaComercial.NmNivel
+	,MetaProducao.Tipo
+	,MetaProducao.TpValor
+	,sum(MetaProducao.VrMedida)/max(case when substr(MetaProducao.TpValor,1,2) = 'Pc' then 1 else MetaProducao.QtGr end) as VrMedida
+
+from bases.TbMeta MetaProducao
+
+	INNER JOIN bases.TbEstruturaComercial EstruturaComercial
+		ON  MetaProducao.CdFilial = EstruturaComercial.CdFilial
+		AND MetaProducao.DtReferencia between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+		AND MetaProducao.CdGrupoCargo = EstruturaComercial.CdGrupoCargo
+		AND EstruturaComercial.NmNivel = 'N1'
+
+		LEFT JOIN bases.TbColaborador Colaborador
+			ON  EstruturaComercial.CdColaboradorAtivo = Colaborador.CdColaborador
+
+WHERE 1=1
+  AND MetaProducao.NuAnoMes >= 201801
+  AND MetaProducao.Tipo = 'Meta'
+  AND MetaProducao.FlAtivo = 'S'
+
+  AND NmGrupoProdutoMeta not in
+	(
+	'Consorcio'
+	'AVONALE'
+	)
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12
+order by 1,2,3,4,5,6,7,8,9,10,11,12
+;run;
+
+proc sql;
+create table TbMetaColaboradorN2 as
+select
+	 MetaProducao.NuAnoMes
+	,EstruturaComercial.CdColaboradorAtivo as CdColaborador
+	,EstruturaComercial.NmColaborador
+	,MetaProducao.NmGrupoCargo as NmGrupoCargoColaborador
+	,EstruturaComercial.DsLoginN1
+	,MetaProducao.NmGrupoProdutoMeta
+	,MetaProducao.StVeiculo
+	,MetaProducao.DsTipoCanalProducao
+	,MetaProducao.CdFilial
+	,EstruturaComercial.NmNivel
+	,MetaProducao.Tipo
+	,MetaProducao.TpValor
+	,sum(VrMedida) as VrMedida
+from bases.TbMeta MetaProducao
+
+	LEFT JOIN bases.TbEstruturaComercial EstruturaComercial
+		ON  MetaProducao.CdFilial = EstruturaComercial.CdFilial
+		AND MetaProducao.DtReferencia between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia
+		AND EstruturaComercial.NmNivel = 'N2'
+
+WHERE 1=1
+  AND MetaProducao.NuAnoMes >= 201801
+  AND MetaProducao.Tipo = 'Meta'
+  AND MetaProducao.FlAtivo = 'S'
+  AND NmGrupoProdutoMeta not in
+	(
+	'Consorcio'
+	'AVONALE'
+	)
+
+group by 1,2,3,4,5,6,7,8,9,10,11,12
+order by 1,2,3,4,5,6,7,8,9,10,11,12
+;run;
+
+data TbMetaColaborador;
+set TbMetaColaboradorN1
+	TbMetaColaboradorN2
+;run;
+
+proc sql;
+delete from TbMetaColaborador where NuAnoMes < 202201 and TpValor in
+	(
+	'PcRCF'
+	'VrRCF'
+	'PcCasco'
+	'VrCasco'
+	'PcGarantiaMecanica'
+	'VrGarantiaMecanica'
+	'PcGap'
+	'VrGap'
+	'PcAutoTotal'
+	'PcDFI'
+	'VrDFI'
+	'TxFinanciamento'
+	'TxSpread'
+	'TxTir'
+	'VpTxFinanciamento'
+	'VpTxSpread'
+	'VpTxTir'
+	);
+delete from TbMetaColaborador where NuAnoMes >= 202201 and TpValor in
+	(
+	'PcCap'
+	'PcSPF'
+	'PcCasco'
+	'VrCasco'
+	'VrAutoTotal'
+	'VrCap'
+	'VrDemais'
+	'QtProduto'
+	);
+delete from TbMetaColaborador where (TpValor in ('PcAutoTotal','VrAutoTotal') and NuAnoMes < 202101);
+delete from TbMetaColaborador where (TpValor in ('PcAutoTotal','VrAutoTotal') and DsTipoCanalProducao in ('LOJA CANAL NEGOCIOS','PROMOTORA'));
+;run;
+
+proc sql;
+create table TbMetaColaborador_00  as
+select
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,StVeiculo
+	,DsTipoCanalProducao
+	,CdFilial
+	,case
+		when NmGrupoProdutoMeta like 'MCN%' or NmGrupoProdutoMeta = 'NaPista' then 'VrMcn'
+/*		when NmGrupoProdutoMeta = 'NaPista' then 'VrNaPista'*/
+		when NmGrupoProdutoMeta like 'Consorcio' then 'VrConsorcio'
+	 else TpValor end as TpValor
+	,sum(case when substr(TpValor,1,2) = 'Vr' and NmNivel <> 'N2' then VrMedida end) as VrMetaN1 format 18.2
+	,sum(case when substr(TpValor,1,2) = 'Vr' and NmNivel =  'N2' then VrMedida end) as VrMetaN2 format 18.2
+	,sum(case when substr(TpValor,1,2) = 'Pc' then VrMedida end) as PcMeta format 18.2
+	,sum(case when substr(TpValor,1,2) = 'Qt' and NmNivel <> 'N2' then VrMedida end) as QtProdutoN1 format 18.0
+	,sum(case when substr(TpValor,1,2) = 'Qt' and NmNivel =  'N2' then VrMedida end) as QtProdutoN2 format 18.0
+from TbMetaColaborador
+
+WHERE NmGrupoProdutoMeta NOT IN ('MCN - Anuncio', 'MCN - Publicidade', 'NaPista')
+
+group by 1,2,3,4,5,6,7,8,9,10
+order by 1,2,3,4,5,6,7,8,9,10
+;quit;
+
+proc sql;
+create table TbMetaColaborador_01  as
+select
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,StVeiculo
+	,DsTipoCanalProducao
+	,CdFilial
+	,case
+		when NmGrupoProdutoMeta like 'MCN%' or NmGrupoProdutoMeta = 'NaPista' then 'VrMcn'
+/*		when NmGrupoProdutoMeta = 'NaPista' then 'VrNaPista'*/
+		when NmGrupoProdutoMeta like 'Consorcio' then 'VrConsorcio'
+	 else TpValor end as TpValor
+	,sum(case when substr(TpValor,1,2) = 'Vr' and NmNivel <> 'N2' AND TpValor <> 'VrProducaoSeguros' then VrMedida end) as VrMetaN1 format 18.2
+	,sum(case when substr(TpValor,1,2) = 'Vr' and NmNivel =  'N2' AND TpValor <> 'VrProducaoSeguros' then VrMedida end) as VrMetaN2 format 18.2
+	,sum(case when substr(TpValor,1,2) = 'Pc' AND TpValor <> 'VrProducaoSeguros' then VrMedida end) as PcMeta format 18.2
+	,sum(case when substr(TpValor,1,2) = 'Qt' and NmNivel <> 'N2' AND TpValor <> 'VrProducaoSeguros' then VrMedida end) as QtProdutoN1 format 18.0
+	,sum(case when substr(TpValor,1,2) = 'Qt' and NmNivel =  'N2' AND TpValor <> 'VrProducaoSeguros' then VrMedida end) as QtProdutoN2 format 18.0
+from TbMetaColaborador
+
+WHERE NmGrupoProdutoMeta IN ('MCN - Anuncio', 'MCN - Publicidade', 'NaPista')
+
+group by 1,2,3,4,5,6,7,8,9,10
+order by 1,2,3,4,5,6,7,8,9,10
+;quit;
+
+DATA work.TbMetaColaborador;
+SET WORK.TBMETACOLABORADOR_00
+	WORK.TBMETACOLABORADOR_01;
+;RUN;
+
+/*proc sql;delete from work.TbMetaColaborador where NuAnoMes > year(intnx('month',today(),1))*100+month(intnx('month',today(),1)) and NmGrupoProdutoMeta like '%MCN%' or NmGrupoProdutoMeta = 'NaPista';run;*/
+/*proc sql;delete from work.TbMetaColaborador where NuAnoMes > year(intnx('month',today(),0))*100+month(intnx('month',today(),0)) and NmGrupoProdutoMeta not like '%MCN%' or NmGrupoProdutoMeta = 'NaPista';run;*/
+
+/*20240110 - GFM - COMENTAMOS AS LINHAS ACIMA  E INCLUIMOS A LINHA ABAIXO PARA APARECER TODAS AS METAS ATÉ O MÊS ATUAL*/
+proc sql;delete from work.TbMetaColaborador where NuAnoMes > year(intnx('month',today(),0))*100+month(intnx('month',today(),0));run;
+
+data Bases.TbMetaColaborador;
+set work.TbMetaColaborador;
+;run;

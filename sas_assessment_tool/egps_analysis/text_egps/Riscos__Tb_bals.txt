@@ -1,0 +1,220 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Tb_bals
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:46 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 132
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: INSIGHT = /riscosbvf/insight; MISCRED = /riscosbv/credito/MISCREDITO
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): INSIGHT.TBBALS [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202312 [SAS/Local], MISCRED.DE_PARA_MACRO_SETOR [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: INSIGHT, MISCRED
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): INSIGHT.TBBALS [DATA Step - SET; PROC SQL - FROM], MISCRED.BASE_UNICA_ATACADO_202312 [PROC SQL - FROM], MISCRED.DE_PARA_MACRO_SETOR [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CARTEIRABV_1, CARTEIRABV_202312, CONFIGURAR_BAL, CONFIGURAR_UNIDADE, LISTA_BALS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 1 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-XVqKNKm3WUEjzfXQ/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MISCRED BASE "/riscosbv/credito/MISCREDITO"; 
+LIBNAME INSIGHT "/riscosbvf/insight";
+
+PROC SQL;
+CREATE TABLE CONFIGURAR_UNIDADE AS
+SELECT DISTINCT NuCpfCnpj, AnoBase, MesBase, CdTpBalanco, DsUnidade
+FROM INSIGHT.TbBALS
+WHERE DsUnidade NE '' AND CdTpBalanco IN (1,5);
+QUIT;
+
+DATA CONFIGURAR_BAL;
+SET INSIGHT.TbBALS;
+
+		
+		IF CDCONTA EQ 136 	THEN FCO = VRCONTA;
+
+		
+		IF CDCONTA EQ 87 	THEN PL = VRCONTA;
+
+		
+		IF CDCONTA EQ 114 	THEN LUCRO_PREJUIZO = VRCONTA;
+
+		
+		IF CDCONTA EQ -9 	THEN ALAVANCAGEM = VRINDICE;
+
+		
+		IF CDCONTA EQ -3 	THEN EBITDA = VRCONTAAA;
+
+		
+		IF CDCONTA EQ -15 	THEN M_EBITDA = VRINDICE;
+
+		
+		IF CDCONTA EQ -16 	THEN PPM_EBITDA = VRINDICE;
+
+		
+		IF CdConta EQ 93  	THEN Faturamento = VrConta;
+
+		
+		IF CdConta EQ -5  	THEN DIVIDA_PL = VrIndice;
+
+		
+		IF CdConta EQ 352  	THEN LIQUIDEZ_2 = VrConta;
+
+		
+		IF CdConta EQ -19  	THEN DIVIDA_LIQUIDA = VrIndice;
+
+		
+		IF CdConta EQ -7 	THEN LIQUIDEZ = VrIndice;
+		IF CdConta EQ -2	THEN DIVIDA_TOTAL = VrConta;
+		IF CdConta EQ 47	THEN DIVIDA_CP = VrConta;
+		IF CdConta EQ 66	THEN DIVIDA_LP = VrConta;
+
+		IF CdConta EQ -11	THEN RECEITA = VrConta;
+
+		IF CdConta EQ 42    THEN ATIVO_TOTAL = VrConta;
+RUN;
+
+PROC SQL;
+CREATE TABLE Lista_Bals AS
+	SELECT 		A.CdGpEconomico,
+				A.CdPessoa,
+				A.NmPessoa,
+				A.NuCpfCnpj,
+				A.CdBalanco,
+				A.AnoBase,
+				A.MesBase,
+				A.DtBase,
+				A.SqBase, 
+				A.FlRF,
+				A.Versao,
+				A.NuMeses,
+				A.CdTpBalanco,
+				A.NmTpBalanco,
+				A.FlBalanco,
+				A.FlConsolidado,
+				A.DtInclusao,
+				B.DsUnidade,
+				SUM(A.FCO) 				AS FCO,
+				SUM(CASE WHEN B.DsUnidade = 'Milhões' THEN A.PL * 1000000 WHEN B.DsUnidade = 'Milhares' THEN A.PL * 1000 ELSE A.PL END) AS PL,
+				SUM(A.Lucro_Prejuizo) 	AS Lucro_Prejuizo,
+				SUM(A.Alavancagem) 		AS Alavancagem,
+				SUM(A.EBITDA) 			AS EBITDA,
+				SUM(A.M_EBITDA) 			AS M_EBITDA,
+				SUM(A.ppM_EBITDA) 		AS ppM_EBITDA,
+				sum(A.DIVIDA_PL)			AS DIVIDA_PL,
+		
+				sum(A.DIVIDA_LIQUIDA) 	AS DIVIDA_LIQUIDA,
+
+				sum(CASE WHEN B.DsUnidade = 'Milhões' THEN A.DIVIDA_TOTAL * 1000000 WHEN B.DsUnidade = 'Milhares' THEN A.DIVIDA_TOTAL * 1000 ELSE A.DIVIDA_TOTAL END)	AS DIVIDA_TOTAL,
+				sum(A.DIVIDA_CP) 			AS DIVIDA_CP,
+				sum(A.DIVIDA_LP) 			AS DIVIDA_LP,
+				SUM(CASE WHEN B.DsUnidade = 'Milhões' THEN A.Faturamento * 1000000 WHEN B.DsUnidade = 'Milhares' THEN A.Faturamento * 1000 ELSE A.Faturamento END) AS Faturamento,
+				SUM(A.LIQUIDEZ) 			AS LIQUIDEZ,
+				SUM(A.RECEITA)			AS RECEITA,
+				SUM(CASE WHEN B.DsUnidade = 'Milhões' THEN A.ATIVO_TOTAL * 1000000 WHEN B.DsUnidade = 'Milhares' THEN A.ATIVO_TOTAL * 1000 ELSE A.ATIVO_TOTAL END) AS ATIVO_TOTAL
+
+	FROM CONFIGURAR_BAL A
+	LEFT JOIN CONFIGURAR_UNIDADE B
+	ON A.NuCpfCnpj =  B.NuCpfCnpj AND A.AnoBase = B.AnoBase AND A.MesBase =  B.MesBase AND A.CdTpBalanco = B.CdTpBalanco
+		where A.CdTpBalanco in (1, 5)  
+		AND A.AnoBase = "2023" AND A.MesBase = "12"
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
+;QUIT;
+
+PROC SORT data = Lista_Bals; 
+BY DESCENDING CdTpBalanco;
+RUN;
+
+PROC SORT data = Lista_Bals NODUPKEY; 
+BY NuCpfCnpj;
+RUN;
+
+PROC SQL;
+
+CREATE TABLE CarteiraBV_1 AS
+	SELECT
+			A.CdClienteRisco,
+			A.NuCpfCnpjClienteRisco,
+			A.DsClienteRisco,
+			A.DsGrupoEconomicoRisco,
+			A.DsSetorClienteRisco_novo,
+			A.DsProduto,
+			A.DsGrupoProduto,
+			A.CdCNAE_SubClasse,
+			A.DsCNAE_SubClasse,
+			A.TIPO_CARTEIRA,
+			A.VrFaturamento_Cliente,
+			A.VrFaturamento_Grupo,
+			sum(A.VrSaldo) as VrSaldo
+
+	FROM MISCRED.BASE_UNICA_ATACADO_202312 AS A
+		GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12;
+
+CREATE TABLE CarteiraBV_202312 AS
+	SELECT DISTINCT
+
+			A.NuCpfCnpjClienteRisco,
+			A.DsClienteRisco,
+			A.DsGrupoEconomicoRisco,
+			A.DsSetorClienteRisco_novo,
+			B.MACRO_SETOR as 'Macro Setor'n LENGTH=20,
+			A.DsProduto,
+			A.DsGrupoProduto,
+			A.CdCNAE_SubClasse,
+			A.DsCNAE_SubClasse,
+			A.TIPO_CARTEIRA,
+			A.VrFaturamento_Cliente FORMAT COMMAX26.,
+			A.VrFaturamento_Grupo FORMAT COMMAX26.,
+			A.VrSaldo FORMAT COMMAX26.,
+			sum(C.Faturamento) as FATURAMENTO FORMAT COMMAX26.,
+			sum(C.ATIVO_TOTAL) as ATIVO_TOTAL FORMAT COMMAX26.,
+			sum(C.DIVIDA_TOTAL) as DIVIDA_TOTAL FORMAT COMMAX26.,
+			sum(C.PL) as PATRIMONIO_LIQUIDO FORMAT COMMAX26.
+
+	FROM CarteiraBV_1 AS A
+	LEFT JOIN MISCRED.DE_PARA_MACRO_SETOR AS B ON (A.DsSetorClienteRisco_novo = B.SETOR_CREDITO)
+	LEFT JOIN Lista_Bals AS C ON (A.NuCpfCnpjClienteRisco = input(C.NuCpfCnpj,14.) OR A.CdClienteRisco = C.CdPessoa)
+	GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

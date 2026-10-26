@@ -1,0 +1,272 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 15 - Pen_PDV.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 203
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBMETANAOISONOMICA [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBMETANAOISONOMICA [PROC SQL - FROM], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_PENPDV_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PENPDV_CANAL_TOTAL, BASE_PENPDV_FILIAL_TOTAL, BASE_PENPDV_GRS_TOTAL, BASE_PENPDV_PDVS_TOTAL, BASE_PRODUCAO_PDVS, COBANS_SOLAR_ATIVO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**Gerar a base de PDVs de Solar Ativos**/
+Proc Sql;
+Create Table Cobans_Solar_Ativo as
+Select Distinct
+NmAreaEstruturaComercialC
+,NmColaboradorC
+,DsLoginN1C
+,DsLoginN2C
+,DsLoginN3C
+,cdParceiroComercial
+,NuCnpjLoja as NuCnpjLojaFavorecido
+,DatePart(DtCadastro) as DtCadastro Format DDMMYY10.
+,FlAtivo
+from tmp.tbparceirocomercial
+where 1=1
+and tpatividade = 7
+and NmCanalEstruturaComercialC = 'Canal Solar' and
+		NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+;
+run;
+
+Proc Sql;
+Create Table Base_Producao_PDVs as
+Select
+Prod.NuAnoMes
+,Prod.NuCnpjLojaFavorecido
+,Sum(Prod.VrProducao) as VrProducao
+,Case When Calculated VrProducao > 0 Then 1 Else 0 end as Qtd_Prod
+,Max(Prod.DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and
+		Prod.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2
+;Quit;
+
+Proc Sql;
+Create Table Base_PenPDV_Canal_Total as
+Select
+'PenPDV' as Base
+,Meta.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+,Count(Distinct TbParceiro.NuCnpjLoja) as Qt_PDV
+,Sum(PenPDV.Qtd_Prod) as Qtd_PDV_Prod
+,Calculated Qtd_PDV_Prod / Calculated Qt_PDV as PenPDV
+,Max(PenPDV.DataBase) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+	Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+	Left Join Base_Producao_PDVs as PenPDV ON Meta.NuAnomes = PenPDV.NuAnomes and TbParceiro.NuCnpjLoja = PenPDV.NuCnpjLojaFavorecido
+	Left Join Base_Porte_Cobans_CNPJ as Porte On TbParceiro.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Meta.NuAnomes = Porte.NuAnomes
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_PenPDV_Filial_Total as
+Select Distinct
+'PenPDV' as Base
+,Meta.NuAnoMes
+,'Filial' as Visao
+,"" as DsLoginN1C
+,Meta.DsLoginN2A as DsLoginN2C
+,Meta.DsLoginN3A as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Meta.NmAreaEstruturaComercial as Dimensao2
+,Meta.NmAreaEstruturaComercial as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+,Count(Distinct TbParceiro.NuCnpjLoja) as Qt_PDV
+,Sum(PenPDV.Qtd_Prod) as Qtd_PDV_Prod
+,Calculated Qtd_PDV_Prod / Calculated Qt_PDV as PenPDV
+,Max(PenPDV.DataBase) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+Left Join Base_Producao_PDVs as PenPDV ON Meta.NuAnomes = PenPDV.NuAnomes and TbParceiro.NuCnpjLoja = PenPDV.NuCnpjLojaFavorecido
+Left Join Base_Porte_Cobans_CNPJ as Porte On TbParceiro.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Meta.NuAnomes = Porte.NuAnomes
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_PenPDV_Grs_Total as
+Select Distinct
+'PenPDV' as Base
+,Meta.NuAnoMes
+,'GRs' as Visao
+,Meta.DsLoginN1 as DsLoginN1C
+,Meta.DsLoginN2A as DsLoginN2C
+,Meta.DsLoginN3A as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Meta.NmAreaEstruturaComercial as Dimensao2
+,TbEstrutura.NmColaborador as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Count(Distinct TbParceiro.NuCnpjLoja) as Qt_PDV
+,Sum(PenPDV.Qtd_Prod) as Qtd_PDV_Prod
+,Calculated Qtd_PDV_Prod / Calculated Qt_PDV as PenPDV
+,Max(PenPDV.DataBase) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+Left Join Base_Producao_PDVs as PenPDV ON Meta.NuAnomes = PenPDV.NuAnomes and TbParceiro.NuCnpjLoja = PenPDV.NuCnpjLojaFavorecido
+Left Join Bases.TbEstruturaComercial as TbEstrutura ON Meta.NuANomes = TbEstrutura.NuAnomes and Meta.DsLoginN1 = TbEstrutura.DsLoginN1
+Left Join Base_Porte_Cobans_CNPJ as Porte On TbParceiro.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Meta.NuAnomes = Porte.NuAnomes
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_PenPDV_PDVs_Total as
+Select Distinct
+'PenPDV' as Base
+,Meta.NuAnoMes
+,'Cobans' as Visao
+,Meta.DsLoginN1 as DsLoginN1C
+,Meta.DsLoginN2A as DsLoginN2C
+,Meta.DsLoginN3A as DsLoginN3C
+,Meta.NmAreaEstruturaComercial as Dimensao1
+,TbEstrutura.NmColaborador as Dimensao2
+,put(Meta.CdParceiroComercial, 8.) || '-' || TbParceiro.NmParceiroComercial as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,0 as QtCorridosDiaUtilMes
+
+,Max(DatePart(TbParceiro.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Count(Distinct TbParceiro.NuCnpjLoja) as Qt_PDV
+,Sum(PenPDV.Qtd_Prod) as Qtd_PDV_Prod
+,Calculated Qtd_PDV_Prod / Calculated Qt_PDV as PenPDV
+,Max(PenPDV.DataBase) as DataBase Format DDMMYY10.
+
+From basegrc.TbMetaNaoIsonomica as Meta
+Left Join Bases.TbParceiroComercial as TbParceiro ON Meta.CdParceiroComercial = TbParceiro.CdParceiroComercial
+Left Join Base_Producao_PDVs as PenPDV ON Meta.NuAnomes = PenPDV.NuAnomes and TbParceiro.NuCnpjLoja = PenPDV.NuCnpjLojaFavorecido
+Left Join Bases.TbEstruturaComercial as TbEstrutura ON Meta.NuANomes = TbEstrutura.NuAnomes and Meta.DsLoginN1 = TbEstrutura.DsLoginN1
+Left Join Base_Porte_Cobans_CNPJ as Porte On TbParceiro.NuCnpjLoja = Porte.NuCnpjLojaFavorecido and Meta.NuAnomes = Porte.NuAnomes
+
+Where Meta.NuANomes >= &Base_m5. and Meta.Produto = 'Solar' and
+		Coalesce(Meta.NmAreaEstruturaComercial, TbParceiro.NmAreaEstruturaComercialC) in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Data ritosol.Base_PenPDV_Solar;
+Set
+	Base_PenPDV_PDVs_Total
+	Base_PenPDV_Grs_Total
+	Base_PenPDV_Filial_Total
+	Base_PenPDV_Canal_Total
+;Run;

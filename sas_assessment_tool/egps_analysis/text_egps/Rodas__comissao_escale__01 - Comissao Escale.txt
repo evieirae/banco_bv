@@ -1,0 +1,319 @@
+START_METADATA
+PROJECT: Rodas__comissao_escale
+FILE_SAS: 01 - Comissao Escale.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 25
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (2x | +160), %INCLUDE (2x | +40), FILENAME  (1x | +12)
+----------------------------------------
+LINES_OF_CODE: 246
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: C2C = /infogrc/contratacao_veiculos/bases; INFOGRC = /infogrc/precoxrisco
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m0
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], C2C.CONTRATACAO_C2C [SAS/Local], DBCOR.TBFILIAL [DBCON], DBCOR.TBFINANCIAMENTOVEICULO [DBCON], DBCOR.TBTABELAFINANCIAMENTO [DBCON], DBCOR.TBTABELAFINANCIAMENTOFILIAL [DBCON], DBCRED.TBPROPOSTA [DBCON], DBPAGAMENTO.TBPAGAMENTO [DBCON], INFOGRC.PPR_ANALITICO [SAS/Local], TMP.TBORIGINACAO [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.HISTORICOTABELASGERAL, WORK.PRODUCAOGERAL, WORK.TBPRODSCALE
+IMPORTED_LIBNAMES: C2C, INFOGRC
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.HISTORICOTABELASGERAL, WORK.PRODUCAOGERAL, WORK.TBPRODSCALE
+TABLE_READ_PROVENANCE (Flow): C2C.CONTRATACAO_C2C [PROC SQL - JOIN], DBCOR.TBFILIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFINANCIAMENTOVEICULO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTABELAFINANCIAMENTO [Pass-Through Native (DBCON) - FROM], DBCOR.TBTABELAFINANCIAMENTOFILIAL [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBPAGAMENTO.TBPAGAMENTO [Pass-Through Native (DBCON) - JOIN], INFOGRC.PPR_ANALITICO [PROC SQL - JOIN], TMP.TBORIGINACAO [PROC SQL - JOIN], TMP.TBPRODUCAO [PROC SQL - FROM], WORK.HISTORICOTABELASGERAL [PROC SQL - JOIN], WORK.PRODUCAOGERAL [PROC EXPORT - DATA=], WORK.TBPRODSCALE [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/comissao_escale/Escale.csv, /infogrc/utils/IQ.sas, /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): C2C.CONTRATACAO_C2C, INFOGRC.PPR_ANALITICO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /infogrc/comissao_escale/Escale.csv, /riscosbvf/coaching/tribo_veiculos/SAS/Funil_Leads/csv/EnvioOrigemEscale/Escale.csv
+TEMP/DISCARDED OUTPUTS: HISTORICOTABELASGERAL, PRODUCAOGERAL, TBPAGAMENTO, TBPRODSCALE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/comissao_escale/Escale.csv
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /infogrc/utils/IQ.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* |	Atualizacao:	22/05/2023														| */
+/* |	Responsavel: 	Gustavo Domingues | MIS IGE										| */
+/* |	Alt. Realizada:	- Inclusao de 'Pesados' e da colunas "DtLiquidacaoEfetivada"	| */
+/* ====================================================================================== */
+/* |	Atualizacao:	08/08/2023														| */
+/* |	Responsavel: 	Gustavo Domingues | MIS IGE										| */
+/* |	Alt. Realizada:	- Inclusao da colunas "DtPagamento"								| */
+/* ====================================================================================== */
+/* |	Atualizacao:	21/08/2023														| */
+/* |	Responsavel: 	Gustavo Domingues | MIS IGE										| */
+/* |	Alt. Realizada:	- Inclusao da colunas "Origem"									| */
+/* ====================================================================================== */
+/* |	Atualizacao:	21/06/2024														| */
+/* |	Responsavel: 	Gustavo Domingues | MIS IGE										| */
+/* |	Alt. Realizada:	- Incluido CdTabelaFinanciamento "								| */
+/* ====================================================================================== */
+
+options validvarname=any;
+options nofmterr;
+
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+%include '/infogrc/utils/all-includes.sas';
+%include '/infogrc/utils/IQ.sas';
+libname C2C '/infogrc/contratacao_veiculos/bases';
+
+DATA _NULL_;
+CALL SYMPUT ('Base_m0',INPUT(PUT(INTNX('MONTHS',TODAY(),-1,'END'),YYMMN6.),6.));
+
+;RUN;
+%PUT &Base_m0;
+
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE HistoricoTabelasGeral AS SELECT * FROM CONNECTION TO DbCon(
+SELECT
+a.CdTabelaFinanciamento
+,a.DsTabela
+,a.DsLogin
+,a.DtInclusao
+,a.DtInicioVigencia
+,a.DtExpiracao
+,a.DtAlteracao
+,CASE a.TpRestricao
+WHEN 1 THEN 'FILIAL'
+WHEN 3 THEN 'NACIONAL'
+WHEN NULL THEN 'PARCEIRO'
+WHEN 2 THEN 'PARCEIRO'
+WHEN 4 THEN 'NACIONAL/PARCEIRO'
+END AS TpRestricao
+,f.dsfilial
+,CASE a.StTabelaFinanciamento
+WHEN 'A' THEN 'APROVADA'
+WHEN 'L' THEN 'CANCELADA'
+WHEN 'E' THEN 'ENCERRADA'
+WHEN 'R' THEN 'RECUSADA'
+WHEN 'C' THEN 'CRIACAO'
+WHEN 'P' THEN 'PENDENTE'
+END AS 'Status'
+,CASE a.CdAreaUtilizacao
+WHEN 'C' THEN 'CONCESSIONARIA'
+WHEN 'L' THEN 'MULTIMARCA'
+WHEN 'T' THEN 'TODOS'
+WHEN NULL THEN 'TODOS'
+END AS 'Canal'
+,d.PcTaxaAdicional,
+a.FlPermiteAcordo,
+a.PcMaximoAcordo
+FROM
+DBCOR..TbTabelaFinanciamento a
+INNER JOIN DBCOR..TbFinanciamentoVeiculo d ON a.CdTabelaFinanciamento = d.CdTabelaFinanciamento
+LEFT JOIN dbcor..tbtabelafinanciamentofilial e ON a.CdTabelaFinanciamento= e.CdTabelaFinanciamento
+LEFT JOIN dbcor..tbfilial f ON e.CdFilial = f.CdFilial WHERE
+a.StTabelaFinanciamento IN ('A','L','E') );
+quit;
+
+/*CÓDIGO PARA GERAR DATAS DE PAGAMENTO*/
+Proc Sql;
+%CONECTADB (server=CTR);
+Create Table TbPagamento as
+SELECT * from connection to dbcon
+(
+SELECT
+year(cast(p.DtStatusProposta as date))*100+month(cast(p.DtStatusProposta as date)) as NuAnoMes,
+P.NuContratoGestao as NuContrato,
+CONVERT(VARCHAR,p.DtStatusProposta, 103) as DtContrato,
+P.DtEntradaProposta,
+CONVERT(VARCHAR,PGTO.DtPagamento, 103) as DtPagamento,
+Sum(PGTO.VrLiberado) as VrLiberado
+FROM DBCRED..TbProposta P
+	INNER JOIN DBPAGAMENTO..TbPagamento PGTO
+		ON PGTO.NuContratoGestao = P.NuContratoGestao
+/*    INNER JOIN DBPAGAMENTO..TbInformacaoBancariaPagamento INFOPGTO */
+/*    	ON INFOPGTO.CdInformacaoBancariaPagto = pgto.CdInforBancariaPagtoFavorecido */
+/*    INNER JOIN DBPAGAMENTO..TbPessoaPagamento PEPGTO */
+/*    	ON PEPGTO.CdPessoaPagamento = infopgto.CdPessoaPagamento*/
+WHERE 1=1
+and year(cast(p.DtStatusProposta as date))*100+month(cast(p.DtStatusProposta as date)) >= &Base_m0.
+and P.CdSubProduto in (1,2,3,4,5,6,7,8,9,10,11,13,16,19,20,29,30,31,32,33,34,35,39,40,41,58,59,60,61,62,63,64,65,66,102,103)
+/*and P.NuContratoGestao in (12274000022512)*/
+group by year(cast(p.DtStatusProposta as date))*100+month(cast(p.DtStatusProposta as date))
+		,P.NuContratoGestao
+		,p.DtStatusProposta
+		,P.DtEntradaProposta
+		,PGTO.DtPagamento
+)
+ ;
+  QUIT;
+
+proc sql;
+create table TbProdScale as
+select
+	nuanomes,
+	dtcontrato FORMAT ddmmyy10.,
+	DtLiquidacaoEfetiva FORMAT ddmmyy10.,
+	nuproposta,
+	nucontrato,
+	sum(VrProducao) as VrProducao,
+	sum(VrContrato) as VrContrato,
+	sum(VrComissaoTotal) as VrComissaoTotal,
+	sum(VrSeguros) as VrSeguros,
+	sum(VrBVMAIS) as SPF,
+	sum(VrCAP) as AP,
+	sum(VrCompleto) as Auto_Completo,
+	sum(VrGarantiaMecanica) + sum(VrRCF) + sum(VrCasco) + sum(VrGAP) + sum(VrDFI) as Auto_Parcial_Total,
+	tppessoa
+
+from
+	TMP.tbproducao
+where
+	nuanomes >= &Base_m0.
+	and nmgrupoprodutometa in ('Leves','Motos','Pesados')
+	and cdparceirocomercial = 451012
+group by
+	nuanomes,
+	dtcontrato,
+	DtLiquidacaoEfetiva,
+	nuproposta,
+	nucontrato
+;quit;
+
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+
+PROC SQL;
+CREATE TABLE ProducaoGeral AS
+SELECT DISTINCT
+	e.NuAnoMes,
+	e.DtContrato,
+/*	e.DtLiquidacaoEfetiva,*/
+	f.DtPagamento,
+	e.NuProposta,
+	e.NuContrato,
+	a.NmGrupoProdutoMeta,
+	put(e.VrProducao,10.2) as VrProducao,
+	put(e.VrContrato,10.2) as VrContrato,
+	put(e.VrComissaoTotal,10.2) as VrComissaoTotal,
+	put(e.VrSeguros,10.2) as VrSeguros,
+	put(e.SPF,10.2) as SPF,
+	put(e.AP,10.2) as AP,
+	put(e.Auto_Completo,10.2) as Auto_Completo,
+	put(e.Auto_Parcial_Total,10.2) as Auto_Parcial_Total,
+	e.TpPessoa,
+	a.CdTabelaFinanciamento,
+	sum(((C.PcTaxaAdicional/100)*A.VrProducao)) / sum(A.VrProducao) AS Plus,
+	sum((D.TxRetorno/100)) * sum(A.VrProducao) / sum(A.VrProducao) AS Comissao_Total,
+	(sum((B.TaxaRetorno/100)) * sum(A.VrProducao) / sum(A.VrProducao)) -
+	(sum(((C.PcTaxaAdicional/100)*A.VrProducao)) / sum(A.VrProducao)) as Retorno,
+	put(e.spf * 0.18,10.2) as Comissao_SPF,
+	put(e.AP * 0.13,10.2) as Comissao_AP,
+	put(e.Auto_Completo * 0.07,10.2) as Comissao_Auto_Completo,
+	put(e.Auto_Parcial_Total * 0.11,10.2) as Comissao_Auto_Parcial,
+	Case when c2c.Nuproposta is not null then 'C2C' else 'B2C' end as Origem
+FROM
+	TMP.TBPRODUCAO AS A
+
+LEFT JOIN
+	INFOGRC.PPR_ANALITICO AS B
+		ON A.NuProposta=B.NuProposta
+LEFT JOIN
+	WORK.HistoricoTabelasGeral AS C
+		ON A.CdTabelaFinanciamento = C.CdTabelaFinanciamento
+LEFT JOIN
+    Tmp.TBORIGINACAO d
+        on a.nuproposta = d.nuproposta
+INNER JOIN
+	work.tbprodscale as E
+		on a.nucontrato = e.nucontrato
+
+lEFT JOIN TbPagamento AS F
+		ON F.nucontrato  = A.nucontrato
+		AND F.NUANOMES   = A.NUANOMES
+		AND F.VrLiberado = A.VrProducao
+
+LEFT JOIN c2c.contratacao_c2c AS c2c
+		ON c2c.Nuproposta = A.Nuproposta
+WHERE
+	A.NmGrupoProdutoMeta in ('Leves','Motos','Pesados')
+	AND A.CdParceiroComercial = 451012
+  	AND A.NuAnoMes >= &Base_m0.
+group by
+	e.NuAnoMes,
+	e.DtContrato,
+	f.DtPagamento,
+	e.NuProposta,
+	e.NuContrato,
+	a.NmGrupoProdutoMeta,
+	e.VrProducao,
+	e.VrContrato,
+	e.VrComissaoTotal,
+	e.VrSeguros,
+	e.SPF,
+	e.AP,
+	e.Auto_Completo,
+	e.Auto_Parcial_Total,
+	e.TpPessoa,
+	c2c.Nuproposta,
+	a.CdTabelaFinanciamento
+;run;
+
+PROC EXPORT
+        DATA=work.ProducaoGeral
+        OUTFILE="/infogrc/comissao_escale/Escale.csv"
+        DBMS=DLM
+        REPLACE;
+        DELIMITER=";";
+        PUTNAMES=YES;
+RUN;
+
+PROC EXPORT
+        DATA=work.ProducaoGeral
+        OUTFILE="/riscosbvf/coaching/tribo_veiculos/SAS/Funil_Leads/csv/EnvioOrigemEscale/Escale.csv"
+        DBMS=DLM
+        REPLACE;
+        DELIMITER=";";
+        PUTNAMES=YES;
+RUN;
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+ FILENAME MAIL EMAIL
+    FROM=("inf-gerenciais@bv.com.br")
+    TO=("nathalia.nogueira@bv.com.br","leticia.melquiades@bv.com.br","gabriel.miranda@bv.com.br")
+    /*TO=("BVF-SuporteComercial@bvfinanceira.com.br")*/
+    CC="inf-gerenciais@bv.com.br"
+
+ SUBJECT="Comissao Escale";
+
+DATA _NULL_;
+    FILE MAIL;
+        PUT '!em_attach!("/infogrc/comissao_escale/Escale.csv" )';
+        PUT "Prezados";
+        PUT ;
+        PUT "Segue em anexo o arquivo de comissão Escale.";
+        PUT ;
+/*		PUT "A informação de CPF foi incluída conforme solicitado";*/
+/*        PUT ;*/
+        PUT "Esse e-mail é automatico favor não responder este e-mail.";
+        PUT ;
+        PUT "Atenciosamente,";
+        PUT ;
+        PUT "IGE";
+        PUT "Banco BV";
+        PUT ;
+RUN;

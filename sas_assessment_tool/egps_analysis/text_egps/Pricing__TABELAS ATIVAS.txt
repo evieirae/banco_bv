@@ -1,0 +1,197 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Pricing__TABELAS ATIVAS
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:20 UTC
+BUSINESS_AREA: Pricing
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 132
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], DBCOR.DBO.TBPARAMETROVARIACAORANGECPF [DBCON], DBCOR.TBFILIAL [DBCON], DBCOR.TBFINANCIAMENTOVEICULO [DBCON], DBCOR.TBTABELAFINANCIAMENTO [DBCON], DBCOR.TBTABELAFINANCIAMENTOFILIAL [DBCON], DBCOR.TBTABELAFINANCIAMENTOPRMTOVRCO [DBCON], DBCOR.TBTABELAFINANCIAMENTORANGECPF [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.DELTA_PPR, WORK.LIMITE_PA, WORK.TABELAS_ATIVAS, WORK.TABELAS_PA, WORK.VIGENCIAPA
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.DELTA_PPR, WORK.LIMITE_PA, WORK.TABELAS_ATIVAS, WORK.TABELAS_PA, WORK.VIGENCIAPA
+TABLE_READ_PROVENANCE (Flow): DBCOR.DBO.TBPARAMETROVARIACAORANGECPF [Pass-Through Native (DBCON) - FROM], DBCOR.TBFILIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFINANCIAMENTOVEICULO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTABELAFINANCIAMENTO [Pass-Through Native (DBCON) - FROM], DBCOR.TBTABELAFINANCIAMENTOFILIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTABELAFINANCIAMENTOPRMTOVRCO [Pass-Through Native (DBCON) - FROM], DBCOR.TBTABELAFINANCIAMENTORANGECPF [Pass-Through Native (DBCON) - FROM], WORK.DELTA_PPR [PROC SQL - JOIN], WORK.LIMITE_PA [PROC SQL - JOIN], WORK.TABELAS_ATIVAS [PROC SQL - FROM], WORK.TABELAS_PA [PROC SQL - FROM], WORK.VIGENCIAPA [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (fluxo EG): /infogrc/utils/IQ.sas
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DVMD\Planejamento Varejo\Planejamento e Pricing\Pricing\0.9 Veículos\Estudos\2025\14. Tabelas Ativas\TABELAS ATIVAS.xlsx
+TEMP/DISCARDED OUTPUTS: DELTA_PPR, LIMITE_PA, TABELAS_ATIVAS, TABELAS_ATIVAS_FINAL, TABELAS_ATIVAS_GERAL, TABELAS_PA, VIGENCIAPA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|/infogrc/utils/IQ.sas|/INFOGRC/UTILS|IQ.SAS||suspeito
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: TABELAS ATIVAS */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: TABELAS ATIVAS */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-NTcvezqAknuIO8rS/code.sas */
+/* =========================INÍCIO TASK========================= */
+%include '/infogrc/utils/IQ.sas';
+%CRIAVARDB;
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE DELTA_PPR AS SELECT * FROM CONNECTION TO DbCon(
+SELECT
+CdTabelaFinanciamento,
+CdParametroVariacaoTabelaFnnco AS DELTA_PPR
+FROM DbCor..TbTabelaFinanciamentoPrmtoVrco v where v.FlAtivo = 'S'
+ORDER BY v.DtInclusao);
+RUN;
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE TABELAS_PA AS SELECT * FROM CONNECTION TO DbCon(
+SELECT
+CdTabelaFinanciamento,
+CdParametroVariacaoRangeCPF AS CD_LIMITE_PA
+FROM dbcor..TbTabelaFinanciamentoRangeCPF v  where v.FlAtivo = 'S'
+ORDER BY v.DtInclusao);
+RUN;
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE VIGENCIAPA AS SELECT * FROM CONNECTION TO DbCon(
+SELECT
+CdParametroVariacaoRangeCPF,
+DtFimVigencia as DtFimVigenciaPA
+FROM DBCOR.dbo.TbParametroVariacaoRangeCPF
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE LIMITE_PA AS
+SELECT
+
+A.CdTabelaFinanciamento,
+A.CD_LIMITE_PA,
+b.DtFimVigenciaPA
+
+FROM WORK.TABELAS_PA AS A
+LEFT JOIN WORK.VIGENCIAPA AS B ON A.CD_LIMITE_PA = B.CdParametroVariacaoRangeCPF;
+RUN;
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE TABELAS_ATIVAS AS SELECT * FROM CONNECTION TO DbCon(
+SELECT
+a.CdTabelaFinanciamento
+,a.DsTabela
+,a.DsLogin
+,a.DtInclusao
+,a.DtInicioVigencia
+,a.DtExpiracao
+,a.DtAlteracao
+,CASE a.TpRestricao
+WHEN 1 THEN 'FILIAL'
+WHEN 3 THEN 'NACIONAL'
+WHEN NULL THEN 'PARCEIRO'
+WHEN 2 THEN 'PARCEIRO'
+WHEN 4 THEN 'NACIONAL/PARCEIRO'
+END AS TpRestricao
+,f.dsfilial
+,CASE a.StTabelaFinanciamento
+WHEN 'A' THEN 'APROVADA'
+WHEN 'L' THEN 'CANCELADA'
+WHEN 'E' THEN 'ENCERRADA'
+WHEN 'R' THEN 'RECUSADA'
+WHEN 'C' THEN 'CRIACAO'
+WHEN 'P' THEN 'PENDENTE'
+END AS 'Status'
+,CASE a.CdAreaUtilizacao
+WHEN 'C' THEN 'CONCESSIONARIA'
+WHEN 'L' THEN 'MULTIMARCA'
+WHEN 'T' THEN 'TODOS'
+WHEN NULL THEN 'TODOS'
+END AS 'Canal'
+,d.PcTaxaAdicional,
+a.FlPermiteAcordo,
+a.PcMaximoAcordo
+FROM DBCOR..TbTabelaFinanciamento a
+INNER JOIN DBCOR..TbFinanciamentoVeiculo d ON a.CdTabelaFinanciamento = d.CdTabelaFinanciamento
+LEFT JOIN dbcor..tbtabelafinanciamentofilial e ON a.CdTabelaFinanciamento= e.CdTabelaFinanciamento
+LEFT JOIN dbcor..tbfilial f ON e.CdFilial = f.CdFilial WHERE
+a.StTabelaFinanciamento IN ('A') );
+RUN;
+
+PROC SQL;
+CREATE TABLE TABELAS_ATIVAS_FINAL AS
+SELECT
+*
+FROM WORK.TABELAS_ATIVAS AS A
+LEFT JOIN WORK.LIMITE_PA AS B ON A.CdTabelaFinanciamento = B.CdTabelaFinanciamento
+LEFT JOIN WORK.DELTA_PPR AS C ON A.CdTabelaFinanciamento = C.CdTabelaFinanciamento;
+RUN;
+
+
+
+PROC SORT DATA= TABELAS_ATIVAS_FINAL OUT= TABELAS_ATIVAS_GERAL NODUPKEY;
+BY CdTabelaFinanciamento;
+RUN;
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE VIGENCIAPA AS SELECT * FROM CONNECTION TO DbCon(
+SELECT
+CdParametroVariacaoRangeCPF,
+DsParametroVariacaoRangeCPF,
+DtFimVigencia as DtFimVigenciaPA
+FROM DBCOR.dbo.TbParametroVariacaoRangeCPF
+GROUP BY CdParametroVariacaoRangeCPF
+);
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: TABELAS ATIVAS */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TABELAS_ATIVAS_GERAL
+    OUTFILE='N:\DVMD\Planejamento Varejo\Planejamento e Pricing\Pricing\0.9 Veículos\Estudos\2025\14. Tabelas Ativas\TABELAS ATIVAS.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

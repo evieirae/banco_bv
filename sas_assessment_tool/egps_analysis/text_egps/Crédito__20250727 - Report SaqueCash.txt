@@ -1,0 +1,261 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Crédito__20250727 - Report SaqueCash
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:37:24 UTC
+BUSINESS_AREA: Crédito
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -6
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 173
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: FREQ, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: MIS = /riscosbvf/pol_empcr/fatigatte/MIS
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: SYSSCPL, _SASSERVERNAME
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOCONTACARTAO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOSOLICITACAOAUTORIZACAO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TBFATOSOLICITACAOAUTORIZACAO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: MIS
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.SORT, WORK.TBFATOSOLICITACAOAUTORIZACAO
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOCONTACARTAO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DWBI_DMOC.TBFATOSOLICITACAOAUTORIZACAO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], MIS.SAQUECASH [DATA Step - SET; PROC SQL - FROM], MIS.SAQUECASH_APROV [DATA Step - SET], WORK.SORT [PROC FREQ - DATA=], WORK.TBFATOSOLICITACAOAUTORIZACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): MIS.SAQUECASH, MIS.SAQUECASH_APROV
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): MIS.SAQUECASH, MIS.SAQUECASH_APROV
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_REPORT, SAQUECASH_APROV_BKP, SAQUECASH_BKP, SAQUE_NEW, TBFATOCONTACARTAO, TBFATOSOLICITACAOAUTORIZACAO, WORK.SORT
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Report SaqueCash */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Report SaqueCash */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-O3EbHTLNhoEgWbJ8/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table tbfatosolicitacaoautorizacao as
+   select * from connection to perm
+     (select
+            cast(Cddimcontacartao as bigint) as Cddimcontacartao,
+            cast(CdTipoPlanoVenda as int) as CdTipoPlanoVenda,
+            cast(CdRamoEstabelecimentoCartao as int) as CdRamoEstabelecimentoCartao,
+            cast(VrAutorizacao as decimal) as VrAutorizacao,
+            cast(CdMotivoAutorizacaoNegada as int) as CdMotivoAutorizacaoNegada,
+            CdClsfoBhvrScreCnta,
+            DtsolicitacaoAutorizacaoEmsr,
+			cast(CdrespostaAutorizacao as int) as CdrespostaAutorizacao,
+            CAST(EXTRACT(YEAR FROM dtsolicitacaoautorizacaoemsr) * 100 + EXTRACT(MONTH FROM dtsolicitacaoautorizacaoemsr) AS INT64) AS Safra
+      from bv-pdbd-prd.trusted_dwbi_dmoc.tbfatosolicitacaoautorizacao
+	  WHERE DtsolicitacaoAutorizacaoEmsr >= '2025-07-01' AND DtsolicitacaoAutorizacaoEmsr <= '2025-07-31'
+      AND cast(CDRAMOESTABELECIMENTOCARTAO as bigint) IN (6010,6011));
+   disconnect from perm;
+quit;
+
+
+
+proc sql ;
+connect to bigquery as perm (project='bv-sacv-dtm' credfile='/projetos/acessos/bq/cv/sacv-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage);
+Create table tbfatocontacartao as
+   select * from connection to perm
+     (select
+		    cdpessoatitularconta,
+			cast(cdpessoatitularconta as bigint) - 100000000000000 as Nucpfcnpj,
+			CAST(cddimcontacartao as bigint) as cddimcontacartao
+		FROM bv-pdbd-prd.trusted_dwbi_dmoc.tbfatocontacartao
+        WHERE dtreferencia = '2025-07-31');
+   disconnect from perm;
+quit;
+
+
+
+PROC SQL;
+CREATE TABLE BASE_REPORT AS SELECT
+A.*,
+B.NuCpfCnpj
+FROM tbfatosolicitacaoautorizacao AS A
+LEFT JOIN tbfatocontacartao AS B ON A.CdDimContaCartao = B.CdDimContaCartao 
+;
+Quit;
+
+
+
+DATA SAQUE_NEW;
+SET BASE_REPORT (KEEP= Cddimcontacartao Safra
+CdrespostaAutorizacao CdRamoEstabelecimentoCartao CdMotivoAutorizacaoNegada NuCpfCnpj);
+SAQUE = 1;
+RUN;
+
+
+
+
+
+DATA SAQUECASH_BKP; 
+SET MIS.SAQUECASH;
+RUN;
+
+
+
+DATA MIS.SAQUECASH (compress=binary); 
+SET SAQUECASH_BKP
+SAQUE_NEW;
+RUN;
+
+
+
+
+
+DATA SAQUECASH_APROV_BKP; 
+SET MIS.SAQUECASH_APROV;
+RUN;
+
+
+DATA MIS.SAQUECASH_APROV (COMPRESS=BINARY); 
+SET SAQUECASH_APROV_BKP
+SAQUE_NEW (WHERE=(CdMotivoAutorizacaoNegada= -3));
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Report SaqueCash */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Libs */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Libs */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gn2UVYKCqEYJklrn/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname MIS '/riscosbvf/pol_empcr/fatigatte/MIS';
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Libs */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA MIS.SAQUECASH_APROV (COMPRESS=BINARY); 
+SET SAQUECASH_APROV_BKP
+SAQUE_NEW (WHERE=(CdMotivoAutorizacaoNegada= -3));
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.SORT);
+
+
+PROC SQL;
+	CREATE VIEW WORK.SORT AS
+		SELECT T.CdRamoEstabelecimentoCartao
+	FROM WORK.TBFATOSOLICITACAOAUTORIZACAO as T
+;
+QUIT;
+
+TITLE;
+TITLE1 "One-Way Frequencies";
+TITLE2 "Results";
+FOOTNOTE;
+FOOTNOTE1 "Generated by the SAS System (&_SASSERVERNAME, &SYSSCPL) on %TRIM(%QSYSFUNC(DATE(), NLDATE20.)) at %TRIM(%SYSFUNC(TIME(), TIMEAMPM12.))";
+PROC FREQ DATA=WORK.SORT
+	ORDER=INTERNAL
+;
+	TABLES CdRamoEstabelecimentoCartao /  SCORES=TABLE;
+RUN;
+
+RUN; QUIT;
+%_eg_conditional_dropds(WORK.SORT);
+TITLE; FOOTNOTE;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.SORT);
+
+
+PROC SQL;
+	CREATE VIEW WORK.SORT AS
+		SELECT T.Safra
+	FROM MIS.SAQUECASH as T
+;
+QUIT;
+
+TITLE;
+TITLE1 "One-Way Frequencies";
+TITLE2 "Results";
+FOOTNOTE;
+FOOTNOTE1 "Generated by the SAS System (&_SASSERVERNAME, &SYSSCPL) on %TRIM(%QSYSFUNC(DATE(), NLDATE20.)) at %TRIM(%SYSFUNC(TIME(), TIMEAMPM12.))";
+PROC FREQ DATA=WORK.SORT
+	ORDER=INTERNAL
+;
+	TABLES Safra /  SCORES=TABLE;
+RUN;
+
+RUN; QUIT;
+%_eg_conditional_dropds(WORK.SORT);
+TITLE; FOOTNOTE;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

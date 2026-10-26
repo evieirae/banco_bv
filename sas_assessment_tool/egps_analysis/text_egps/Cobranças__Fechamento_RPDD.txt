@@ -1,0 +1,325 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Fechamento_RPDD
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:12 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 247
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORP_CREDITO.CONCESSAO_CREDITO_DIARIO_AGGR [BIGQUERY], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.PROVISAO_VAREJO
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.PROVISAO_VAREJO
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORP_CREDITO.CONCESSAO_CREDITO_DIARIO_AGGR [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.DVRY_CORP_RISCOCREDAT.PROVISAO_VAREJO_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], WORK.PROVISAO_VAREJO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BU, PROVISAO_VAREJO, PROVISAO_VAREJO_V2, RPDD_EXPORT, WORK.QUERY_FOR_PROVISAO_VAREJO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: RPDD */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: RPDD */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5DT87poJXInXy6RT/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL ;
+CONNECT TO BIGQUERY AS PERM (PROJECT='bv-safn-dtm' credfile='/projetos/acessos/bq/fn/safn-dtm.json'
+     SCHEMA='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=25);
+
+CREATE TABLE PROVISAO_VAREJO AS
+   SELECT
+        *,
+	CASE
+		WHEN cd_produto_risco = '1' THEN 'LEVES'
+		WHEN cd_produto_risco = '2' THEN 'CARTOES'
+		WHEN cd_produto_risco = '3' THEN 'CONSIGNADO PUBLICO'
+		WHEN cd_produto_risco = '4' THEN 'CONSIGNADO PRIVADO'
+		WHEN cd_produto_risco = '5' THEN 'CONSIGNADO INSS'
+		WHEN cd_produto_risco = '6' THEN 'CP'
+		WHEN cd_produto_risco = '7' THEN 'EGV'
+		WHEN cd_produto_risco = '8' THEN 'EGV'
+		WHEN cd_produto_risco = '9' THEN 'MOTOS'
+		WHEN cd_produto_risco = '10' THEN 'PESADOS'
+		WHEN cd_produto_risco = '11' THEN 'TURISMO'
+		WHEN cd_produto_risco = '13' THEN 'SAUDE'
+		WHEN cd_produto_risco = '14' THEN 'SOLAR'
+		WHEN cd_produto_risco = '19' THEN 'FGTS'
+		WHEN cd_produto_risco = '20' THEN 'CARTOES BANKLY'
+		WHEN cd_produto_risco = '21' THEN 'DESENROLA BRASIL'
+		WHEN cd_produto_risco = '22' THEN 'CARTOES DARWIN'
+ 	ELSE 'OUTROS'
+	END AS PRODUTO
+   FROM CONNECTION TO PERM
+     (SELECT
+        *
+      FROM
+        bv-pdbd-prd.dvry_corp_riscocredat.provisao_varejo_fato
+   WHERE
+        DT_REFERENCIA >= '2023-01-01');
+   DISCONNECT FROM PERM;
+QUIT;
+
+
+
+
+
+
+
+
+
+PROC SQL;
+CREATE TABLE PROVISAO_VAREJO_V2 AS
+SELECT A.*,
+	   CASE WHEN B.safra_Concessao >= 202501 THEN SUM(vr_saldo_carteira, vr_custo)
+	   		ELSE A.vr_saldo_carteira END AS vr_saldo_carteira_ajustado
+
+FROM PROVISAO_VAREJO AS A
+LEFT JOIN BU AS B
+	ON A.CD_CONTRATO = PUT(B.NUCONTRATO, 14.)
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE RPDD_EXPORT AS
+SELECT
+	 dt_referencia
+	,PRODUTO
+	,cd_estagio_final
+	,fl_ativo_problematico
+
+	,CASE
+		WHEN QT_DIAS_ATRASO <= 0    THEN '01 - EM DIA'
+		WHEN QT_DIAS_ATRASO <= 30   THEN '03 - 0001 A 0030'
+		WHEN QT_DIAS_ATRASO <= 60   THEN '04 - 0031 A 0060'
+		WHEN QT_DIAS_ATRASO <= 90   THEN '05 - 0061 A 0090'
+		WHEN QT_DIAS_ATRASO <= 120  THEN '06 - 0091 A 0120'
+		WHEN QT_DIAS_ATRASO <= 150  THEN '07 - 0121 A 0150'
+		WHEN QT_DIAS_ATRASO <= 180  THEN '08 - 0151 A 0180'
+		WHEN QT_DIAS_ATRASO <= 210  THEN '09 - 0181 A 0210'
+		WHEN QT_DIAS_ATRASO <= 240  THEN '10 - 0211 A 0240'
+		WHEN QT_DIAS_ATRASO <= 270  THEN '11 - 0241 A 0270'
+		WHEN QT_DIAS_ATRASO <= 300  THEN '12 - 0271 A 0300'
+		WHEN QT_DIAS_ATRASO <= 330  THEN '13 - 0301 A 0330'
+		WHEN QT_DIAS_ATRASO <= 360  THEN '14 - 0331 A 0360'
+		WHEN QT_DIAS_ATRASO <= 390  THEN '15 - 0361 A 0390'
+		WHEN QT_DIAS_ATRASO <= 420  THEN '16 - 0391 A 0420'
+		WHEN QT_DIAS_ATRASO <= 450  THEN '17 - 0421 A 0450'
+		WHEN QT_DIAS_ATRASO <= 480  THEN '18 - 0451 A 0480'
+		WHEN QT_DIAS_ATRASO <= 510  THEN '19 - 0481 A 0510'
+		WHEN QT_DIAS_ATRASO <= 540  THEN '20 - 0511 A 0540'
+		WHEN QT_DIAS_ATRASO <= 570  THEN '21 - 0541 A 0570'
+		WHEN QT_DIAS_ATRASO <= 600  THEN '22 - 0571 A 0600'
+		WHEN QT_DIAS_ATRASO <= 630  THEN '23 - 0601 A 0630'
+		WHEN QT_DIAS_ATRASO <= 660  THEN '24 - 0631 A 0660'
+		WHEN QT_DIAS_ATRASO <= 690  THEN '25 - 0661 A 0690'
+		WHEN QT_DIAS_ATRASO <= 720  THEN '26 - 0691 A 0720'
+		WHEN QT_DIAS_ATRASO <= 900  THEN '29 - 0721 A 0900'
+		WHEN QT_DIAS_ATRASO <= 1180 THEN '30 - 0901 A 1180'
+		WHEN QT_DIAS_ATRASO <= 1260 THEN '31 - 1181 A 1260'
+		WHEN QT_DIAS_ATRASO <= 1440 THEN '32 - 1261 A 1440'
+		WHEN QT_DIAS_ATRASO <= 1620 THEN '33 - 1441 A 1620'
+		WHEN QT_DIAS_ATRASO <= 1800 THEN '34 - 1621 A 1800'
+		WHEN QT_DIAS_ATRASO <= 1980 THEN '35 - 1801 A 1980'
+		WHEN QT_DIAS_ATRASO <= 2160 THEN '36 - 1981 A 2160'
+		WHEN QT_DIAS_ATRASO <= 2340 THEN '36 - 2161 A 2340'
+		WHEN QT_DIAS_ATRASO <= 2520 THEN '37 - 2341 A 2520'
+		WHEN QT_DIAS_ATRASO <= 2700 THEN '38 - 2521 A 2700'
+		WHEN QT_DIAS_ATRASO <= 2880 THEN '39 - 2701 A 2880'
+		WHEN QT_DIAS_ATRASO <= 3600 THEN '40 - 2881 A 3600'
+		WHEN QT_DIAS_ATRASO  > 3600 THEN '41 - ACIMA 3600'
+	ELSE 'EM DIA' END AS FX_ATRASO
+
+	,SUM(vr_saldo_carteira_ajustado) as CARTEIRA
+	,SUM(vr_provisao_total) AS PERDA_ESPERADA
+	,COUNT(cd_contrato) AS QNT
+
+FROM PROVISAO_VAREJO_V2
+GROUP BY 1,2,3,4,5;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: RPDD */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: BU */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BU */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-anEPUJjE6rSBieZV/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+CONNECT TO BIGQUERY AS PERM (project='bv-sadi-dtm' credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage MAX_CHAR_LEN=50);
+create table BU AS SELECT a.*
+FROM CONNECTION TO PERM(
+SELECT
+CAST(cd_contrato_final AS INT64) as nucontrato,
+upper(ds_produto_agrupado) as produto,
+ds_canal as Estabelecimento ,
+dm_contrato as DtContrato ,
+cast(FORMAT_DATE('%Y%m', DATE(TIMESTAMP(dm_contrato))) as int64) AS safra_Concessao,
+cd_loja as CdLoja ,
+cd_regiao as CdRegiao,
+Cd_Filial as cdfilial,
+Qt_Parcelas as qtparcelas,
+Pc_entrada as PcEntrada ,
+pc_comproment_renda as PcCompromentRenda,
+ds_aa_modelo as Ano_Modelo,
+st_zero_km as FlZeroKm,
+cd_uf_loja as UF_Cliente,
+vr_financiamento as VrFinanciamento,
+cd_cpf_cnpj as nucpfcnpj,
+ds_tipo_profissional as dstipoprofissional,
+ds_tipo_cliente as Tipo_Cliente,
+qt_idade_bem_ajustada as idade_veiculo,
+tp_pessoa as tppessoa
+
+FROM `bv-pdbd-prd.dvry_corp_credito.concessao_credito_diario_aggr` AS a
+
+where (a.ds_produto_agrupado  in ('Leves', 'Motos', 'Pesados') or (a.ds_produto_agrupado like 'CVG%'))
+and a.st_proposta = 'AP'
+AND a.cd_contrato_final <> 'NA') as a
+;
+QUIT;
+
+PROC SORT DATA=BU NODUPKEY; BY NUCONTRATO ;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: BU */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE RPDD_EXPORT AS
+SELECT
+	 dt_referencia
+	,PRODUTO
+	,cd_estagio_final
+	,fl_ativo_problematico
+
+	,CASE
+		WHEN QT_DIAS_ATRASO <= 0    THEN '01 - EM DIA'
+		WHEN QT_DIAS_ATRASO <= 30   THEN '03 - 0001 A 0030'
+		WHEN QT_DIAS_ATRASO <= 60   THEN '04 - 0031 A 0060'
+		WHEN QT_DIAS_ATRASO <= 90   THEN '05 - 0061 A 0090'
+		WHEN QT_DIAS_ATRASO <= 120  THEN '06 - 0091 A 0120'
+		WHEN QT_DIAS_ATRASO <= 150  THEN '07 - 0121 A 0150'
+		WHEN QT_DIAS_ATRASO <= 180  THEN '08 - 0151 A 0180'
+		WHEN QT_DIAS_ATRASO <= 210  THEN '09 - 0181 A 0210'
+		WHEN QT_DIAS_ATRASO <= 240  THEN '10 - 0211 A 0240'
+		WHEN QT_DIAS_ATRASO <= 270  THEN '11 - 0241 A 0270'
+		WHEN QT_DIAS_ATRASO <= 300  THEN '12 - 0271 A 0300'
+		WHEN QT_DIAS_ATRASO <= 330  THEN '13 - 0301 A 0330'
+		WHEN QT_DIAS_ATRASO <= 360  THEN '14 - 0331 A 0360'
+		WHEN QT_DIAS_ATRASO <= 390  THEN '15 - 0361 A 0390'
+		WHEN QT_DIAS_ATRASO <= 420  THEN '16 - 0391 A 0420'
+		WHEN QT_DIAS_ATRASO <= 450  THEN '17 - 0421 A 0450'
+		WHEN QT_DIAS_ATRASO <= 480  THEN '18 - 0451 A 0480'
+		WHEN QT_DIAS_ATRASO <= 510  THEN '19 - 0481 A 0510'
+		WHEN QT_DIAS_ATRASO <= 540  THEN '20 - 0511 A 0540'
+		WHEN QT_DIAS_ATRASO <= 570  THEN '21 - 0541 A 0570'
+		WHEN QT_DIAS_ATRASO <= 600  THEN '22 - 0571 A 0600'
+		WHEN QT_DIAS_ATRASO <= 630  THEN '23 - 0601 A 0630'
+		WHEN QT_DIAS_ATRASO <= 660  THEN '24 - 0631 A 0660'
+		WHEN QT_DIAS_ATRASO <= 690  THEN '25 - 0661 A 0690'
+		WHEN QT_DIAS_ATRASO <= 720  THEN '26 - 0691 A 0720'
+		WHEN QT_DIAS_ATRASO <= 900  THEN '29 - 0721 A 0900'
+		WHEN QT_DIAS_ATRASO <= 1180 THEN '30 - 0901 A 1180'
+		WHEN QT_DIAS_ATRASO <= 1260 THEN '31 - 1181 A 1260'
+		WHEN QT_DIAS_ATRASO <= 1440 THEN '32 - 1261 A 1440'
+		WHEN QT_DIAS_ATRASO <= 1620 THEN '33 - 1441 A 1620'
+		WHEN QT_DIAS_ATRASO <= 1800 THEN '34 - 1621 A 1800'
+		WHEN QT_DIAS_ATRASO <= 1980 THEN '35 - 1801 A 1980'
+		WHEN QT_DIAS_ATRASO <= 2160 THEN '36 - 1981 A 2160'
+		WHEN QT_DIAS_ATRASO <= 2340 THEN '36 - 2161 A 2340'
+		WHEN QT_DIAS_ATRASO <= 2520 THEN '37 - 2341 A 2520'
+		WHEN QT_DIAS_ATRASO <= 2700 THEN '38 - 2521 A 2700'
+		WHEN QT_DIAS_ATRASO <= 2880 THEN '39 - 2701 A 2880'
+		WHEN QT_DIAS_ATRASO <= 3600 THEN '40 - 2881 A 3600'
+		WHEN QT_DIAS_ATRASO  > 3600 THEN '41 - ACIMA 3600'
+	ELSE 'EM DIA' END AS FX_ATRASO
+
+	,SUM(vr_saldo_carteira_ajustado) as CARTEIRA
+	,SUM(vr_provisao_total) AS PERDA_ESPERADA
+	,COUNT(cd_contrato) AS QNT
+
+FROM PROVISAO_VAREJO_V2
+GROUP BY 1,2,3,4,5;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_PROVISAO_VAREJO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PROVISAO_VAREJO AS
+   SELECT t1.dt_referencia,
+          
+            (COUNT(t1.cd_contrato)) AS COUNT_of_cd_contrato
+      FROM WORK.PROVISAO_VAREJO t1
+      GROUP BY t1.dt_referencia;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

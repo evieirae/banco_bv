@@ -1,0 +1,362 @@
+START_METADATA
+PROJECT: SAS_UC4__ext_contratos
+FILE_SAS: ext_contratos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:49 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -26
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (3x | +60), PROC DATASETS (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 281
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: W_ini, iqA0
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], RISCOS.MIS_BASEPROPOSTASCOMPLETA [SAS/Local], STGORA_APRO_SIMU.TBSIMULACAOPRAZOFNNCO [DBCON], STGORA_APRO_SIMU.TBSIMULACAOPRZOFNNCOPRPSA [DBCON], TMP.EXTRACAO_PTAIQCONT_CDCCG [SAS/Local], TMP.EXTRACAO_PTAIQCONT_CDCSG [SAS/Local], TMP.EXTRACAO_PTAIQCONT_CP [SAS/Local], TMP.EXTRACAO_PTAIQCONT_CPC_H [SAS/Local], TMP.EXTRACAO_PTAIQCONT_EGI [SAS/Local], TMP.EXTRACAO_PTAIQCONT_FLEX [SAS/Local], TMP.EXTRACAO_PTAIQCONT_LSG [SAS/Local], TMP.TBDEPARAEXTCONTRATO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBEXTCONTRATO [DATA Step - UPDATE; PROC SORT - DATA=; PROC SQL - FROM], RISCOS.MIS_BASEPROPOSTASCOMPLETA [PROC SQL - FROM], STGORA_APRO_SIMU.TBSIMULACAOPRAZOFNNCO [Pass-Through Native (DBCON) - FROM], STGORA_APRO_SIMU.TBSIMULACAOPRZOFNNCOPRPSA [Pass-Through Native (DBCON) - JOIN], TMP.EXTRACAO_PTAIQCONT_CDCCG [DATA Step - SET], TMP.EXTRACAO_PTAIQCONT_CDCSG [DATA Step - SET], TMP.EXTRACAO_PTAIQCONT_CP [DATA Step - SET], TMP.EXTRACAO_PTAIQCONT_CPC_H [DATA Step - SET], TMP.EXTRACAO_PTAIQCONT_EGI [DATA Step - SET], TMP.EXTRACAO_PTAIQCONT_FLEX [DATA Step - SET], TMP.EXTRACAO_PTAIQCONT_LSG [DATA Step - SET], TMP.TBDEPARAEXTCONTRATO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): BASES.TBEXTCONTRATO
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBEXTCONTRATO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEPROPOSTASCOMPLETA, EXTRACAO_PTAIQCONT, TBEXTCONTRATOAJUSTES, TBSIMURATING, TBSIMURATING_1
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_contratos.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	ext_contratos.sas													| */
+/* |	Descricao: 	Programa que consolida as informacoes de contratos.					| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableua utilizados pela		| */
+/* |				area comercial.														| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de BA								| */
+/* |	Criador: 	Carlos Makoto - BA													| */
+/* |	Data:		01/04/2020															| */
+/* ====================================================================================== */
+/* |	Atualizacao:	08/04/2020														| */
+/* |	Responsavel: 	Paulo Oliveira - Squad MIS Comercial							| */
+/* |	Alt. Realizada:	- Inclusao de cabecalho											| */
+/* |					- Testes iniciais												| */
+/* ====================================================================================== */
+/* |	Atualizacao:	24/04/2020														| */
+/* |	Responsavel: 	Christian Seki(tenbu.cseki) - Squad MIS Comercial				| */
+/* |	Alt. Realizada:	- Inclusao dos imports de conexao								| */
+/* |					- Alteracao no nome do programa ext_contratos.sas				| */
+/* |																					| */
+/* |					29/06/2020														| */
+/* |					- Inclusao do extracao_ptaiqcont_flex							| */
+/* ====================================================================================== */
+/* |	Atualizacao:	28/05/2021  													| */
+/* |	Responsavel: 	Caroline Silva (Campo DsTipoCanalProducao)                      | */
+/* |	Alt. Realizada:	- Inclusão da tabela bases.TbTipoCanalProducaoContrato			| */
+/* |					e da tabela TbFilial (conexão com PTA)						 	| */
+/* | 					  																| */
+/* ====================================================================================== */
+/* |	Atualizacao:	10/07/2025													| */
+/* |	Responsavel: 	FlÃ¡vio Pereira                      | */
+/* |	Alt. Realizada:	AlteraÃ§Ã£o da origem do Rating de riscos.MIS_BASEPROPOSTASCOMPLETA			| */
+/* |			para CONVSIMU.TBSIMULACOES			 	| */
+/* | 					  																| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+%include '/infogrc/utils/all-includes.sas';
+
+/*data tmp.extracao_ptaiqcont;*/
+data extracao_ptaiqcont;
+set
+	tmp.extracao_ptaiqcont_LSG
+	tmp.extracao_ptaiqcont_CDCCG
+	tmp.extracao_ptaiqcont_EGI
+	tmp.extracao_ptaiqcont_CDCSG
+	tmp.extracao_ptaiqcont_CP
+	tmp.extracao_ptaiqcont_CPC_H
+	tmp.extracao_ptaiqcont_flex
+;run;
+
+proc sort data=extracao_ptaiqcont; by NuContrato SqContratoFinanceiro;run;
+proc sort data=bases.TbExtContrato; by NuContrato SqContratoFinanceiro;run;
+
+/*	Consolidar informacoes de contratos	*/
+data bases.TbExtContrato;
+	update
+		bases.TbExtContrato
+		extracao_ptaiqcont
+	;by NuContrato SqContratoFinanceiro;
+run;
+
+/* ========================================================= */
+/* ================== NuScoreFim x Rating ================== */
+/* ========================================================= */
+
+options nofmterr;
+
+PROC SQL;
+CREATE TABLE BasePropostasCompleta AS
+SELECT
+	BasePropostasCompleta.Safra
+	,INPUT(BasePropostasCompleta.NumProposta,NUM12.) AS NumProposta
+	,INPUT(BasePropostasCompleta.Flag_CRISP,NUM12. ) AS Flag_CRISP
+	,INPUT(BasePropostasCompleta.scoreCRISP,NUM12.) AS scoreCRISP
+	,BasePropostasCompleta.Rating
+	,BasePropostasCompleta.Msg
+	,BasePropostasCompleta.ProbAprovacao
+
+FROM riscos.MIS_BASEPROPOSTASCOMPLETA BasePropostasCompleta
+;RUN;
+
+/*	Inclusão da filial dentro da tabela de TbColaboradorFilial 11/07/2022*/
+/**/
+/*%CRIAVARDB;*/
+/*PROC SQL;*/
+/*%CONECTADB(server=PTA);*/
+/*CREATE TABLE TbColaboradorFilial AS */
+/*SELECT * FROM connection to dbcon*/
+/*(*/
+/*	SELECT DISTINCT */
+/*		 Colaborador.CdOperador*/
+/*		,first_value(Colaborador.CdColaborador) over (partition BY Colaborador.CdOperador ORDER BY CASE WHEN (Colaborador.NmColaborador LIKE 'DUP%' OR Colaborador.DsLogin LIKE 'DUP%') THEN 1 ELSE 0 END) AS CdColaborador*/
+/*		,first_value(Colaborador.CdFilial) over (partition BY Colaborador.CdOperador ORDER BY CASE WHEN (Colaborador.NmColaborador LIKE 'DUP%' OR Colaborador.DsLogin LIKE 'DUP%') THEN 1 ELSE 0 END) AS CdFilial*/
+/*		,FilialColaborador.DsFilial*/
+/*	FROM DBA.TbColaborador Colaborador*/
+/*		LEFT JOIN DBA.TbFilial FilialColaborador*/
+/*			ON  Colaborador.CdFilial = FilialColaborador.CdFilial*/
+/*	WHERE Colaborador.CdColaborador > 0*/
+/*	AND Colaborador.CdOperador > 0*/
+/*)*/
+/*;run;*/
+
+/*	Inclusão da filial dentro da tabela AjusteContratoFilial 11/07/2022*/
+/**/
+/*PROC SQL;*/
+/*CREATE TABLE TbAjustesContratoFilial AS */
+/*SELECT */
+/*	 AjusteContratos.NuAnoMes*/
+/*	,AjusteContratos.NuContratoGestao*/
+/*	,AjusteContratos.CdColaborador*/
+/*	,AjusteContratos.Cod_Operador*/
+/*	,ColaboradorFilial.CdOperador*/
+/*	,ColaboradorFilial.CdFilial*/
+/*	,ColaboradorFilial.DsFilial*/
+/*FROM basegrc.TbAjusteContratos AjusteContratos*/
+/*	LEFT JOIN TbColaboradorFilial ColaboradorFilial*/
+/*		ON AjusteContratos.CdColaborador = ColaboradorFilial.CdColaborador*/
+/*;*/
+/*run;*/
+
+ /* ======================================================================= */
+/* ================== Gera base de rating usando a tbsimulacoes ========== */
+/* ======================================================================= */
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TBSIMURATING AS SELECT * FROM connection to dbcon (
+  SELECT Distinct
+    b.nuproposta,
+    CAST((a.PcProbabilidadeAprovacao*10) AS FLOAT) as PcProbabilidadeAprovacao
+   FROM STGORA_APRO_SIMU.TbSimulacaoPrazoFnnco a
+  LEFT JOIN STGORA_APRO_SIMU.TbSimulacaoPrzoFnncoPrpsa b
+  ON a.CdSimulacaoPrazoFnnco = b.CdSimulacaoPrazoFnnco
+  WHERE 1=1
+  AND a.DtSimulacaoPrazoFnnco >= &iqA0.
+  AND b.nuproposta IS NOT NULL
+);
+RUN;
+
+DATA TBSIMURATING_1;
+	SET TBSIMURATING;
+	FORMAT PcProbabilidadeAprovacao COMMAX12.2;RUN;
+
+ /* ======================================================================= */
+/* ================== Enriquece base de propostas com o rating ========== */
+/* ======================================================================= */
+
+proc sql;
+create table TbExtContratoAjustes as
+select
+	 ExtContrato.NuAnoMes
+	,ExtContrato.DtContrato
+	,ExtContrato.DtContratoFinanceiro
+	,ExtContrato.DtLiquidacaoEfetiva
+	,ExtContrato.DtCancelamento
+	,ExtContrato.DtProcessamento
+	,ExtContrato.NuProposta
+	,ExtContrato.DtEntradaProposta
+	,ExtContrato.NuContrato
+	,ExtContrato.SqContratoFinanceiro
+	,ExtContrato.CdMotivoContratoFinanceiro
+	,ExtContrato.CdTipoCobranca
+	,ExtContrato.NuContratoLegado
+	,COALESCE(c.CdColaborador,ExtContrato.CdColaborador) AS CdColaborador
+	,ExtContrato.CdColaboradorPromotor
+	,COALESCE(c.CdFilial,ExtContrato.CdFilial) AS CdFilial
+	,COALESCE(c.DsFilial,ExtContrato.DsFilial) AS DsFilial
+	,ExtContrato.CdParceiroComercial
+	,ExtContrato.CdParceiroComercialCoban
+	,ExtContrato.CdGrupoParceiroMeta
+	,ExtContrato.CdPessoa
+	,ExtContrato.NmPessoa
+	,ExtContrato.TpPessoa
+	,ExtContrato.NuCpfCnpj
+	,ExtContrato.FxParcela
+	,ExtContrato.PcEntradaMolicar
+	,ExtContrato.FxEntrada
+	,ExtContrato.AaFabricacao
+	,ExtContrato.AaModelo
+	,ExtContrato.CdMarca
+	,ExtContrato.CdModelo
+	,ExtContrato.DsPlaca
+	,ExtContrato.SgUfPlaca
+	,ExtContrato.FlZeroKm
+	,ExtContrato.FxIdade
+	,ExtContrato.FlTxAlterada
+	,ExtContrato.CdGrupoSubProduto
+	,ExtContrato.CdSubProduto
+	,ExtContrato.DsSubProduto
+	,ExtContrato.StProducao
+	,ExtContrato.CdSituacaoContrato
+	,ExtContrato.CdTipoMercado
+	,ExtContrato.CdTabelaFinanciamento
+	,ExtContrato.VrIof
+	,ExtContrato.VrTarifaFinanciadaTotal
+	,ExtContrato.VrPrestacao
+	,ExtContrato.VrContrato
+	,ExtContrato.VrEntrada
+	,ExtContrato.VpEntrada
+	,ExtContrato.VrProducao
+	,ExtContrato.VrComissaoParcelada
+	,ExtContrato.VrComissaoTotal
+	,ExtContrato.VrFinanciamento
+	,ExtContrato.VrTarifaCadastro
+	,ExtContrato.VrTarifaAvaliacaoBem
+	,ExtContrato.TxGerencial
+	,ExtContrato.VpTxGerencial
+	,ExtContrato.TxJuros
+	,ExtContrato.VpTxJuros
+	,case
+		when datepart(ExtContrato.DtEntradaProposta) > '09FEB2022'd then ExtContrato.NuScoreFim
+		when BasePropostasCompleta.Flag_CRISP = 1 then BasePropostasCompleta.scoreCRISP /100
+		else ExtContrato.NuScoreFim
+	 end as NuScoreFim format 18.4
+/*	,input(BasePropostasCompleta.Rating,18.) as NuRating */
+	,CASE WHEN tbsimu.PcProbabilidadeAprovacao IN(-1,0,1) THEN . ELSE tbsimu.PcProbabilidadeAprovacao END as NuRating
+	,ExtContrato.VpScore
+	,ExtContrato.QtAnosIdade
+	,ExtContrato.VpIdade
+	,ExtContrato.QtParcelas
+	,ExtContrato.VpPrazo
+	,ExtContrato.CdLoja
+	,ExtContrato.VrTxGerencialPonderado
+	,ExtContrato.VrTxJurosPonderado
+	,ExtContrato.VrScorePonderado
+	,ExtContrato.VrIdadePonderado
+	,ExtContrato.NmTipoCobranca
+	,ExtContrato.CdUfPessoa
+	,ExtContrato.NmCidadePessoa
+	,ExtContrato.VrRetencao
+	,ExtContrato.CdTipoMeioVenda
+	,ExtContrato.FlPropostaBipartida
+	,ExtContrato.FlRefinConsignado
+	,ExtContrato.FlCompraDivida
+	,ExtContrato.VrProducaoLiquida
+	,ExtContrato.VrCliente
+	,ExtContrato.VrRefin
+	,ExtContrato.VrCompra
+	,ExtContrato.VrOutroDesdobro
+	,ExtContrato.VrObjGarantia
+	,ExtContrato.FlPropostaUtilizacaoFgts
+	,ExtContrato.QtAnosIdadePessoa
+	,ExtContrato.FlContratoExcecao
+	,ExtContrato.CdDocumentoAlienacao
+	,ExtContrato.StDocumentoAlienacao
+
+from bases.TbExtContrato ExtContrato
+
+	LEFT JOIN BasePropostasCompleta BasePropostasCompleta
+		ON  ExtContrato.NuProposta = BasePropostasCompleta.NumProposta
+
+/*	LEFT JOIN TbAjustesContratoFilial AjustesContratoFilial
+		ON ExtContrato.NuContrato = AjustesContratoFilial.NuContratoGestao*/  /*Retirado em 08/10/2025 por GustavoD pois só faz join com propostas de 2022*/
+
+	/*LEFT JOIN BASES.TbHistoricoFilialProposta B
+		ON ExtContrato.NuProposta = B.NuProposta*/ /*Retirado em 08/10/2025 por GustavoD pois só faz join com propostas de 2023*/
+
+	Left join Tmp.TbDeParaExtContrato as C
+		on ExtContrato.NuProposta = C.NuProposta  /*De para criado para substituir o IF de ajuste de propostas*/
+	Left join TBSIMURATING_1 tbsimu
+		on tbsimu.nuproposta = (ExtContrato.NuProposta)
+
+order by
+	 ExtContrato.NuContrato
+	,ExtContrato.SqContratoFinanceiro
+;run;
+
+proc sort data=TbExtContratoAjustes; by NuContrato SqContratoFinanceiro;run;
+
+data Bases.TbExtContrato;
+	update
+		bases.TbExtContrato
+		TbExtContratoAjustes
+	;by NuContrato SqContratoFinanceiro;
+run;
+
+/*	Excluir bases temporarias 	*/
+proc datasets lib=tmp nolist;
+	delete
+	extracao_ptaiqcont_LSG
+	extracao_ptaiqcont_CDCCG
+	extracao_ptaiqcont_EGI
+	extracao_ptaiqcont_CDCSG
+	extracao_ptaiqcont_CP
+	extracao_ptaiqcont_CPC_H
+	extracao_ptaiqcont_flex
+/*	extracao_ptaiqcont*/
+
+;run;
+
+proc datasets lib=Work nolist;
+	delete
+	extracao_ptaiqcont
+;run;
+
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* ====================================================================================== */
+%PUT #!# FIM ext_contratos.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%PUT #!# TEMPO PROCESSAMENTO:   %SYSFUNC(intck(SECOND, &W_ini, %SYSFUNC(datetime())), tod8.);

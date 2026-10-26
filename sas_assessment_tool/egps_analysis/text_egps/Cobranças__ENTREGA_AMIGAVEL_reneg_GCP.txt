@@ -1,0 +1,879 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__ENTREGA_AMIGAVEL_reneg_GCP
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:50 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 729
+CODE_TASKS_COUNT: 15
+DETECTED_PROCS: EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (9x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ARTHUR = /riscosbv/cobranca/aesteves; CART = /projetos/ctrcredito/modelos/historico/carteira; CLEBER = /riscosbv/cobranca/csaure; COLLEC = /projetos/ctrcredito/modelos/historico/rodas; ENTREGA = /riscosbv/cobranca/caroline/Entrega_amigavel; JOAO = /riscosbv/cobranca/bsilva/; LTV_WO = /projetos/ctrcredito/modelos/historico/ltvwo; POLITICA = /riscosbv/cobranca/caroline/LTV_POLITICA; RAFAEL2 = /riscosbv/cobranca/ranapole/Caroline
+DETECTED_MACROS_DEFINED: BASE_EA, DtProcessamento, HOJE, N, NREF
+DETECTED_MACROS_USED: BASE_EA, DtProcessamento, HOJE, N, NREF, REF
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: OBSERV
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBPARCELARECEBIMENTO [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_AGENTE [BIGQUERY/GCP], ENTREGA.BASE_ELEG_110226 [SAS/Local], ENTREGA.BASE_ELEG_110925 [SAS/Local], ENTREGA.BASE_ELEG_141025 [SAS/Local], ENTREGA.BASE_RENEG_20240516 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_INICIAL_V7
+IMPORTED_LIBNAMES: ENTREGA
+EXPORTED_LIBNAMES: ENTREGA
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_INICIAL_V7
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBPARCELARECEBIMENTO [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_SCC_FIN.SAJ_AGENTE [PROC SQL - FROM], ENTREGA.BASE_ELEG_110226 [PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], ENTREGA.BASE_ELEG_110925 [PROC SQL - FROM], ENTREGA.BASE_ELEG_141025 [PROC SQL - FROM], ENTREGA.BASE_RENEG_20240516 [PROC SQL - FROM], ENTREGA.BASE_RENEG_20260211 [DATA Step - SET; PROC SQL - FROM; Resolved dynamic lib.member&macro (%LET)], WORK.BASE_INICIAL_V7 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): ENTREGA.BASE_RENEG_20260211
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ENTREGA.BASE_RENEG_20260211
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\BELLINATI1.xlsx, N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\CRC1.xlsx, N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\LM_ANGELIS1.xlsx, N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\MANDALITI1.xlsx, N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\PASCHOALOTTO1.xlsx, N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\SCHULZE1.xlsx, N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\TOLEDO1.xlsx
+TEMP/DISCARDED OUTPUTS: BASE_INICIAL, BASE_INICIAL_V2, BASE_INICIAL_V3, BASE_INICIAL_V4, BASE_INICIAL_V5, BASE_INICIAL_V6, BASE_INICIAL_V7, BASE_RENEG, WORK.BASE_RENEG_20260211, WORK.QUERY_FOR_BASE_ELEG_11, WORK.QUERY_FOR_BASE_ELEG_14, WORK.QUERY_FOR_BASE_INICIAL_V7, WORK.QUERY_FOR_BASE_INICIAL_V7_0000, WORK.QUERY_FOR_BASE_RENEG_2024
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET NREF=&NREF.;
+%LET N=%SYSFUNC(SUM(&N., 1));
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Seleção */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 49 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Seleção */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-SGnpyGiw2bhR7tjr/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname cart '/projetos/ctrcredito/modelos/historico/carteira';
+	libname RAFAEL2 '/riscosbv/cobranca/ranapole/Caroline';
+	libname cleber 		'/riscosbv/cobranca/csaure';
+	libname politica	'/riscosbv/cobranca/caroline/LTV_POLITICA';
+	libname collec      '/projetos/ctrcredito/modelos/historico/rodas';
+	libname entrega '/riscosbv/cobranca/caroline/Entrega_amigavel';
+
+	LIBNAME JOAO '/riscosbv/cobranca/bsilva/';
+	libname arthur '/riscosbv/cobranca/aesteves';
+	LIBNAME LTV_WO         '/projetos/ctrcredito/modelos/historico/ltvwo';
+
+	%LET DtProcessamento = '2026-02-10';
+	%lET HOJE = 20260211;
+	%LET BASE_EA = 110226;
+
+	
+	PROC SQL;
+connect to bigquery as perm
+(project='bv-sadi-dtm'
+ credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+ schema='bv-pdbd-prd'
+ read_mode=storage
+ allow_large_results=must
+ max_char_len=100);
+
+	CREATE TABLE Base_inicial AS SELECT e.*
+
+	from CONNECTION TO perm (
+WITH QUERY_1 AS (
+
+SELECT
+    b.*,
+    a.nucontratogestao,
+    a.dt_asses,
+    a.cod_asses
+FROM
+    bv-pdbd-prd.trusted_scc_fin.saj_processo AS a
+JOIN
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS b
+ON
+    a.nucontratogestao = b.nucontrato
+    AND a.sqcontratofinanceiro = b.sqcontratofinanceiro
+WHERE
+    a.cod_acao IN (1, 3, 39, 59, 60)
+    AND (DATE(a.dt_asses) <= &DtProcessamento.
+    AND (a.dt_ret_asses IS NULL
+    OR DATE(a.dt_ret_asses) > &DtProcessamento.))
+    AND DATE(b.dtprocessamento) = &DtProcessamento.
+
+)
+SELECT * FROM QUERY_1) as e;
+	QUIT;
+	
+
+	data Base_inicial_v2;
+	set Base_inicial ;
+	if nudiasatraso > 30;
+	format fx_atraso $30.;
+	if NuDiasAtraso < 0 then fx_atraso = "a. negativo";
+	else if NuDiasAtraso = 0 then fx_atraso = "b. Em dia";
+	else if NuDiasAtraso <= 70 then fx_atraso = "c. 0 a 70 dias";
+	else if NuDiasAtraso <= 90 then fx_atraso = "d. 71 a 90 dias";
+	else if NuDiasAtraso <= 120 then fx_atraso = "e. 91 a 120 dias";
+	else if NuDiasAtraso <= 150 then fx_atraso = "f. 121 a 150 dias";
+	else if NuDiasAtraso <= 180 then fx_atraso = "g. 151 a 180 dias";
+	else if NuDiasAtraso <= 360 then fx_atraso = "h. 181 a 360 dias";
+	else if NuDiasAtraso <= 420 then fx_atraso = "i. 361 a 420 dias";
+	else if NuDiasAtraso <= 540 then fx_atraso = "j. 421 a 540 dias";
+	else if NuDiasAtraso > 540 then fx_atraso = "k. > 541 dias";
+	run;
+
+	proc sort data=Base_inicial_v2; by NuContrato SqContratoFinanceiro descending NuDiasAtraso;
+	proc sort data=Base_inicial_v2 nodupkey; by NuContrato SqContratoFinanceiro;
+
+	
+
+	proc sql;
+connect to bigquery as perm
+(project='bv-sadi-dtm'
+ credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+ schema='bv-pdbd-prd'
+ read_mode=storage
+ allow_large_results=must
+ max_char_len=100);
+create table BASE_RENEG as
+	select  *,
+		YEAR(dtcontratoContabil)*100 + MONTH(dtcontratoContabil) AS SAFRA_CTCONTABIL
+
+	from connection to perm (
+
+	WITH QUERY_1 AS (
+
+SELECT
+    t.nucontrato,
+    t.sqcontratofinanceiro,
+    t.cdproduto,
+    t.cdmotivocontratofinanceiro,
+    DATE(t.dtcontratocontabil) AS dtcontratoContabil,
+    t.sqcontratofinanceiro - 1 AS SqContrato_m1,
+    count(*) AS n
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS t
+WHERE
+    t.dtprocessamento <= &DtProcessamento.
+    AND t.cdmotivocontratofinanceiro = 4
+    AND t.dtprocessamentocancelamento IS NULL
+    AND t.dtprocessamentoliquidacao IS NULL
+GROUP BY
+    t.nucontrato,
+    t.sqcontratofinanceiro,
+    t.cdproduto,
+    t.cdmotivocontratofinanceiro,
+    dtcontratoContabil,
+    SqContrato_m1
+
+)
+SELECT * FROM QUERY_1);
+quit;
+
+PROC SQL;
+CREATE TABLE Base_inicial_v3 AS SELECT
+A.*,
+CASE WHEN B.NUCONTRATO NE '' THEN 1 ELSE 0 END AS FLAG_RENEG,
+CASE WHEN C.NUCONTRATOGESTAO NE . THEN 1 ELSE 0 END AS FLAG_EAQUITACAO
+FROM Base_inicial_v2 AS A
+LEFT JOIN (SELECT DISTINCT NUCONTRATO FROM BASE_RENEG ) AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+LEFT JOIN (SELECT DISTINCT NUCONTRATOGESTAO FROM ENTREGA.BASE_ELEG_&BASE_EA.) AS C
+ON A.NUCONTRATO = put(C.NUCONTRATOGESTAO, 14.)
+WHERE A.CdProduto IN (12,14);
+QUIT;
+
+DATA Base_inicial_v4;
+SET Base_inicial_v3;
+WHERE FLAG_RENEG = 1 AND FLAG_EAQUITACAO = 0 AND NUDIASATRASO > 70;
+RUN;
+
+proc sql;
+connect to bigquery as perm
+(project='bv-sadi-dtm'
+ credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+ schema='bv-pdbd-prd'
+ read_mode=storage
+ allow_large_results=must
+ max_char_len=100);
+
+create table Base_inicial_v5 as
+	select  A.*,
+		B.QTDE_PARCELAS_PAGAS AS PARCELAS_PAGA_RENEG,
+		C.QTDE_PARCELAS_PAGAS AS PARCELAS_PAGA_CONTRATO
+
+	from Base_inicial_v4 AS A
+
+	LEFT JOIN connection to perm (
+WITH QUERY_1 AS (
+SELECT
+    Z.nucontrato,
+    Z.sqcontratofinanceiro,
+    MAX(Z.nudiasatraso) AS Dias_atraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS Z
+WHERE
+    Z.dtprocessamento = PARSE_TIMESTAMP('%Y%m%d', '20251109')
+    AND Z.nudiasatraso > 60
+GROUP BY
+    Z.nucontrato,
+    Z.sqcontratofinanceiro
+),
+QUERY_2 AS (
+
+SELECT A.*,
+B.QTDE_PARCELAS_PAGAS
+FROM QUERY_1 AS A
+LEFT JOIN
+(SELECT vw.cd_contrato,
+vw.sq_contrato_financeiro,
+COUNT(vw.cd_contrato) AS QTDE_PARCELAS_PAGAS
+FROM bv-pdbd-prd.dvry_core.tbparcelarecebimento AS vw
+GROUP BY vw.cd_contrato,
+vw.sq_contrato_financeiro) AS B ON A.NUCONTRATO = B.cd_contrato
+AND A.SqContratoFinanceiro = B.sq_contrato_financeiro
+
+)
+SELECT * FROM QUERY_2
+		) AS B
+	ON A.NUCONTRATO = B.NUCONTRATO AND
+	A.SqContratoFinanceiro = B.SqContratoFinanceiro
+	LEFT JOIN connection to perm (
+			WITH QUERY_1 AS (
+
+SELECT
+    Z.nucontrato,
+    MAX(Z.nudiasatraso) AS Dias_atraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS Z
+WHERE
+    CAST(Z.dtprocessamento AS DATE) = PARSE_DATE('%Y%m%d', '20251109')
+    AND Z.nudiasatraso > 60
+GROUP BY
+    Z.nucontrato
+
+),
+QUERY_2 AS (
+
+SELECT
+    A.*,
+    B.QTDE_PARCELAS_PAGAS
+FROM
+    QUERY_1 AS A
+LEFT JOIN
+    (
+        SELECT
+            vw.cd_contrato,
+            COUNT(vw.cd_contrato) AS QTDE_PARCELAS_PAGAS
+        FROM
+            bv-pdbd-prd.dvry_core.tbparcelarecebimento AS vw
+        GROUP BY
+            vw.cd_contrato
+    ) AS B
+ON
+    A.nucontrato = B.cd_contrato
+
+)
+SELECT * FROM QUERY_2) AS C
+	ON A.NUCONTRATO = C.NUCONTRATO;
+quit;
+
+DATA Base_inicial_v6;
+SET Base_inicial_v5;
+	aleat = rand("Integer", 1, 10);
+	if aleat > 8 then pilto = 'CONTROLE';
+	ELSE pilto = 'TESTE';
+WHERE PARCELAS_PAGA_RENEG < 4 AND PARCELAS_PAGA_CONTRATO > 3;
+RUN;
+
+PROC SQL;
+connect to bigquery as perm
+(project='bv-sadi-dtm'
+ credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+ schema='bv-pdbd-prd'
+ read_mode=storage
+ allow_large_results=must
+ max_char_len=100);
+CREATE TABLE Base_inicial_v7 AS
+SELECT
+	A.*,
+	B.RAZAO_NOME,
+	CASE
+	WHEN B.RAZAO_NOME LIKE '%NA - HOEPERS%'    	  THEN 'NA-HOEPERS'
+	WHEN B.RAZAO_NOME LIKE '%NA - RN_ADV%' 		  THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PASCHOALOTTO%' 	  THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PORTINHO%' 		  THEN 'NA-PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%NA - REALE%' 		  THEN 'NA-REALE'
+	WHEN B.RAZAO_NOME LIKE '%NA - MBM%' 			  THEN 'NA-MBM'
+	WHEN B.RAZAO_NOME LIKE '%NA - ANASTASSOPOULOS%' THEN 'NA-A.COSTA'
+	WHEN B.RAZAO_NOME LIKE '%MELHADO%'       THEN 'MELHADO'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI_2%'       THEN 'BELLINATI_2'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI%'       	THEN 'BELLINATI'
+	WHEN B.RAZAO_NOME LIKE '%CARVALHO%'       THEN 'CARVALHO'
+	WHEN B.RAZAO_NOME LIKE '%PASQUALI%'       THEN 'PASQUALI'
+	WHEN B.RAZAO_NOME LIKE '%REALE%'        THEN 'REALE'
+	WHEN B.RAZAO_NOME LIKE '%SCHULZE%'       THEN 'SCHULZE'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO_2%'        THEN 'TOLEDO_2'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO%'        THEN 'TOLEDO'
+	WHEN B.RAZAO_NOME LIKE '%MARCONDES%'       THEN 'MARCONDES'
+	WHEN B.RAZAO_NOME LIKE '%FIGUEIREDO%'       THEN 'FIGUEIREDO'
+	WHEN B.RAZAO_NOME LIKE '%RN_ADV%'      THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%PASCHOALOTTO%'      THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%CONT_RN%'      THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%LM_ANGELIS%'      THEN 'LM_ANGELIS'
+	WHEN B.RAZAO_NOME LIKE '%PORTINHO%'          THEN 'PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%GASPARIM%'          THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%CARDOSO%'          THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%AYRES%'          THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%REDE BRASIL%'          THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%ANTONIO BRAZ%'          THEN 'ANTONIO BRAZ'
+	WHEN B.RAZAO_NOME LIKE '%CONT_CRC%'          THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%CONT_MENDES E CUNHA%'          THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%MANDALITI%'          THEN 'MANDALITI'
+ELSE 'OUTRAS' END AS ASSESSORIA
+FROM Base_inicial_v6 A LEFT JOIN CONNECTION TO perm (
+WITH QUERY_1 AS (
+
+SELECT DISTINCT t1.cod_agente,
+       t1.razao_nome
+  FROM bv-pdbd-prd.trusted_scc_fin.saj_agente AS t1
+
+)
+SELECT * FROM QUERY_1) B
+ON
+	A.cod_asses = B.COD_AGENTE;
+QUIT;
+RUN;
+
+DATA WORK.BASE_RENEG_&HOJE.;
+SET Base_inicial_v7;
+RUN;
+
+DATA ENTREGA.BASE_RENEG_&HOJE.;
+SET BASE_RENEG_&HOJE.;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Seleção */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Layout assessorias */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 49 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Layout assessorias */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-nlNBSmUAkPEUBuct/code.sas */
+/* =========================INÍCIO TASK========================= */
+%MACRO EXPORTAR_ARQUIVOS_ASSESSORIAS (OBSERV=MAX);
+PROC SQL NOPRINT;
+SELECT FREQ(DISTINCT(assessoria)) INTO :NREF
+FROM ENTREGA.BASE_RENEG_&HOJE.;
+%LET NREF = &NREF.;
+SELECT DISTINCT(assessoria) INTO :REF1-:REF&NREF
+FROM ENTREGA.BASE_RENEG_&HOJE.
+WHERE pilto = 'TESTE';
+QUIT;
+
+%PUT _USER_;
+
+DATA
+
+%LET N = 1;
+%DO %WHILE (&N. LE &NREF.);
+	&&REF&N.
+	%LET N = %SYSFUNC(SUM(&N., 1));
+%END;
+;
+
+SET ENTREGA.BASE_RENEG_&HOJE.;
+WHERE pilto = 'TESTE';
+
+%LET N = 1;
+%DO %WHILE (&N. LE (&NREF. - 1));
+	IF assessoria EQ COMPRESS("&&REF&N.") THEN			OUTPUT &&REF&N.; ELSE
+	%LET N = %SYSFUNC(SUM(&N., 1));
+%END;
+	IF assessoria EQ COMPRESS("&&REF&NREF.") THEN			OUTPUT &&REF&N.;
+
+RUN;
+
+%MEND EXPORTAR_ARQUIVOS_ASSESSORIAS;
+%EXPORTAR_ARQUIVOS_ASSESSORIAS (OBSERV=MAX);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Layout assessorias */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE Base_inicial_v3 AS SELECT
+A.*,
+CASE WHEN B.NUCONTRATO NE '' THEN 1 ELSE 0 END AS FLAG_RENEG,
+CASE WHEN C.NUCONTRATOGESTAO NE . THEN 1 ELSE 0 END AS FLAG_EAQUITACAO
+FROM Base_inicial_v2 AS A
+LEFT JOIN (SELECT DISTINCT NUCONTRATO FROM BASE_RENEG ) AS B
+ON A.NUCONTRATO = B.NUCONTRATO
+LEFT JOIN (SELECT DISTINCT NUCONTRATOGESTAO FROM ENTREGA.BASE_ELEG_&BASE_EA.) AS C
+ON A.NUCONTRATO = put(C.NUCONTRATOGESTAO, 14.)
+WHERE A.CdProduto IN (12,14);
+QUIT;
+
+DATA Base_inicial_v4;
+SET Base_inicial_v3;
+WHERE FLAG_RENEG = 1 AND FLAG_EAQUITACAO = 0 AND NUDIASATRASO > 70;
+RUN;
+
+proc sql;
+connect to bigquery as perm
+(project='bv-sadi-dtm'
+ credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+ schema='bv-pdbd-prd'
+ read_mode=storage
+ allow_large_results=must
+ max_char_len=100);
+
+create table Base_inicial_v5 as
+	select  A.*,
+		B.QTDE_PARCELAS_PAGAS AS PARCELAS_PAGA_RENEG,
+		C.QTDE_PARCELAS_PAGAS AS PARCELAS_PAGA_CONTRATO
+
+	from Base_inicial_v4 AS A
+
+	LEFT JOIN connection to perm (
+WITH QUERY_1 AS (
+SELECT
+    Z.nucontrato,
+    Z.sqcontratofinanceiro,
+    MAX(Z.nudiasatraso) AS Dias_atraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS Z
+WHERE
+    Z.dtprocessamento = PARSE_TIMESTAMP('%Y%m%d', '20251109')
+    AND Z.nudiasatraso > 60
+GROUP BY
+    Z.nucontrato,
+    Z.sqcontratofinanceiro
+),
+QUERY_2 AS (
+
+SELECT A.*,
+B.QTDE_PARCELAS_PAGAS
+FROM QUERY_1 AS A
+LEFT JOIN
+(SELECT vw.cd_contrato,
+vw.sq_contrato_financeiro,
+COUNT(vw.cd_contrato) AS QTDE_PARCELAS_PAGAS
+FROM bv-pdbd-prd.dvry_core.tbparcelarecebimento AS vw
+GROUP BY vw.cd_contrato,
+vw.sq_contrato_financeiro) AS B ON A.NUCONTRATO = B.cd_contrato
+AND A.SqContratoFinanceiro = B.sq_contrato_financeiro
+
+)
+SELECT * FROM QUERY_2
+		) AS B
+	ON A.NUCONTRATO = B.NUCONTRATO AND
+	A.SqContratoFinanceiro = B.SqContratoFinanceiro
+	LEFT JOIN connection to perm (
+			WITH QUERY_1 AS (
+
+SELECT
+    Z.nucontrato,
+    MAX(Z.nudiasatraso) AS Dias_atraso
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS Z
+WHERE
+    CAST(Z.dtprocessamento AS DATE) = PARSE_DATE('%Y%m%d', '20251109')
+    AND Z.nudiasatraso > 60
+GROUP BY
+    Z.nucontrato
+
+),
+QUERY_2 AS (
+
+SELECT
+    A.*,
+    B.QTDE_PARCELAS_PAGAS
+FROM
+    QUERY_1 AS A
+LEFT JOIN
+    (
+        SELECT
+            vw.cd_contrato,
+            COUNT(vw.cd_contrato) AS QTDE_PARCELAS_PAGAS
+        FROM
+            bv-pdbd-prd.dvry_core.tbparcelarecebimento AS vw
+        GROUP BY
+            vw.cd_contrato
+    ) AS B
+ON
+    A.nucontrato = B.cd_contrato
+
+)
+SELECT * FROM QUERY_2) AS C
+	ON A.NUCONTRATO = C.NUCONTRATO;
+quit;
+
+DATA Base_inicial_v6;
+SET Base_inicial_v5;
+	aleat = rand("Integer", 1, 10);
+	if aleat > 8 then pilto = 'CONTROLE';
+	ELSE pilto = 'TESTE';
+WHERE PARCELAS_PAGA_RENEG < 4 AND PARCELAS_PAGA_CONTRATO > 3;
+RUN;
+
+PROC SQL;
+connect to bigquery as perm
+(project='bv-sadi-dtm'
+ credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+ schema='bv-pdbd-prd'
+ read_mode=storage
+ allow_large_results=must
+ max_char_len=100);
+CREATE TABLE Base_inicial_v7 AS
+SELECT
+	A.*,
+	B.RAZAO_NOME,
+	CASE
+	WHEN B.RAZAO_NOME LIKE '%NA - HOEPERS%'    	  THEN 'NA-HOEPERS'
+	WHEN B.RAZAO_NOME LIKE '%NA - RN_ADV%' 		  THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PASCHOALOTTO%' 	  THEN 'NA-PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%NA - PORTINHO%' 		  THEN 'NA-PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%NA - REALE%' 		  THEN 'NA-REALE'
+	WHEN B.RAZAO_NOME LIKE '%NA - MBM%' 			  THEN 'NA-MBM'
+	WHEN B.RAZAO_NOME LIKE '%NA - ANASTASSOPOULOS%' THEN 'NA-A.COSTA'
+	WHEN B.RAZAO_NOME LIKE '%MELHADO%'       THEN 'MELHADO'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI_2%'       THEN 'BELLINATI_2'
+	WHEN B.RAZAO_NOME LIKE '%BELLINATI%'       	THEN 'BELLINATI'
+	WHEN B.RAZAO_NOME LIKE '%CARVALHO%'       THEN 'CARVALHO'
+	WHEN B.RAZAO_NOME LIKE '%PASQUALI%'       THEN 'PASQUALI'
+	WHEN B.RAZAO_NOME LIKE '%REALE%'        THEN 'REALE'
+	WHEN B.RAZAO_NOME LIKE '%SCHULZE%'       THEN 'SCHULZE'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO_2%'        THEN 'TOLEDO_2'
+	WHEN B.RAZAO_NOME LIKE '%TOLEDO%'        THEN 'TOLEDO'
+	WHEN B.RAZAO_NOME LIKE '%MARCONDES%'       THEN 'MARCONDES'
+	WHEN B.RAZAO_NOME LIKE '%FIGUEIREDO%'       THEN 'FIGUEIREDO'
+	WHEN B.RAZAO_NOME LIKE '%RN_ADV%'      THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%PASCHOALOTTO%'      THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%CONT_RN%'      THEN 'PASCHOALOTTO'
+	WHEN B.RAZAO_NOME LIKE '%LM_ANGELIS%'      THEN 'LM_ANGELIS'
+	WHEN B.RAZAO_NOME LIKE '%PORTINHO%'          THEN 'PORTINHO'
+	WHEN B.RAZAO_NOME LIKE '%GASPARIM%'          THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%CARDOSO%'          THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%AYRES%'          THEN 'GASPARIM'
+	WHEN B.RAZAO_NOME LIKE '%REDE BRASIL%'          THEN 'CARDOSO'
+	WHEN B.RAZAO_NOME LIKE '%ANTONIO BRAZ%'          THEN 'ANTONIO BRAZ'
+	WHEN B.RAZAO_NOME LIKE '%CONT_CRC%'          THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%CONT_MENDES E CUNHA%'          THEN 'CRC'
+	WHEN B.RAZAO_NOME LIKE '%MANDALITI%'          THEN 'MANDALITI'
+ELSE 'OUTRAS' END AS ASSESSORIA
+FROM Base_inicial_v6 A LEFT JOIN CONNECTION TO perm (
+WITH QUERY_1 AS (
+
+SELECT DISTINCT t1.cod_agente,
+       t1.razao_nome
+  FROM bv-pdbd-prd.trusted_scc_fin.saj_agente AS t1
+
+)
+SELECT * FROM QUERY_1) B
+ON
+	A.cod_asses = B.COD_AGENTE;
+QUIT;
+RUN;
+
+DATA WORK.BASE_RENEG_&HOJE.;
+SET Base_inicial_v7;
+RUN;
+
+DATA ENTREGA.BASE_RENEG_&HOJE.;
+SET BASE_RENEG_&HOJE.;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_RENEG_2024);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_RENEG_2024 AS
+   SELECT t1.ASSESSORIA,
+          t1.pilto,
+          
+            (COUNT(t1.DtProcessamento)) AS COUNT_of_DtProcessamento
+      FROM ENTREGA.BASE_RENEG_20240516 t1
+      GROUP BY t1.ASSESSORIA,
+               t1.pilto;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_INICIAL_V7_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_INICIAL_V7_0000 AS
+   SELECT t1.RAZAO_NOME,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.BASE_INICIAL_V7 t1
+      GROUP BY t1.RAZAO_NOME;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_INICIAL_V7);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_INICIAL_V7 AS
+   SELECT t1.ASSESSORIA,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.BASE_INICIAL_V7 t1
+      GROUP BY t1.ASSESSORIA;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ELEG_14);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ELEG_14 AS
+   SELECT t1.fx_atraso,
+          
+            (COUNT(t1.nucontratogestao)) AS COUNT_of_nucontratogestao
+      FROM ENTREGA.BASE_ELEG_141025 t1
+      GROUP BY t1.fx_atraso;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_BASE_ELEG_11);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_BASE_ELEG_11 AS
+   SELECT t1.fx_atraso,
+          
+            (COUNT(t1.nucontratogestao)) AS COUNT_of_nucontratogestao
+      FROM ENTREGA.BASE_ELEG_110925 t1
+      GROUP BY t1.fx_atraso;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.MANDALITI
+    OUTFILE='N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\MANDALITI1.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.BELLINATI
+    OUTFILE='N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\BELLINATI1.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.CRC
+    OUTFILE='N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\CRC1.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 012 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.LM_ANGELIS
+    OUTFILE='N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\LM_ANGELIS1.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 012 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 013 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.PASCHOALOTTO
+    OUTFILE='N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\PASCHOALOTTO1.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 013 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 014 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.SCHULZE
+    OUTFILE='N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\SCHULZE1.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 014 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 015 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TOLEDO
+    OUTFILE='N:\DVMD\Cobrança\Estrategia\Veículos\Entrega Amigável\Bases_Finais\TOLEDO1.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 015 */
+/* =========================FIM TASK=========================== */

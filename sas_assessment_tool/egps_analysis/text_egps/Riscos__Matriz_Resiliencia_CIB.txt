@@ -1,0 +1,765 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Matriz_Resiliencia_CIB
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:15 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -6
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC DATASETS (1x | +20), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 631
+CODE_TASKS_COUNT: 10
+DETECTED_PROCS: DATASETS, DELETE, EXPORT, SORT, SQL
+HAS_DATA_STEP: Yes (7x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: MISCRED = /riscosbv/credito/MISCREDITO
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: ANOMES, ANOMES_ANT, anomes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES, ANOMES_ANT
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): MISCRED.BASE_UNICA_ATACADO_201912 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202012 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202112 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202212 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202310 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202312 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202401 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202410 [SAS/Local], MISCRED.DE_PARA_MACRO_SETOR [SAS/Local], MISCRED.DE_PARA_MACRO_SETOR_2023 [SAS/Local], MISCRED.INFOS_MATRIZ_202310 [SAS/Local], MISCRED.MATRIZ_GRUPOS_202310 [SAS/Local], PDD.SEGMENTO_ORIGINAL_GRUPOS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.TB_FLUXO
+IMPORTED_LIBNAMES: MISCRED
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.TB_FLUXO
+TABLE_READ_PROVENANCE (Flow): MISCRED.BASE_UNICA_ATACADO_201912 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202012 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202112 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202212 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202310 [DATA Step - SET; Resolved dynamic lib.member&macro (%LET)], MISCRED.BASE_UNICA_ATACADO_202312 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202401 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202410 [DATA Step - SET], MISCRED.DE_PARA_MACRO_SETOR [PROC SQL - JOIN], MISCRED.DE_PARA_MACRO_SETOR_2023 [PROC SQL - JOIN], MISCRED.INFOS_MATRIZ_202310 [DATA Step - SET; Resolved dynamic lib.member&macro (%LET)], MISCRED.MATRIZ_GRUPOS_202310 [PROC SQL - JOIN; Resolved dynamic lib.member&macro (%LET)], PDD.SEGMENTO_ORIGINAL_GRUPOS [PROC SQL - JOIN], WORK.TB_FLUXO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_FLUXO.xlsx, N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_MATRIZ.xlsx, N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_OPERACAO.xlsx, N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_VARIACOES_MATRIZ.xlsx
+TEMP/DISCARDED OUTPUTS: BASE_UNICA_ATACADO_202310, CARTEIRAS, CARTEIRAS2, CARTEIRAS3, INFOS_MATRIZ_202310, TB_FLUXO, TB_FLUXO_202310, TB_MATRIZ, TB_MATRIZ_202310, TB_OPERACAO, TB_OPERACAO_202310, TB_VARIACOES_MATRIZ, TB_VARIACOES_MATRIZ_202310, VARIACOES, VARIACOES_2, VARIACOES_2_FINAL, VARIACOES_2_GP, WORK.QUERY_FOR_TB_FLUXO, WORK.TB_MATRIZ_202310
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET ANOMES=202310;
+%LET ANOMES_ANT=202309;
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Alterações históricas */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 63 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Alterações históricas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-LIDQyouhZAfns3qd/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname MISCRED BASE "/riscosbv/credito/MISCREDITO";
+
+%MACRO AJUSTE_HIST (ANOMES);
+data INFOS_MATRIZ_&ANOMES.;
+set MISCRED.INFOS_MATRIZ_&ANOMES.;
+
+Ref = &anomes.;
+
+IF  DsGrupoEconomicoRisco in ('CREDZ') OR DsGrupoEconomicoRisco =: ("SACADO") THEN DELETE;
+IF DsGrupoEconomicoRisco in ('BTG PACTUAL') THEN DELETE;
+IF DsGrupoEconomicoRisco in ('AIZ.') THEN DELETE;
+
+
+IF CdClienteRisco = 15787660 THEN DsClienteRisco = 'VENTOS DE SAO JULIO I ENERGIAS RENOVAVEIS SA';
+
+
+IF &anomes. GE 202312 and DsGrupoEconomicoRisco in ('UNIGEL') THEN DO; Eixo_X = 'Ativos Especiais'; Cluster_Matriz = 'AE'; END;
+IF &anomes. GE 202401 and DsGrupoEconomicoRisco in ('FARMAERVAS') THEN DO; Eixo_X = 'Ativos Especiais'; Cluster_Matriz = 'AE'; END;
+IF &anomes. GE 202403 and DsGrupoEconomicoRisco in ('SERVIMED' 'PATENSE') tTHEN DO; Eixo_X = 'Ativos Especiais'; Cluster_Matriz = 'AE'; END;
+IF &anomes. GE 202404 and DsGrupoEconomicoRisco in ('POLISHOP') THEN DO; Eixo_X = 'Ativos Especiais'; Cluster_Matriz = 'AE'; END;
+IF &anomes. GE 202405 and DsGrupoEconomicoRisco in ('SUMESA' 'SUPERBAC') THEN DO; Eixo_X = 'Ativos Especiais'; Cluster_Matriz = 'AE'; END;
+IF &anomes. GE 202406 and DsGrupoEconomicoRisco in ('QUALIPOL') THEN DO; Eixo_X = 'Ativos Especiais'; Cluster_Matriz = 'AE'; END;
+
+
+IF &ANOMES. = 202506 then do;
+if DsGrupoEconomicoRisco in ('PLUXEE') 			then SegmentoAtuacaoFinal = 'SERVICOS';
+
+end;
+run;
+
+%mend;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Alterações históricas */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Bases */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 63 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Bases */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-NA4EsjA6ySRoHRQb/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC DELETE;
+TB_MATRIZ_:
+TB_OPERACAO_:
+TB_FLUXO_:
+TB_VARIACOES_MATRIZ_:
+RUN;
+
+%MACRO GERAR_BASES (ANOMES, ANOMES_ANT);
+
+DATA BASE_UNICA_ATACADO_&ANOMES.;
+SET MISCRED.BASE_UNICA_ATACADO_&ANOMES.;
+IF CdClienteRisco = 85063 THEN DsGrupoEconomicoRisco = 'SINAGRO';
+
+
+IF CdClienteRisco = 15787660 THEN DsClienteRisco = 'VENTOS DE SAO JULIO I ENERGIAS RENOVAVEIS SA';
+
+IF DsGrupoEconomicoRisco IN ('CREDZ' 'SACADO SME 92544196') THEN DO;
+ Avaliação_Grupo = 'NA';
+ Avaliação_Setorial = 'NA';
+ Cluster_Risco = 'NA';
+END;
+
+
+IF &ANOMES. = 202407 and DsGrupoEconomicoRisco in ('OCYAN') and DsSetorClienteRisco_novo in ('DOWNSTREAM / MIDSTREAM / SERVIÇOS DE APOIO') then Avaliação_Setorial='Neutro';
+
+
+IF &ANOMES. = 202404 AND DsGrupoEconomicoRisco = 'MAKRO ENGENHARIA LTDA' THEN DO;
+ Avaliação_Grupo = 'NA';
+ Avaliação_Setorial = 'NA';
+ Cluster_Risco = 'NA';
+END;
+RUN;
+
+DATA INFOS_MATRIZ_&ANOMES.;
+SET INFOS_MATRIZ_&ANOMES.;
+IF DsClienteRisco = 'SINAGRO PRODUTOS AGROPECUARIOS S.A' THEN DsGrupoEconomicoRisco = 'SINAGRO';
+RUN;
+
+%IF &ANOMES. > 202402 %THEN %DO;
+PROC SQL;
+CREATE TABLE WORK.TB_MATRIZ_&ANOMES. AS
+SELECT DISTINCT
+		&ANOMES. AS AnoMes_Referencia
+		,CATS(&ANOMES., A.CdClienteRisco) AS Chave
+		,A.DsGrupoEconomicoRisco
+		,A.CdClienteRisco
+		,A.DsClienteRisco
+		,C.NmGerenteCredito
+		,C.NmAnalistaCredito
+
+		,A.SegmentoAtuacaoFinal
+		,A.Cenario_Stress_Flag
+		,A.Eixo_X
+		,A.Eixo_Y
+		,A.Cluster_Matriz
+		,A.DsRatingCliente
+		,A.PD
+FROM INFOS_MATRIZ_&ANOMES. 				AS A
+LEFT JOIN MISCRED.MATRIZ_GRUPOS_&ANOMES. C
+ON A.DsGrupoEconomicoRisco = C.NmGrupoEconomico
+;QUIT;
+%END;
+
+%ELSE %DO;
+PROC SQL;
+CREATE TABLE TB_MATRIZ_&ANOMES. AS
+SELECT DISTINCT
+		&ANOMES. AS AnoMes_Referencia
+		,CATS(&ANOMES., B.CdClienteRisco) AS Chave
+		,A.DsGrupoEconomicoRisco
+		,B.CdClienteRisco
+		,A.DsClienteRisco
+		,C.NmGerenteCredito
+		,C.NmAnalistaCredito
+
+		,A.SegmentoAtuacaoFinal
+		,A.Cenario_Stress_Flag
+		,A.Eixo_X
+		,A.Eixo_Y
+		,A.Cluster_Matriz
+		,A.DsRatingCliente
+		,A.PD
+FROM INFOS_MATRIZ_&ANOMES. 				AS A
+LEFT JOIN BASE_UNICA_ATACADO_&ANOMES. 	AS B
+ON A.DsClienteRisco = B.DsClienteRisco AND B.Cluster_Risco NOT IN ('NA', "") AND B.Cluster_Risco NOT CONTAINS "PME"
+LEFT JOIN MISCRED.MATRIZ_GRUPOS_&ANOMES. C
+ON A.DsGrupoEconomicoRisco = C.NmGrupoEconomico
+;QUIT;
+%END;
+
+PROC SQL;
+CREATE TABLE TB_OPERACAO_&ANOMES. AS
+
+SELECT AnoMes_Referencia
+		,CATS(AnoMes_Referencia,CdClienteRisco) AS Chave_Cliente
+		,NuObjetoNegociacao
+		,CATS(AnoMes_Referencia,NuObjetoNegociacao) AS Chave_Operacao
+		,CdClienteRisco
+		,DsProduto
+		,DsGrupoProduto
+	    ,CASE WHEN DsProduto = "CCB PEAC" THEN "PEAC"
+			WHEN DsGrupoProduto IN ('BNDES' 'Empréstimos' 'External Loans' 'Trade Finance' 'Crédito Rural' 'External Trade Finance' 'Convênio Flex' 'Créditos do Agronegócio' 'Câmbio') THEN 'Empréstimos'
+			WHEN DsGrupoProduto IN ('TVM') THEN 'TVM'
+			WHEN DsGrupoProduto IN ('Leasing') THEN 'Leasing'
+			WHEN DsGrupoProduto IN ('Operações de Garantias') THEN 'Fianças'
+			WHEN DsGrupoProduto IN ('Hedge' 'Mercado Bancário') THEN 'Derivativos'
+			END AS DsGrupoProduto2
+		,Tipo_Carteira
+		,CASE WHEN Cluster_Risco IN ('NA', "") THEN 'NA'
+			  WHEN Cluster_Risco CONTAINS "PME" THEN "P" ELSE "C" END AS Flag_Matriz
+		,SUM(VrSaldo) AS Saldo
+		,SUM(VrProvisao) AS PDD
+
+		%IF _&ANOMES. <= 202412 %THEN %DO;
+			,SUM(VrImpairment) AS Impairment
+			,SUM(VrAjustePrudencial) AS Ajuste_Prud
+		%END;
+		%ELSE %DO;
+			,0 AS Impairment
+			,0 AS Ajuste_Prud
+		%END;
+
+		,MIN(DtInicioOperacao) AS Dt_Inicio FORMAT DATE9.
+		,MAX(DtVencimentoParcela) AS Dt_Venc FORMAT DATE9.
+		,MAX(INTCK('DAY', DtInicioOperacao, DtVencimentoParcela)) AS Prazo
+		,MAX(NumDiasVencidos) AS Atraso
+		,SUM(ValorGarantiaReal) AS Garantia
+		,(CASE WHEN ((YEAR(MIN(DtInicioOperacao)))*100+MONTH(MIN(DtInicioOperacao))) = &ANOMES. THEN 1 ELSE 0 END) AS Flag_Producao
+FROM BASE_UNICA_ATACADO_&ANOMES.
+GROUP BY 1,2,3,4,5,6,7,8,9,10;
+QUIT;
+
+PROC SQL;
+CREATE TABLE TB_FLUXO_&ANOMES. AS
+SELECT AnoMes_Referencia
+		,CATS(AnoMes_Referencia,NuObjetoNegociacao) AS Chave_Operacao
+		,NuObjetoNegociacao
+		,DtVencimentoParcela AS Dt_Venc FORMAT DATE9.
+		,SUM(VrSaldo) AS Saldo
+		,MAX(NumDiasVencidos) AS Atraso
+FROM BASE_UNICA_ATACADO_&ANOMES.
+GROUP BY 1,2,3,4
+;
+QUIT;
+
+%IF &ANOMES. > 202307 %THEN %DO;
+PROC SQL;
+CREATE TABLE VARIACOES AS
+SELECT DISTINCT
+		&ANOMES. AS AnoMes_Referencia
+		,CATS(COALESCE(A.AnoMes_Referencia, B.AnoMes_Referencia), COALESCE(A.CdClienteRisco,B.CdClienteRisco)) AS Chave_Cliente
+		,COALESCE(A.DsGrupoEconomicoRisco, B.DsGrupoEconomicoRisco) AS DsGrupoEconomicoRisco
+		,COALESCE(A.DsClienteRisco, B.DsClienteRisco) AS DsClienteRisco
+		,COALESCE(A.CdClienteRisco, B.CdClienteRisco) AS CdClienteRisco
+		,A.Eixo_X
+		,A.Eixo_Y
+		,A.Cluster_Matriz
+		,COALESCE(B.Eixo_X, C.Eixo_X) AS Eixo_X_Ant
+		,COALESCE(B.Eixo_Y, C.Eixo_Y) AS Eixo_Y_Ant
+		,COALESCE(B.Cluster_Matriz, C.Cluster_Matriz) AS Cluster_Matriz_Ant
+FROM TB_MATRIZ_&ANOMES. 			AS A
+FULL OUTER JOIN TB_MATRIZ_&ANOMES_ANT. 	AS B ON A.CdClienteRisco = B.CdClienteRisco
+LEFT JOIN (SELECT DISTINCT DsGrupoEconomicoRisco, Eixo_X, Eixo_Y, Cluster_Matriz from TB_MATRIZ_&ANOMES_ANT.) 	AS C ON A.DsGrupoEconomicoRisco = C.DsGrupoEconomicoRisco;
+
+CREATE TABLE VARIACOES_2 AS
+SELECT A.*
+		,SUM(C.Saldo) AS Saldo format commax22.2
+		,SUM(D.Saldo) AS Saldo_Ant format commax22.2
+		,MAX(C.Flag_Producao) AS Flag_Producao
+		,CASE WHEN (A.Cluster_Matriz = "NA" AND A.Cluster_Matriz_Ant = "NA") OR (A.Cluster_Matriz = "NA" AND A.Cluster_Matriz_Ant = "") OR (A.Cluster_Matriz = "" AND A.Cluster_Matriz_Ant = "NA") THEN "Fora"
+			  WHEN CALCULATED Saldo = . AND CALCULATED Saldo_Ant>0 THEN "Liquidação"
+			  WHEN CALCULATED Saldo>0 AND CALCULATED Saldo_Ant = . AND DsGrupoEconomicoRisco NOT IN (SELECT DISTINCT DsGrupoEconomicoRisco FROM TB_MATRIZ_&ANOMES_ANT.) THEN "Novos Grupos"
+			  WHEN CALCULATED Saldo>0 AND CALCULATED Saldo_Ant = . THEN "Aumento de Exposição"
+			  WHEN CALCULATED Saldo>0 AND A.Cluster_Matriz_Ant = "NA" THEN "Novos Grupos"
+			  WHEN A.Cluster_Matriz = A.Cluster_Matriz_Ant AND (CALCULATED Saldo - CALCULATED Saldo_Ant)>0 AND CALCULATED Flag_Producao=1 THEN "Aumento de Exposição" 
+			  WHEN A.Cluster_Matriz = A.Cluster_Matriz_Ant AND (CALCULATED Saldo - CALCULATED Saldo_Ant)>0 THEN "Accrual" 
+			  WHEN A.Cluster_Matriz = A.Cluster_Matriz_Ant AND (CALCULATED Saldo - CALCULATED Saldo_Ant)<0 THEN "Amortização"
+			  WHEN A.Cluster_Matriz = A.Cluster_Matriz_Ant AND (CALCULATED Saldo - CALCULATED Saldo_Ant)=0 THEN "Igual"
+			  ELSE "Alteração Cluster" END AS Status
+
+FROM VARIACOES AS A
+LEFT JOIN (SELECT CdClienteRisco, SUM(Saldo) AS Saldo, MAX(Flag_Producao) AS Flag_Producao FROM TB_OPERACAO_&ANOMES. WHERE Flag_Matriz = 'C' GROUP BY 1) AS C ON A.CdClienteRisco = C.CdClienteRisco
+LEFT JOIN (SELECT CdClienteRisco, SUM(Saldo) AS Saldo FROM TB_OPERACAO_&ANOMES_ANT. WHERE Flag_Matriz = 'C' GROUP BY 1) AS D ON A.CdClienteRisco = D.CdClienteRisco
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11;
+
+CREATE TABLE VARIACOES_2_GP AS
+SELECT DISTINCT
+		A.AnoMes_Referencia
+		,A.DsGrupoEconomicoRisco
+		,A.Cluster_Matriz
+		,A.Cluster_Matriz_Ant
+		,SUM(C.Saldo) AS Saldo format commax22.2
+		,SUM(D.Saldo) AS Saldo_Ant format commax22.2
+		,MAX(C.Flag_Producao) AS Flag_Producao
+FROM VARIACOES AS A
+LEFT JOIN (SELECT CdClienteRisco, SUM(Saldo) AS Saldo, MAX(Flag_Producao) AS Flag_Producao FROM TB_OPERACAO_&ANOMES. WHERE Flag_Matriz = 'C' GROUP BY 1) AS C ON A.CdClienteRisco = C.CdClienteRisco
+LEFT JOIN (SELECT CdClienteRisco, SUM(Saldo) AS Saldo FROM TB_OPERACAO_&ANOMES_ANT. WHERE Flag_Matriz = 'C' GROUP BY 1) AS D ON A.CdClienteRisco = D.CdClienteRisco
+GROUP BY 1,2;
+QUIT;
+
+PROC SORT DATA=VARIACOES_2_GP;
+BY AnoMes_Referencia DsGrupoEconomicoRisco  DESCENDING Cluster_Matriz DESCENDING Cluster_Matriz_Ant;
+RUN;
+
+PROC SORT DATA=VARIACOES_2_GP NODUPKEY;
+BY AnoMes_Referencia DsGrupoEconomicoRisco;
+RUN;
+
+PROC SQL;
+CREATE TABLE VARIACOES_2_GP AS
+SELECT DISTINCT
+		*
+		,CASE WHEN (Cluster_Matriz = "NA" AND Cluster_Matriz_Ant = "NA") OR (Cluster_Matriz = "NA" AND Cluster_Matriz_Ant = "") OR (Cluster_Matriz = "" AND Cluster_Matriz_Ant = "NA") THEN "Fora"
+			  WHEN Saldo = . AND Saldo_Ant>0 THEN "Liquidação"
+			  WHEN Saldo>0 AND Saldo_Ant = . AND DsGrupoEconomicoRisco NOT IN (SELECT DISTINCT DsGrupoEconomicoRisco FROM TB_MATRIZ_&ANOMES_ANT.) THEN "Novos Grupos"
+			  WHEN Saldo>0 AND Saldo_Ant = . THEN "Aumento de Exposição"
+			  WHEN Saldo>0 AND Cluster_Matriz_Ant = "NA" THEN "Novos Grupos"
+			  WHEN Cluster_Matriz = Cluster_Matriz_Ant AND (Saldo - Saldo_Ant)>0 AND Flag_Producao=1 THEN "Aumento de Exposição" 
+			  WHEN Cluster_Matriz = Cluster_Matriz_Ant AND (Saldo - Saldo_Ant)>0 THEN "Accrual" 
+			  WHEN Cluster_Matriz = Cluster_Matriz_Ant AND (Saldo - Saldo_Ant)<0 THEN "Amortização"
+			  WHEN Cluster_Matriz = Cluster_Matriz_Ant AND (Saldo - Saldo_Ant)=0 THEN "Igual"
+			  ELSE "Alteração Cluster" END AS Status
+FROM VARIACOES_2_GP;
+
+CREATE TABLE VARIACOES_2_FINAL AS
+SELECT A.*
+		,B.Status AS Status_Gp
+FROM VARIACOES_2 A
+LEFT JOIN VARIACOES_2_GP B
+ON A.DsGrupoEconomicoRisco = B.DsGrupoEconomicoRisco;
+
+SELECT 'DUP CLIENTES' AS Nome_Tabela, Anomes_Referencia, CdClienteRisco, COUNT(CdClienteRisco) AS Qtd_Linhas FROM VARIACOES_2_FINAL GROUP BY 1,2,3 HAVING Qtd_Linhas>1;
+
+SELECT 'TB_MATRIZ' AS Nome_Tabela, Anomes_Referencia, COUNT(Anomes_Referencia) AS Qtd_Linhas FROM TB_MATRIZ_&ANOMES. GROUP BY 1,2
+UNION ALL
+SELECT 'VARIACOES_2' AS Nome_Tabela, Anomes_Referencia, COUNT(Anomes_Referencia) AS Qtd_Linhas FROM VARIACOES_2 GROUP BY 1,2
+UNION ALL
+SELECT 'VARIACOES_2_FINAL' AS Nome_Tabela, Anomes_Referencia, COUNT(Anomes_Referencia) AS Qtd_Linhas FROM VARIACOES_2_FINAL GROUP BY 1,2
+;
+
+CREATE TABLE TB_VARIACOES_MATRIZ_&ANOMES. AS
+SELECT DISTINCT
+		AnoMes_Referencia
+		,CdClienteRisco
+		,Chave_Cliente
+		,DsGrupoEconomicoRisco
+		,COALESCE(Cluster_Matriz, Cluster_Matriz_Ant) AS Cluster_Matriz
+		,Status_Gp
+		,Status
+		,0 AS Flag
+		,CASE WHEN Status NOT IN ("NA" "Alteração Cluster") THEN (MAX(Saldo,0) - MAX(Saldo_Ant,0)) ELSE Saldo END AS Delta format commax22.2
+FROM VARIACOES_2_FINAL
+UNION ALL
+SELECT DISTINCT
+		AnoMes_Referencia
+		,CdClienteRisco
+		,Chave_Cliente
+		,DsGrupoEconomicoRisco
+		,Cluster_Matriz_Ant AS Cluster_Matriz
+		,Status_Gp
+		,Status
+		,1 AS Flag
+		,(Saldo_Ant*-1) AS Delta
+FROM VARIACOES_2_FINAL
+WHERE Status = "Alteração Cluster"
+UNION ALL
+SELECT DISTINCT
+		AnoMes_Referencia
+		,0 AS CdClienteRisco
+		,CATS(AnoMes_Referencia,0) AS Chave_Cliente
+		,'' AS DsGrupoEconomicoRisco
+		,Cluster_Matriz_Ant AS Cluster_Matriz
+		,'Exposição Anterior' AS Status
+		,'Exposição Anterior' AS Status_Gp
+		,0 AS Flag
+		,SUM(Saldo_Ant) AS Delta
+FROM VARIACOES_2_FINAL
+WHERE Cluster_Matriz_Ant NE ''
+GROUP BY 1,2,3,4,5,6,7,8
+;
+QUIT;
+%END;
+
+%MEND;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Bases */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Macros */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 63 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Macros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-lLHXmAH1xiW3oPRE/code.sas */
+/* =========================INÍCIO TASK========================= */
+%AJUSTE_HIST (202302);
+%AJUSTE_HIST (202303);
+%AJUSTE_HIST (202304);
+%AJUSTE_HIST (202305);
+%AJUSTE_HIST (202306);
+%AJUSTE_HIST (202307);
+%AJUSTE_HIST (202308);
+%AJUSTE_HIST (202309);
+%AJUSTE_HIST (202310);
+%AJUSTE_HIST (202311);
+%AJUSTE_HIST (202312);
+%AJUSTE_HIST (202401);
+%AJUSTE_HIST (202402);
+%AJUSTE_HIST (202403);
+%AJUSTE_HIST (202404);
+%AJUSTE_HIST (202405);
+%AJUSTE_HIST (202406);
+%AJUSTE_HIST (202407);
+%AJUSTE_HIST (202408);
+%AJUSTE_HIST (202409);
+%AJUSTE_HIST (202410);
+%AJUSTE_HIST (202411);
+%AJUSTE_HIST (202412);
+%AJUSTE_HIST (202501);
+%AJUSTE_HIST (202502);
+%AJUSTE_HIST (202503);
+%AJUSTE_HIST (202504);
+%AJUSTE_HIST (202505);
+%AJUSTE_HIST (202506);
+%AJUSTE_HIST (202507);
+%AJUSTE_HIST (202508);
+%AJUSTE_HIST (202509);
+
+%GERAR_BASES(202302, 202303);
+%GERAR_BASES(202307, 202308);
+%GERAR_BASES(202308, 202307);
+%GERAR_BASES(202309, 202308);
+%GERAR_BASES(202310, 202309);
+%GERAR_BASES(202311, 202310);
+%GERAR_BASES(202312, 202311);
+%GERAR_BASES(202401, 202312);
+%GERAR_BASES(202402, 202401);
+%GERAR_BASES(202403, 202402);
+%GERAR_BASES(202404, 202403);
+%GERAR_BASES(202405, 202404);
+%GERAR_BASES(202406, 202405);
+%GERAR_BASES(202407, 202406);
+%GERAR_BASES(202408, 202407);
+%GERAR_BASES(202409, 202408);
+%GERAR_BASES(202410, 202409);
+%GERAR_BASES(202411, 202410);
+%GERAR_BASES(202412, 202411);
+%GERAR_BASES(202501, 202412);
+%GERAR_BASES(202502, 202501);
+%GERAR_BASES(202503, 202502);
+%GERAR_BASES(202504, 202503);
+%GERAR_BASES(202505, 202504);
+%GERAR_BASES(202506, 202505);
+%GERAR_BASES(202507, 202506);
+%GERAR_BASES(202508, 202507);
+%GERAR_BASES(202509, 202508);
+
+DATA TB_MATRIZ(DROP=Eixo_X Eixo_Y Cluster_Matriz RENAME=(Eixo_X_=Eixo_X Eixo_Y_=Eixo_Y Cluster_Matriz_=Cluster_Matriz));
+SET TB_MATRIZ_:;
+FORMAT Eixo_X_ 1.;
+FORMAT Eixo_Y_ 1.;
+FORMAT Cluster_Matriz_ 1.;
+IF Eixo_X = 'Normal' 				THEN Eixo_X_ = 5;
+IF Eixo_X = 'Atenção' 				THEN Eixo_X_ = 4;
+IF Eixo_X = 'Preocupante' 			THEN Eixo_X_ = 3;
+IF Eixo_X = 'Critico' 				THEN Eixo_X_ = 2;
+IF Eixo_X = 'Ativos Especiais' 		THEN Eixo_X_ = 1;
+
+IF Eixo_Y = 'Fortemente Positivo' 	THEN Eixo_Y_ = 1;
+IF Eixo_Y = 'Levemente Positivo' 	THEN Eixo_Y_ = 2;
+IF Eixo_Y = 'Neutro' 				THEN Eixo_Y_ = 3;
+IF Eixo_Y = 'Levemente Negativo' 	THEN Eixo_Y_ = 4;
+IF Eixo_Y = 'Fortemente Negativo' 	THEN Eixo_Y_ = 5;
+
+IF Cluster_Matriz = 'Beneficiado' 	THEN Cluster_Matriz_ = 1;
+IF Cluster_Matriz = 'Resiliente' 	THEN Cluster_Matriz_ = 2;
+IF Cluster_Matriz = 'Auxilio' 		THEN Cluster_Matriz_ = 3;
+IF Cluster_Matriz = 'Saida' 		THEN Cluster_Matriz_ = 4;
+IF Cluster_Matriz = 'AE' 			THEN Cluster_Matriz_ = 5;
+
+RUN;
+
+DATA TB_OPERACAO;
+SET TB_OPERACAO_:;
+RUN;
+
+DATA TB_FLUXO;
+SET TB_FLUXO_:;
+WHERE AnoMes_Referencia GE 202312;
+RUN;
+
+DATA TB_VARIACOES_MATRIZ(DROP=Cluster_Matriz Status  Status_Gp RENAME=(Cluster_Matriz_=Cluster_Matriz Status_=Status Status_Gp_=Status_Gp ));
+SET TB_VARIACOES_MATRIZ_:;
+
+IF Cluster_Matriz = 'Beneficiado' 	THEN Cluster_Matriz_ = 1;
+IF Cluster_Matriz = 'Resiliente' 	THEN Cluster_Matriz_ = 2;
+IF Cluster_Matriz = 'Auxilio' 		THEN Cluster_Matriz_ = 3;
+IF Cluster_Matriz = 'Saida' 		THEN Cluster_Matriz_ = 4;
+IF Cluster_Matriz = 'AE' 			THEN Cluster_Matriz_ = 5;
+
+IF Status = 'Exposição Anterior' 	THEN Status_ = 0;
+IF Status = 'Aumento de Exposição' 	THEN Status_ = 1;
+IF Status = 'Novos Grupos' 			THEN Status_ = 2;
+IF Status = 'Accrual' 				THEN Status_ = 3;
+IF Status = 'Alteração Cluster' 	THEN Status_ = 4;
+IF Status = 'Liquidação' 			THEN Status_ = 5;
+IF Status = 'Amortização' 			THEN Status_ = 6;
+IF Status = 'Igual' 				THEN Status_ = 7;
+
+IF Status_Gp = 'Exposição Anterior' 	THEN Status_Gp_ = 0;
+IF Status_Gp = 'Aumento de Exposição' 	THEN Status_Gp_ = 1;
+IF Status_Gp = 'Novos Grupos' 			THEN Status_Gp_ = 2;
+IF Status_Gp = 'Accrual' 				THEN Status_Gp_ = 3;
+IF Status_Gp = 'Alteração Cluster' 	THEN Status_Gp_ = 4;
+IF Status_Gp = 'Liquidação' 			THEN Status_Gp_ = 5;
+IF Status_Gp = 'Amortização' 			THEN Status_Gp_ = 6;
+IF Status_Gp = 'Igual' 				THEN Status_Gp_ = 7;
+
+RUN;
+
+PROC DATASETS NOLIST LIB=WORK;
+DELETE
+
+
+
+TB_OPERACAO_:
+TB_FLUXO_:
+TB_VARIACOES_MATRIZ_:;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Macros */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Outros */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 63 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Outros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Z8yzem1QmLGCLIp1/code.sas */
+/* =========================INÍCIO TASK========================= */
+data carteiras;
+set miscred.base_unica_atacado_201912
+	miscred.base_unica_atacado_202012
+	miscred.base_unica_atacado_202112
+	miscred.base_unica_atacado_202212
+	miscred.base_unica_atacado_202312
+	miscred.base_unica_atacado_202401 - miscred.base_unica_atacado_202410;
+run;
+
+proc sql;
+create table carteiras2 as
+selecet a.*
+		,case when DsSetorClienteRisco_novo = 'VAREJO' then 'VAREJO'
+				when DsSetorClienteRisco_novo in ('', 'PMEs') then 'DEMAIS'
+				else coalesce(c.Macro_Setor, d.Macro_Setor) end as MacroSetor
+		,case when Tipo_carteira in ('ATIVOS ESPECIAIS', 'GPR/AE') then coalesce(a.tipo_carteira_gerencial, b.Segmento_Original) end as Segmento_Original
+from carteiras a
+left join pdd.SEGMENTO_ORIGINAL_GRUPOS b
+on a.DsGrupoEconomicoRisco = b.DsGrupoEconomicoRisco
+left join miscred.DE_PARA_MACRO_SETOR c
+on a.DsSetorClienteRisco_novo = c.Setor_Credito
+left join miscred.DE_PARA_MACRO_SETOR_2023 d
+on a.DsSetorClienteRisco_novo = d.Setor_Credito
+;
+
+create table carteiras3 as
+select Anomes_referencia
+		,dsgrupoeconomicorisco
+		,dsclienterisco
+		,DsRatingCliente
+		,DsSetorClienteRisco_novo as Setor
+		,MacroSetor
+		,Tipo_Carteira as Segmento
+		,Segmento_Original
+		,case when Tipo_carteira = 'CORPORATE' or Segmento_Original = 'CORPORATE' then 'CORPORATE' else 'OUTROS' end as Segmento_Final
+		,sum(VrSaldo) as Saldo
+		,sum(VrProvisao) as Provisao
+		,sum(VrAjustePrudencial) as AjustePrudencial
+		,sum(VrImpairment) as Impairment
+		,sum(ValorGarantiaReal) as Garantia_Formalizada
+from carteiras2
+group by 1,2,3,4,5,6,7,8
+;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Outros */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data carteiras;
+set miscred.base_unica_atacado_201912
+	miscred.base_unica_atacado_202012
+	miscred.base_unica_atacado_202112
+	miscred.base_unica_atacado_202212
+	miscred.base_unica_atacado_202312
+	miscred.base_unica_atacado_202401 - miscred.base_unica_atacado_202410;
+run;
+
+proc sql;
+create table carteiras2 as
+selecet a.*
+		,case when DsSetorClienteRisco_novo = 'VAREJO' then 'VAREJO'
+				when DsSetorClienteRisco_novo in ('', 'PMEs') then 'DEMAIS'
+				else coalesce(c.Macro_Setor, d.Macro_Setor) end as MacroSetor
+		,case when Tipo_carteira in ('ATIVOS ESPECIAIS', 'GPR/AE') then coalesce(a.tipo_carteira_gerencial, b.Segmento_Original) end as Segmento_Original
+from carteiras a
+left join pdd.SEGMENTO_ORIGINAL_GRUPOS b
+on a.DsGrupoEconomicoRisco = b.DsGrupoEconomicoRisco
+left join miscred.DE_PARA_MACRO_SETOR c
+on a.DsSetorClienteRisco_novo = c.Setor_Credito
+left join miscred.DE_PARA_MACRO_SETOR_2023 d
+on a.DsSetorClienteRisco_novo = d.Setor_Credito
+;
+
+create table carteiras3 as
+select Anomes_referencia
+		,dsgrupoeconomicorisco
+		,dsclienterisco
+		,DsRatingCliente
+		,DsSetorClienteRisco_novo as Setor
+		,MacroSetor
+		,Tipo_Carteira as Segmento
+		,Segmento_Original
+		,case when Tipo_carteira = 'CORPORATE' or Segmento_Original = 'CORPORATE' then 'CORPORATE' else 'OUTROS' end as Segmento_Final
+		,sum(VrSaldo) as Saldo
+		,sum(VrProvisao) as Provisao
+		,sum(VrAjustePrudencial) as AjustePrudencial
+		,sum(VrImpairment) as Impairment
+		,sum(ValorGarantiaReal) as Garantia_Formalizada
+from carteiras2
+group by 1,2,3,4,5,6,7,8
+;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TB_FLUXO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TB_FLUXO AS
+   SELECT t1.AnoMes_Referencia,
+          
+            (COUNT(t1.NuObjetoNegociacao)) AS COUNT_of_NuObjetoNegociacao
+      FROM WORK.TB_FLUXO t1
+      GROUP BY t1.AnoMes_Referencia;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TB_OPERACAO
+    OUTFILE='N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_OPERACAO.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TB_FLUXO
+    OUTFILE='N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_FLUXO.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TB_VARIACOES_MATRIZ
+    OUTFILE='N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_VARIACOES_MATRIZ.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.TB_MATRIZ
+    OUTFILE='N:\DTEC\Desenvolvimento\Tableau\RiscoCreditoAtacado\Matriz_Resiliencia\TB_MATRIZ.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */

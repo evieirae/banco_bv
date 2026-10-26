@@ -1,0 +1,206 @@
+START_METADATA
+PROJECT: Rodas__MisVarejo_TbEnvioBvia
+FILE_SAS: TbSimulacoes_napista.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 147
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: data_hoje, dir_csv
+DETECTED_MACROS_USED: data_hoje, dir_csv, m2, m2_bq, safraM2
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], AUXL.GRUPO_MENSAGERIA [SAS/Local], AUXL.TBMOLICAR [SAS/Local], BASES.TBPESSOA [SAS/Local], BV-PDBD-PRD.DVRY_CORE.TBSIMULACOESRODAS [BIGQUERY], CONVSIMU.TBSIMULACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): AUXL.GRUPO_MENSAGERIA [PROC SQL - JOIN], AUXL.TBMOLICAR [PROC SQL - FROM], BASES.TBPESSOA [PROC SQL - FROM], BV-PDBD-PRD.DVRY_CORE.TBSIMULACOESRODAS [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], CONVSIMU.TBSIMULACOES [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./informacoes_BVIA_aceleradorDeVendas_&data_hoje..csv
+TEMP/DISCARDED OUTPUTS: SIMULACOES, SIMULACOESNAPISTA, SIMULACOES_QTPARCELA, TBMOLICAR, TBPESSOA
+DYNAMIC REFS (Ambiguous): {DATA_HOJE}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+data simulacoes; set convsimu.tbsimulacoes (where=(nuanomes >= &safraM2.)); run;
+
+data _null_; m2_bq = "'"||put(year("&m2."d),4.)||"-"||put(month("&m2."d),z2.)||"-"||put(day("&m2."d),z2.)||"'"; call symputx('m2_bq',m2_bq); ;run; %put &m2_bq;
+
+proc sql;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json' schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+create table simulacoes_qtparcela as
+select * from connection to perm(
+WITH
+  tb1 AS (
+  SELECT
+    CAST(cd_simulacao_proposta AS numeric) cd_simulacao_proposta,
+    MAX(cd_simulacao_financiamento) cd_simulacao_financiamento_max,
+  FROM
+    `bv-pdbd-prd.dvry_core.tbsimulacoesrodas`
+  WHERE
+    dt_simulacao_proposta >= &m2_bq
+  GROUP BY
+    1)
+SELECT
+  a.cd_simulacao_proposta,
+  b.qt_parcelas,
+  b.vr_prestacao
+FROM
+  tb1 a
+INNER JOIN (
+  SELECT
+    cd_simulacao_proposta,
+    cd_simulacao_financiamento,
+    qt_parcelas,
+    vr_prestacao
+  FROM
+    `bv-pdbd-prd.dvry_core.tbsimulacoesrodas`
+  WHERE
+    dt_simulacao_proposta >= &m2_bq
+    ) b
+ON
+  a.cd_simulacao_financiamento_max = b.cd_simulacao_financiamento
+);
+disconnect from perm;
+quit;
+
+proc sql;
+create table tbpessoa as
+select
+	a.nutelefone1,
+	a.nutelefone2,
+	a.nutelefone3,
+        a.DsEmail,
+	a.DsEmail2,
+	a.dtnascimento,
+	a.nmpessoa,
+	a.nucpfcnpj
+from bases.tbpessoa a
+inner join (select distinct nucpfcnpj from simulacoes where nucpfcnpj ne "") b
+	on a.nucpfcnpj = b.nucpfcnpj
+;run;
+
+proc sql;
+create table tbmolicar as
+select distinct
+	input(a.cdmolicar, 9.) as cdmolicar,
+	a.aamodelo,
+	a.cdmarca,
+	a.cdmodelo,
+	a.dscategoria
+from auxl.tbmolicar a
+inner join (select distinct cdmolicar, aamodelo from simulacoes where cdmolicar ne .) b
+	on 	input(a.cdmolicar, 9.) = b.cdmolicar and a.aamodelo = b.aamodelo
+;run;
+
+proc sql;
+create table simulacoesnapista as
+select distinct
+	 simulacao.nuanomes
+	,simulacao.dtsimulacaoinicial as dtsimulacao
+	,simulacao.cdsimulacaoinicial as cdsimulacao
+	,simulacao.nucpfcnpj
+	,simulacao.sistemainicial
+	,Pessoa.NuTelefone1
+	,Pessoa.NuTelefone2
+	,Pessoa.NuTelefone3
+	,Pessoa.DsEmail
+	,Pessoa.DsEmail2
+	,Pessoa.DtNascimento
+	,Pessoa.NmPessoa
+	,simulacao.produto
+	,simulacao.cdparceirocomercial
+	,tranwrd(simulacao.nmparceirocomercial, " - ", "-") as nmparceirocomercial
+	,simulacao.flcard
+	,simulacao.flpap
+	,coalesce(simulacao.mensageria,'9. Não houve mensageria') as dsmensageria
+	,simulacao.fxentrada
+	,simulacao.probabilidadeaprovacao
+	,simulacao.motivorecusa
+	,simulacao.flpropostaoriginada
+	,simulacao.flpropostaaprovada
+	,simulacao.flpropostaefetivada
+	,simulacao.flconversao
+	,simulacao.flconcorrente
+	,simulacao.dtinclusaogravame
+	,simulacao.banco
+	,simulacao.stpagoloja
+	,simulacao.nuproposta
+	,simulacao.regional
+	,simulacao.Canal
+	,simulacao.filial
+	,simulacao.NmColaborador
+	,simulacao.DsLoginN1
+	,simulacao.DsLoginN2
+	,simulacao.DsLoginN3
+	,simulacao.cdmolicar
+	,simulacao.aamodelo
+	,simulacao.aafabricacao
+	,simulacao.idadebem
+	,molicar.cdmarca
+	,molicar.cdmodelo
+	,molicar.dscategoria
+	,simulacao.fxidade
+	,simulacao.NuPlaca
+/*	,simulacao.QtParcela*/
+	,simulacao.vrveiculomolicar
+	,simulacao.vrveiculosimulacao
+	,simulacao.vrproposta as vrsimulacao
+	,simulacao.VrEntrada
+	,case when  simulacao.pcentradaminima > 1 then  simulacao.pcentradaminima /100 else  simulacao.pcentradaminima end as pcentradaminima
+	,parcela.qt_parcelas as qtparcelas
+	,parcela.vr_prestacao as vrprestacao
+	,simulacao.nucontrato
+	,simulacao.dtcontrato
+	,simulacao.vrproducao
+from simulacoes simulacao
+left join tbmolicar molicar on simulacao.cdmolicar = molicar.cdmolicar and simulacao.aamodelo = molicar.aamodelo and simulacao.cdmolicar ne .
+left join tbpessoa pessoa on simulacao.nucpfcnpj = pessoa.nucpfcnpj
+/*left join leads.abandono on simulacao.cdsimulacaoinicial = abandono.cd_simulacao_proposta*/
+inner join auxl.grupo_mensageria msg on msg.mensageria = simulacao.mensageria
+left join simulacoes_qtparcela parcela on simulacao.cdsimulacaoinicial = parcela.cd_simulacao_proposta and simulacao.qtparcela = parcela.qt_parcelas
+where 1=1
+and simulacao.sistemainicial in ('PPAR', 'APAR', 'ACOM', 'APP', 'SITE BV', 'NA_PISTA')
+and simulacao.produto in ("Leves")
+and simulacao.flsimuvalidapdv=1
+and (msg.grupomsg = 'P' or simulacao.banco <> "N/A")
+;run;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+%let data_hoje = %sysfunc(today(), yymmddn8.);
+%put &data_hoje.;
+
+PROC EXPORT DATA=simulacoesnapista
+	FILE="&dir_csv./informacoes_BVIA_aceleradorDeVendas_&data_hoje..csv" REPLACE
+	DBMS=DLM;
+	DELIMITER=';';
+RUN;

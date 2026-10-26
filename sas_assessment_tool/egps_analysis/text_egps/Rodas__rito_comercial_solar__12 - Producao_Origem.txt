@@ -1,0 +1,407 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 12 - Producao_Origem.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 0
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 331
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBESTRUTURACOMERCIAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBESTRUTURACOMERCIAL [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_PRODUCAO_ORIGEM_SOLAR_01
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PRODUCAO_ORIGEM_SOLAR, BASE_PROD_ORIGEM_CANAL_SEM, BASE_PROD_ORIGEM_CANAL_TOTAL, BASE_PROD_ORIGEM_FILIAL_SEM, BASE_PROD_ORIGEM_FILIAL_TOTAL, BASE_PROD_ORIGEM_GRS_SEM, BASE_PROD_ORIGEM_GRS_TOTAL, BASE_PROD_ORIGEM_PDVS_SEM, BASE_PROD_ORIGEM_PDVS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+Proc Sql;
+Create Table Base_Prod_Origem_Canal_Total as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,Prod.CanalProducaoSolar
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Prod_Origem_Canal_Sem as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,Prod.CanalProducaoSolar
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,Case
+	When Day(Prod.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Prod.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Prod.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Prod.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Prod_Origem_Filial_Total as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'Filial' as Visao
+,"                         " as DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,Prod.CanalProducaoSolar
+,'Canal Solar' as Dimensao1
+,Prod.NmAreaEstruturaComercialC as Dimensao2
+,Prod.NmAreaEstruturaComercialC as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Prod_Origem_Filial_Sem as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'Filial' as Visao
+,"                         " as DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,Prod.CanalProducaoSolar
+,'Canal Solar' as Dimensao1
+,Prod.NmAreaEstruturaComercialC as Dimensao2
+,Prod.NmAreaEstruturaComercialC as Dimensao3
+,Case
+	When Day(Prod.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Prod.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Prod.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Prod.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Prod_Origem_Grs_Total as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'GRs' as Visao
+,Prod.DsLoginN1CartPDV as DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,Prod.CanalProducaoSolar
+,'Canal Solar' as Dimensao1
+,Prod.NmAreaEstruturaComercialC as Dimensao2
+,Estrutura.NmColaborador as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Left Join (Select Distinct DsloginN1, NmColaborador From Bases.TbEstruturaComercial Where DsLoginN1 NE '') as Estrutura ON Prod.DsLoginN1CartPDV = Estrutura.DsloginN1
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Prod_Origem_Grs_Sem as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'GRs' as Visao
+,Prod.DsLoginN1CartPDV as DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,Prod.CanalProducaoSolar
+,'Canal Solar' as Dimensao1
+,Prod.NmAreaEstruturaComercialC as Dimensao2
+,Estrutura.NmColaborador as Dimensao3
+,Case
+	When Day(Prod.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Prod.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Prod.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Prod.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Left Join (Select Distinct DsloginN1, NmColaborador From Bases.TbEstruturaComercial Where DsLoginN1 NE '') as Estrutura ON Prod.DsLoginN1CartPDV = Estrutura.DsloginN1
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Prod_Origem_PDVs_Total as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'Cobans' as Visao
+,Prod.DsLoginN1CartPDV as DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,Prod.CanalProducaoSolar
+,Prod.NmAreaEstruturaComercialC as Dimensao1
+,Estrutura.NmColaborador as Dimensao2
+,Case
+	When Prod.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Prod.CdParceiroComercial,8.) || '-' || Prod.NmParceiroComercial
+End as Dimensao3
+/*,put(Prod.CdParceiroComercial, 8.) || '-' || Prod.NmParceiroComercial as Dimensao3*/
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Cobans_Solar_Saida as Parc On Prod.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Left Join (Select Distinct DsloginN1, NmColaborador From Bases.TbEstruturaComercial Where DsLoginN1 NE '') as Estrutura ON Prod.DsLoginN1CartPDV = Estrutura.DsloginN1
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Proc Sql;
+Create Table Base_Prod_Origem_PDVs_Sem as
+Select
+'Prod. Origem' as Base
+,Prod.NuAnoMes
+,'Cobans' as Visao
+,Prod.DsLoginN1CartPDV as DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,Prod.CanalProducaoSolar
+,Prod.NmAreaEstruturaComercialC as Dimensao1
+,Estrutura.NmColaborador as Dimensao2
+,Case
+	When Prod.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Prod.CdParceiroComercial,8.) || '-' || Prod.NmParceiroComercial
+End as Dimensao3
+/*,put(Prod.CdParceiroComercial, 8.) || '-' || Prod.NmParceiroComercial as Dimensao3*/
+,Case
+	When Day(Prod.DtContrato) <=07 Then '01 á 07 dias'
+	When Day(Prod.DtContrato) <=14 Then '08 á 14 dias'
+	When Day(Prod.DtContrato) <=21 Then '15 á 21 dias'
+	When Day(Prod.DtContrato) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Prod.QtCorridosDiaUtilMes
+
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Sum(VrProducao) as VrProducao
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From tmp.TbProducao as Prod
+Left Join Base_Cobans_Solar_Saida as Parc On Prod.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+Left Join Base_Porte_Cobans_CNPJ as Porte On Prod.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Prod.NuAnomes = Porte.NuAnomes
+Left Join (Select Distinct DsloginN1, NmColaborador From Bases.TbEstruturaComercial Where DsLoginN1 NE '') as Estrutura ON Prod.DsLoginN1CartPDV = Estrutura.DsloginN1
+Where Prod.NuANomes >= &Base_m5. and Prod.NmGrupoProdutoMeta = 'Solar' and Prod.NmCanalEstruturaComercial = 'Canal Solar' and
+		Prod.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+Data Base_Producao_Origem_Solar;
+Set
+	Base_Prod_Origem_PDVs_Total
+/*	Base_Prod_Origem_PDVs_Sem*/
+
+	Base_Prod_Origem_Grs_Total
+/*	Base_Prod_Origem_Grs_Sem*/
+
+	Base_Prod_Origem_Filial_Total
+/*	Base_Prod_Origem_Filial_Sem*/
+
+	Base_Prod_Origem_Canal_Total
+/*	Base_Prod_Origem_Canal_Sem*/
+;Run;
+
+Proc Sort data=Base_Producao_Origem_Solar; by Base NuAnoMes DataBase DsLoginN1C DsLoginN2C DsLoginN3C Dimensao1 Dimensao2 Dimensao3 Semana Porte TipoParceiro DtCadastro QtCorridosDiaUtilMes; Quit;
+
+proc transpose data=Base_Producao_Origem_Solar out=ritosol.Base_Producao_Origem_Solar_01
+(drop=_LABEL_ _NAME_ rename=(/*_NAME_=TpValor */COL1=Canal_MFS COL2=Canal_Solar COL3=Sinergia));
+by
+Base
+NuAnoMes
+DataBase
+DsLoginN1C
+DsLoginN2C
+DsLoginN3C
+Dimensao1
+Dimensao2
+Dimensao3
+Semana
+Porte
+TipoParceiro
+DtCadastro
+QtCorridosDiaUtilMes
+;quit;

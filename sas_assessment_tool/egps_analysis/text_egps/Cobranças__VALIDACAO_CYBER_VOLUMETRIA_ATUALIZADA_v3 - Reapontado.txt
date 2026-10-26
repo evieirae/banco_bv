@@ -1,0 +1,1012 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__VALIDACAO_CYBER_VOLUMETRIA_ATUALIZADA_v3 - Reapontado
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:07 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -17
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (3x | +240), RETAIN (2x | +20), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 734
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: FREQ, SQL
+HAS_DATA_STEP: Yes (11x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: ALVESDS = /riscosbv/cobranca/alvesds; BRUNO = /riscosbv/cobranca/bsilva; CAROL2 = /riscosbv/cobranca/caroline/Auxiliar; CAROL2 = /riscosbv/cobranca/caroline/Auxiliar LTV; LDUARTE = /riscosbv/cobranca/lduarte; POLITICA = /riscosbv/cobranca/caroline/LTV_POLITICA; PRETER = /riscosbv/cobranca/preter; SATIE = /riscosbv/cobranca/satie
+DETECTED_MACROS_DEFINED: DATA_MENOS_UM, NUM_ELEMENTOS, REF_TAB
+DETECTED_MACROS_USED: CONTRATO1, DATA_MENOS_UM, DIA_ANTERIOR, DIA_REF, DIA_REF3, LISTA_DIA_ANTERIOR, LISTA_MES, NUM_ELEMENTOS, REF_M0, TOTAL_PARTES, i
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY/GCP], BV-PDBD-PRD.DVRY_CORE.TBPARCELARECEBIMENTO [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_DBCOBRANCA.TBSCORECOBRANCA [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [BIGQUERY/GCP], BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [BIGQUERY], BV-PDBD-PRD.TRUSTED_RCVRY.UDA2 [BIGQUERY], CAROL2.LTV_NOVO_202512 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.ELEGIVEIS_ATUALIZACAO_1, WORK.ELEGIVEIS_QUEBRAS, WORK.PARCELA2
+IMPORTED_LIBNAMES: CAROL2
+EXPORTED_LIBNAMES: ALVESDS
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.ELEGIVEIS_ATUALIZACAO_1, WORK.ELEGIVEIS_QUEBRAS, WORK.PARCELA2, WORK.SIMULA_ATRASO
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBPARCELA [PROC SQL - FROM], BV-PDBD-PRD.DVRY_CORE.TBPARCELARECEBIMENTO [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_DBCOBRANCA.TBSCORECOBRANCA [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_GESTAOCONTABIL.TBCONTRATOCONTABIL [PROC SQL - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.DELQMST [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_RCVRY.UDA2 [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], CAROL2.LTV_NOVO_202512 [PROC SQL - FROM], WORK.ELEGIVEIS_ATUALIZACAO_1 [PROC SQL - FROM], WORK.ELEGIVEIS_QUEBRAS [PROC SQL - FROM], WORK.PARCELA2 [PROC SQL - FROM], WORK.SIMULA_ATRASO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ALVESDS.ELEGIVEIS_20260102, ALVESDS.ELEGIVEIS_QUEBRAS, ALVESDS.QUERY_FOR_ELEGIVEIS_QUEBRAS_0000
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_SELECIONADA, BASE_SELECIONADA2, BASE_SELECIONADA_2_2, CONSULTA_ORACLE, CONTRATOS_DIVERGENTES, CUBO, DIVERGENCIAS_LTV_CYBER, DIVERGENCIAS_PAGAMENTO, ELEGIVEIS_ATRASO_MARCACAO, ELEGIVEIS_ATUALIZACAO_1, ELEGIVEIS_QUEBRAS, ELEGIVEIS_VF, LIQUIDACAO, LIQUIDACAO_1, PARCELA, PARCELA2, TABELA_CONTROLE_FILTRADO, TABELA_CONTROLE_SINALIZADO, TABELA_PARCIAL, TABELA_TRATADA2, VALIDA_LIQUIDACAO, VERIFICACAO_LETRA, WORK.QUERY_FOR_ELEGIVEIS_ATUALIZACAO_, WORK.QUERY_FOR_ELEGIVEIS_QUEBRAS, WORK.QUERY_FOR_ELEGIVEIS_QUEBRAS_0000, WORK.QUERY_FOR_PARCELA2, WORK.QUERY_FOR_SIMULA_ATRASO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: 01. Principal */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 01. Principal */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-IPEfuzuWfM8Mxbbf/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE BASE_SELECIONADA AS
+SELECT DISTINCT
+A.NUCONTRATO
+,A.SQCONTRATOFINANCEIRO
+,A.QTATRASO
+,A.FILTRO_EXCLUSAO
+,A.NOME_ASSESSORIA
+,A.LETRA_HISTORICO
+,A.LETRA_HISTORICO_DATA
+,A.LETRA_FINAL_ELEITA
+
+
+,CASE
+	WHEN A.FILTRO_EXCLUSAO <> 'SEM FILTRO' THEN 'Impeditivo'
+	  WHEN A.NOME_ASSESSORIA = '' THEN 'S/ Assessoria'
+	  WHEN A.SCORE_FINAL <= 0 THEN 'Score inválido'
+
+	  WHEN A.QTATRASO <= 55 THEN 'Atraso inferior à 55 dias'
+
+	  WHEN A.LETRA_FINAL_ELEITA IN('', '0') THEN 'Letra incompatível'
+	  WHEN A.LETRA_FINAL_ELEITA = A.LETRA_HISTORICO THEN 'Eleita igual histórico'
+      ELSE 'Elegível à atualização' END AS QUEBRA_SUBIDA
+
+,CASE WHEN CALCULATED QUEBRA_SUBIDA <> 'Elegível à atualização' THEN A.LETRA_HISTORICO ELSE A.LETRA_FINAL_ELEITA END AS LETRA_FINAL
+
+
+FROM CAROL2.LTV_NOVO_202512 A
+
+;QUIT;
+
+
+DATA _NULL_;
+	CALL SYMPUT('DIA_REF', "'" || PUT(TODAY(), YYMMDD10.) || "'");
+	CALL SYMPUT('DIA_REF2', PUT(TODAY(), DATE9.));
+	CALL SYMPUT('DIA_REF3', "'" || PUT(TODAY(), DATE9.) || "'");
+
+RUN;
+
+
+
+options compress=binary;
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm'
+credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE BASE_SELECIONADA_2_2 AS
+SELECT DISTINCT
+	A.*,
+	INPUT(&DIA_REF3., ANYDTDTE.) AS DIA_REF2 FORMAT=DATE9.,
+	B.DtPrimeiroVenc,
+	CASE WHEN A.SqContratoFinanceiro <> B.sq_contrato_financeiro THEN 1 ELSE 0 END AS FLAG_SEQFINANCEIRA,
+	(CALCULATED DIA_REF2 - B.DtPrimeiroVenc)-1 AS ATRASO_ATUALIZADO,
+	CASE WHEN CALCULATED FLAG_SEQFINANCEIRA = 1 THEN 0 ELSE (CALCULATED DIA_REF2 - B.DtPrimeiroVenc)-1 END AS ATRASO_ATUALIZADO2
+FROM BASE_SELECIONADA A
+LEFT JOIN CONNECTION TO PERM (
+	WITH QUERY_1 AS (
+
+SELECT
+    t.cd_contrato,
+    t.sq_contrato_financeiro,
+    DATE(MIN(CASE
+        WHEN t.st_parcela <> 'Q'
+        OR (t.st_parcela = 'Q'
+        AND DATE(t.dt_processamento_ult_recebimento) >= DATE(&DIA_REF.)) THEN t.dt_vencimento
+        ELSE NULL
+    END)) AS DtPrimeiroVenc
+FROM
+    bv-pdbd-prd.dvry_core.tbparcela AS t
+GROUP BY
+    t.cd_contrato,
+    t.sq_contrato_financeiro
+
+)
+SELECT * FROM QUERY_1
+
+		) B
+		ON
+			A.NUCONTRATO = INPUT(B.cd_contrato, 14.)
+
+
+
+		GROUP BY B.cd_contrato
+
+		HAVING B.sq_contrato_financeiro = MAX(B.sq_contrato_financeiro)
+;
+QUIT;
+
+
+
+options compress=binary;
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm'
+credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE
+	BASE_SELECIONADA2 AS
+SELECT DISTINCT
+	A.*,
+	B.DMQUE3,
+	B.DMDAYS,
+	E.DsAcaoCobranca AS LETRA_TBSCORE,
+    E.DtGravacaoScore AS DT2
+FROM
+	BASE_SELECIONADA_2_2 A
+LEFT JOIN
+
+	CONSULTA_ORACLE B
+ON A.NUCONTRATO = INPUT(B.DMACCT, 14.)
+
+LEFT JOIN
+	CONNECTION TO PERM (
+        WITH QUERY_1 AS (
+
+SELECT
+    t.nucontratogestao,
+    t.sqcontratofinanceiro,
+    t.dsacaocobranca,
+    t.nuscore,
+    t.dtgravacaoscore
+FROM
+    bv-pdbd-prd.trusted_dbcobranca.tbscorecobranca AS t
+WHERE
+    t.cdmodelo IN (77, 76)
+    AND DATE(t.dtgravacaoscore) < &DIA_REF.
+
+)
+SELECT * FROM QUERY_1
+    ) AS E ON A.NUCONTRATO = INPUT(E.NuContratoGestao, 14.) AND A.SqContratoFinanceiro = E.SqContratoFinanceiro
+WHERE
+	A.ATRASO_ATUALIZADO > 90 AND A.ATRASO_ATUALIZADO < 720
+GROUP BY
+	A.NuContrato,
+	A.SqContratoFinanceiro
+HAVING
+	E.DtGravacaoScore = MAX(E.DtGravacaoScore)
+;
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE
+	TABELA_CONTROLE_SINALIZADO AS
+SELECT DISTINCT
+	*,
+	CASE WHEN
+		DMQUE3
+	IN
+		('CT02', 'DSR', 'CT01', 'CT05', 'TD2', 'DG1')
+	THEN 'Sim'
+	ELSE 'Nao'
+	END AS
+		FLAG_CONTROLE
+FROM
+	BASE_SELECIONADA2;
+QUIT;
+
+
+
+PROC SQL;
+CREATE TABLE
+	TABELA_CONTROLE_FILTRADO AS
+SELECT DISTINCT
+	*
+FROM
+	TABELA_CONTROLE_SINALIZADO
+WHERE
+	FLAG_CONTROLE = 'Sim';
+QUIT;
+
+
+PROC FREQ DATA=TABELA_CONTROLE_FILTRADO;
+    TABLES DMQUE3*FLAG_CONTROLE/ norow nocol nopercent;
+RUN;
+
+
+
+DATA TABELA_TRATADA2;
+SET TABELA_CONTROLE_SINALIZADO;
+
+LENGTH DMQUE3_TRATADA $4.;
+
+IF TRIM(UPCASE(DMQUE3)) EQ "11K" 	THEN   DMQUE3_TRATADA = "K"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "11K1" 	THEN   DMQUE3_TRATADA = "K1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "12L" 	THEN   DMQUE3_TRATADA = "L"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "12L1" 	THEN   DMQUE3_TRATADA = "L1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "13J" 	THEN   DMQUE3_TRATADA = "J"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "13J1" 	THEN   DMQUE3_TRATADA = "J1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "14M" 	THEN   DMQUE3_TRATADA = "M"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "14M1" 	THEN   DMQUE3_TRATADA = "M1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "15W" 	THEN   DMQUE3_TRATADA = "W"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "15W1" 	THEN   DMQUE3_TRATADA = "W1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "16N" 	THEN   DMQUE3_TRATADA = "N"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "16N1" 	THEN   DMQUE3_TRATADA = "N1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "17O" 	THEN   DMQUE3_TRATADA = "O"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "17O1" 	THEN   DMQUE3_TRATADA = "O1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "17O2" 	THEN   DMQUE3_TRATADA = "O2"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "1C" 		THEN   DMQUE3_TRATADA = "C"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "1C1" 	THEN   DMQUE3_TRATADA = "C1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "2D" 		THEN   DMQUE3_TRATADA = "D"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "2D1" 	THEN   DMQUE3_TRATADA = "D1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "3E" 		THEN   DMQUE3_TRATADA = "E"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "3E1" 	THEN   DMQUE3_TRATADA = "E1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "4F" 		THEN   DMQUE3_TRATADA = "F"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "4F1" 	THEN   DMQUE3_TRATADA = "F1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "5G" 		THEN   DMQUE3_TRATADA = "G"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "5G1" 	THEN   DMQUE3_TRATADA = "G1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "G1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "6H" 		THEN   DMQUE3_TRATADA = "H"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "6H1" 	THEN   DMQUE3_TRATADA = "H1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "9I" 		THEN   DMQUE3_TRATADA = "I"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "9I1" 	THEN   DMQUE3_TRATADA = "I1"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "SM01" 	THEN   DMQUE3_TRATADA = "0"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "J1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "F1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "K1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "H1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "I1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "L1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "M1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "N1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "O1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "O2" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "E1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "D1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "C1" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+IF TRIM(UPCASE(DMQUE3)) EQ "L" 		THEN   DMQUE3_TRATADA = "XX"; 	ELSE
+DMQUE3_TRATADA = DMQUE3;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE
+	VERIFICACAO_LETRA AS
+SELECT DISTINCT
+	*,
+	CASE WHEN
+		DMQUE3_TRATADA = LETRA_FINAL
+	THEN
+		'Igual'
+	ELSE
+		'Diferente'
+	END AS
+		STATUS_VERIFICACAO_LC,
+
+CASE WHEN
+		DMQUE3_TRATADA = LETRA_TBSCORE
+	THEN
+		'Igual'
+	ELSE
+		'Diferente'
+	END AS
+		STATUS_VERIFICACAO_CT
+FROM
+	TABELA_TRATADA2;
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE
+	TABELA_PARCIAL AS
+SELECT DISTINCT
+	NUCONTRATO,
+	SQCONTRATOFINANCEIRO,
+	LETRA_FINAL,
+	LETRA_TBSCORE,
+	DT2 AS DT_MARCACAO_TBSCOR,
+	FLAG_CONTROLE,
+	DMQUE3_TRATADA,
+	STATUS_VERIFICACAO_LC,
+	STATUS_VERIFICACAO_CT,
+	ATRASO_ATUALIZADO2 AS ATRASO_ATUALIZADO,
+	QTATRASO AS ATRASO_LTV,
+	DMDAYS AS ATRASO_ORACLE,
+	QUEBRA_SUBIDA
+FROM
+	VERIFICACAO_LETRA;
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE
+	CUBO AS
+SELECT DISTINCT
+	LETRA_FINAL,
+	FLAG_CONTROLE,
+	DMQUE3_TRATADA,
+	STATUS_VERIFICACAO_LC,
+	STATUS_VERIFICACAO_CT,
+	QUEBRA_SUBIDA,
+	COUNT(NUCONTRATO) AS CONTAGEM_CONTRATOS
+FROM
+	TABELA_PARCIAL
+GROUP BY
+	LETRA_FINAL,
+	FLAG_CONTROLE,
+	DMQUE3_TRATADA,
+	STATUS_VERIFICACAO_LC,
+	STATUS_VERIFICACAO_CT,
+	QUEBRA_SUBIDA
+;
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE
+	CONTRATOS_DIVERGENTES AS
+SELECT DISTINCT
+	*
+FROM
+	TABELA_PARCIAL
+WHERE
+	STATUS_VERIFICACAO_CT = 'Diferente'
+	;
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE
+	DIVERGENCIAS_LTV_CYBER AS
+SELECT DISTINCT
+	*
+FROM
+	CONTRATOS_DIVERGENTES
+WHERE
+	DMQUE3_TRATADA <> 'DSR' AND
+	QUEBRA_SUBIDA NOT IN ('Impeditivo', 'S/ Assessoria')
+	;
+QUIT;
+
+
+
+options compress=binary;
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm'
+credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE
+	DIVERGENCIAS_PAGAMENTO AS
+SELECT DISTINCT
+	A.*,
+	B.DtRecebimento AS DT_PAGAMENTO,
+	CASE WHEN DATEPART(B.DtRecebimento) >= '13OCT2025'd THEN 1 ELSE 0 END AS FLAG_PAGOU
+FROM
+	DIVERGENCIAS_LTV_CYBER A
+LEFT JOIN
+	CONNECTION TO PERM (
+           WITH QUERY_1 AS (
+
+SELECT t1.cd_contrato,
+MAX(t1.dt_recebimento) AS DtRecebimento
+FROM bv-pdbd-prd.dvry_core.tbparcelarecebimento AS t1
+GROUP BY t1.cd_contrato
+
+)
+SELECT * FROM QUERY_1
+       ) AS B
+       ON A.NUCONTRATO = INPUT(B.cd_contrato, 14.);
+QUIT;
+
+
+PROC SQL;
+CREATE TABLE
+	ELEGIVEIS_ATUALIZACAO_1 AS
+SELECT DISTINCT
+	*,
+	DATEPART(DT_MARCACAO_TBSCOR) - 1 FORMAT=DATE9. AS DIA_MENOS_1,
+	CASE
+		WHEN
+			ATRASO_ATUALIZADO >= 5 THEN 1 ELSE 0 END AS FLAG_ATRASO,
+	CASE
+		WHEN
+			ATRASO_ATUALIZADO >= 55 THEN 1 ELSE 0 END AS FLAG_ATRASO55
+
+FROM
+	DIVERGENCIAS_PAGAMENTO;
+QUIT;
+
+
+
+
+
+
+
+
+
+
+data _null_;
+    set ELEGIVEIS_ATUALIZACAO_1 end=last;
+    length contrato $32767;
+    retain contrato;
+    retain i 1;
+
+    contrato_formatado = quote(strip(put(NUCONTRATO, 14.)));
+    if length(contrato) + length(contrato_formatado) + 1 < 32000 then
+        contrato = catx(',', contrato, contrato_formatado);
+    else do;
+        call symputx(cats('CONTRATO', i), contrato);
+        i + 1;
+        contrato = contrato_formatado;
+    end;
+
+    if last then call symputx(cats('CONTRATO', i), contrato);
+    call symputx('TOTAL_PARTES', i);
+run;
+
+
+%put Total de partes: &TOTAL_PARTES.;
+
+
+
+
+options compress=binary;
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm'
+credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE
+	LIQUIDACAO_1 AS
+SELECT DISTINCT
+	A.*
+FROM CONNECTION TO PERM (
+	WITH QUERY_1 AS (
+
+SELECT DISTINCT
+    t.cd_contrato,
+    t.sq_contrato_financeiro
+FROM
+    bv-pdbd-prd.dvry_core.tbparcela AS t
+WHERE
+    t.cd_contrato IN (&CONTRATO1.)
+    AND t.st_parcela = 'A'
+
+)
+SELECT * FROM QUERY_1
+
+) A;
+QUIT;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DATA LIQUIDACAO;
+SET LIQUIDACAO_1
+
+;
+RUN;
+
+%put O total de partes é: &TOTAL_PARTES;
+
+
+PROC SQL;
+CREATE TABLE
+	VALIDA_LIQUIDACAO AS
+SELECT DISTINCT
+	A.*,
+	CASE WHEN B.cd_contrato IS NOT NULL THEN 0 ELSE 1 END AS FLAG_LIQUIDA
+FROM
+	ELEGIVEIS_ATUALIZACAO_1 A
+LEFT JOIN
+	LIQUIDACAO B
+ON
+	A.NUCONTRATO = INPUT(B.cd_contrato, 14.)
+AND
+	A.SQCONTRATOFINANCEIRO = B.sq_contrato_financeiro;
+QUIT;
+
+
+
+PROC SQL;
+SELECT DISTINCT PUT(DATEPART(DT_MARCACAO_TBSCOR), YYMMDD10.)
+INTO :LISTA_MES SEPARATED BY '*'
+FROM ELEGIVEIS_ATUALIZACAO_1
+WHERE DT_MARCACAO_TBSCOR IS NOT MISSING;
+QUIT;
+
+%PUT &LISTA_MES;
+
+
+PROC SQL;
+SELECT DISTINCT PUT(DIA_MENOS_1, YYMMDD10.)
+INTO :LISTA_DIA_ANTERIOR SEPARATED BY '*'
+FROM ELEGIVEIS_ATUALIZACAO_1
+WHERE DIA_MENOS_1 IS NOT MISSING;
+QUIT;
+
+%PUT &LISTA_DIA_ANTERIOR;
+
+
+DATA PARCELA2;
+RUN;
+
+
+
+%MACRO EMPILHA_ATRASO;
+
+%let NUM_ELEMENTOS = %sysfunc(COUNTW(&LISTA_MES.), %str(*));
+
+%do i = 1 %to &NUM_ELEMENTOS.;
+
+%let REF_TAB = %scan(&LISTA_MES., &i., *);
+
+DATA _NULL_ ;
+	MES_M0 = INPUT(scan("&LISTA_MES.", &i., "*"), yymmdd10.);
+	DIA_ANTERIOR = INPUT(scan("&LISTA_DIA_ANTERIOR.", &i., "*"), yymmdd10.);
+	CALL SYMPUT("REF_M0", "'" || scan("&LISTA_DIA_ANTERIOR.", &i., "*") || "'" );
+
+ 	CALL SYMPUTX("DIA_ANTERIOR", "'" || PUT(DIA_ANTERIOR, yymmdd10.) || "'" );
+
+RUN;
+
+%put &REF_M0;
+%put &DIA_ANTERIOR;
+
+options compress=binary;
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm'
+credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE PARCELA AS
+SELECT DISTINCT
+*
+FROM CONNECTION TO PERM (
+WITH QUERY_1 AS (
+
+SELECT
+    &REF_M0. AS REF_M0,
+    CAST(&DIA_ANTERIOR. AS DATE) AS DIA_ANTERIOR,
+    t1.cd_contrato,
+    t1.sq_contrato_financeiro,
+    DATE(MIN(CASE
+        WHEN t1.st_parcela <> 'Q'
+        OR (t1.st_parcela = 'Q'
+        AND DATE(t1.dt_processamento_ult_recebimento) >= &DIA_ANTERIOR.) THEN t1.dt_vencimento
+        ELSE NULL
+    END)) AS DtPrimeiroVenc
+FROM
+    bv-pdbd-prd.dvry_core.tbparcela AS t1
+WHERE
+    t1.cd_contrato IN (&CONTRATO1.)
+GROUP BY
+    t1.cd_contrato,
+    t1.sq_contrato_financeiro
+
+)
+SELECT * FROM QUERY_1
+
+)
+		GROUP BY cd_contrato
+
+		HAVING sq_contrato_financeiro = MAX(sq_contrato_financeiro)
+;QUIT;
+
+DATA PARCELA2;
+SET PARCELA2 PARCELA;
+RUN;
+
+%end;
+
+%MEND EMPILHA_ATRASO;
+%EMPILHA_ATRASO;
+
+
+PROC SQL;
+CREATE TABLE
+	ELEGIVEIS_ATRASO_MARCACAO AS
+SELECT DISTINCT
+	A.*,
+	(DATEPART(A.DT_MARCACAO_TBSCOR) - B.DtPrimeiroVenc) AS ATRASO_MARCACAO,
+	B.DtPrimeiroVenc,
+
+	INPUT(B.REF_M0, YYMMDD10.) AS DATA_TRATADA FORMAT=DATE9.
+
+FROM
+	VALIDA_LIQUIDACAO A
+LEFT JOIN
+	PARCELA2 B
+ON
+	A.NUCONTRATO = INPUT(B.cd_contrato, 14.)
+AND
+	A.DIA_MENOS_1 = INPUT(B.REF_M0, YYMMDD10.)
+AND
+	A.SQCONTRATOFINANCEIRO = B.sq_contrato_financeiro;
+QUIT;
+
+
+%LET DATA_MENOS_UM = '2026-01-01';
+
+
+options compress=binary;
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm'
+credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE
+	ELEGIVEIS_QUEBRAS AS
+SELECT DISTINCT
+	A.*,
+	CASE
+		WHEN A.FLAG_LIQUIDA = 1 THEN 'LIQUIDADO'
+		WHEN A.ATRASO_ATUALIZADO = 0 THEN 'EM DIA'
+		WHEN A.ATRASO_ATUALIZADO < 6 AND A.ATRASO_ATUALIZADO IS NOT MISSING THEN '<6'
+		WHEN A.ATRASO_ATUALIZADO BETWEEN 6 AND 15 THEN 'ATIVA'
+		WHEN A.ATRASO_ATUALIZADO BETWEEN 16 AND 70 THEN 'ADM'
+		WHEN A.ATRASO_ATUALIZADO > 70 THEN 'CONTENCIOSO'
+		WHEN B.DTCESSAO IS NOT NULL THEN 'FIDIC'
+		ELSE 'OUTRO'
+		END AS ATRASO_RECENTE,
+	CASE
+		WHEN A.ATRASO_MARCACAO = 0 THEN 'EM DIA'
+		WHEN A.ATRASO_MARCACAO < 6 AND A.ATRASO_MARCACAO IS NOT MISSING THEN '<6'
+		WHEN A.ATRASO_MARCACAO BETWEEN 6 AND 15 THEN 'ATIVA'
+		WHEN A.ATRASO_MARCACAO BETWEEN 16 AND 70 THEN 'ADM'
+		WHEN A.ATRASO_MARCACAO > 70 THEN 'CONTENCIOSO'
+		ELSE 'OUTRO'
+		END AS ATRASO_TBSCORE
+FROM
+	ELEGIVEIS_ATRASO_MARCACAO A
+LEFT JOIN CONNECTION TO PERM (
+    SELECT
+    A.nucontrato,
+    A.sqcontratofinanceiro,
+    A.vrpdd AS PDD_M1,
+    A.nudiasatraso AS ATRASO_M1,
+    (CAST(A.vrpermanenciaapropriado AS NUMERIC) + CAST(A.vrtaxacontrato AS NUMERIC)) AS SALDO_M1,
+    A.dtprocessamentoliquidacao,
+    A.dtcessao
+FROM
+    bv-pdbd-prd.trusted_gestaocontabil.tbcontratocontabil AS A
+WHERE
+    A.dtprocessamento = &DATA_MENOS_UM.
+    AND A.cdcarteira IN (1, 3, 4, 5, 12)
+
+
+
+
+   ) B
+   	ON
+   		A.NUCONTRATO = INPUT(B.NUCONTRATO, 14.)
+	AND
+		A.SQCONTRATOFINANCEIRO = B.SQCONTRATOFINANCEIRO
+;
+QUIT;
+
+LIBNAME ALVESDS '/riscosbv/cobranca/alvesds';
+
+DATA ALVESDS.ELEGIVEIS_QUEBRAS;
+SET ELEGIVEIS_QUEBRAS;
+RUN;
+
+
+
+
+
+DATA ALVESDS.QUERY_FOR_ELEGIVEIS_QUEBRAS_0000;
+SET QUERY_FOR_ELEGIVEIS_QUEBRAS_0000;
+RUN;
+
+
+PROC SQL;
+CREATE TABLE
+	ELEGIVEIS_VF AS
+SELECT DISTINCT
+	*
+FROM
+	ELEGIVEIS_QUEBRAS
+WHERE
+	ATRASO_RECENTE = 'CONTENCIOSO'
+AND
+	ATRASO_TBSCORE IN ('<6', 'ATIVA', 'ADM', 'CONTENCIOSO', 'OUTRO');
+QUIT;
+
+DATA ALVESDS.ELEGIVEIS_20260102;
+SET ELEGIVEIS_VF;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 01. Principal */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: 00. Dependencias */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: 00. Dependencias */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-HJePASu4SZsSYOvU/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME CAROL2 '/riscosbv/cobranca/caroline/Auxiliar LTV';
+LIBNAME PRETER '/riscosbv/cobranca/preter';
+LIBNAME LDUARTE '/riscosbv/cobranca/lduarte';
+LIBNAME BRUNO '/riscosbv/cobranca/bsilva';
+LIBNAME SATIE '/riscosbv/cobranca/satie';
+LIBNAME POLITICA	'/riscosbv/cobranca/caroline/LTV_POLITICA';
+
+
+options compress=binary;
+proc sql;
+connect to bigquery as perm(project='bv-sadi-dtm'
+credfile='/projetos/acessos/bq/di/sadi-dtm.json'
+schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+
+CREATE TABLE
+	CONSULTA_ORACLE AS
+SELECT
+DMACCT,
+DMQUE3,
+U2SCORE1,
+DMDAYS
+FROM CONNECTION TO PERM(
+
+SELECT * FROM bv-pdbd-prd.trusted_rcvry.delqmst A
+LEFT JOIN bv-pdbd-prd.trusted_rcvry.uda2 B
+ON A.DMACCT = B.U2ACCT
+WHERE A.DMSTATUS IS NULL AND (SAFE_CAST(A.DMDAYS AS INT64) > 90 AND SAFE_CAST(A.DMDAYS AS INT64) <= 1800)
+
+)
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: 00. Dependencias */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA ALVESDS.ELEGIVEIS_20260102;
+SET ELEGIVEIS_VF;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_SIMULA_ATRASO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_SIMULA_ATRASO AS
+   SELECT t1.LETRA_FINAL,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO,
+          t1.FAIXA_ATRASO
+      FROM WORK.SIMULA_ATRASO t1
+      GROUP BY t1.LETRA_FINAL,
+               t1.FAIXA_ATRASO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ELEGIVEIS_ATUALIZACAO_);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ELEGIVEIS_ATUALIZACAO_ AS
+   SELECT DISTINCT t1.LETRA_FINAL,
+          t1.LETRA_TBSCORE,
+          t1.DMQUE3_TRATADA,
+          t1.FAIXA_ATRASO,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO,
+          t1.FLAG_PAGOU
+      FROM WORK.ELEGIVEIS_ATUALIZACAO_1 t1
+      GROUP BY t1.LETRA_FINAL,
+               t1.LETRA_TBSCORE,
+               t1.DMQUE3_TRATADA,
+               t1.FAIXA_ATRASO,
+               t1.FLAG_PAGOU;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ELEGIVEIS_QUEBRAS);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ELEGIVEIS_QUEBRAS AS
+   SELECT DISTINCT t1.ATRASO_CYBER,
+          t1.ATRASO_TBSCORE,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO
+      FROM WORK.ELEGIVEIS_QUEBRAS t1
+      GROUP BY t1.ATRASO_CYBER,
+               t1.ATRASO_TBSCORE;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_PARCELA2);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PARCELA2 AS
+   SELECT DISTINCT t1.REF_M0,
+          
+            (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato
+      FROM WORK.PARCELA2 t1
+      GROUP BY t1.REF_M0;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_ELEGIVEIS_QUEBRAS_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_ELEGIVEIS_QUEBRAS_0000 AS
+   SELECT DISTINCT t1.ATRASO_TBSCORE,
+          t1.ATRASO_RECENTE,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO,
+          t1.LETRA_TBSCORE,
+          t1.DMQUE3_TRATADA
+      FROM WORK.ELEGIVEIS_QUEBRAS t1
+      GROUP BY t1.ATRASO_TBSCORE,
+               t1.ATRASO_RECENTE,
+               t1.LETRA_TBSCORE,
+               t1.DMQUE3_TRATADA;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

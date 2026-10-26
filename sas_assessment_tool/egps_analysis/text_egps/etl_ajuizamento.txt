@@ -1,0 +1,1485 @@
+START_METADATA
+PROJECT: SAS_UC4__etl_ajuizamento
+FILE_SAS: etl_ajuizamento.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:05 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -52
+ODS_OUTPUTS_DETECTED: txt
+TRIGGERS: DATA _NULL_ (6x | +480), PROC FORMAT (6x | +150), %INCLUDE (1x | +20), PROC DATASETS (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 1126
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, EXPORT, FORMAT, SORT, SQL
+HAS_DATA_STEP: Yes (52x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: BASEANOT = /projetos/mod_credito/fullservices; CARTEIRA = /projetos/ctrcredito/modelos/historico/carteira; ESTUDO = /projetos/ctrcredito/modelos/historico/ajuizamento; LTVWO = /projetos/ctrcredito/modelos/historico/ltvwo
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: CONTADOR, DTBASE, DtProcessamentoCart, conex_syb, dtbase, safra
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: SYBASEIQ
+INCLUDED SCRIPTS (Dependencies): /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/CTRCREDITO/MODELOS/SCRIPTS/MONTA_CONEXAO.SAS [SAS/Local], CARTEIRA.CARTEIRA_SD2_&DTBASE [SAS/Local], CDCCG.TBCONTRATO [SYBASEIQ], CDCCG.TBCONTRATOFINANCEIRO [SYBASEIQ], CDCCG.TBPARCELA [SYBASEIQ], CDCSG.TBCONTRATO [SYBASEIQ], CDCSG.TBPARCELA [SYBASEIQ], DBA.TBPESSOAFISICASOBANALISE [SYBASEIQ], DBA.TBPESSOASOBANALISE [SYBASEIQ], DBA.TBPROPOSTA [SYBASEIQ], DBCRED.TBENDERECOTBPESSOASOBANALISE [SYBASEIQ], LSG.TBCONTRATO [SYBASEIQ], LSG.TBPARCELA [SYBASEIQ], LTVWO.LTV_WO_&DTBASE [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CARTEIRA, LTVWO
+EXPORTED_LIBNAMES: ESTUDO
+IMPORTED FILES (Requires Ingestion): /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+TABLE_READ_PROVENANCE (Flow): CARTEIRA.CARTEIRA_SD2_&DTBASE [DATA Step - SET], CDCCG.TBCONTRATO [Pass-Through Native (SYBASEIQ) - FROM; Pass-Through Native (SYBASEIQ) - JOIN], CDCCG.TBCONTRATOFINANCEIRO [Pass-Through Native (SYBASEIQ) - FROM], CDCCG.TBPARCELA [Pass-Through Native (SYBASEIQ) - FROM], CDCSG.TBCONTRATO [Pass-Through Native (SYBASEIQ) - FROM], CDCSG.TBPARCELA [Pass-Through Native (SYBASEIQ) - FROM], DBA.TBPESSOAFISICASOBANALISE [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPESSOASOBANALISE [Pass-Through Native (SYBASEIQ) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (SYBASEIQ) - FROM], DBCRED.TBENDERECOTBPESSOASOBANALISE [Pass-Through Native (SYBASEIQ) - FROM], ESTUDO.AJUIZAMENTO_&SAFRA [DATA Step - SET], LSG.TBCONTRATO [Pass-Through Native (SYBASEIQ) - FROM], LSG.TBPARCELA [Pass-Through Native (SYBASEIQ) - FROM], LTVWO.LTV_WO_&DTBASE [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+INTERNAL READS (Temp/Local): ESTUDO.AJUIZAMENTO_&SAFRA
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ESTUDO.AJUIZAMENTO_&SAFRA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/ctrcredito/modelos/results/Ajuizamento.txt
+TEMP/DISCARDED OUTPUTS: AJUIZAMENTO, AJUIZAMENTO2, AJUIZAMENTO2_&SAFRA, AJUIZAMENTO_ENTREGA, AJUIZAMENTO_ENTREGA2, AMOSTRA, BASE2, CADASTRAIS, CARTEIRALEVES, CARTEIRALEVES_FINAL, CONTRATOSRODAS_PORPESSOA, FILTER_CONTRATOSPESSOA, LEVES, LEVES2, LEVES3, LEVES4, LMP, MOTOS, MOTOS2, MOTOS3, MOTOS4, P1, PES, PESADOS, PESADOS1, PESADOS2, PREJUIZO, PREJUIZO2, PREJUIZO3, PROCESSAMENTO, TBCONTRATO, TBENDERECO, TBPARCELA, VER, VERIFICA
+DYNAMIC REFS (Ambiguous): CARTEIRA.CARTEIRA_SD2_{DTBASE}, ESTUDO.AJUIZAMENTO_{SAFRA}, LTVWO.LTV_WO_{DTBASE}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas
+
+END_METADATA
+================================================================================
+/*
++-------------------------------------------------------------------------------------------------+
+| Programa   | AJUIZAMENTO                                                                        |
+| Autor      | MODELAGEM DE CRÉDITO - BANCO VOTORANTIM                                            |
+|            |                                                                                    |
+| Objetivo   | O modelo que foi desenvolvido pela área de Modelagem de Crédito e Cobrança tem o   |
+|            | objetivo de identificar qual veículo seria rentável para a BV ajuizar.             |
+|            |     Para isso, foram utilizadas variáveis comportamentais, cadastrais e            |
+|            | relacionadas às características do veículo financiado.                             |
+|            |     Além disso, foi desenvolvido um estudo sobre o custo de ajuizamento levando em |
+|            | consideração a UF do cliente e o tipo de veículo (Leves ou Motos).                 |
+|            |                                                                                    |
+|            | O fato de existir muitos veículos ajuizados sem serem retomados trazia altíssimos  |
+|            | custos à BV. O modelo estatístico que foi segmentado por produto (Leves e Motos)   |
+|            | traz como resultado a probabilidade de retomar ou haver pagamento ou entrega       |
+|            | amigável de um determinado veículo, dado que ele foi ajuizado.                     |
+|            |     Juntando este resultado com o custo de ajuizar um determinado automóvel foi    |
+|            | construída uma matriz e com base nela foi desenvolvida uma política de corte para  |
+|            | a decisão de ajuizar ou não o bem financiado.                                      |
++-------------------------------------------------------------------------------------------------+
+| HISTÓRICO                                                                                       |
++-------------------------------------------------------------------------------------------------+
+|    DATA    | Responsável                            |            Alteração                      |
+| 15/10/2015 | Resource IT Solution                   | - Unificação / Organização códs.          |
+|            |                                        | - Retirado Warnings                       |
+| 09/10/2018 | Vinicius Barbosa / Simone Penariol     | - Nova versão do modelo                   |
+| 15/10/2018 | Ana Raquel Lazarini / Marcio Bezerra   | - Otimização do modelo                    |
++-------------------------------------------------------------------------------------------------+
+| OUTPUTS SAS                                                                                     |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                        | Nome                         |
+| ESTUDO     | /projetos/ctrcredito/modelos/historico/ajuizamento  | Ajuizamento_&safra           |
++-------------------------------------------------------------------------------------------------+
+| INPUTS SAS                                                                                      |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                        | Nome                         |
+| CARTEIRA   | /projetos/ctrcredito/modelos/historico/carteira     | CARTEIRA_SD2_&dtbase         |
+| LTVWO      | /projetos/ctrcredito/modelos/historico/ltvwo        | LTV_WO_&dtbase               |
+| ESTUDO     | /projetos/ctrcredito/modelos/historico/ajuizamento  | Ajuizamento_&safra           |
+| BASEANOT   | /projetos/mod_credito/fullservices                  | SAS_FULL_SERVICE_&SafraFull  |
++-------------------------------------------------------------------------------------------------+
+*/
+
+DATA _NULL_;
+    contador = DATETIME();
+    CALL SYMPUT('CONTADOR', PUT(contador, DATETIME16.));
+RUN;
+
+%PUT ############ (TIMEMARKER) Início do processo de ajuizamento: &CONTADOR.;
+
+/*** ETAPA 1 - Declaração das Libraries que serão utilizadas no projeto ***/
+LIBNAME CARTEIRA '/projetos/ctrcredito/modelos/historico/carteira';
+LIBNAME LTVWO '/projetos/ctrcredito/modelos/historico/ltvwo';
+LIBNAME ESTUDO '/projetos/ctrcredito/modelos/historico/ajuizamento';
+LIBNAME BASEANOT '/projetos/mod_credito/fullservices';
+
+OPTIONS SYMBOLGEN OBS=max COMPRESS=binary;
+
+/** ETAPA 1.1 - Chama programa para montar conexão ao Banco de Dados IQ **/
+%INCLUDE '/projetos/ctrcredito/modelos/scripts/MONTA_CONEXAO.sas';
+
+OPTIONS SYMBOLGEN;
+
+%PUT ############ String para conectar ao IQ: &conex_syb.;
+
+/*** ETAPA 2 - Definição dos parâmetros de DATA ***/
+DATA _NULL_;
+
+    /**** DEFINIÇÃO DAS VARIÁVEIS ****/
+    /*                               */
+    /* Hoje                          */ dt        = TODAY();
+    /* Primeiro dia do mês anterior  */ dt_Inicio = INTNX('month',dt,-1);
+    /* Último dia do mês anterior    */ dt_fim    = INTNX('month',dt,-1,'end');
+    /* Último dia do mês retrasado   */ dt_fim2   = INTNX('month',dt,-2,'end');
+    /* Ano de dt_fim                 */ ano       = YEAR(dt_fim)*1;
+    /* Mês de dt_fim                 */ mes       = MONTH(dt_fim);
+    /* Mês de dt_fim2                */ mes2      = MONTH(dt_fim2);
+    /* AnoMês de dt_inicio           */ dt_base   = COMPRESS((YEAR(dt_Inicio) * 100) + MONTH(dt_Inicio));
+    /* AnoMês de dt_fim              */ Safra     = (YEAR(dt_fim) * 100) + MONTH(dt_fim);
+    /* Safra (AnoMês de dt_fim2)     */ SafraFull = (YEAR(dt_fim2) * 100) + MONTH(dt_fim2);
+    /* Ano_Mês de dt_inicio          */ dtbase    = SUBSTR(dt_base,1,4)||'_'||SUBSTR(dt_base,5,2);
+    /*********************************/
+
+    /* Criação das Macro Variáveis necessárias */
+    CALL SYMPUT('Safra',PUT(Safra,6.));
+    CALL SYMPUT('dtbase',PUT(dtbase,7.));
+
+    FORMAT dt dt_fim DATE.;
+RUN;
+
+/* Base-mãe - Depende diretamente do processamento do modelo de Carteiras */
+DATA CARTEIRALEVES;
+SET CARTEIRA.CARTEIRA_SD2_&dtbase.;
+    WHERE Produto = 'Leves' AND Atraso >= 30;
+RUN;
+
+/* Verifica qual a data de processamento */
+DATA PROCESSAMENTO;
+SET CARTEIRALEVES;
+    KEEP DtProcessamento;
+RUN;
+
+PROC SORT DATA=PROCESSAMENTO NODUPKEY;
+BY DtProcessamento;
+RUN;
+
+DATA _null_;
+SET PROCESSAMENTO;
+    CALL SYMPUT('DtProcessamentoCart',
+                CAT("'", put(DtProcessamento,yymmddn8.),"'"));
+RUN;
+
+%PUT ############ DtProcessamento: &DtProcessamentoCart.;
+
+/*** ETAPA 3 - Verificações cadastrais ***/
+/* Busca informações no PTA-IQPRD01 (Réplica) */
+
+/* Dados cadastrais */
+PROC SQL NOPRINT;
+    connect to SYBASEIQ (&conex_syb.);
+    CREATE TABLE CADASTRAIS AS SELECT * FROM CONNECTION TO SYBASEIQ
+    (
+		SELECT NuContratoGestao AS NuContrato,
+               MAX(NuProposta) AS MaxNuProposta,
+               MAX(DtEntradaProposta) AS MaxDtEntradaProposta
+		INTO #TbMaxProp
+		FROM DBA.TbProposta
+		WHERE StProposta = 'AP'
+		  AND NuContratoGestao IS NOT NULL
+		  AND NuContratoGestao <> 0
+		GROUP BY NuContratoGestao
+
+		SELECT AAMSB.NuContrato,
+               AAMSB.MaxNuProposta AS NuProposta,
+               b.CdPapel,
+               b.CdPessoaSobAnalise,
+               c.CdProfissao,
+               c.CdTipoProfissional,
+               c.VrTotalReceitas,
+               b.NuCpfCnpj
+		FROM #TbMaxProp AS AAMSB
+        LEFT JOIN DBA.TbPessoaSobAnalise AS b ON AAMSB.MaxNuProposta=b.NuProposta
+        LEFT JOIN DBA.TbPessoafisicaSobAnalise AS c ON b.CdPessoaSobAnalise = c.CdPessoaSobAnalise
+		WHERE b.CdPapel = 1
+    );
+QUIT;
+
+PROC SQL NOPRINT;
+    connect to SYBASEIQ (&conex_syb.);
+    CREATE TABLE TBENDERECO AS SELECT * FROM CONNECTION TO SYBASEIQ
+    (
+		SELECT CdPessoaSobAnalise,
+		       CdUf as UF_Cliente,
+               CdCep AS CEP,
+               LEFT(CdCep,3) AS Cep_3d
+
+        FROM DBCRED.TbEnderecoTbPessoaSobAnalise
+		WHERE CdTipoEndereco = 1
+	);
+QUIT;
+
+/* Informações referentes aos contratos */
+PROC SQL NOPRINT;
+CONNECT TO SYBASEIQ (&conex_syb.);
+    CREATE TABLE TBCONTRATO AS SELECT * FROM CONNECTION TO SYBASEIQ
+    (
+		SELECT NuContrato,
+               MAX(CASE WHEN CdMotivoContratoFinanceiro = 4 THEN 1 ELSE 0 END) AS FlagReneg
+        INTO #CDCCG_Reneg
+		FROM CDCCG.TbContratoFinanceiro
+        WHERE DtContratoFinanceiro < &DtProcessamentoCart.
+        GROUP BY NuContrato
+
+        SELECT a.*,
+               CASE WHEN c.FlagReneg IS NULL
+                    THEN 0
+                    ELSE c.FlagReneg
+               END AS FlagReneg
+        INTO #TbContrato
+        FROM CDCCG.TbContrato AS a
+        LEFT JOIN #CDCCG_Reneg AS c
+               ON a.NuContrato = c.NuContrato
+        WHERE a.DtCancelamento IS NULL
+          AND a.DtContrato < &DtProcessamentoCart.
+
+		SELECT NuContrato,
+               MAX(CASE WHEN CdMotivoContratoFinanceiro = 4 THEN 1 ELSE 0 END) AS FlagReneg
+        INTO #LSG_Reneg
+		FROM CDCCG.TbContratoFinanceiro
+        WHERE DtContratoFinanceiro < &DtProcessamentoCart.
+        GROUP BY NuContrato
+
+        INSERT INTO #TbContrato
+        SELECT a.*,
+               CASE WHEN c.FlagReneg IS NULL
+                    THEN 0
+                    ELSE c.FlagReneg
+               END AS FlagReneg
+        FROM LSG.TbContrato AS a
+        LEFT JOIN #LSG_Reneg AS c
+               ON a.NuContrato = c.NuContrato
+        WHERE a.DtCancelamento IS NULL
+          AND a.DtContrato < &DtProcessamentoCart.
+
+		SELECT NuContrato,
+               MAX(CASE WHEN CdMotivoContratoFinanceiro = 4 THEN 1 ELSE 0 END) AS FlagReneg
+        INTO #CDCSG_Reneg
+		FROM CDCCG.TbContratoFinanceiro
+        WHERE DtContratoFinanceiro < &DtProcessamentoCart.
+        GROUP BY NuContrato
+
+        INSERT INTO #TbContrato
+        SELECT a.*,
+               CASE WHEN c.FlagReneg IS NULL
+                    THEN 0
+                    ELSE c.FlagReneg
+               END AS FlagReneg
+        FROM CDCSG.TbContrato AS a
+        LEFT JOIN #CDCSG_Reneg AS c
+               ON a.NuContrato = c.NuContrato
+        WHERE a.DtCancelamento IS NULL
+          AND a.DtContrato < &DtProcessamentoCart.
+
+        SELECT * FROM #TbContrato
+    );
+
+QUIT;
+
+PROC SQL NOPRINT;
+CONNECT TO SYBASEIQ (&conex_syb.);
+    CREATE TABLE CONTRATOSRODAS_PORPESSOA AS SELECT * FROM CONNECTION TO SYBASEIQ
+    (
+        SELECT NuCpfCnpj,
+               NuContrato,
+               (CASE WHEN DtLiquidacaoEfetiva IS NULL OR DtLiquidacaoEfetiva > &DtProcessamentoCart. THEN 1 ELSE 0 END) AS flag_ativo
+        INTO #ContratoPorPessoa
+        FROM CDCCG.TbContrato
+        WHERE DtCancelamento IS NULL
+          /*AND CdModalidadeProduto IN (1, 2, 3, 5, 6, 7, 8, 9, 27, 28, 38, 46, 47, 48, 49)*/
+          AND DtContrato < &DtProcessamentoCart.
+		  AND DtCancelamento IS NULL
+
+        INSERT INTO #ContratoPorPessoa
+        SELECT NuCpfCnpj,
+               NuContrato,
+               (CASE WHEN DtLiquidacaoEfetiva IS NULL OR DtLiquidacaoEfetiva > &DtProcessamentoCart. THEN 1 ELSE 0 END) AS flag_ativo
+        FROM LSG.TbContrato
+        WHERE DtCancelamento IS NULL
+          /*AND CdModalidadeProduto IN (1, 2, 3, 5, 6, 7, 8, 9, 27, 28, 38, 46, 47, 48, 49)*/
+          AND DtContrato < &DtProcessamentoCart.
+		  AND DtCancelamento IS NULL
+
+        INSERT INTO #ContratoPorPessoa
+        SELECT NuCpfCnpj,
+               NuContrato,
+               (CASE WHEN DtLiquidacaoEfetiva IS NULL OR DtLiquidacaoEfetiva > &DtProcessamentoCart. THEN 1 ELSE 0 END) AS flag_ativo
+        FROM CDCSG.TbContrato
+        WHERE DtCancelamento IS NULL
+          AND CdModalidadeProduto IN (1, 2, 3, 5, 6, 7, 8, 9, 27, 28, 38, 46, 47, 48, 49)
+          AND DtContrato < &DtProcessamentoCart.
+		  AND DtCancelamento IS NULL
+
+        SELECT NuCpfCnpj,
+	           NuContrato,
+	           flag_ativo
+        FROM #ContratoPorPessoa
+    );
+
+QUIT;
+
+PROC SQL;
+CREATE TABLE FILTER_CONTRATOSPESSOA AS
+	SELECT A.NuCpfCnpj,
+		   COUNT(A.NuContrato) AS qtd_rodas,
+		   SUM(A.flag_ativo) AS qtd_rodas_aberto
+    FROM CONTRATOSRODAS_PORPESSOA AS A
+         INNER JOIN CARTEIRALEVES     AS B
+		            ON A.NuCpfCnpj = B.NuCpfCnpj
+				   AND A.NuContrato <> B.NuContrato
+    GROUP BY A.NuCpfCnpj;
+QUIT;
+
+PROC SQL NOPRINT;
+CONNECT TO SYBASEIQ (&conex_syb.);
+    CREATE TABLE TBPARCELA AS SELECT * FROM CONNECTION TO SYBASEIQ
+    (
+        SELECT a.NuContrato,
+               SUM(CASE WHEN DATEDIFF(DAY, a.DtVencimento, a.DtUltimoRecebimento) > 70 THEN 1 ELSE 0 END) AS qtd_70_mais
+        INTO #TbParcela
+        FROM cdccg.tbparcela AS a
+        INNER JOIN cdccg.TbContrato b ON a.NuContrato = b.NuContrato AND a.SqContratoFinanceiro = b.SqContratoFinanceiroAtivo
+        WHERE a.DtVencimento < &DtProcessamentoCart. AND a.DtUltimoRecebimento < &DtProcessamentoCart.
+        GROUP BY a.NuContrato
+
+        INSERT INTO #TbParcela
+        SELECT a.NuContrato,
+               SUM(CASE WHEN DATEDIFF(DAY, a.DtVencimento, a.DtUltimoRecebimento) > 70 THEN 1 ELSE 0 END) AS qtd_70_mais
+        FROM cdcsg.tbparcela as a
+        INNER JOIN cdccg.TbContrato b ON a.NuContrato = b.NuContrato AND a.SqContratoFinanceiro = b.SqContratoFinanceiroAtivo
+        WHERE a.DtVencimento < &DtProcessamentoCart. AND a.DtUltimoRecebimento < &DtProcessamentoCart.
+        GROUP BY a.NuContrato
+
+        INSERT INTO #TbParcela
+        SELECT a.NuContrato,
+               SUM(CASE WHEN DATEDIFF(DAY, a.DtVencimento, a.DtUltimoRecebimento) > 70 THEN 1 ELSE 0 END) AS qtd_70_mais
+        FROM lsg.tbparcela as a
+        INNER JOIN cdccg.TbContrato b ON a.NuContrato = b.NuContrato AND a.SqContratoFinanceiro = b.SqContratoFinanceiroAtivo
+        WHERE a.DtVencimento < &DtProcessamentoCart. AND a.DtUltimoRecebimento < &DtProcessamentoCart.
+        GROUP BY a.NuContrato
+
+        SELECT NuContrato, SUM(qtd_70_mais) as qtd_70_mais FROM #TbParcela GROUP BY NuContrato
+    );
+
+QUIT;
+
+DATA _NULL_;
+    contador = DATETIME();
+    CALL SYMPUT('CONTADOR', PUT(contador, DATETIME16.));
+RUN;
+
+%PUT ############ (TIMEMARKER) Finalização da leitura na base de dados IQ: &CONTADOR.;
+
+/*** ETAPA 4 - Escoragem da carteira ***/
+DATA _NULL_;
+    contador = DATETIME();
+    CALL SYMPUT('CONTADOR', PUT(contador, DATETIME16.));
+RUN;
+
+%PUT ############ (TIMEMARKER) Finalização da leitura ao FULL SERVICE: &CONTADOR.;
+
+PROC SQL;
+CREATE TABLE CARTEIRALEVES_FINAL AS
+
+    SELECT DISTINCT
+           a.*,
+           e.*,
+           b.CdPapel,
+           b.VrTotalReceitas,
+           f.UF_Cliente,
+           f.CEP,
+		   f.CEP_3D,
+           CASE WHEN c.qtd_rodas IS NULL THEN 0
+			    ELSE c.qtd_rodas
+		   END AS qtd_rodas,
+           CASE WHEN c.qtd_rodas_aberto IS NULL THEN 0
+			    ELSE c.qtd_rodas_aberto
+		   END AS qtd_rodas_aberto,
+           d.qtd_70_mais
+    FROM CARTEIRALEVES as a
+    LEFT JOIN TBCONTRATO as e               ON e.NuContrato = a.NuContrato
+    LEFT JOIN CADASTRAIS as b               ON a.NuContrato = b.NuContrato
+	LEFT JOIN TBENDERECO as f               ON b.CdPessoaSobAnalise = f.CdPessoaSobAnalise
+    LEFT JOIN FILTER_CONTRATOSPESSOA   as c ON e.NuCpfCnpj = c.NuCpfCnpj
+	LEFT JOIN TBPARCELA as d                ON a.NuContrato = d.NuContrato;
+
+QUIT;
+
+/** ETAPA 4.1.1 - Categorizar variáveis **/
+DATA CARTEIRALEVES_FINAL;
+SET CARTEIRALEVES_FINAL;
+    Perc_SaldoComprometido     = ROUND(Saldo/VrTotalReceitas);
+    Perc_NaoPagasSobreVencidas = ROUND(VencidasNaoPagas/ParcelasVencidas,0.01);
+
+    /* Substituindo os valores missing pela média da variável */
+    IF Perc_NaoPagasSobreVencidas = .
+       THEN Perc_NaoPagasSVencidas_cont = 1/0.377;
+       ELSE Perc_NaoPagasSVencidas_cont = 1/Perc_NaoPagasSobreVencidas;
+
+    IF Perc_SaldoComprometido = .
+       THEN Perc_SaldoComprometido_cont = LOG(6.317+0.0001);
+       ELSE Perc_SaldoComprometido_cont = LOG(Perc_SaldoComprometido+0.0001);
+
+    /* Categoriza veículos com idade inferior ou superior a 10 anos */
+    IF idade_veic <= 10
+       THEN cat_IdadeVeiculo = 1;
+       ELSE cat_IdadeVeiculo = 2;
+
+    /* Cria categoria para segregar veículos da FIAT */
+    Format cat_CdMarca $10.;
+    IF Marca = 'FIAT'
+       THEN cat_CdMarca = 'FIAT';
+       ELSE cat_CdMarca = 'OUTROS';
+
+    /* {desconhecido} */
+    IF cobertura_sdetran <= 1.144215488
+       THEN cat_cobertura_sdetran = 1;
+       ELSE cat_cobertura_sdetran = 2;
+
+    /* Categoriza se o contrato tem mais do que x parcelas atrasadas a mais de 70 dias */
+    /* e se possui atraso inferior a 173 ou superior a 255                             */
+         IF     qtd_70_mais >  4 AND       Atraso <= 173 THEN cat_cruzada2 = 1;
+    ELSE IF 0 < qtd_70_mais <= 4 AND       Atraso <= 173 THEN cat_cruzada2 = 2;
+    ELSE IF     qtd_70_mais <= 0 AND       Atraso <= 173 THEN cat_cruzada2 = 3;
+    ELSE IF     qtd_70_mais >  4 AND 173 < Atraso <= 255 THEN cat_cruzada2 = 2;
+    ELSE IF 0 < qtd_70_mais <= 4 AND 173 < Atraso <= 255 THEN cat_cruzada2 = 3;
+    ELSE IF     qtd_70_mais <= 0 AND 173 < Atraso <= 255 THEN cat_cruzada2 = 3;
+    ELSE IF     qtd_70_mais >  4 AND       Atraso >  255 THEN cat_cruzada2 = 3;
+    ELSE IF     qtd_70_mais <= 4 AND       Atraso >  255 THEN cat_cruzada2 = 3;
+
+    /* Verifica se a conta possui pelo menos um contrato de Rodas */
+    IF qtd_rodas > 0
+       THEN Flag_rodas = 1;
+       ELSE Flag_rodas = 0;
+
+    /* Verifica se a conta possui pelo menos um contrato de Rodas em aberto (não liquidado) */
+    IF qtd_rodas_aberto > 0
+       THEN Flag_rodas_aberto = 1;
+       ELSE Flag_rodas_aberto = 0;
+
+    /* Categoria conta pela localização (CEP) */
+    IF CEP_3D in ('138', '130', '137', '133', '024', '139', '134', '132',
+                  '129', '076', '136', '190', '376', '084', '116', '185', '699', '375',
+                  '083', '379', '150', '135', '046', '126', '028', '120', '122', '124',
+                  '123', '125', '121', '117', '082', '080', '071', '374', '833', '087',
+                  '113', '144', '159', '142', '143', '141', '145', '147', '030', '157',
+                  '149', '913', '162', '152', '151', '153', '154', '156', '168', '163',
+                  '382', '793', '787', '166', '173', '796', '197', '825', '837', '811',
+                  '841', '806', '892', '891', '834', '815', '817', '870', '812', '835',
+                  '836', '819', '838', '828', '803', '814', '830', '832', '813', '824',
+                  '853', '823', '883', '893', '872', '856', '792', '860', '195', '858',
+                  '894', '851', '846', '844', '850', '849', '840', '845', '852', '895',
+                  '855', '871', '867', '877', '866', '869', '875', '879', '876', '170',
+                  '859', '868', '884', '885', '952', '896', '886', '882', '888', '925',
+                  '898', '960', '956', '184', '987', '182', '180', '183', '181', '064',
+                  '186', '070', '091', '060', '058', '187', '061', '717', '706', '659',
+                  '770', '778', '774', '776', '723', '386', '727', '750', '757', '387',
+                  '762', '198', '250', '275', '216', '256', '271', '279', '205', '243',
+                  '293', '854', '899', '982', '799', '938', '098', '041', '094', '095',
+                  '099', '096', '114', '092', '115', '067', '031', '032', '027', '029',
+                  '022', '351', '015', '034', '011', '303', '330', '308', '340', '355',
+                  '331', '362', '336', '398', '359', '368', '392', '358', '356', '347',
+                  '329', '391', '369', '397', '388', '631', '630', '635', '634', '636',
+                  '625', '627', '617', '689', '459', '626', '621', '641', '643', '646',
+                  '912', '920', '932', '908', '939', '930', '961', '933', '955', '911',
+                  '935', '941', '937', '958', '959', '970', '951', '385', '383', '756',
+                  '758', '782', '769', '788', '783', '794', '768', '791', '790', '798',
+                  '179', '984', '983', '997', '990', '950', '980', '992', '280', '954',
+                  '976', '371', '372', '175', '966', '968', '989', '965', '971', '363',
+                  '199', '172', '188', '174', '169', '176', '863', '864', '350', '684',
+                  '352', '489', '562', '194', '365', '062', '038', '025', '021', '112',
+                  '074', '012', '556', '367', '753', '766', '779', '506', '507', '544',
+                  '587', '559', '554', '588', '585', '557', '567', '550', '568', '530',
+                  '591', '508', '569', '299', '292', '290', '862', '861', '402', '464',
+                  '450', '440', '456', '454', '401', '576', '443', '596', '595', '597',
+                  '287', '224', '680', '661', '671', '690', '160', '167', '360', '658',
+                  '177', '178', '494', '497', '490', '491')
+       THEN    DO;
+            IF CEP_3D IN ('138', '130', '133', '134', '132', '076', '116', '185',
+                          '375', '083', '126', '028', '122', '117', '080', '071', '087', '144',
+                          '159', '142', '141', '162', '163', '787', '173', '796', '841', '892',
+                          '891', '834', '828', '832', '883', '893', '792', '844', '845', '869',
+                          '875', '879', '884', '885', '896', '882', '888', '956', '184', '987',
+                          '180', '181', '064', '060', '058', '659', '770', '723', '386', '750',
+                          '198', '250', '256', '279', '293', '799', '938', '094', '096', '092',
+                          '067', '031', '029', '351', '303', '330', '308', '355', '362', '398',
+                          '368', '392', '356', '369', '388', '631', '630', '625', '617', '689',
+                          '459', '621', '932', '930', '955', '911', '935', '937', '970', '383',
+                          '756', '758', '769', '788', '783', '768', '990', '950', '992', '172',
+                          '350', '684', '352', '365', '038', '556', '506', '507', '544', '587',
+                          '559', '554', '588', '557', '567', '550', '591', '440', '456', '576',
+                          '595', '680', '671', '690', '360', '658', '490', '491')
+               THEN cat2_CEP_3D = 1;
+               ELSE cat2_CEP_3D = 2;
+       END;
+       ELSE    DO;
+            IF CEP_3D in ('289', '086', '078', '085', '239', '081', '072', '044',
+                          '949', '890', '192', '050', '733', '715', '718', '725', '710', '728',
+                          '738', '720', '737', '726', '749', '478', '751', '207', '273', '255',
+                          '259', '217', '210', '252', '288', '230', '215', '244', '263', '403',
+                          '213', '260', '248', '262', '338', '235', '049', '026', '332', '324',
+                          '339', '302', '301', '334', '313', '316', '345', '306', '312', '322',
+                          '320', '333', '605', '639', '608', '629', '607', '619', '647', '653',
+                          '948', '962', '931', '745', '784', '897', '297', '065', '023', '040',
+                          '744', '651', '743', '748', '746', '521', '565', '547', '558', '581',
+                          '535', '534', '541', '542', '579', '570', '486', '571', '458', '413',
+                          '417', '445', '452', '574', '660', '666', '670', '687', '366', '572',
+                          '622', '437')
+               THEN cat2_CEP_3D = 3;
+               ELSE cat2_CEP_3D = 4;
+       END;
+
+         IF qtd_70_mais >= 3.5                                                                                                THEN cat_cruzada5 = 1;
+    ELSE IF qtd_70_mais <  3.5 AND UF_Cliente not in ('SP' ,'AC' ,'PR' ,'RS' ,'MS' ,'SC' ,'TO' ,'ES' ,'AP' ,'RO' ,'RR' ,'AM') THEN cat_cruzada5 = 2;
+    ELSE IF qtd_70_mais <  3.5 AND UF_Cliente in ('SP' ,'AC' ,'PR' ,'RS' ,'MS' ,'SC' ,'TO' ,'ES' ,'AP' ,'RO' ,'RR' ,'AM')     THEN cat_cruzada5 = 3;
+
+RUN;
+
+/** ETAPA 4.1.1 - Modelo e GH **/
+DATA CARTEIRALEVES_FINAL;
+SET CARTEIRALEVES_FINAL;
+
+    ScoreInt = sum(-0.330155515909413, 0.0643889929469998*Perc_NaoPagasSVencidas_cont, -0.0480956244417317*Perc_SaldoComprometido_cont);
+
+    If cat_IdadeVeiculo = 1 then ScoreInt = sum(ScoreInt, 0);
+    If cat_IdadeVeiculo = 2 then ScoreInt = sum(ScoreInt, 0.273066363706256);
+
+    If cat_CdMarca = 'FIAT' then ScoreInt = sum(ScoreInt, -0.091332079751854);
+    If cat_CdMarca = 'OUTROS' then ScoreInt = sum(ScoreInt, 0);
+
+    If cat_cobertura_sdetran = 1 then ScoreInt = sum(ScoreInt, 0);
+    If cat_cobertura_sdetran = 2 then ScoreInt = sum(ScoreInt, 0.350611674219127);
+
+    If cat_cruzada2 = 1 then ScoreInt = sum(ScoreInt, 0.709519697011426);
+    If cat_cruzada2 = 2 then ScoreInt = sum(ScoreInt, 0.40313030573315);
+    If cat_cruzada2 = 3 then ScoreInt = sum(ScoreInt, 0);
+
+    If FlagReneg = 0 then ScoreInt = sum(ScoreInt, 0);
+    If FlagReneg = 1 then ScoreInt = sum(ScoreInt, 0.361495272543371);
+
+    If Flag_rodas = 0 then ScoreInt = sum(ScoreInt, 0);
+    If Flag_rodas = 1 then ScoreInt = sum(ScoreInt, 0.165185603108505);
+
+    If Flag_rodas_aberto = 0 then ScoreInt = sum(ScoreInt, 0);
+    If Flag_rodas_aberto = 1 then ScoreInt = sum(ScoreInt, -0.193774923245556);
+
+    If cat2_CEP_3D = 1 then ScoreInt = sum(ScoreInt, 0);
+    If cat2_CEP_3D = 2 then ScoreInt = sum(ScoreInt, 0.328860395877629);
+    If cat2_CEP_3D = 3 then ScoreInt = sum(ScoreInt, -0.668033559623781);
+    If cat2_CEP_3D = 4 then ScoreInt = sum(ScoreInt, -0.358114519606348);
+
+    If cat_cruzada5 = 1 then ScoreInt = sum(ScoreInt, 0.13953733394187);
+    If cat_cruzada5 = 2 then ScoreInt = sum(ScoreInt, -0.232030857566503);
+    If cat_cruzada5 = 3 then ScoreInt = sum(ScoreInt, 0);
+
+    PredInterno=1/(1+(exp(-ScoreInt)));
+    ScoreInterno = round(PredInterno*1000,1);
+
+RUN;
+
+DATA CARTEIRALEVES_FINAL;
+SET CARTEIRALEVES_FINAL;
+
+         IF PredInterno <=  0.246777965355776 THEN gh_ajz_leves_orig = 1;
+    ELSE IF PredInterno <=  0.297759003876259 THEN gh_ajz_leves_orig = 2;
+    ELSE IF PredInterno <=  0.380451187428476 THEN gh_ajz_leves_orig = 3;
+    ELSE IF PredInterno <=  0.440077708449707 THEN gh_ajz_leves_orig = 4;
+    ELSE IF PredInterno <=  0.497889336029832 THEN gh_ajz_leves_orig = 5;
+    ELSE IF PredInterno <=  0.592371577864027 THEN gh_ajz_leves_orig = 6;
+    ELSE IF PredInterno <=  0.68980272663769  THEN gh_ajz_leves_orig = 7;
+    ELSE gh_ajz_leves_orig = 8;
+
+    gh_ajz_leves = gh_ajz_leves_orig;
+
+RUN;
+
+/** ETAPA 4.1.3 - Parte Financeira */
+DATA CARTEIRALEVES_FINAL;
+SET CARTEIRALEVES_FINAL;
+
+    ano_venda  = INT(safra/100);
+    idade_veic = ano_venda-anomodelo;
+
+    IF       idade_veic  = 2  THEN idade='2.    2 anos';
+    IF 3  <= idade_veic <= 4  THEN idade='3. 3 -4 anos';
+    IF 5  <= idade_veic <= 7  THEN idade='4. 5 -7 anos';
+    IF 8  <= idade_veic <= 10 THEN idade='5. 8-10 anos';
+    IF 11 <= idade_veic <= 15 THEN idade='6.11-15 anos';
+    IF       idade_veic >= 16 THEN idade='7.  >=16anos';
+    IF       idade_veic <= 1  THEN idade='1.até 1 ano';
+
+    IF vrmercado=.
+       THEN DO;
+            IF       idade_veic <= 1  THEN vrmercado = 45391;
+            IF       idade_veic  = 2  THEN vrmercado = 40331;
+            IF 3  <= idade_veic <= 4  THEN vrmercado = 36097;
+            IF 5  <= idade_veic <= 7  THEN vrmercado = 31247;
+            IF 8  <= idade_veic <= 10 THEN vrmercado = 26610;
+            IF 11 <= idade_veic <= 15 THEN vrmercado = 21560;
+            IF       idade_veic >= 16 THEN vrmercado = 19665;
+       END;
+
+    vlr_med_venda = p1_DEPREC_FINAL2 * vrmercaDO;
+
+    IF Uf IN ("PE","TO","RO")           THEN custo_retoma2 = 1126;
+    IF Uf IN ("SE","MS","RJ")           THEN custo_retoma2 = 2351;
+    IF Uf IN ("MT")                     THEN custo_retoma2 = 1962;
+    IF Uf IN ("RR"    ,"GO")              THEN custo_retoma2 = 2286;
+    IF Uf IN ("PA","PI","CE")           THEN custo_retoma2 = 2077;
+    IF Uf IN ("MA","PR","BA","AC","AM") THEN custo_retoma2 = 2646;
+    IF Uf IN ("SP","DF")                THEN custo_retoma2 = 1414;
+    IF Uf IN ("PB","AP","RN")           THEN custo_retoma2 = 2125;
+    IF Uf IN ("SC","AL")                THEN custo_retoma2 = 1462;
+    IF Uf IN ("ES")                     THEN custo_retoma2 = 1263;
+    IF Uf IN ("RS","MG")                THEN custo_retoma2 = 1452;
+    IF Uf IN ("")                       THEN custo_retoma2 = 1358;
+
+    custo_honor=0.1*vlr_med_venda;
+
+RUN;
+
+DATA verifica;
+SET CARTEIRALEVES_FINAL;
+    WHERE vrmercado in (.,0);
+RUN;
+
+DATA leves;
+SET CARTEIRALEVES_FINAL;
+
+    KEEP nucontrato  gh_ajz_leves_orig  gh_ajz_leves
+         atraso      vlr_med_venda      custo_retoma2
+         Produto;
+
+RUN;
+
+DATA leves2;
+SET leves;
+
+         IF 90  <= Atraso <= 180 THEN tpmatriz = 1;
+    ELSE IF 181 <= Atraso <= 360 THEN tpmatriz = 2;
+    ELSE tpmatriz = 3;
+
+RUN;
+
+DATA leves3;
+SET leves2;
+
+    VrCustoMedio = custo_retoma2;
+    VrCustoVenda = vlr_med_venda-VrCustoMedio;
+    DtImportacao = DATETIME();
+
+    FORMAT DtImportacao DATETIME.;
+
+    DROP custo_retoma2;
+
+RUN;
+
+PROC FORMAT;
+    PICTURE dash
+    LOW-HIGH='%0Y-%0m-%0d %0H:%0M:%0S' (DATATYPE=DATETIME);
+RUN;
+
+DATA leves3;
+    SET leves3;
+    FORMAT DtImportacao dash.;
+RUN;
+
+DATA leves4;
+SET leves3;
+
+    FORMAT Publico $23.;
+
+    IF (Atraso < 90 or Atraso > 360)
+       THEN DO;
+            gh_ajz_leves_orig=.;
+            gh_ajz_leves=0;
+            Publico = 'Não se aplica';
+       END;
+
+    IF (Atraso >= 90 AND Atraso <= 360) AND SUBSTR(PUT(NuContrato,$14.),12,1) = 0 AND SUBSTR(PUT(NuContrato,$14.),14,1) <= 9
+       THEN DO;
+            gh_ajz_leves = 0;
+            Publico = 'Controle 1 - Não Ajuíza';
+    END;
+
+    ELSE IF (Atraso >= 90 AND Atraso <= 360) AND SUBSTR(PUT(NuContrato,$14.),12,1) = 9 AND SUBSTR(PUT(NuContrato,$14.),14,1) <= 9
+       THEN DO;
+            gh_ajz_leves = 9;
+            Publico = 'Controle 2 - Ajuíza';
+       END;
+
+    ELSE IF (Atraso >= 90 AND Atraso <= 360) AND (SUBSTR(PUT(NuContrato,$14.),12,1) <> 9 AND SUBSTR(PUT(NuContrato,$14.),12,1) <> 0)
+       THEN DO;
+            gh_ajz_leves = gh_ajz_leves_orig;
+            Publico = 'Teste';
+       END;
+
+RUN;
+
+/*** ETAPA 5 - Motos ***/
+DATA Motos;
+SET carteira.CARTEIRA_SD2_&dtbase. ;
+    IF produto='Motos' AND atraso >= 30;
+RUN;
+
+PROC SQL NOPRINT;
+    CREATE TABLE amostra as
+    SELECT
+        a.*,
+        b.CdProfissao,
+        b.CdTipoProfissional
+    FROM motos AS a LEFT JOIN cadastrais AS b ON a.Nucontrato=b.NuContrato;
+QUIT;
+
+DATA MOTOS2;
+SET amostra;
+
+    START = ANYDIGIT(cdmodelo);
+    END_2= NOTDIGIT(cdmodelo,start);
+
+    IF START NE 0 THEN cilindradas=INPUT(SUBSTR(CDMODELO,START,END_2-START),9.);
+
+RUN;
+
+DATA MOTOS3;
+SET MOTOS2;
+
+         IF cdmodelo in ("PRIMA(RENAULTF-1TEAM) 150 (GG) BASICO")  THEN cilindradas = "150";
+    ELSE IF cdmodelo in ("YZF R-1 1000 (GG) BASICO")               THEN cilindradas = "1000";
+    ELSE IF cdmodelo in ("YZF R-1 1000(N.SERIE) (GG) BASICO")      THEN cilindradas = "1000";
+    ELSE IF cdmodelo in ("YZF R-1(REPL.FIAT) 1000 (GG) BASICO")    THEN cilindradas = "1000";
+    ELSE IF cdmodelo in ("MT-03 660 (GG) BASICO")                  THEN cilindradas = "660";
+    ELSE IF cdmodelo in ("NX-4 FALCON 400 (GG) BASICO")            THEN cilindradas = "400";
+    ELSE IF cdmodelo in ("ER-6N 650 (GG) BASICO")                  THEN cilindradas = "650";
+    ELSE IF cdmodelo in ("ER-6N 650(ABS) (GG) BASICO")             THEN cilindradas = "650";
+    ELSE IF cdmodelo in ("FZ-6 600 FAZER (GG) BASICO")             THEN cilindradas = "600";
+    ELSE IF cdmodelo in ("FZ6 N 600 (GG) BASICO")                  THEN cilindradas = "600";
+    ELSE IF cdmodelo in ("FZ6-S 600 (GG) BASICO")                  THEN cilindradas = "600";
+    ELSE IF cdmodelo in ("NINJA ZX-6R 600CC (GG) BASICO")          THEN cilindradas = "600";
+    ELSE IF cdmodelo in ("XJ6-N 600 (GG) BASICO")                  THEN cilindradas = "600";
+    ELSE IF cdmodelo in ("YZF R-6 600 (GG) BASICO")                THEN cilindradas = "600";
+    ELSE IF cdmodelo in ("YZF R-6 600 BASICO")                     THEN cilindradas = "600";
+    ELSE IF cdmodelo in ("NINJA ZX-9R 900 (GG) BASICO")            THEN cilindradas = "900";
+    ELSE IF cdmodelo in ("NINJA ZX-10R 1000 (GG) BASICO")          THEN cilindradas = "1000";
+    ELSE IF cdmodelo in ("FIREBOLT XB12R 1200 (GG) BASICO")        THEN cilindradas = "1200";
+    ELSE IF cdmodelo in ("LIGHTNING LONG XB12SS 1200 (GG) BASICO") THEN cilindradas = "1200";
+
+RUN;
+
+/* Filtra carros */
+DATA ver;
+
+    SET motos3;
+    WHERE nucontrato in ( 12015000121278);
+
+RUN;
+
+DATA motos3;
+
+    SET motos3;
+    WHERE nucontrato not in (12015000121278);
+
+RUN;
+
+/* Define categorização para cada variável */
+PROC FORMAT;
+
+    VALUE cilindradas_
+       ., low -< 250 = "124-249"
+          250 - high = "250-1800";
+
+    VALUE atraso_
+          low -< 188  = "1. 91-187"
+          188 -  high = "2. 188-386";
+
+    VALUE AtrasoMax_
+          low -< 7   = "1. 0-6"
+            7 -< 36  = "2. 7-35"
+           36 - high = "3. 36-423";
+
+    VALUE Atrasom1_
+        ., 11 -< 92   = "1. 11-91"
+           92 -  high = "2. 92-355";
+
+    VALUE MaxAtraso6M_
+       ., 60  -< 158  = "1. 60-157"
+          158 -  high = "2. 158-356" ;
+
+    VALUE N_pgto_6m_
+          low -< 6    = "1. ate5"
+            6 -  high = "2. 6-mais";
+
+    VALUE PVNP_
+          low -< 35.48 = "1. 0-35"
+        35.48 -< 81.81 = "2. 35-80"
+        81.81 -  high  = "3. 81-100";
+
+    VALUE PagasComAtraso_
+          low -< 1    = "1. 0"
+            1 -< 5    = "2. 1-4"
+            5 - high  = "3. 5-32";
+
+    VALUE ParcelasPagas_
+         low  -< 1   = "1.   0"
+           1  -< 2   = "2.   1"
+           2  -< 11  = "3.  2-10"
+           11 - high = "4. 11-47";
+
+    VALUE ParcelasVencidas_
+          low -< 17    = "1.  3-16"
+           17 -  high  = "2. 17-42";
+
+    VALUE porcetPagas_
+          low -< 0.02380 = "1. 0-0.02083"
+      0.02380 -< 0.15    = "2. 0.02380-0.1458"
+         0.15 -  high    = "3. 0.15-0.9791";
+
+    VALUE saldo_
+          low -< 9345.22 = "1. 330-9345"
+      9345.22 -  high    = "2. 9345-59894";
+
+    VALUE Saldom1_
+    ., 330.75 -< 9352.48 = "1. 330-9352"
+      9352.48 -  high    = "2. 9352-59894";
+
+    VALUE TotalPagAtraso_
+          low -< 1    = "1. 0"
+            1 -< 2    = "2. 1"
+            2 -< 3    = "3. 2"
+            3 -  high = "4. 3-6" ;
+
+    VALUE VencidasNaoPagas_
+          low -< 10   = "1. 0-9"
+           10 -  high = "2. 10-13";
+
+    VALUE VrSaldoPVNP_
+          low -< 1276.44 = "1. 0-1276"
+      1276.44 -< 2819.43 = "2. 1276-2819"
+      2819.43 -  high    = "3. 2819-13109";
+
+    VALUE idadecontrato_
+          low -< 13   = "1. 3-12"
+           13 -  high = "2. 13-42";
+
+    VALUE pago_do_plano_
+          low -< 0.016 = "1.  0"
+        0.016 -< 0.15  = "2. 0.016-0.145"
+         0.15 -  high  = "3. 0.15-mais ";
+
+    VALUE parc_aberto_
+          low -< 47   = "1. ate46"
+           47 -  high = "2. 47-60";
+
+    VALUE perc_a_pagar_
+          low -< 0.97992 = "1. ate0.97"
+      0.97992 -< 1.0694  = "2. 0.97-1.06"
+       1.0694 -  high    = "3. 1.06-mais";
+
+    VALUE $uf_
+    "PR", "MG", "RO", "AP" = "1. PR MG RO AP"
+    "SP", "AC", "MT", "MS", "RR", "AM", "TO", "PI", "PB", "ES", "SC" = "2. SP AC MT MS RR AM TO PI PB ES SC"
+    "CE", "PE", "RS", "SE", "BA", "GO", "AL", "MA", "DF", "RN", "RJ" ,"PA" = "3. BA GO AL MA DF RN RJ PA";
+
+RUN;
+
+/* Atribui categorização definida acima para as variáveis do dataset */
+DATA MOTOS3;
+SET MOTOS3;
+
+               C_Saldo = PUT(Saldo, Saldo_.);
+              C_Atraso = PUT(Atraso, Atraso_.);
+    C_ParcelasVencidas = PUT(ParcelasVencidas, ParcelasVencidas_.);
+       C_ParcelasPagas = PUT(ParcelasPagas, ParcelasPagas_.);
+    C_VencidasNaoPagas = PUT(VencidasNaoPagas, VencidasNaoPagas_.);
+      C_PagasComAtraso = PUT(PagasComAtraso, PagasComAtraso_.);
+           C_AtrasoMax = PUT(AtrasoMax, AtrasoMax_.);
+            C_Atrasom1 = PUT(Atrasom1, Atrasom1_.);
+         C_MaxAtraso6M = PUT(MaxAtraso6M, MaxAtraso6M_.);
+      C_TotalPagAtraso = PUT(TotalPagAtraso, TotalPagAtraso_.);
+                C_PVNP = PUT(PVNP, PVNP_.);
+         C_VrSaldoPVNP = PUT(VrSaldoParcelaVencidaNaoPaga, VrSaldoPVNP_.);
+       C_pago_do_plano = PUT(pago_do_plano, pago_do_plano_.);
+        C_perc_a_pagar = PUT(perc_a_pagar, perc_a_pagar_.);
+         C_parc_aberto = PUT(parc_aberto, parc_aberto_.);
+           C_N_pgto_6m = PUT(N_pgto_6m, N_pgto_6m_.);
+                  C_uf = PUT(uf, $uf_.);
+         C_porcetPagas = PUT(porcetPagas, porcetPagas_.);
+             C_Saldom1 = PUT(Saldom1, Saldom1_.);
+       C_idadecontrato = PUT(idadecontrato, idadecontrato_.);
+         C_cilindradas = PUT(cilindradas, cilindradas_.);
+
+RUN;
+
+DATA motos3;
+SET motos3;
+
+    WHERE nucontrato NOT IN (12015000119615, 12042000117151, 12112000031398, 12209000008174,
+							 12243000000066, 12014000147733, 12014000159863, 12018000111342,
+							 12073000077998, 12145000034422);
+
+RUN;
+
+DATA motos4;
+SET motos3;
+
+    saldo2 = saldo/1000;
+
+    /* Interações UF e VencidasNaoPagas */
+    IF C_UF IN ("1. PR MG RO AP") AND C_VencidasNaoPagas IN ("1. 0-9")
+	   THEN int_uf_VencNaoPagas = 1;
+
+    IF C_UF IN ("2. SP AC MT MS RR AM TO PI PB ES SC") AND C_VencidasNaoPagas IN ("1. 0-9")
+       THEN int_uf_VencNaoPagas = 1;
+
+    IF C_UF IN ("1. PR MG RO AP", "2. SP AC MT MS RR AM TO PI PB ES SC" ) AND C_VencidasNaoPagas IN ("2. 10-13")
+       THEN int_uf_VencNaoPagas = 2;
+
+    IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_VencidasNaoPagas IN ("1. 0-9")
+       THEN int_uf_VencNaoPagas = 2;
+
+    IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_VencidasNaoPagas IN ("2. 10-13")
+       THEN int_uf_VencNaoPagas = 2;
+
+    /*Interação UF e TotalPagAtraso*/
+    IF C_UF IN ("1. PR MG RO AP","2. SP AC MT MS RR AM TO PI PB ES SC") AND C_TotalPagAtraso IN ("4. 3-6")
+       THEN int_uf_totpgatraso = 1;
+
+    IF C_UF IN ("1. PR MG RO AP") AND C_TotalPagAtraso IN ("2. 1")
+       THEN int_uf_totpgatraso = 2;
+
+    IF C_UF IN ("1. PR MG RO AP","2. SP AC MT MS RR AM TO PI PB ES SC") AND C_TotalPagAtraso IN ("3. 2")
+       THEN int_uf_totpgatraso = 2;
+
+    IF C_UF IN ("1. PR MG RO AP") AND C_TotalPagAtraso IN ("1. 0")
+       THEN int_uf_totpgatraso = 3;
+
+    IF C_UF IN ("2. SP AC MT MS RR AM TO PI PB ES SC") AND C_TotalPagAtraso IN ("2. 1")
+       THEN int_uf_totpgatraso = 3;
+
+    IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_TotalPagAtraso IN ("3. 2")
+       THEN int_uf_totpgatraso = 3;
+
+    IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_TotalPagAtraso IN ("4. 3-6")
+       THEN int_uf_totpgatraso = 3;
+
+    IF C_UF IN ("2. SP AC MT MS RR AM TO PI PB ES SC") AND C_TotalPagAtraso IN ("1. 0")
+       THEN int_uf_totpgatraso = 4;
+
+    IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_TotalPagAtraso IN ("2. 1")
+       THEN int_uf_totpgatraso = 4;
+
+    IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_TotalPagAtraso IN ("1. 0")
+       THEN int_uf_totpgatraso = 4;
+
+    /* Interações UF e Atraso */
+    IF C_UF IN ("1. PR MG RO AP") AND C_Atraso IN ("1. 91-187")
+       THEN int_uf_atraso =1;
+
+    ELSE IF C_UF IN ("1. PR MG RO AP") AND C_Atraso IN ("1. 91-187")
+       THEN  int_uf_atraso = 2;
+
+    ELSE IF C_UF IN ("2. SP AC MT MS RR AM TO PI PB ES SC") AND C_Atraso IN ("1. 91-187")
+       THEN int_uf_atraso = 2;
+
+    ELSE IF C_UF IN ("2. SP AC MT MS RR AM TO PI PB ES SC") AND C_Atraso IN ("1. 91-187")
+       THEN int_uf_atraso = 3;
+
+    ELSE IF C_UF IN ("1. PR MG RO AP") AND C_Atraso IN ("2. 188-386")
+       THEN int_uf_atraso = 3;
+
+    ELSE IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_Atraso IN ("1. 91-187")
+       THEN int_uf_atraso = 3;
+
+    ELSE IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_Atraso IN ("1. 91-187")
+       THEN int_uf_atraso = 4;
+
+    ELSE IF C_UF IN ("2. SP AC MT MS RR AM TO PI PB ES SC") AND C_Atraso IN ("2. 188-386")
+       THEN int_uf_atraso = 4;
+
+    ELSE IF C_UF IN ("3. BA GO AL MA DF RN RJ PA") AND C_Atraso IN ("2. 188-386")
+       THEN int_uf_atraso = 4;
+
+    ELSE int_uf_atraso = 2;
+
+    /*Interações feitas através do eMiner*/
+    IF 4.5 <= VencidasNaoPagas < 6.5  AND 18.5 <= atrasomax < 67.5 AND UF = "SP" OR UF = "MG" OR UF = "PR"
+	   THEN D9_intVNP_atrmax_uf = 1;
+       ELSE D9_intVNP_atrmax_uf = 0;
+
+    /*interação Cilindrada*Valor*/
+    IF Valor < 2536.51 AND C_cilindradas IN ("250-1800")
+	   THEN int_Valor_cilin = "1";
+
+    IF Valor < 1691.59 AND C_cilindradas IN ("124-249","<124")
+	   THEN int_Valor_cilin = "1";
+
+    IF Valor >= 2536.51 AND C_cilindradas IN ("250-1800")
+	   THEN int_valor_cilin = "2";
+
+    IF Valor >= 1691.59 AND C_cilindradas IN ("124-249","<124")
+	   THEN int_Valor_cilin = "2";
+
+    /*variável profissão*/
+         IF CdProfissao IN (413, 126)
+	   THEN profissao = 1;
+    ELSE IF CdProfissao IN (419, 113, 142, 143)
+	   THEN profissao = 2;
+    ELSE IF CdProfissao IN (119, 125, 129, 155, 157, 159, 161, 179,
+	                        295, 296, 298, 299, 303, 391, 393, 399,
+							403, 411, 499, 511, 519, 521, 522, 525,
+							529, 531, 532, 536, 537, 541, 543, 602,
+							719, 740, 750, 754, 759, 762, 763, 764,
+							769, 774, 801, 802, 803, 804, 805, 806,
+							807, 809, 810, 820, 901, 905, 906, 924)
+	   THEN profissao = 3;
+    ELSE IF CdProfissao IN (139, 156, 385, 402, 410, 501, 502, 539,
+	                        542, 701, 742, 765, 768, 771, 776, 777,
+							902, 998)
+	   THEN profissao = 4;
+    ELSE IF CdProfissao IN (145, 199, 209, 294, 297, 392, 409, 549,
+	                        601, 753, 758, 770, 811, 903, 923)
+	   THEN profissao = 5;
+       ELSE profissao = 6;
+RUN;
+
+DATA MOTOS4;
+SET MOTOS4;
+
+    IF profissao in (1,2,3,5,6)
+	   THEN profissao2 = 1;
+
+    IF profissao in (4)
+	   THEN profissao2 = 2;
+
+RUN;
+
+/** ETAPA 5.1.1 - Parte 1: Não retoma */
+DATA MOTOS4;
+SET MOTOS4;
+
+    score = 0.2645 + 0.00828 * PVNP -0.00216 * AtrasoMax + 0.0381 * saldo2 + 0.000984 * atraso;
+
+    IF profissao2 = 2
+	   THEN score = score + (0.3138);
+
+    IF D9_intVNP_atrmax_uf = "1"
+	   THEN score = score + (-0.1066);
+
+    IF int_uf_totpgatraso = "4"
+       THEN score = score + (0.2907);
+
+    IF int_uf_totpgatraso = "2"
+   	   THEN score = score + (-0.1982);
+
+    IF int_uf_totpgatraso = "1"
+	   THEN score = score + (-0.3483);
+
+    IF int_uf_VencNaoPagas = "2"
+   	   THEN score = score + (0.3672);
+
+    IF int_uf_atraso = "4"
+	   THEN score = score + (0.00928);
+
+    IF int_uf_atraso = "2"
+   	   THEN score = score + (-0.1359);
+
+    IF int_uf_atraso = "1"
+	   THEN score = score + (-0.2593);
+
+    IF int_Valor_cilin = "2"
+   	   THEN score = score + (-0.1737);
+
+    prob_nretoma = 1/(1+(exp(-score)));
+
+RUN;
+
+PROC FORMAT;
+
+    VALUE gh_motos
+             low -< 0.5099510289 = "1"
+    0.5099510289 -< 0.6442359329 = "2"
+    0.6442359329 -< 0.7351615004 = "3"
+    0.7351615004 -< 0.8579085139 = "4"
+    0.8579085139 -  high = "5";
+
+RUN;
+
+DATA MOTOS4;
+SET MOTOS4;
+
+    gh_motos_orig = INPUT(PUT(prob_nretoma,gh_motos.),1.);
+
+	gh_motos = gh_motos_orig;
+
+	IF prob_nretoma ne . AND cilindradas ne .;
+
+RUN;
+
+DATA VERIFICA;
+SET MOTOS4;
+    WHERE VrMercado in (.,0);
+RUN;
+
+/** ETAPA 5.1.2 - Parte 2: Financeira */
+DATA BASE2;
+SET MOTOS4;
+
+    IF VrMercado = .
+	    THEN DO;
+                 IF idade_veic <= 1 THEN VrMercado = 5754.75;
+            ELSE IF idade_veic >  1 THEN VrMercado = 5494.21;
+        END;
+
+    vlr_med_venda = 0.63 * VrMercado;
+
+    IF UF IN ("RR", "AC", "SE", "AP", "RO", "MA", "TO", "RN", "PI", "PB", "AL") THEN custo_retoma2 = 1278;
+    IF UF IN ("PE", "RJ")                                                       THEN custo_retoma2 = 1426;
+    IF UF IN ("SP")                                                             THEN custo_retoma2 = 1217;
+    IF UF IN ("AM", "RS", "DF", "PA", "BA", "MS", "GO", "SC", "ES", "CE")       THEN custo_retoma2 = 1681;
+    IF UF IN ("MG")                                                             THEN custo_retoma2 = 1653;
+    IF UF IN ("MT", "PR")                                                       THEN custo_retoma2 = 2136;
+    IF UF IN (" ")                                                              THEN custo_retoma2 = 1621;
+
+    detran = 1294;
+
+    financeiro = SUM(vlr_med_venda,-custo_retoma2,-detran);
+
+RUN;
+
+DATA MOTOS;
+SET BASE2;
+
+    KEEP nucontrato gh_motos gh_motos_orig atraso vlr_med_venda custo_retoma2 Produto ;
+
+RUN;
+
+DATA MOTOS2;
+SET MOTOS;
+
+         IF 60  <= Atraso <= 187 THEN tpmatriz = 4;
+    ELSE IF 188 <= Atraso <= 386 THEN tpmatriz = 5;
+    ELSE tpmatriz = 6;
+
+RUN;
+
+DATA MOTOS3;
+SET MOTOS2;
+
+    VrCustoMedio = custo_retoma2;
+    VrCustoVenda = vlr_med_venda-VrCustoMedio;
+    DtImportacao = DATETIME();
+
+    FORMAT DtImportacao DATETIME.;
+
+    DROP custo_retoma2;
+
+RUN;
+
+PROC FORMAT;
+    PICTURE dash
+        LOW-HIGH='%0Y-%0m-%0d %0H:%0M:%0S' (DATATYPE=DATETIME);
+RUN;
+
+DATA MOTOS3;
+SET MOTOS3;
+
+    FORMAT DtImportacao dash.;
+
+RUN;
+
+DATA MOTOS4;
+    SET MOTOS3;
+
+    FORMAT Publico $23.;
+
+    IF (Atraso < 60 or Atraso > 386)
+	    THEN DO;
+            gh_motos_orig=.;
+            gh_motos=0;
+            Publico = 'Não se aplica';
+    END;
+    ELSE IF (Atraso >= 60 AND Atraso <= 386) AND SUBSTR(PUT(NuContrato,$14.),12,1) = 0 AND SUBSTR(PUT(NuContrato,$14.),14,1) <= 9
+	    THEN DO;
+            gh_motos = 0;
+            Publico = 'Controle 1 - Não Ajuíza';
+    END;
+    ELSE IF (Atraso >= 60 AND Atraso <= 386) AND SUBSTR(PUT(NuContrato,$14.),12,1) = 9 AND SUBSTR(PUT(NuContrato,$14.),14,1) <= 9
+	    THEN DO;
+            gh_motos = 9;
+            Publico = 'Controle 2 - Ajuíza';
+    END;
+    ELSE IF (Atraso >= 60 AND Atraso <= 386) AND (SUBSTR(PUT(NuContrato,$14.),12,1) <> 9 AND SUBSTR(PUT(NuContrato,$14.),12,1) <> 0)
+	    THEN DO;
+            Publico = 'Teste';
+    END;
+
+RUN;
+
+/*** ETAPA 6 - Pesados ***/
+
+DATA pes;
+SET CARTEIRA.CARTEIRA_SD2_&dtbase.;
+
+    IF produto = 'Pesados' AND atraso >= 30;
+
+RUN;
+
+DATA P1;
+SET PES;
+
+    IF p1_molicar_defl=.
+	    THEN DO;
+            IF       idade_veic <= 1  THEN p1_molicar_defl = 73842.22; ELSE
+            IF       idade_veic  = 2  THEN p1_molicar_defl = 65233.40; ELSE
+            IF       idade_veic  = 3  THEN p1_molicar_defl = 65560.64; ELSE
+            IF       idade_veic  = 4  THEN p1_molicar_defl = 63206.52; ELSE
+            IF       idade_veic  = 5  THEN p1_molicar_defl = 66256.02; ELSE
+            IF       idade_veic  = 6  THEN p1_molicar_defl = 57877.48; ELSE
+            IF       idade_veic  = 7  THEN p1_molicar_defl = 54440.49; ELSE
+            IF       idade_veic  = 8  THEN p1_molicar_defl = 53139.85; ELSE
+            IF  9 <= idade_veic <= 10 THEN p1_molicar_defl = 46362.55; ELSE
+            IF 11 <= idade_veic <= 15 THEN p1_molicar_defl = 39222.91; ELSE
+            IF       idade_veic >= 16 THEN p1_molicar_defl = 36552.58;
+    END;
+
+RUN;
+
+DATA PESADOS;
+SET P1;
+
+    Vlr_med_venda = p1_molicar_defl;
+
+    VrCustoMedio = custo_sdetran;
+
+    VrCustoVenda = vlr_med_venda-VrCustoMedio;
+
+    DtImportacao = DATETIME();
+
+    FORMAT DtImportacao DATETIME.;
+
+RUN;
+
+DATA pesados1;
+SET pesados;
+
+    GH_orig = .;
+
+    GH = 0;
+
+    TpMatriz=7;
+
+    Format Publico $23.;
+
+    Publico = 'Controle 2 - Ajuíza';
+
+    KEEP nucontrato     gh        gh_orig       TpMatriz
+	     VrCustoVenda   atraso    vlr_med_venda VrCustoMedio
+		 DtImportacao   produto   Publico;
+;
+RUN;
+
+PROC FORMAT;
+   PICTURE dash
+   LOW-HIGH='%0Y-%0m-%0d %0H:%0M:%0S' (DATATYPE=DATETIME);
+RUN;
+
+DATA PESADOS1;
+SET PESADOS1;
+
+    FORMAT DtImportacao dash.;
+
+RUN;
+
+PROC SQL NOPRINT;
+CREATE TABLE PESADOS2 AS
+
+	SELECT a.nucontrato,
+	       a.atraso,
+		   a.gh_orig,
+		   a.gh,
+		   a.vlr_med_venda,
+		   a.TpMatriz,
+		   a.VrCustoMedio,
+		   a.VrCustoVenda,
+		   a.DtImportacao,
+		   a.Produto,
+		   a.Publico
+    FROM pesados1 as a;
+
+RUN;
+
+DATA p;
+    SET pesados2;
+RUN;
+
+DATA L;
+    SET leves4 ;
+    RENAME gh_ajz_leves_orig = GH_orig;
+    RENAME gh_ajz_leves = GH;
+RUN;
+
+DATA M;
+    SET motos4;
+    RENAME gh_motos_orig = GH_orig;
+    RENAME gh_motos = GH;
+RUN;
+
+DATA lmp;
+    SET l m p;
+RUN;
+
+PROC SQL NOPRINT;
+create table ajuizamento
+    as select a.nucontrato, a.GH_orig, a.GH, a.tpmatriz,a.VrCustoVenda,
+        a.atraso, a.vlr_med_venda,a.VrCustoMedio,a.DtImportacao, a.Produto, a.Publico
+    from lmp as a;
+RUN;
+
+DATA ajuizamento2;
+    SET ajuizamento;
+
+    FORMAT VrCustoVenda    8.2;
+    FORMAT vlr_med_venda 8.2;
+    FORMAT    VrCustoMedio 8.2;
+RUN;
+
+/*** ETAPA 7 - Base Ajuizamento ***/
+DATA PREJUIZO;
+SET LTVWO.LTV_WO_&DTBASE.;
+
+    WHERE produto in ("Leves","Motos","Pesados");
+
+    KEEP nucontrato atraso GH_orig GH tpmatriz VrCustoVenda VrCustoMedio p1_molicar_defl DtImportacao Produto Publico;
+
+	GH_orig = .;
+    GH = 0;
+
+	FORMAT Publico $23.;
+
+	Publico = 'NÃ£o se aplica';
+
+    IF produto = "Leves"   THEN tpmatriz = 3;
+    IF produto = "Motos"   THEN tpmatriz = 6;
+    IF produto = "Pesados" THEN tpmatriz = 7;
+
+	VrCustoVenda = 0;
+    VrCustoMedio = 0;
+    DtImportacao = DATETIME();
+
+    FORMAT DtImportacao DATETIME.;
+
+RUN;
+
+PROC FORMAT ;
+    PICTURE dash
+   LOW-HIGH='%0Y-%0m-%0d %0H:%0M:%0S' (DATATYPE=DATETIME);
+RUN;
+
+DATA PREJUIZO2;
+SET PREJUIZO;
+
+    RENAME p1_molicar_defl = vlr_med_venda;
+
+    FORMAT DtImportacao dash.;
+    FORMAT VrCustoVenda 8.2;
+    FORMAT VrCustoMedio 8.2;
+
+RUN;
+
+PROC SQL NOPRINT;
+CREATE TABLE PREJUIZO3 AS
+
+    SELECT nucontrato,
+           GH_orig,
+           GH,
+           tpmatriz,
+           VrCustoVenda,
+           atraso,
+           vlr_med_venda AS vlr_med_venda,
+           VrCustoMedio,
+           DtImportacao,
+           Produto,
+           Publico
+    FROM prejuizo2;
+
+QUIT;
+
+DATA AJUIZAMENTO_ENTREGA;
+SET PREJUIZO3;
+
+    FORMAT vlr_med_venda 8.2;
+
+RUN;
+
+/** ETAPA 7.1 - Filtrar vlr_med_venda missing **/
+DATA AJUIZAMENTO_ENTREGA;
+SET AJUIZAMENTO_ENTREGA;
+
+    IF vlr_med_venda >= 0;
+
+RUN;
+
+DATA AJUIZAMENTO_ENTREGA2;
+SET AJUIZAMENTO_ENTREGA
+    AJUIZAMENTO2;
+RUN;
+
+PROC SORT DATA = AJUIZAMENTO_ENTREGA2 NODUPKEY;
+    BY nucontrato;
+RUN;
+
+DATA ESTUDO.Ajuizamento_&safra. (COMPRESS=YES);
+SET AJUIZAMENTO_ENTREGA2;
+
+    DtImportacao2 = TRANWRD(PUT(DtImportacao, E8601DT20.),'T', ' ');
+
+    DROP DtImportacao;
+    RENAME  DtImportacao2 = DtImportacao;
+
+RUN;
+
+/*** ETAPA 8 - Dados para o repositório (Robô) ***/
+/*********************************************************************************************
+|                                                                                            |
+|                             ARQUIVO TXT PARA DIRETÓRIO DE REDE                             |
+|                                                                                            |
+|     Pegar o arquivo Ajuizamento.txt e colar no diretório abaixo. O arquivo não pode conter |
+| cabeçalho e a última linha deve estar em branco.                                           |
+|                                                                                            |
+| \\Bvnet\pta\APPS\COBRANCA\AJUIZAMENTO\bvf-cobranca-ajuizamento-importacao                  |
+|                                                                                            |
+|     Após colar nesta pasta aguardar uma hora para o robô (UC4) processar o arquivo, e      |
+| verificar se o arquivo está disponível na pasta:                                           |
+|                                                                                            |
+| \\Bvnet\pta\APPS\COBRANCA\AJUIZAMENTO\bvf-cobranca-ajuizamento-importacao\SUCESSO          |
+|                                                                                            |
+*********************************************************************************************/
+
+DATA Ajuizamento2_&safra.;
+SET ESTUDO.Ajuizamento_&safra.;
+    DROP Produto Publico GH_orig;
+RUN;
+
+/* Exporta arquivo para Servidor do SAS para inserção em Diretório na Rede */
+PROC EXPORT DATA = Ajuizamento2_&safra.
+
+        outfile = "/projetos/ctrcredito/modelos/results/Ajuizamento.txt"
+        dbms = dlm
+        replace;
+        delimiter = ";";
+        PUTNAMES=no;
+
+RUN;
+
+/*** ETAPA 9 - Limpar a WORK ***/
+PROC DATASETS LIB = WORK
+    KILL;
+RUN;
+
+DATA _NULL_;
+    contador = DATETIME();
+    CALL SYMPUT('CONTADOR', PUT(contador, DATETIME16.));
+RUN;
+
+%PUT ############ (TIMEMARKER) Finalização do processo de ajuizamento: &CONTADOR.;

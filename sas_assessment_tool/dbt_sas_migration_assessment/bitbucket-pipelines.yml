@@ -1,0 +1,366 @@
+image: python:3.12.3
+
+definitions:
+  steps:
+  - step: &pre-build-checks-databricks
+      name: Run dbt deps and dbt debug (Databricks)
+      caches:
+        - pip
+      script:
+        - python3 -m venv venv_databricks
+        - source venv_databricks/bin/activate
+        - export CI_SCHEMA_NAME=$(echo "dbt_ci_${BITBUCKET_BRANCH}_${BITBUCKET_BUILD_NUMBER}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export DBT_PROFILE_TARGET="indimesh_databricks"
+        - pip install --upgrade pip
+        - pip install -r requirements_databricks.txt
+        - dbt debug
+        - dbt deps
+        - colibri generate --manifest target-defer-databricks/manifest.json --catalog target-defer-databricks/catalog.json --output-dir docs-databricks
+        - colibri generate --manifest target-defer-snowflake/manifest.json --catalog target-defer-snowflake/catalog.json --output-dir docs-snowflake
+      artifacts:
+        - venv_databricks/** # Save the virtual environment as an artifact
+        - dbt_packages/** # Save dbt packages
+        - docs-databricks/index.html # Save dbt colibri html file as an artifact
+        - docs-snowflake/index.html # Save dbt colibri html file as an artifact
+
+  - step: &pre-build-checks-snowflake
+      name: Run dbt deps and dbt debug (Snowflake)
+      caches:
+        - pip
+      script:
+        - python3 -m venv venv_snowflake
+        - source venv_snowflake/bin/activate
+        - export CI_SCHEMA_NAME=$(echo "dbt_ci_${BITBUCKET_BRANCH}_${BITBUCKET_BUILD_NUMBER}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export DBT_PROFILE_TARGET="indimesh_snowflake"
+        - pip install --upgrade pip
+        - pip install -r requirements_snowflake.txt
+        - dbt debug
+        - dbt deps
+      artifacts:
+        - venv_snowflake/** # Save the virtual environment as an artifact
+        - dbt_packages/** # Save dbt packages
+
+  - step: &evaluation-databricks
+      name: SQLFluff linting, dbt-checkpoint and yamllint (Databricks)
+      caches:
+        - pip
+      script:
+        - source venv_databricks/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME=$(echo "dbt_ci_${BITBUCKET_BRANCH}_${BITBUCKET_BUILD_NUMBER}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export DBT_PROFILE_TARGET="indimesh_databricks"
+        - dbt parse
+        - pre-commit run --from-ref origin/main --to-ref HEAD --all-files pre-build-databricks
+        - pre-commit run --from-ref origin/main --to-ref HEAD --all-files pre-build
+
+  - step: &evaluation-snowflake
+      name: SQLFluff linting, dbt-checkpoint and yamllint (Snowflake)
+      caches:
+        - pip
+      script:
+        - source venv_snowflake/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME=$(echo "dbt_ci_${BITBUCKET_BRANCH}_${BITBUCKET_BUILD_NUMBER}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export DBT_PROFILE_TARGET="indimesh_snowflake"
+        - dbt parse
+        - pre-commit run --from-ref origin/main --to-ref HEAD --all-files pre-build-snowflake
+        - pre-commit run --from-ref origin/main --to-ref HEAD --all-files pre-build
+
+  - step: &run_dbt_build-databricks
+      name: Run dbt build (Databricks)
+      caches:
+        - pip
+      script:
+        - source venv_databricks/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME=$(echo "dbt_ci_${BITBUCKET_BRANCH}_${BITBUCKET_BUILD_NUMBER}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export CLEANED_BRANCH=$(echo "${BITBUCKET_BRANCH}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export DBT_PROFILE_TARGET="indimesh_databricks"
+        - |
+            if [[ "${BITBUCKET_BRANCH}" == *"FULL-REFRESH" ]]; then
+                export FULL_REFRESH="--full-refresh"
+            else
+                export FULL_REFRESH=""
+            fi
+        - echo $FULL_REFRESH
+        - |
+            if [ -f "target-defer-databricks/manifest.json" ]; then
+              dbt clone -s state:modified+,config.materialized:incremental,state:old --state target-defer-databricks
+              dbt clone -s state:modified+,config.materialized:snapshot,state:old --state target-defer-databricks
+              dbt build -s state:modified+ --state target-defer-databricks --defer --fail-fast $FULL_REFRESH
+            else
+              dbt build --fail-fast $FULL_REFRESH
+            fi
+        - git fetch origin main:refs/remotes/origin/main
+        - dbt-coves generate docs --merge-deferred --state target-defer-databricks
+        - chmod +x hooks/check-column-name-exists.py
+        - pre-commit run --from-ref origin/main --to-ref HEAD --all-files pos-build
+        - |
+            echo "Dropping schemas matching: dbt_ci_${CLEANED_BRANCH}_%"
+            dbt run-operation drop_schemas_inactive --args "{\"pattern\": \"dbt_ci_${CLEANED_BRANCH}_%\", \"database_name\": \"mesh_dev_db\", \"days\": 0}"
+
+  - step: &run_dbt_build-snowflake
+      name: Run dbt build (Snowflake)
+      caches:
+        - pip
+      script:
+        - source venv_snowflake/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME=$(echo "dbt_ci_${BITBUCKET_BRANCH}_${BITBUCKET_BUILD_NUMBER}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export CLEANED_BRANCH=$(echo "${BITBUCKET_BRANCH}"|sed 's;/;_;g'|sed 's/-/_/g')
+        - export DBT_PROFILE_TARGET="indimesh_snowflake"
+        - |
+            if [[ "${BITBUCKET_BRANCH}" == *"FULL-REFRESH" ]]; then
+                export FULL_REFRESH="--full-refresh"
+            else
+                export FULL_REFRESH=""
+            fi
+        - echo $FULL_REFRESH
+        - |
+            if [ -f "target-defer-snowflake/manifest.json" ]; then
+              echo "DBT_PROFILE_TARGET=$DBT_PROFILE_TARGET"
+              dbt clone -s state:modified+,config.materialized:incremental,state:old --state target-defer-snowflake
+              dbt clone -s state:modified+,config.materialized:snapshot,state:old --state target-defer-snowflake
+              dbt build -s state:modified+ --state target-defer-snowflake --defer --fail-fast $FULL_REFRESH
+            else
+              dbt build --fail-fast $FULL_REFRESH
+            fi
+        - git fetch origin main:refs/remotes/origin/main
+        - dbt-coves generate docs --merge-deferred --state target-defer-snowflake
+        - chmod +x hooks/check-column-name-exists.py
+        - pre-commit run --from-ref origin/main --to-ref HEAD --all-files pos-build
+        - |
+            echo "Dropping schemas matching: dbt_ci_${CLEANED_BRANCH}_%"
+            dbt run-operation drop_schemas_inactive --args "{\"pattern\": \"dbt_ci_${CLEANED_BRANCH}_%\", \"database_name\": \"mesh_dev_db\", \"days\": 0}"
+
+  - step: &upload_manifest-databricks
+      name: Upload artifacts for slim CI runs (Databricks)
+      caches:
+        - pip
+      script:
+        - source venv_databricks/bin/activate # Activate the virtual environment from the artifact
+        - export DBT_DEFAULT_TARGET="prod"
+        - export DBT_PROFILE_TARGET="indimesh_databricks"
+        - git remote set-url origin "https://${CI_USER}:${CI_PASSWORD}@bitbucket.org/${BITBUCKET_REPO_OWNER}/${BITBUCKET_REPO_SLUG}"
+        - git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+        - git remote update
+        - git fetch --all
+        - git checkout main
+        - git pull origin main
+        - dbt parse --target prod
+        - dbt docs generate
+        - |
+            mkdir -p target-defer-databricks
+            if [ -f target/manifest.json ]; then
+              mv target/manifest.json target-defer-databricks/manifest.json
+              mv target/catalog.json target-defer-databricks/catalog.json
+              echo "Databricks artifacts prepared in target-defer-databricks/"
+            else
+              echo "manifest.json or catalog.json not found after dbt parse/dbt docs generate. Cannot proceed with upload."
+              exit 1
+            fi
+        - |
+            git add target-defer-databricks/manifest.json target-defer-databricks/catalog.json
+            if git diff --staged --quiet; then
+              echo "No changes to commit."
+            else
+              git commit -m "[skip ci] Upload Databricks artifacts to branch main"
+            fi
+        - git push origin main
+
+  - step: &upload_manifest-snowflake
+      name: Upload artifacts for slim CI runs (Snowflake)
+      caches:
+        - pip
+      script:
+        - source venv_snowflake/bin/activate # Activate the virtual environment from the artifact
+        - export DBT_DEFAULT_TARGET="prod"
+        - export DBT_PROFILE_TARGET="indimesh_snowflake"
+        - git remote set-url origin "https://${CI_USER}:${CI_PASSWORD}@bitbucket.org/${BITBUCKET_REPO_OWNER}/${BITBUCKET_REPO_SLUG}"
+        - git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+        - git remote update
+        - git fetch --all
+        - git checkout main
+        - git pull origin main
+        - dbt parse --target prod
+        - dbt docs generate
+        - |
+            mkdir -p target-defer-snowflake
+            if [ -f target/manifest.json ]; then
+              mv target/manifest.json target-defer-snowflake/manifest.json
+              mv target/catalog.json target-defer-snowflake/catalog.json
+              echo "Snowflake artifacts prepared in target-defer-snowflake/"
+            else
+              echo "manifest.json or catalog.json not found after dbt parse/dbt docs generate. Cannot proceed with upload."
+              exit 1
+            fi
+        - |
+            git add target-defer-snowflake/manifest.json target-defer-snowflake/catalog.json
+            if git diff --staged --quiet; then
+              echo "No changes to commit."
+            else
+              git commit -m "[skip ci] Upload Snowflake artifacts to branch main"
+            fi
+        - git push origin main
+
+  - step: &build_and_push_image_to_ecr
+      name: Build and Push Docker Image to ECR
+      image: docker:stable
+      services:
+        - docker
+      script:
+        - export DBT_PROFILE_TARGET="indimesh_snowflake"
+        - apk add --no-cache python3 py3-pip
+        - pip install awscli
+        - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+        - docker build --build-arg DBT_PROFILE_TARGET="$DBT_PROFILE_TARGET" -t $IMAGE_NAME:latest .
+
+        - pipe: atlassian/aws-ecr-push-image:2.4.2
+          variables:
+            AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+            AWS_DEFAULT_REGION: $AWS_REGION
+            IMAGE_NAME: $IMAGE_NAME
+            TAGS: latest
+  
+  - step: &push_static_site_to_s3-databricks
+         name: Deploy databricks column lineage to S3
+         deployment: production
+         oidc: true
+         script:
+            - source venv_databricks/bin/activate
+            - |
+                if [ -f docs-databricks/index.html ]; then
+                  echo "Snowflake artifacts prepared in docs-databricks/"
+                else
+                  echo "index.html not found after colibri generate. Cannot proceed with upload."
+                  exit 1
+                fi
+            - pipe: atlassian/aws-s3-deploy:1.1.0
+              variables:
+                AWS_OIDC_ROLE_ARN: $AWS_ROLE_ARN
+                AWS_DEFAULT_REGION: $AWS_REGION
+                S3_BUCKET: $S3_BUCKET_NAME
+                LOCAL_PATH: 'docs-databricks'
+                DELETE_FLAG: 'true'
+
+  - step: &push_static_site_to_s3-snowflake
+         name: Deploy snowflake column lineage to S3
+         deployment: production
+         oidc: true
+         script:
+            - source venv_snowflake/bin/activate
+            - |
+                if [ -f docs-snowflake/index.html ]; then
+                  echo "Snowflake artifacts prepared in docs-snowflake/"
+                else
+                  echo "index.html not found after colibri generate. Cannot proceed with upload."
+                  exit 1
+                fi
+            - pipe: atlassian/aws-s3-deploy:1.1.0
+              variables:
+                AWS_OIDC_ROLE_ARN: $AWS_ROLE_ARN
+                AWS_DEFAULT_REGION: $AWS_REGION
+                S3_BUCKET: $S3_BUCKET_NAME
+                LOCAL_PATH: 'docs-snowflake'
+                DELETE_FLAG: 'true'
+
+  - step: &ci_schema_cleanup-databricks
+      name: Delete schema created by Bitbucket CI (Databricks)
+      caches:
+        - pip
+      script:
+        - source venv_databricks/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME="schema_not_configured"
+        - export DBT_PROFILE_TARGET="indimesh_databricks"
+        - echo "--- Running dbt run-operation ---"
+        - |
+          dbt run-operation drop_schemas_inactive --args '{pattern: dbt_ci_%, database_name: mesh_dev_db, days: 7}' 2>&1 \
+            | tail -1 \
+            | grep -oP '\["dbt_ci_.*"\]' \
+            | python macros/storage_cleaning/notify_deleted_schemas.py
+
+  - step: &ci_schema_cleanup-snowflake
+      name: Delete schema created by Bitbucket CI (Snowflake)
+      caches:
+        - pip
+      script:
+        - source venv_snowflake/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME="schema_not_configured"
+        - export DBT_PROFILE_TARGET="indimesh_snowflake"
+        - |
+          dbt run-operation drop_schemas_inactive --args '{pattern: dbt_ci_%, database_name: mesh_dev_db, days: 7}' 2>&1 \
+            | tail -1 \
+            | grep -oP '\["dbt_ci_.*"\]' \
+            | python macros/storage_cleaning/notify_deleted_schemas.py
+
+  - step: &dev_schema_cleanup-databricks
+      name: Delete development schemes (Databricks)
+      caches:
+        - pip
+      script:
+        - source venv_databricks/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME="schema_not_configured"
+        - export DBT_PROFILE_TARGET="indimesh_databricks"
+        - |
+          dbt run-operation drop_schemas_inactive --args '{pattern: dev_%, database_name: mesh_dev_db, days: 30}' 2>&1 \
+            | tail -1 \
+            | grep -oP '\["dev_.*"\]' \
+            | python macros/storage_cleaning/notify_deleted_schemas.py
+
+  - step: &dev_schema_cleanup-snowflake
+      name: Delete development schemes (Snowflake)
+      caches:
+        - pip
+      script:
+        - source venv_snowflake/bin/activate # Activate the virtual environment from the artifact
+        - export CI_SCHEMA_NAME="schema_not_configured"
+        - export DBT_PROFILE_TARGET="indimesh_snowflake"
+        - |
+          dbt run-operation drop_schemas_inactive --args '{pattern: dev_%, database_name: mesh_dev_db, days: 30}' 2>&1 \
+            | tail -1 \
+            | grep -oP '\["dev_.*"\]' \
+            | python macros/storage_cleaning/notify_deleted_schemas.py
+
+pipelines:
+  pull-requests:
+    '**':
+      - parallel:
+        - step: *pre-build-checks-databricks
+        - step: *pre-build-checks-snowflake
+      - parallel:
+        - step: *evaluation-databricks
+        - step: *evaluation-snowflake
+      - parallel:
+        - step: *run_dbt_build-databricks
+        - step: *run_dbt_build-snowflake
+  branches:
+    main:
+      - parallel:
+        - step: *pre-build-checks-snowflake
+        - step: *pre-build-checks-databricks
+      - step: *upload_manifest-databricks
+      - step: *upload_manifest-snowflake
+      # - parallel:
+      #   - step: *push_static_site_to_s3-snowflake
+      #   - step: *push_static_site_to_s3-databricks
+  custom:
+    ci_schema_cleanup:
+      - parallel:
+        - step: *pre-build-checks-snowflake
+        - step: *pre-build-checks-databricks
+      - parallel:
+        - step: *ci_schema_cleanup-databricks
+        - step: *ci_schema_cleanup-snowflake
+    dev_schema_cleanup:
+      - parallel:
+        - step: *pre-build-checks-snowflake
+        - step: *pre-build-checks-databricks
+      - parallel:
+        - step: *dev_schema_cleanup-databricks
+        - step: *dev_schema_cleanup-snowflake
+    build_ecr_image:
+      - step: *pre-build-checks-snowflake
+      - step: *build_and_push_image_to_ecr
+    deploy_snowflake_lineage_site:
+      - step: *pre-build-checks-snowflake
+      - step: *push_static_site_to_s3-snowflake
+    deploy_databricks_lineage_site:
+      - step: *pre-build-checks-databricks
+      - step: *push_static_site_to_s3-databricks

@@ -1,0 +1,141 @@
+START_METADATA
+PROJECT: Rodas__Incentivo_Comercial
+FILE_SAS: 04 - Base ICM.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 75)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: ARRAY (5x | +75)
+----------------------------------------
+LINES_OF_CODE: 66
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBGRINCENTIVO [SAS/Local], ICOM.TBGRCOMISSAODIRETA [SAS/Local], ICOM.TBGRCOMISSAOPERF [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_INCENTIVO_FINAL_01
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: ICOM
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_COMISSAO_PRODUTO, WORK.BASE_INCENTIVO_FINAL, WORK.BASE_INCENTIVO_FINAL_01
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRINCENTIVO [PROC SQL - JOIN], ICOM.TBGRCOMISSAODIRETA [PROC SQL - JOIN], ICOM.TBGRCOMISSAOPERF [PROC SQL - FROM], WORK.BASE_COMISSAO_PRODUTO [PROC SQL - JOIN], WORK.BASE_INCENTIVO_FINAL [DATA Step - SET], WORK.BASE_INCENTIVO_FINAL_01 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): ICOM.TBGRCOMISSAOICM
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_INCENTIVO_FINAL, BASE_INCENTIVO_FINAL_01, WORK.BASE_INCENTIVO_FINAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE BASE_INCENTIVO_FINAL AS
+SELECT
+
+A.NuAnoMes,
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+
+SUM(A.VrComissaoGR) AS VrComissaoGR_Total FORMAT COMMAX20.2,
+B.VrComissaoDiretaGR AS VrComissaoDiretaGR_MC FORMAT COMMAX20.2,
+
+SUM(VrAtingimentoPonderado) as ICM FORMAT percent9.2
+
+FROM ICOM.TBGRCOMISSAOPERF A
+
+LEFT JOIN ICOM.TBGRCOMISSAODIRETA B ON B.NUANOMES = A.NUANOMES AND B.DsLoginN1 = A.DsLoginN1 and B.CdColaborador = A.CdColaborador AND B.NmGrupoCargoColaborador = A.NmGrupoCargoColaborador
+
+GROUP BY 1,2,3,4,6
+
+;RUN;
+
+data work.BASE_INCENTIVO_FINAL;
+	set work.BASE_INCENTIVO_FINAL;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+PROC SQL;
+CREATE TABLE BASE_INCENTIVO_FINAL_01 AS
+SELECT
+
+A.NuAnoMes,
+
+B.NmCanalEstruturaComercial,
+B.NmEstruturaComercialA,
+B.NmSubEstruturaComercialA,
+B.NmAreaEstruturaComercial,
+B.LstSubstituicao,
+B.LstColaboradorFocal,
+B.DsLoginN3A,
+CASE WHEN B.DsLoginN2A = '' THEN 'cadeira.vazia' ELSE B.DsLoginN2A END AS DsLoginN2A,
+
+A.CdColaborador,
+A.NmGrupoCargoColaborador,
+A.DsLoginN1,
+
+A.VrComissaoGR_Total FORMAT COMMAX20.2,
+A.VrComissaoDiretaGR_MC FORMAT COMMAX20.2,
+A.VrComissaoGR_Total + A.VrComissaoDiretaGR_MC as VrComissaoFinal FORMAT COMMAX20.2,
+
+CASE WHEN A.ICM > 2 THEN 2 ELSE A.ICM END AS ICM FORMAT percent9.2, /*REGRA DE ICM MÁXIMO DE 200%*/
+CASE WHEN CALCULATED ICM * calculated VrComissaoFinal > 14000 THEN 14000 ELSE CALCULATED ICM * calculated VrComissaoFinal END AS VrICM_ComissaoFinal FORMAT COMMAX20.2, /*REGRA DE COMISSÃO MAXIMA DE R$ 14 MIL SEM DSR*/
+
+C.VrComissaoSeguros FORMAT COMMAX20.2,
+C.VrComissaoNaPista FORMAT COMMAX20.2,
+C.VrComissaoLevesBVO FORMAT COMMAX20.2,
+C.VrComissaoProduto FORMAT COMMAX20.2,
+
+CALCULATED VrICM_ComissaoFinal + C.VrComissaoProduto AS VrComissaoTotal FORMAT COMMAX20.2
+
+FROM BASE_INCENTIVO_FINAL A
+
+LEFT JOIN BASEGRC.TBGRINCENTIVO B ON B.DsLoginN1 = A.DsLoginN1 AND B.NUANOMES = A.NUANOMES
+LEFT JOIN WORK.BASE_COMISSAO_PRODUTO C ON C.DsLoginN1 = A.DsLoginN1 AND C.NUANOMES = A.NUANOMES
+
+/*GROUP BY 1,2,3,4,6*/
+ORDER BY 1,4,5,12
+
+;RUN;
+
+/*******************************/
+/*FAZ BKP DA ÚLTIMA BASE VALIDA*/
+/*******************************/
+/*
+DATA ICOM_BKP.TBGRCOMISSAOICM_BKP_&AnoMes.;
+SET ICOM.TBGRCOMISSAOICM;
+;RUN;
+*/
+/******************/
+/*SALVA BASE FINAL*/
+/******************/
+
+DATA ICOM.TBGRCOMISSAOICM;
+SET WORK.BASE_INCENTIVO_FINAL_01;
+;RUN;

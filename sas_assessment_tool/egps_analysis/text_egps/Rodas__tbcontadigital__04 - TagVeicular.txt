@@ -1,0 +1,126 @@
+START_METADATA
+PROJECT: Rodas__tbcontadigital
+FILE_SAS: 04 - TagVeicular.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -5
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 66
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBABERTURACONTADARODAS [SAS/Local], BV-PDBD-PRD.DVRY_NEGC_CONTA.CONTADIGITAL_TAGBV_FATO [BIGQUERY], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBABERTURACONTADARODAS [PROC SQL - JOIN], BASES.TAGVEICULAR [PROC SQL - JOIN], BV-PDBD-PRD.DVRY_NEGC_CONTA.CONTADIGITAL_TAGBV_FATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+INTERNAL READS (Temp/Local): BASES.TAGVEICULAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TAGVEICULAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/TagVeicular.csv
+TEMP/DISCARDED OUTPUTS: TAGVEICULAR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas7bdat: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/data/bases/tmp/tbproducao.sas7bdat
+
+END_METADATA
+================================================================================
+/*Base de TAGs Ativas*/
+
+proc sql ;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+   schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+   Create table Bases.TagVeicular as
+   select Distinct * from connection to perm
+	(
+	  select * from `bv-pdbd-prd.dvry_negc_conta.contadigital_tagbv_fato`
+	)
+;Quit;
+
+%VerificaAtualizacao(/projetos/MISV/data/bases/tmp/tbproducao.sas7bdat,60,150);
+
+Proc Sql;
+Create Table TagVeicular as
+	  select
+	  	Prod.NuAnoMes
+		,Prod.NuProposta
+		,Prod.NuContrato
+		,Prod.DtContrato
+		,Prod.NmSubEstruturaComercialA
+		,Prod.NmCanalEstruturaComercial
+		,Prod.NmAreaEstruturaComercial
+		,Prod.NmColaborador
+		,Prod.DsLoginN1
+		,Prod.NmAreaEstruturaComercialC
+		,Prod.NmColaboradorC
+		,Prod.DsLoginN1C
+		,Prod.DsLoginN1CartPDV
+		,Prod.DsLoginN2C
+		,Prod.NmGrupoProdutoMeta
+		,Prod.DsLoginOriginador
+		,Prod.NuCnpjLoja
+		,Prod.CdParceiroComercial
+		,Prod.NmParceiroComercial
+		,Prod.NmPessoa
+		,Prod.TpPessoa
+		,Prod.NuCpfCnpj
+		,Prod.VrProducao
+		,Prod.DtAtualizacao
+
+		,Conta.NuConta
+		,Conta.DtAbertuaCC
+		,Conta.DtAtivacao
+		,Conta.FlContaAberta
+		,Conta.FlDebitoAutomaticoEfetivado
+
+		,Tag.ds_ultm_evento as Status_TAG
+		,Tag.fl_solicitacao_app
+		,Tag.dt_solicitacao
+		,Tag.dt_ativacao
+		,Tag.fl_tag_ativada
+		,Tag.dt_primeiro_uso
+		,Tag.fl_tag_utilizada
+		,Tag.dt_cancelamento
+		,Tag.fl_cancelada
+
+		from tmp.TbProducao Prod
+			Left join BaseGrc.TBABERTURACONTADARODAS Conta
+				 On Prod.NuCpfCnpj = Conta.NuCpfCnpj
+
+				 Left join Bases.TagVeicular as Tag
+				 		On InPut(Conta.NuConta, 8.) = InPut(Tag.cd_conta_corrente, 8.)
+
+WHERE Prod.NuAnomes >= 202501 and TpPessoa = 'F'
+;Quit;
+
+/*Exporta BAse*/
+proc export
+data=TagVeicular
+file='/riscosbvf/BA/processos/output/TagVeicular.csv' replace
+dbms=dlm;
+delimiter=';';
+run;

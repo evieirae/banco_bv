@@ -1,0 +1,124 @@
+START_METADATA
+PROJECT: SAS_UC4__03-ExecutaMotorDRM
+FILE_SAS: 03-ExecutaMotorDRM.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:54 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 65)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (3x | +60), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 56
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: AAAAMM, AAAAMMDD, ANO, DIA, DTAUX, DTMUD, MES, Modo_Exec, dtCorteOne, dtproc, flagAlgoOne, origem, result_pos, result_rwa
+DETECTED_MACROS_USED: AAAAMMDD, ANO, DIA, DTAUX, DTREF, MES, Modo_Exec, dtCorteOne, dtproc, flagAlgoOne, origem, result_pos, result_rwa, sysparm
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /&Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/00-IncludeFatorVertice.sas, /&Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/01-MotorDRM_AlocaVertices.sas, /&Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/02-MotorDRM_GeraXML.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /&MODO_EXEC./RISCOSMERCADO/RMSAS/BIN/SAS/JOBLIST/00-INCLUDEFATORVERTICE.SAS [SAS/Local], /&MODO_EXEC./RISCOSMERCADO/RMSAS/BIN/SAS/JOBLIST/01-MOTORDRM_ALOCAVERTICES.SAS [SAS/Local], /&MODO_EXEC./RISCOSMERCADO/RMSAS/BIN/SAS/JOBLIST/02-MOTORDRM_GERAXML.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/00-IncludeFatorVertice.sas, /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/01-MotorDRM_AlocaVertices.sas, /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/02-MotorDRM_GeraXML.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/00-IncludeFatorVertice.sas, /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/01-MotorDRM_AlocaVertices.sas, /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/02-MotorDRM_GeraXML.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): _CADONE.RWA_BACENMOR_{AAAAMMDD}, _INPUT.RWA_BACEN{ORIGEM}, _INPUT.TBPOSICAO{ORIGEM}, _POSONE.TBPOSICAOMOR_{AAAAMMDD}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/00-IncludeFatorVertice.sas
+[CODE REF] /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/01-MotorDRM_AlocaVertices.sas
+[CODE REF] /&amp;Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/02-MotorDRM_GeraXML.sas
+
+END_METADATA
+================================================================================
+OPTIONS SYMBOLGEN COMPRESS=YES;
+OPTIONS dlcreatedir;
+
+/*%let Modo_Exec=riscosbv/mercado;*/
+%let Modo_Exec=projetos;
+
+/*Imputar Datas manuais*/
+/*%LET sysparm 20221103/MOR;*/
+
+%include "/&Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/00-IncludeFatorVertice.sas";
+%include "/&Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/01-MotorDRM_AlocaVertices.sas";
+%include "/&Modo_Exec./riscosmercado/rmsas/bin/sas/joblist/02-MotorDRM_GeraXML.sas";
+
+%let DTAUX=%sysfunc(SCAN(&sysparm.,1,"/"));
+/*Data de mudança no DRM - condições para reprocessamento retroativo*/
+%LET DTMUD = 20180530;
+%let dtCorteOne = 20220830;
+
+%let origem=%sysfunc(SCAN(&sysparm.,-1,"/"));
+
+%let DIA = %sysfunc(substr(&DTAUX.,7,2));
+%let MES = %sysfunc(substr(&DTAUX.,5,2));
+%let ANO = %sysfunc(substr(&DTAUX.,1,4));
+%let AAAAMM  =&ANO.&MES.;
+%let AAAAMMDD=&ANO.&MES.&DIA.;
+
+%let dtproc = %sysfunc(putn(%sysfunc(mdy(&MES.,&DIA.,&ANO.)), date9.));
+
+%put DTAUX=&DTAUX.;
+%put DTREF=&DTREF.;
+%put origem=&origem.;
+%put dtproc=&dtproc.;
+
+%macro ExecutaDRM;
+
+	%GeraFatorVertice(False);
+
+	%let flagAlgoOne = 0;
+
+	%if &AAAAMMDD. < &dtCorteOne. %then %do;
+		%let result_rwa=%sysfunc(exist(_INPUT.RWA_BACEN&origem._&AAAAMMDD.));
+		%let result_pos=%sysfunc(exist(_INPUT.TBPOSICAO&origem._&AAAAMMDD.));
+		%let flagAlgoOne = 0;
+	%end;
+	%else %do;
+		%let result_rwa=%sysfunc(exist(_CADONE.RWA_BACENMOR_&AAAAMMDD.));
+		%let result_pos=%sysfunc(exist(_POSONE.TBPOSICAOMOR_&AAAAMMDD.));
+		%let flagAlgoOne = 1;
+	%end;
+
+	%if &result_rwa eq 1 and &result_pos eq 1 %then %do;
+		%CriaFatoresDeRisco;
+
+		%if &flagAlgoOne eq 1 %then %do;
+			%CriaRWAPOSICAO_One(&origem.);
+		%end;
+		%else %do;
+			%CriaRWAPOSICAO(&origem.);
+		%end;
+
+		%GeraBaseDRMContabil(&origem.);
+		%GeraBaseDRMAtivFinan(&origem.);
+/*		%GeraArquivoXML(&origem.,2040);*/
+		%GeraArquivoXML(&origem.,2060);
+	%end;
+	%else %do;
+		%put result_rwa=&result_rwa.;
+		%put result_pos=&result_pos.;
+	%end;
+%mend ExecutaDRM;
+
+%ExecutaDRM;

@@ -1,0 +1,126 @@
+START_METADATA
+PROJECT: Rodas__Bases_Planejamento_pesados
+FILE_SAS: 04 - Ticket.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 57
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_TICKET_POT_P
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_TICKET_POT_P, WORK.POTENCIAL_RODAS_04_P
+TABLE_READ_PROVENANCE (Flow): WORK.BASE_TICKET_POT_P [PROC SQL - FROM], WORK.POTENCIAL_RODAS_04_P [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_TICKET_00_P, BASE_TICKET_01_P, BASE_TICKET_POT_P
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+PROC SQL;
+CREATE TABLE BASE_TICKET_00_P AS
+SELECT distinct
+
+NmAreaEstruturaComercialC,
+FxIdade,
+strip(NmAreaEstruturaComercialC)||FxIdade as Chave,
+
+SUM(QtdContratos_ProjSab) AS QtdContratos_ProjSab FORMAT COMMAX20.6,
+SUM(VrProducao_ProjSab) AS VrProducao_ProjSab FORMAT COMMAX20.2,
+COALESCE(CALCULATED VrProducao_ProjSab / CALCULATED QtdContratos_ProjSab,0) AS Ticket_BV_ProjSab FORMAT COMMAX20.2,
+
+SUM(QtGravamesMercadoAjustado) AS qtgravamesplayers_ProjSab FORMAT COMMAX20.6,
+SUM(VrGravamesMercadoAjustado) AS Vrgravamesplayers_ProjSab FORMAT COMMAX20.2,
+COALESCE(CALCULATED Vrgravamesplayers_ProjSab / CALCULATED qtgravamesplayers_ProjSab,0) AS Ticket_Mercado_ProjSab FORMAT COMMAX20.2,
+
+case when CALCULATED Ticket_BV_ProjSab >0 then CALCULATED Ticket_BV_ProjSab else CALCULATED Ticket_Mercado_ProjSab end as TicketCluster FORMAT COMMAX20.2
+
+FROM WORK.POTENCIAL_RODAS_04_P A
+/*where strip(NmAreaEstruturaComercialC)||FxIdade = 'Canal Pesados0 a 2 anos' */
+GROUP BY 1,2,3
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_TICKET_POT_P AS
+SELECT distinct
+
+a.ChaveCdParceiro_FxIdade,
+a.CdParceiroComercial,
+a.FxIdade,
+a.NmAreaEstruturaComercialC,
+
+SUM(a.QtdContratos_ProjSab) AS QtdContratos_ProjSab FORMAT COMMAX20.6,
+SUM(a.VrProducao_ProjSab) AS VrProducao_ProjSab FORMAT COMMAX20.2,
+COALESCE(CALCULATED VrProducao_ProjSab / CALCULATED QtdContratos_ProjSab,0) AS Ticket_BV_ProjSab FORMAT COMMAX20.2,
+
+SUM(a.QtGravamesMercadoAjustado) AS QtGravamesMercadoAjustado FORMAT COMMAX20.6,
+SUM(a.VrGravamesMercadoAjustado) AS VrGravamesMercadoAjustado FORMAT COMMAX20.2,
+COALESCE(CALCULATED VrGravamesMercadoAjustado / CALCULATED QtGravamesMercadoAjustado,0) AS Ticket_Mercado_ProjSab FORMAT COMMAX20.2
+
+FROM WORK.POTENCIAL_RODAS_04_P A
+GROUP BY 1,2,3,4
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_TICKET_01_P AS
+SELECT distinct
+
+a.ChaveCdParceiro_FxIdade,
+a.CdParceiroComercial,
+a.FxIdade,
+a.NmAreaEstruturaComercialC,
+
+SUM(a.QtdContratos_ProjSab) AS QtdContratos_ProjSab FORMAT COMMAX20.6,
+SUM(a.VrProducao_ProjSab) AS VrProducao_ProjSab FORMAT COMMAX20.2,
+COALESCE(CALCULATED VrProducao_ProjSab / CALCULATED QtdContratos_ProjSab,0) AS Ticket_BV_ProjSab FORMAT COMMAX20.2,
+
+SUM(a.QtGravamesMercadoAjustado) AS qtgravamesplayers_ProjSab FORMAT COMMAX20.6,
+SUM(a.VrGravamesMercadoAjustado) AS Vrgravamesplayers_ProjSab FORMAT COMMAX20.2,
+COALESCE(CALCULATED Vrgravamesplayers_ProjSab / CALCULATED qtgravamesplayers_ProjSab,0) AS Ticket_Mercado_ProjSab FORMAT COMMAX20.2,
+
+case when CALCULATED Ticket_BV_ProjSab >0 then CALCULATED Ticket_BV_ProjSab else CALCULATED Ticket_Mercado_ProjSab end as TicketPDV FORMAT COMMAX20.2,
+Sum(b.TicketCluster) as TicketCluster FORMAT COMMAX20.2,
+case when CALCULATED TicketPDV >0 then CALCULATED TicketPDV else Sum(b.TicketCluster) end as TicketFinal FORMAT COMMAX20.2,
+CALCULATED TicketFinal / Sum(b.TicketCluster)  as Multiplo,
+
+case when CALCULATED Multiplo >3 then Sum(b.TicketCluster) * 3 else CALCULATED TicketFinal end as TicletFinalCap FORMAT COMMAX20.2
+
+FROM WORK.BASE_TICKET_PoT_P A
+	left join BASE_TICKET_00_P as B
+	on strip(a.NmAreaEstruturaComercialC)||a.FxIdade = b.Chave
+/*where strip(a.NmAreaEstruturaComercialC)||a.FxIdade= 'Canal Pesados0 a 2 anos' and CdParceiroComercial = 7554*/
+GROUP BY 1,2,3,4
+;RUN;

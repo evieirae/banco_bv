@@ -1,0 +1,819 @@
+START_METADATA
+PROJECT: Rodas__indicadores-funil-executivo
+FILE_SAS: funil-executivo_02062025.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 729
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtCtp, DtCtpSim, DtPrd, LstD3, LstD3CPr, LstD3CSm, M5, hoje, iqHoje, iqM3, m3, safraM3, safraM5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], CONVPROP.CONVERSAOPROPOSTAS [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], CRM.SIMU_PROP_AQUISICAO [SAS/Local], DWBI_DIME.TBDIMTEMPODATA [DBCON], PPR.PPR_ANALITICO [SAS/Local], RELEXC.TBMARKETSHAREDIARIAABERTA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): CONVPROP.CONVERSAOPROPOSTAS [PROC SQL - FROM; PROC SQL - JOIN], CONVSIMU.TBSIMULACOES [PROC SQL - FROM], CRM.SIMU_PROP_AQUISICAO [DATA Step - SET], DWBI_DIME.TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], PPR.PPR_ANALITICO [PROC SQL - FROM], RELEXC.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEMENSAGERIA, CONVSIMU, CONVSIMU01, CONVSIMUUSADOS, MARKETSHARE, MARKETSHARE_ABERTO, SIMU_PROP_AQUISICAO, TBBASEFINAL, TBBASEFINAL01, TBBASEFINAL01_ABERTO, TBBASEFINAL_ABERTO, TBBASEFINAL_UNIFICADA, TBCONVERSAOSEMSIMULACAO, TBCONVERSAOSEMSIMULACAOD3, TBCONVERSAOSEMSIMULACAOD3_ABERTO, TBCONVERSAOSEMSIMULACAO_ABERTO, TBDADOSCONTRATO, TBDADOSCONTRATO_ABERTO, TBDADOSCONVERSAO, TBDADOSCONVERSAO_ABERTO, TBDIASUTEIS, TBDIASUTEIS01, TBSEMANAS, TBSIMULACAOENTRADA, TBSIMULACAOENTRADA_ABERTA, TBSIMULACAOGERAL, TBSIMULACAOGERAL_ABERTA, TBSIMULACAOPROPENTRADAMINIMA, TBSIMUPROPENTRADAMIN_ABERTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+/* Busca informações de semana e dia útil */
+%Gerar_TbSemanas_InicioSegunda(&iqM3.,&iqHoje.);
+%MarcaDU(&iqM3.,&iqHoje.,3);
+%MarcaDU(&iqM3.,&iqHoje.,1);
+%MarcaDU(&iqM3.,&iqHoje.,0);
+
+/* Ajuste manual na marcação de semana para exceções */
+PROC SQL;
+CREATE TABLE TbSemanas AS
+  SELECT
+    DtTempo,
+    CASE WHEN DtTempo IN ('01OCT2022'd,'02OCT2022'd,'01JAN2023'd,'01APR2023'd,'02APR2023'd) THEN 'S2'
+         WHEN DtTempo = '31OCT2022'd THEN 'S5'
+         ELSE NuSemana
+         END AS NuSemana,
+    NuSemana AS NuSemana_Orig
+  FROM TbSemanas;
+RUN;
+
+/* Corta base de aquisição */
+DATA SIMU_PROP_AQUISICAO (KEEP=Cod_Simulacao Msg_Dash Msg_2 fx_ent_min pc_ent_min);
+SET CRM.SIMU_PROP_AQUISICAO;
+  WHERE Dt_Simulacao >= "&M5."d;
+RUN;
+
+/* Corta CONVSIMU */
+PROC SQL;
+CREATE TABLE Convsimu01 AS
+  SELECT
+    A.*,
+    TRANSTRN(COALESCE(A.FxIdade,A.FxIdade,'Desconhecido'), ' de ', ' ') AS FxIdadeAj,
+    CASE WHEN COALESCE(A.Mensageria,B.Msg_Dash) IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%')
+              AND COALESCE(A.Mensageria2,B.Msg_2) NOT IN ('3. Recusado', '4. Recusado Reversível') THEN 'Mensageria Positiva'
+         WHEN COALESCE(A.Mensageria,B.Msg_Dash) = '6. Recusado'
+              OR COALESCE(A.Mensageria,B.Msg_Dash) IN ('0. Aprovado 100%','1. Muita chance >85%','2. Grande chance >70%','3. Boa chance >50%') and Mensageria2 in ('3. Recusado', '4. Recusado Reversível') THEN 'Recusado'
+         ELSE 'Demais Msgs'
+         END AS GrupoMensageria,
+    COALESCE(A.PcEntradaMinima,B.pc_ent_min) AS EntMinAj,
+    CASE WHEN COALESCE(A.EntradaMinima,B.fx_ent_min) IN ('00% a 4,99%','05% a 9,99%') THEN 'MÍNIMA ATÉ 10%'
+         WHEN COALESCE(A.EntradaMinima,B.fx_ent_min) IN ('10% a 14,99%','15% a 19,99%') THEN 'MÍNIMA ATÉ 20%'
+         WHEN COALESCE(A.EntradaMinima,B.fx_ent_min) IN ('20% a 24,99%','25% a 29,99%') THEN 'MÍNIMA ATÉ 30%'
+         WHEN COALESCE(A.EntradaMinima,B.fx_ent_min) IN ('30% a 34,99%','35% a 39,99%') THEN 'MÍNIMA ATÉ 40%'
+         WHEN COALESCE(A.EntradaMinima,B.fx_ent_min) IN ('40% a 44,99%','45% a 49,99%') THEN 'MÍNIMA ATÉ 50%'
+         ELSE 'MÍNIMA > 50%'
+         END AS FxEntradaMinimaAj,
+    CASE WHEN COALESCE(A.Mensageria,B.Msg_Dash) = '0. Aprovado 100%' then 'PAP' ELSE
+      CASE WHEN A.DtSimulacaoInicial >= '20Apr2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '60' and '61' then 'POLÍTICA 1.2'
+           WHEN A.DtSimulacaoInicial >= '13May2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '60' and '69' then 'POLÍTICA 1.2'
+           WHEN A.DtSimulacaoInicial >= '13Jun2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '60' and '74' then 'POLÍTICA 1.2'
+           WHEN A.DtSimulacaoInicial >= '13Jul2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '60' and '84' then 'POLÍTICA 1.2'
+           WHEN A.DtSimulacaoInicial >= '03Aug2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '20' and '21' then 'POLÍTICA 1.3'
+           WHEN A.DtSimulacaoInicial >= '23Sep2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '40' and '99' then 'POLÍTICA 1.2'
+           WHEN A.DtSimulacaoInicial >= '06Dec2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '20' and '29' then 'POLÍTICA 1.3'
+           WHEN A.DtSimulacaoInicial >= '06Dec2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '10' and '19' then 'POLÍTICA 1.2'
+           WHEN A.DtSimulacaoInicial >= '06Dec2022'd and SUBSTR(A.NUCPFCNPJ,6,2) between '30' and '99' then 'POLÍTICA 1.2'
+           WHEN A.DtSimulacaoInicial >= '14Mar2023'd and SUBSTR(A.NUCPFCNPJ,6,2) between '00' and '09' then 'POLÍTICA 1.3'
+           ELSE 'POLÍTICA 5.1'
+           END
+      END AS FlagPolitica
+  FROM
+    CONVSIMU.TBSIMULACOES A
+  LEFT JOIN
+    SIMU_PROP_AQUISICAO B
+    ON A.CdSimulacaoInicial = B.Cod_Simulacao
+  WHERE
+    NuAnoMes >= &safraM5.;
+RUN;
+
+DATA Convsimu;
+SET Convsimu01;
+  WHERE NuAnoMes >= &safraM3.
+    AND Produto = 'Leves'
+    AND TpPessoa = 'PF'
+    AND SistemaInicial = 'PPAR'
+    AND Canal = 'MULTIMARCAS';
+RUN;
+
+DATA BaseMensageria;
+SET Convsimu01;
+  WHERE NuProposta <> .;
+RUN;
+
+DATA ConvsimuUsados;
+SET Convsimu01;
+  WHERE FxIdadeAj <> 'ZeroKM'
+    AND NuAnoMes >= &safraM3.
+    AND Produto = 'Leves'
+    AND TpPessoa = 'PF'
+    AND SistemaInicial = 'PPAR'
+    AND Canal = 'MULTIMARCAS';
+RUN;
+
+/* Busca informações de simulações, mensageria e entrada */
+PROC SQL;
+CREATE TABLE TbSimulacaoGeral AS
+  SELECT
+    'SimulacaoGeral' as TpDados,
+    A.NuAnoMes,
+    B.NuSemana,
+    A.FxIdadeAj AS FxIdade,
+    A.GrupoMensageria,
+    COUNT(DISTINCT (CASE WHEN FlCard = 1 THEN A.NuCpfCnpj END)) AS QtdSimulacoes,
+    SUM(A.EntMinAj * A.VrProposta) as VpEntradaMinima,
+    SUM(A.VrProposta) as VrProposta,
+    SUM(A.VrEntrada) as VrEntrada,
+    SUM(FlPropostaOriginada) as QtdOriginadas
+  FROM
+    ConvsimuUsados A
+  LEFT JOIN TbSemanas B
+    ON A.DtSimulacaoInicial = B.DtTempo
+  GROUP BY
+    1,2,3,4,5;
+RUN;
+
+PROC SQL;
+SELECT MAX(DtInclusaoGravame) INTO :DtCtpSim FROM CONVSIMU.tbsimulacoes;
+RUN;
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD3CSm FROM TbD3 WHERE D3 <= &DtCtpSim.;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbSimulacaoEntrada AS
+  SELECT
+    'SimulacaoEntrada' as TpDados,
+    A.NuAnoMes,
+    B.NuSemana,
+    A.GrupoMensageria,
+	A.FxEntradaMinimaAj AS FxEntradaMinima,
+    A.FlagPolitica,
+    COUNT(DISTINCT (CASE WHEN FlCard = 1 THEN A.NuCpfCnpj END)) AS QtdSimulacoes,
+    SUM(A.EntMinAj * A.VrProposta) AS VpEntradaMinima,
+    SUM(A.VrProposta) AS VrProposta,
+    SUM(COALESCE(A.VrEntradaOri,A.VrEntrada)) AS VpEntrada,
+    SUM(COALESCE(A.VrPropostaOriginada,A.VrProposta)) AS VrLiberadoHierarquia,
+    SUM(A.ProbabilidadeAprovacao * A.VrProposta) AS RatingSimulacao,
+    SUM(A.TxInicioFinanciamento * A.VrProposta) AS VpTaxa,
+    SUM(A.TxTirContabil * A.VrProposta) AS VpTIR
+  FROM
+    ConvsimuUsados A
+  LEFT JOIN TbSemanas B
+    ON A.DtSimulacaoInicial = B.DtTempo
+  GROUP BY
+    1,2,3,4,5,6;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbSimulacaoPropEntradaMinima AS
+  SELECT
+    'SimulacaoPropostaEntradaMinima' as TpDados,
+    A.NuAnoMes,
+    B.NuSemana,
+    A.FxIdadeAj AS FxIdade,
+    A.GrupoMensageria,
+    A.FxEntradaMinimaAj AS FxEntradaMinima,
+    SUM(FlPropostaOriginada) as QtdOriginadas
+  FROM
+    ConvsimuUsados A
+  LEFT JOIN TbSemanas B
+    ON A.DtSimulacaoInicial = B.DtTempo
+  GROUP BY
+    1,2,3,4,5,6;
+RUN;
+
+/* Busca dados de Share */
+PROC SQL;
+CREATE TABLE MarketShare AS
+  SELECT
+    'MktShare' AS TpDados,
+    NuAnoMes,
+    CASE WHEN NuAnoMes IN (202210,202301,202304) AND TpArquivo = 's1' THEN 'S2'
+         WHEN NuAnoMes = 202210 AND TpArquivo = 's6' THEN 'S5'
+         ELSE UPPER(TpArquivo)
+         END AS NuSemana,
+    CASE WHEN FxIdade in ('Acima 10 anos', 'Acima de 10 anos', '11 a 14 anos','15 a 19 anos', '20 anos e acima' ) then 'Acima 10 anos'
+         ELSE FxIdade
+         END AS FxIdade,
+    StVeiculo,
+    SUM(CASE WHEN Bancos = 'BV' THEN GravTotal else 0 end) as GravamesBV,
+    SUM(CASE WHEN Bancos = 'SANTANDER' THEN GravTotal else 0 end) as GravamesSTD,
+    SUM(CASE WHEN Bancos = 'BRADESCO' THEN GravTotal else 0 end) as GravamesBRAD,
+    SUM(CASE WHEN Bancos = 'ITAU' THEN GravTotal else 0 end) as GravamesITAU,
+    SUM(CASE WHEN Bancos = 'C6' THEN GravTotal else 0 end) as GravamesC6,
+    SUM(CASE WHEN Bancos = 'PANAMERICANO' THEN GravTotal else 0 end) as GravamesPAN,
+    SUM(GravTotal) AS GravTotal
+  FROM
+    RELEXC.TBMARKETSHAREDIARIAABERTA
+  WHERE
+    TpVeiculo = 'Leves'
+    AND NuAnoMes >= &safraM3.
+	AND FxIdade <> 'ZeroKM'
+    AND AjusteManual = 'N'
+  GROUP BY
+    1,2,3,4,5;
+RUN;
+
+/* Busca dados de conversão */
+PROC SQL;
+SELECT MAX(DtContrato) INTO :DtPrd FROM PPR.PPR_ANALITICO WHERE Produto = 'Leves';
+RUN;
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD3 FROM TbD3 WHERE D3 <= &DtPrd.;
+RUN;
+
+PROC SQL;
+SELECT MAX(DtRetornoCetip) INTO :DtCtp FROM CONVPROP.CONVERSAOPROPOSTAS;
+RUN;
+
+PROC SQL;
+SELECT MAX(DtTempo) INTO :LstD3CPr FROM TbD3 WHERE D3 <= &DtCtp.;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbDadosConversao AS
+  SELECT
+    'Conversao' as TpDados,
+    A.Safra AS NuAnoMes,
+    C.NuSemana,
+    MSG.GrupoMensageria,
+	CASE WHEN A.VrProducao <> . THEN 1 ELSE 0 END AS FlProducao,
+    CASE WHEN B.DtRetornoCetip = . OR (B.DtRetornoCetip > D.D3) THEN 0 ELSE 1 END AS FlD3Conversao,
+    CASE WHEN B.DtRetornoCetip = . OR (B.DtRetornoCetip > E.D0) THEN 0 ELSE 1 END AS FlD0Conversao,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > D.D3) THEN 0 ELSE 1 END AS FlD3,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > E.D0) THEN 0 ELSE 1 END AS FlD0,
+    CASE WHEN A.DtEntradaProposta <= &LstD3. THEN 1 ELSE 0 END AS FlElegD3,
+    CASE WHEN A.DtEntradaProposta <= &LstD3CPr. THEN 1 ELSE 0 END AS FlElegConvD3,
+    CASE WHEN A.DtEntradaProposta > B.DtRetornoCetip THEN 1 ELSE 0 END AS FlConvNegativa,
+    A.StPropostaConversao,
+    A.Regional,
+    A.FxIdade,
+    CASE WHEN BancoConversao IN ('SANTANDER','BRADESCO','ITAU','C6','PANAMERICANO') THEN BancoConversao
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    SUM(A.FlPropostaOriginada) as QtdOriginadas,
+    SUM(A.FlPropostaAprovada) as QtdAprovadas,
+    SUM(A.FlPropostaEfetivada) AS QtdEfetivadas,
+    SUM(A.FlConversao) as QtdConvertidas,
+    SUM(A.VrProducao) as VrProducao,
+    SUM(A.VpSpread) as VpSpread,
+    SUM(A.PcProbabilidadeAprovacao * A.VrPropostaOriginada) as RatingProposta,
+    SUM(A.VrPropostaOriginada) as VrPropostaOriginada
+  FROM
+    PPR.PPR_ANALITICO A
+  LEFT JOIN
+    CONVPROP.CONVERSAOPROPOSTAS B
+    ON A.NuProposta = B.NuProposta
+  LEFT JOIN
+    TbSemanas C
+    ON A.DtEntradaProposta = C.DtTempo
+  LEFT JOIN
+    TbD3 D
+    ON A.DtEntradaProposta = D.DtTempo
+  LEFT JOIN
+    TbD0 E
+    ON A.DtEntradaProposta = E.DtTempo
+  LEFT JOIN
+    BaseMensageria MSG
+    ON A.NuProposta = MSG.NuProposta
+  WHERE
+    A.DtEntradaProposta BETWEEN "&m3."D AND "&hoje."d
+    AND A.Produto = 'Leves'
+	AND A.FxIdade <> 'ZeroKM'
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbDadosContrato AS
+  SELECT
+    'Contratos' as TpDados,
+    INPUT(PUT(A.DtContrato,yymmn6.),6.) AS NuAnoMes,
+    C.NuSemana,
+    MSG.GrupoMensageria,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > D.D3) THEN 0 ELSE 1 END AS FlD3,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > E.D0) THEN 0 ELSE 1 END AS FlD0,
+    CASE WHEN A.DtEntradaProposta <= &LstD3. THEN 1 ELSE 0 END AS FlElegD3,
+    CASE WHEN A.DtEntradaProposta <= &LstD3CPr. THEN 1 ELSE 0 END AS FlElegConvD3,
+    A.StPropostaConversao,
+    A.Regional,
+    A.FxIdade,
+    CASE WHEN BancoConversao IN ('SANTANDER','BRADESCO','ITAU','C6','PANAMERICANO') THEN BancoConversao
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    SUM(A.FlPropostaOriginada) as QtdOriginadas,
+    SUM(A.FlPropostaAprovada) as QtdAprovadas,
+    SUM(A.FlPropostaEfetivada) AS QtdEfetivadas,
+    SUM(A.FlConversao) as QtdConvertidas,
+    SUM(A.VrProducao) as VrProducao,
+    SUM(A.VpSpread) as VpSpread,
+    SUM(A.PcProbabilidadeAprovacao * A.VrPropostaOriginada) as RatingProposta,
+    SUM(A.VrPropostaOriginada) as VrPropostaOriginada
+  FROM
+    PPR.PPR_ANALITICO A
+  LEFT JOIN
+    TbSemanas C
+    ON A.DtContrato = C.DtTempo
+  LEFT JOIN
+    TbD3 D
+    ON A.DtEntradaProposta = D.DtTempo
+  LEFT JOIN
+    TbD0 E
+    ON A.DtEntradaProposta = E.DtTempo
+  LEFT JOIN
+    BaseMensageria MSG
+    ON A.NuProposta = MSG.NuProposta
+  WHERE
+    A.DtEntradaProposta BETWEEN "&m3."D AND "&hoje."d
+    AND A.Produto = 'Leves'
+	AND A.FxIdade <> 'ZeroKM'
+	AND A.VrProducao <> .
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbConversaoSemSimulacao AS
+  SELECT
+    'ConversaoSemSimulacao' as TpDados,
+    A.NuAnoMes,
+    C.NuSemana,
+	CASE WHEN A.dtinclusaogravame = . OR (A.dtinclusaogravame > E.D0) THEN 0 ELSE 1 END AS FlD0,
+    CASE WHEN A.DtSimulacaoInicial > A.dtinclusaogravame THEN 1 ELSE 0 END AS FlConvNegativa,
+    A.GrupoMensageria,
+    CASE WHEN A.Banco = 'Santander' then 'SANTANDER'
+         WHEN A.Banco = 'Itau' THEN 'ITAU'
+         WHEN A.Banco = 'Bradesco' THEN 'BRADESCO'
+         WHEN A.Banco = 'C6' THEN 'C6'
+         WHEN A.Banco = 'Pan' THEN 'PAN'
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    COUNT(DISTINCT (CASE WHEN A.FlCard = 1 THEN A.NuCpfCnpj end)) AS QtdSimulacoes,
+    COUNT(DISTINCT (CASE WHEN (A.NuProposta = . OR A.StatusSimulacao = 'Proposta cancelada') AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) AS QtdConvertidas
+  FROM
+    ConvsimuUsados A
+  LEFT JOIN TbSemanas C
+    ON A.DtSimulacaoInicial = C.DtTempo
+  LEFT JOIN
+    TbD0 E
+    ON A.DtSimulacaoInicial = E.DtTempo
+  GROUP BY
+    1,2,3,4,5,6,7;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbConversaoSemSimulacaoD3 AS
+  SELECT
+    'ConversaoSemSimulacaoD3' as TpDados,
+    A.NuAnoMes,
+    C.NuSemana,
+    CASE WHEN A.dtinclusaogravame = . OR (A.dtinclusaogravame > D.D3) THEN 0 ELSE 1 END AS FlD3,
+    CASE WHEN A.DtSimulacaoInicial <= &LstD3CSm. THEN 1 ELSE 0 END AS FlElegConvD3,
+    CASE WHEN A.DtSimulacaoInicial > A.dtinclusaogravame THEN 1 ELSE 0 END AS FlConvNegativa,
+    A.GrupoMensageria,
+    CASE WHEN A.Banco = 'Santander' then 'SANTANDER'
+         WHEN A.Banco = 'Itau' THEN 'ITAU'
+         WHEN A.Banco = 'Bradesco' THEN 'BRADESCO'
+         WHEN A.Banco = 'C6' THEN 'C6'
+         WHEN A.Banco = 'Pan' THEN 'PAN'
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    COUNT(DISTINCT (CASE WHEN A.FlCard = 1 THEN A.NuCpfCnpj end)) AS QtdSimulacoes,
+    COUNT(DISTINCT (CASE WHEN (A.NuProposta = . OR A.StatusSimulacao = 'Proposta cancelada') AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) AS QtdConvertidas
+  FROM
+    ConvsimuUsados A
+  LEFT JOIN TbSemanas C
+    ON A.DtSimulacaoInicial = C.DtTempo
+  LEFT JOIN
+    TbD3 D
+    ON A.DtSimulacaoInicial = D.DtTempo
+  GROUP BY
+    1,2,3,4,5,6,7,8;
+RUN;
+
+/* Gera base de quantidade de dias úteis por semana */
+PROC SQL;
+%CONECTADB(server=BI);
+CREATE TABLE TbDiasUteis01 AS SELECT * FROM connection to dbcon (
+  SELECT
+    DtTempo,
+    CASE WHEN FlFeriadoNacional = 'S' OR SgDiaSemana = 'DOM' THEN 0
+         WHEN SgDiaSemana = 'SAB' THEN 0.6
+         ELSE 1
+         END AS DiaUtil
+  FROM
+    DWBI_DIME.TbDimTempoData
+  WHERE
+    DtTempo BETWEEN &iqM3. AND &iqHoje.
+);
+RUN;
+
+PROC SQL;
+CREATE TABLE TbDiasUteis AS
+  SELECT
+    input(put(A.DtTempo,YYMMn6.),6.) AS NuAnoMes,
+    A.NuSemana,
+    SUM(B.DiaUtil) AS QtdDU
+  FROM
+    TbSemanas A
+  LEFT JOIN
+    TbDiasUteis01 B
+    ON A.DtTempo = B.DtTempo
+  GROUP BY 1,2;
+RUN;
+
+/* Gera base completa */
+PROC SQL;
+CREATE TABLE TbBaseFinal01 AS
+  SELECT * FROM TbSimulacaoGeral
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbSimulacaoEntrada
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbSimulacaoPropEntradaMinima
+  OUTER UNION CORRESPONDING
+  SELECT * FROM MarketShare
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbDadosConversao
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbDadosContrato
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbConversaoSemSimulacao
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbConversaoSemSimulacaoD3;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbBaseFinal AS
+  SELECT
+    A.*,
+    B.QtdDU
+  FROM
+    TbBaseFinal01 A
+  LEFT JOIN
+    TbDiasUteis B
+    ON A.NuAnoMes = B.NuAnoMes
+    AND A.NuSemana = B.NuSemana;
+RUN;
+
+/* --------------------------------------------------------- */
+/* --- Versão com abertura de FxIdade, Regional e Filial --- */
+/* --------------------------------------------------------- */
+
+/* Busca informações de simulações, mensageria e entrada */
+PROC SQL;
+CREATE TABLE TbSimulacaoGeral_Aberta AS
+  SELECT
+    'SimulacaoGeral' as TpDados,
+    A.NuAnoMes,
+    B.NuSemana,
+    A.FxIdadeAj AS FxIdade,
+    A.GrupoMensageria,
+    A.Regional,
+    A.Filial,
+    COUNT(DISTINCT (CASE WHEN FlCard = 1 THEN A.NuCpfCnpj END)) AS QtdSimulacoes,
+    SUM(A.EntMinAj * A.VrProposta) as VpEntradaMinima,
+    SUM(A.VrProposta) as VrProposta,
+    SUM(A.VrEntrada) as VrEntrada,
+    SUM(FlPropostaOriginada) as QtdOriginadas
+  FROM
+    CONVSIMU A
+  LEFT JOIN TbSemanas B
+    ON A.DtSimulacaoInicial = B.DtTempo
+  GROUP BY
+    1,2,3,4,5,6,7;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbSimulacaoEntrada_Aberta AS
+  SELECT
+    'SimulacaoEntrada' as TpDados,
+    A.NuAnoMes,
+    B.NuSemana,
+    A.FxIdadeAj AS FxIdade,
+    A.GrupoMensageria,
+    A.Regional,
+    A.Filial,
+	A.FxEntradaMinimaAj AS FxEntradaMinima,
+    A.FlagPolitica,
+    COUNT(DISTINCT (CASE WHEN FlCard = 1 THEN A.NuCpfCnpj END)) AS QtdSimulacoes,
+    SUM(A.EntMinAj * A.VrProposta) as VpEntradaMinima,
+    SUM(A.VrProposta) AS VrProposta,
+    SUM(COALESCE(A.VrEntradaOri,A.VrEntrada)) as VpEntrada,
+    SUM(COALESCE(A.VrPropostaOriginada,A.VrProposta)) as VrLiberadoHierarquia,
+    SUM(A.ProbabilidadeAprovacao * A.VrProposta) AS RatingSimulacao,
+    SUM(A.TxInicioFinanciamento * A.VrProposta) AS VpTaxa,
+    SUM(A.TxTirContabil * A.VrProposta) AS VpTIR
+  FROM
+    CONVSIMU A
+  LEFT JOIN TbSemanas B
+    ON A.DtSimulacaoInicial = B.DtTempo
+  GROUP BY
+    1,2,3,4,5,6,7,8,9;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbSimuPropEntradaMin_Aberta AS
+  SELECT
+    'SimulacaoPropostaEntradaMinima' as TpDados,
+    A.NuAnoMes,
+    B.NuSemana,
+    A.FxIdadeAj AS FxIdade,
+    A.GrupoMensageria,
+    A.FxEntradaMinimaAj AS FxEntradaMinima,
+    A.Regional,
+    A.Filial,
+    SUM(FlPropostaOriginada) as QtdOriginadas
+  FROM
+    CONVSIMU A
+  LEFT JOIN TbSemanas B
+    ON A.DtSimulacaoInicial = B.DtTempo
+  GROUP BY
+    1,2,3,4,5,6,7,8;
+RUN;
+
+/* Busca dados de Share */
+PROC SQL;
+CREATE TABLE MarketShare_Aberto AS
+  SELECT
+    'MktShare' AS TpDados,
+    NuAnoMes,
+    CASE WHEN NuAnoMes IN (202210,202301,202304) AND TpArquivo = 's1' THEN 'S2'
+         WHEN NuAnoMes = 202210 AND TpArquivo = 's6' THEN 'S5'
+         ELSE UPPER(TpArquivo)
+         END AS NuSemana,
+    CASE WHEN FxIdade in ('Acima 10 anos', 'Acima de 10 anos', '11 a 14 anos','15 a 19 anos', '20 anos e acima' ) then 'Acima 10 anos'
+         ELSE FxIdade
+         END AS FxIdade,
+    StVeiculo,
+    Regional,
+    Filial,
+    SUM(CASE WHEN Bancos = 'BV' THEN GravTotal else 0 end) as GravamesBV,
+    SUM(CASE WHEN Bancos = 'SANTANDER' THEN GravTotal else 0 end) as GravamesSTD,
+    SUM(CASE WHEN Bancos = 'BRADESCO' THEN GravTotal else 0 end) as GravamesBRAD,
+    SUM(CASE WHEN Bancos = 'ITAU' THEN GravTotal else 0 end) as GravamesITAU,
+    SUM(CASE WHEN Bancos = 'C6' THEN GravTotal else 0 end) as GravamesC6,
+    SUM(CASE WHEN Bancos = 'PANAMERICANO' THEN GravTotal else 0 end) as GravamesPAN,
+    SUM(GravTotal) AS GravTotal
+  FROM
+    RELEXC.TBMARKETSHAREDIARIAABERTA
+  WHERE
+    TpVeiculo = 'Leves'
+    AND NuAnoMes >= &safraM3.
+    AND AjusteManual = 'N'
+  GROUP BY
+    1,2,3,4,5,6,7;
+RUN;
+
+/* Busca dados de conversão */
+PROC SQL;
+CREATE TABLE TbDadosConversao_Aberto AS
+  SELECT
+    'Conversao' as TpDados,
+    A.Safra AS NuAnoMes,
+    C.NuSemana,
+    MSG.GrupoMensageria,
+	CASE WHEN A.VrProducao <> . THEN 1 ELSE 0 END AS FlProducao,
+    CASE WHEN B.DtRetornoCetip = . OR (B.DtRetornoCetip > D.D3) THEN 0 ELSE 1 END AS FlD3Conversao,
+    CASE WHEN B.DtRetornoCetip = . OR (B.DtRetornoCetip > E.D0) THEN 0 ELSE 1 END AS FlD0Conversao,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > D.D3) THEN 0 ELSE 1 END AS FlD3,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > E.D0) THEN 0 ELSE 1 END AS FlD0,
+    CASE WHEN A.DtEntradaProposta <= &LstD3. THEN 1 ELSE 0 END AS FlElegD3,
+    CASE WHEN A.DtEntradaProposta <= &LstD3CPr. THEN 1 ELSE 0 END AS FlElegConvD3,
+    CASE WHEN A.DtEntradaProposta > B.DtRetornoCetip THEN 1 ELSE 0 END AS FlConvNegativa,
+    A.StPropostaConversao,
+    A.Regional,
+    A.DsFilial AS Filial,
+    A.FxIdade,
+    CASE WHEN BancoConversao IN ('SANTANDER','BRADESCO','ITAU','C6','PANAMERICANO') THEN BancoConversao
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    SUM(A.FlPropostaOriginada) as QtdOriginadas,
+    SUM(A.FlPropostaAprovada) as QtdAprovadas,
+    SUM(A.FlPropostaEfetivada) AS QtdEfetivadas,
+    SUM(A.FlConversao) as QtdConvertidas,
+    SUM(A.VrProducao) as VrProducao,
+    SUM(A.VpSpread) as VpSpread,
+    SUM(A.PcProbabilidadeAprovacao * A.VrPropostaOriginada) as RatingProposta,
+    SUM(A.VrPropostaOriginada) as VrPropostaOriginada
+  FROM
+    PPR.PPR_ANALITICO A
+  LEFT JOIN
+    CONVPROP.CONVERSAOPROPOSTAS B
+    ON A.NuProposta = B.NuProposta
+  LEFT JOIN
+    TbSemanas C
+    ON A.DtEntradaProposta = C.DtTempo
+  LEFT JOIN
+    TbD3 D
+    ON A.DtEntradaProposta = D.DtTempo
+  LEFT JOIN
+    TbD0 E
+    ON A.DtEntradaProposta = E.DtTempo
+  LEFT JOIN
+    BaseMensageria MSG
+    ON A.NuProposta = MSG.NuProposta
+  WHERE
+    A.DtEntradaProposta BETWEEN "&m3."D AND "&hoje."d
+    AND A.Produto = 'Leves'
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbDadosContrato_Aberto AS
+  SELECT
+    'Contratos' as TpDados,
+    INPUT(PUT(A.DtContrato,yymmn6.),6.) AS NuAnoMes,
+    C.NuSemana,
+    MSG.GrupoMensageria,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > D.D3) THEN 0 ELSE 1 END AS FlD3,
+    CASE WHEN A.DtContrato = . OR (A.DtContrato > E.D0) THEN 0 ELSE 1 END AS FlD0,
+    CASE WHEN A.DtEntradaProposta <= &LstD3. THEN 1 ELSE 0 END AS FlElegD3,
+    CASE WHEN A.DtEntradaProposta <= &LstD3CPr. THEN 1 ELSE 0 END AS FlElegConvD3,
+    A.StPropostaConversao,
+    A.Regional,
+	A.DsFilial AS Filial,
+    A.FxIdade,
+    CASE WHEN BancoConversao IN ('SANTANDER','BRADESCO','ITAU','C6','PANAMERICANO') THEN BancoConversao
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    SUM(A.FlPropostaOriginada) as QtdOriginadas,
+    SUM(A.FlPropostaAprovada) as QtdAprovadas,
+    SUM(A.FlPropostaEfetivada) AS QtdEfetivadas,
+    SUM(A.FlConversao) as QtdConvertidas,
+    SUM(A.VrProducao) as VrProducao,
+    SUM(A.VpSpread) as VpSpread,
+    SUM(A.PcProbabilidadeAprovacao * A.VrPropostaOriginada) as RatingProposta,
+    SUM(A.VrPropostaOriginada) as VrPropostaOriginada
+  FROM
+    PPR.PPR_ANALITICO A
+  LEFT JOIN
+    TbSemanas C
+    ON A.DtContrato = C.DtTempo
+  LEFT JOIN
+    TbD3 D
+    ON A.DtEntradaProposta = D.DtTempo
+  LEFT JOIN
+    TbD0 E
+    ON A.DtEntradaProposta = E.DtTempo
+  LEFT JOIN
+    BaseMensageria MSG
+    ON A.NuProposta = MSG.NuProposta
+  WHERE
+    A.DtEntradaProposta BETWEEN "&m3."D AND "&hoje."d
+    AND A.Produto = 'Leves'
+	AND A.FxIdade <> 'ZeroKM'
+	AND A.VrProducao <> .
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbConversaoSemSimulacao_Aberto AS
+  SELECT
+    'ConversaoSemSimulacao' as TpDados,
+    A.NuAnoMes,
+    C.NuSemana,
+    A.FxIdadeAj AS FxIdade,
+    A.DtSimulacaoInicial,
+    A.dtinclusaogravame as DtRetornoCetip,
+	CASE WHEN A.dtinclusaogravame = . OR (A.dtinclusaogravame > E.D0) THEN 0 ELSE 1 END AS FlD0,
+    CASE WHEN A.DtSimulacaoInicial > A.dtinclusaogravame THEN 1 ELSE 0 END AS FlConvNegativa,
+    A.Regional,
+    A.Filial,
+    A.GrupoMensageria,
+    CASE WHEN A.Banco = 'Santander' then 'SANTANDER'
+         WHEN A.Banco = 'Itau' THEN 'ITAU'
+         WHEN A.Banco = 'Bradesco' THEN 'BRADESCO'
+         WHEN A.Banco = 'C6' THEN 'C6'
+         WHEN A.Banco = 'Pan' THEN 'PAN'
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    COUNT(DISTINCT (CASE WHEN A.FlCard = 1 THEN A.NuCpfCnpj end)) AS QtdSimulacoes,
+    COUNT(DISTINCT (CASE WHEN (A.NuProposta = . OR A.StatusSimulacao = 'Proposta cancelada') AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) AS QtdConvertidas
+  FROM
+    CONVSIMU A
+  LEFT JOIN TbSemanas C
+    ON A.DtSimulacaoInicial = C.DtTempo
+  LEFT JOIN
+    TbD0 E
+    ON A.DtSimulacaoInicial = E.DtTempo
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbConversaoSemSimulacaoD3_Aberto AS
+  SELECT
+    'ConversaoSemSimulacaoD3' as TpDados,
+    A.NuAnoMes,
+    C.NuSemana,
+    A.FxIdadeAj AS FxIdade,
+    A.DtSimulacaoInicial,
+    A.dtinclusaogravame as DtRetornoCetip,
+    CASE WHEN A.dtinclusaogravame = . OR (A.dtinclusaogravame > D.D3) THEN 0 ELSE 1 END AS FlD3,
+    CASE WHEN A.DtSimulacaoInicial <= &LstD3CSm. THEN 1 ELSE 0 END AS FlElegConvD3,
+    CASE WHEN A.DtSimulacaoInicial > A.dtinclusaogravame THEN 1 ELSE 0 END AS FlConvNegativa,
+    A.Regional,
+    A.Filial,
+    A.GrupoMensageria,
+    CASE WHEN A.Banco = 'Santander' then 'SANTANDER'
+         WHEN A.Banco = 'Itau' THEN 'ITAU'
+         WHEN A.Banco = 'Bradesco' THEN 'BRADESCO'
+         WHEN A.Banco = 'C6' THEN 'C6'
+         WHEN A.Banco = 'Pan' THEN 'PAN'
+         ELSE 'DEMAIS BANCOS'
+         END AS Banco,
+    COUNT(DISTINCT (CASE WHEN A.FlCard = 1 THEN A.NuCpfCnpj end)) AS QtdSimulacoes,
+    COUNT(DISTINCT (CASE WHEN (A.NuProposta = . OR A.StatusSimulacao = 'Proposta cancelada') AND FlConcorrente = 1 THEN A.NuCpfCnpj END)) AS QtdConvertidas
+  FROM
+    CONVSIMU A
+  LEFT JOIN TbSemanas C
+    ON A.DtSimulacaoInicial = C.DtTempo
+  LEFT JOIN
+    TbD3 D
+    ON A.DtSimulacaoInicial = D.DtTempo
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13;
+RUN;
+
+/* Gera base completa */
+PROC SQL;
+CREATE TABLE TbBaseFinal01_Aberto AS
+  SELECT * FROM TbSimulacaoGeral_Aberta
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbSimulacaoEntrada_Aberta
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbSimuPropEntradaMin_Aberta
+  OUTER UNION CORRESPONDING
+  SELECT * FROM MarketShare_Aberto
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbDadosConversao_Aberto
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbDadosContrato_Aberto
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbConversaoSemSimulacao_Aberto
+  OUTER UNION CORRESPONDING
+  SELECT * FROM TbConversaoSemSimulacaoD3_Aberto;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbBaseFinal_Aberto AS
+  SELECT
+    A.*,
+    B.QtdDU
+  FROM
+    TbBaseFinal01_Aberto A
+  LEFT JOIN
+    TbDiasUteis B
+    ON A.NuAnoMes = B.NuAnoMes
+    AND A.NuSemana = B.NuSemana;
+RUN;
+
+/* ---------------------- */
+/* --- Unificar bases --- */
+/* ---------------------- */
+
+PROC SQL;
+CREATE TABLE TbBaseFinal_Unificada AS
+  SELECT 'Original' AS VersaoBase, * FROM TbBaseFinal
+  OUTER UNION CORRESPONDING
+  SELECT 'Aberta' AS VersaoBase, * FROM TbBaseFinal_Aberto;
+RUN;
+
+%ExportaCSV(TbTabelaoFunil,TbBaseFinal_Unificada);

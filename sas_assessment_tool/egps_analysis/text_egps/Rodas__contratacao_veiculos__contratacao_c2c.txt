@@ -1,0 +1,144 @@
+START_METADATA
+PROJECT: Rodas__contratacao_veiculos
+FILE_SAS: contratacao_c2c.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -12
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 77
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CONTRATO = /infogrc/contratacao_veiculos/bases; DESDOBRO = /infogrc/desdobro_rodas/bases
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: dt_contrato_sas, dt_contrato_sql, maxContrato
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/COACHING/TRIBO_VEICULOS/SAS/CONECTADB.SAS [SAS/Local], DBCOR.DBO.TBSUBPRODUTO [DBCON], DBCRED.DBO.TBGRUPOSUBPRODUTO [DBCON], DBCRED.DBO.TBPESSOASOBANALISE [DBCON], DBCRED.DBO.TBPROPOSTA [DBCON], DBCRED.DBO.TBSUBPRODUTOGRUPO [DBCON], DBGESTAOCDCCG.DBO.TBCONTRATO [DBCON], DBPAGAMENTO.DBO.TBINFORMACAOBANCARIAPAGAMENTO [DBCON], DBPAGAMENTO.DBO.TBPAGAMENTO [DBCON], DBPAGAMENTO.DBO.TBPESSOAPAGAMENTO [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CONTRATO
+IMPORTED FILES (Requires Ingestion): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): CONTRATO.CONTRATACAO_C2C [PROC SQL - FROM], DBCOR.DBO.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBGRUPOSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBCRED.DBO.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBCRED.DBO.TBSUBPRODUTOGRUPO [Pass-Through Native (DBCON) - JOIN], DBGESTAOCDCCG.DBO.TBCONTRATO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.DBO.TBINFORMACAOBANCARIAPAGAMENTO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.DBO.TBPAGAMENTO [Pass-Through Native (DBCON) - JOIN], DBPAGAMENTO.DBO.TBPESSOAPAGAMENTO [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+INTERNAL READS (Temp/Local): CONTRATO.CONTRATACAO_C2C
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CONTRATO.CONTRATACAO_C2C
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CONTRATO.CONTRATACAO_C2C
+APPEND_ONLY_OUTPUTS: CONTRATO.CONTRATACAO_C2C
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CONTRATO.CONTRATACAO_C2C
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CONTRATOS_PAGAMENTO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas
+
+END_METADATA
+================================================================================
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 VALIDVARNAME=ANY;
+OPTIONS ERRORABEND;
+OPTIONS COMPRESS=BINARY REUSE=YES;
+
+LIBNAME CONTRATO	'/infogrc/contratacao_veiculos/bases';
+LIBNAME DESDOBRO	'/infogrc/desdobro_rodas/bases';
+
+%INCLUDE 			'/riscosbvf/coaching/tribo_veiculos/SAS/ConectaDB.sas';
+
+PROC SQL; SELECT MAX(DtContrato) format DATE9. INTO: maxContrato FROM CONTRATO.CONTRATACAO_C2C; QUIT;
+
+DATA _NULL_;
+
+dt_contrato		= intnx('Month',"&maxContrato"d,-1,'b' );
+dt_contrato_sql = "'"||put(year(dt_contrato),4.)||put(month(dt_contrato),z2.)||put(day(dt_contrato),z2.)||"'";
+
+CALL symputx('dt_contrato_sas', put(dt_contrato,date9.));
+CALL symputx('dt_contrato_sql', dt_contrato_sql);
+
+RUN;
+
+/*%let dt_contrato_sas >= '01JUL2020'd;*/
+/*%let dt_contrato_sql >= '20200101';*/
+
+%put &maxContrato;
+%put &dt_contrato_sas;
+%put &dt_contrato_sql;
+
+/*IDENTIFICA AS PROPOSTAS DE PESSOA FÍSICA PAGAS A PESSOA FÍSICA - C2C*/
+
+PROC SQL;
+%CONECTADB(server=CTR);
+CREATE TABLE CONTRATOS_PAGAMENTO AS
+SELECT * FROM CONNECTION TO DBCON(
+	SELECT
+		  T1.NuProposta
+		, T1.NuContratoGestao AS NuContrato
+		, CAST(T9.DtContrato AS DATE) AS DtContrato
+		, CAST(T1.DtEntradaProposta AS DATE) AS DtEntradaProposta
+		, T1.CdLoja
+		, T4.NmGrupoSubProduto
+		, T5.NuCpfCnpj
+	FROM
+		DBCRED.dbo.TbProposta T1
+	INNER JOIN
+		DBCOR.dbo.TbSubProduto T2
+		ON T1.CdSubProduto = T2.CdSubProduto
+		AND T2.CdProduto = 12 /*PRODUTO 12 = VEÍCULOS*/
+	INNER JOIN
+		DBCRED.dbo.TbSubProdutoGrupo T3
+		ON T2.CdSubProduto = T3.CdSubProduto
+	INNER JOIN
+		DBCRED.dbo.TbGrupoSubProduto T4
+		ON T3.CdGrupoSubProduto = T4.CdGrupoSubProduto
+	INNER JOIN
+		DBCRED.dbo.TbPessoaSobAnalise T5
+		ON T1.NuProposta = T5.NuProposta
+		AND T5.CdPapel = 1 /* 1 = PROPONENTE*/
+		AND T5.TpPessoa = 'F' /* PESSOA FÍSICA*/
+	INNER JOIN
+		DBPAGAMENTO.dbo.TbPagamento T6
+		ON T6.NuContratoGestao = T1.NuContratoGestao
+	INNER JOIN
+		DBPAGAMENTO.dbo.TbInformacaoBancariaPagamento T7
+		ON T7.CdInformacaoBancariaPagto = T6.CdInforBancariaPagtoFavorecido
+	INNER JOIN
+		DBPAGAMENTO.dbo.TbPessoaPagamento T8
+		ON T8.CdPessoaPagamento = T7.CdPessoaPagamento
+		AND T8.TpPessoa = 'F'
+	INNER JOIN
+		DBGESTAOCDCCG.dbo.TbContrato T9
+		ON T1.NuContratoGestao = T9.NuContrato
+	WHERE T9.DtContrato >= &dt_contrato_sql
+/*	AND T1.DtEntradaProposta <= '20220930'*/
+	AND T1.StProposta = 'AP' 		/*SOMENTE PROPOSTAS COM STATUS APROVADA E PAGA*/
+	AND T8.NuCpfCnpj IS NOT NULL 	/*DOCUMENTO DO FAVORECIDO PRECISAR ESTAR IDENTIFICADO*/
+	AND T5.NuCpfCnpj <> T8.NuCpfCnpj /*RECEBEDOR É O PRÓPRIO PROPONENTE - NESTE CASO É CVG - B2C*/
+
+);QUIT;
+
+PROC SORT DATA=CONTRATOS_PAGAMENTO NODUPKEY; BY NuContrato; RUN;
+
+PROC SQL; DELETE FROM CONTRATO.CONTRATACAO_C2C WHERE DtContrato >= "&dt_contrato_sas."d; QUIT;
+PROC SQL; INSERT INTO CONTRATO.CONTRATACAO_C2C SELECT * FROM CONTRATOS_PAGAMENTO; QUIT;
+
+/*DATA CONTRATO.CONTRATACAO_C2C; SET CONTRATOS_PAGAMENTO; RUN;*/
+
+/*PROC EXPORT*/
+/*DATA= CONTRATO.CONTRATACAO_C2C*/
+/*FILE="&dir_csv./contratacao_c2c.csv" REPLACE */
+/*DBMS=DLM;*/
+/*DELIMITER=';';*/
+/*RUN;*/

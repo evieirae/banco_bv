@@ -1,0 +1,191 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 12 - SuperaBV_Grupo3e4-Solar.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 80)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (4x | +80)
+----------------------------------------
+LINES_OF_CODE: 122
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: RANK, SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: AQUISIC = /infogrc/aquisicao_veiculos/bases; CAMPSOL = /infogrc/Campanha_SuperaBV_Solar; INDISOL = /infogrc/indicadores_solar; LEADS = /infogrc/funil_simulacoes_solar/bases; LEADS2 = /infogrc/leads_solar/vm/Bases; PDEC = /infogrc/funil_simulacoes_solar/bases; RSSOLAR = /riscosbvf/plan_mesas/shared
+DETECTED_MACROS_DEFINED: Anomes
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/FUNCOES.SAS [SAS/Local], /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TABLE_READ_PROVENANCE (Flow): TMP.TBPRODUCAO [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/funcoes.sas, /infogrc/utils/libname.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_CAMPANHA_G3E4_FINAL, BASE_CAMPANHA_G3E4_REGRAS, BASE_CAMPANHA_G3E4_REGRAS_RKG, BASE_CAMPANHA_G3E4_REGRAS_RKG2, BASE_PRODUCAO_PDVS_G3E4
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 4 paths (sas: 4)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/funcoes.sas
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+Libname CampSol '/infogrc/Campanha_SuperaBV_Solar';
+option compress = binary;
+options validvarname=any;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+/*%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';*/
+%include '/infogrc/utils/IQ.sas';
+%include '/infogrc/utils/libname.sas';
+%include '/infogrc/utils/funcoes.sas';
+libname RSSOLAR '/riscosbvf/plan_mesas/shared';
+libname aquisic '/infogrc/aquisicao_veiculos/bases';
+Libname Leads '/infogrc/funil_simulacoes_solar/bases';
+Libname Leads2 '/infogrc/leads_solar/vm/Bases';
+libname PDEC '/infogrc/funil_simulacoes_solar/bases';
+libname IndiSol '/infogrc/indicadores_solar';
+%Let Anomes = 202501;
+
+/*Gerando a base dos Participantes com o Realizado e Premiação*/
+
+Proc Sql;
+Create table Base_Producao_PDVs_G3e4 as
+Select Distinct
+Participantes.NuAnomes as NuAnomes_Campanha
+,DtAtualizacao
+,Participantes.Canal
+,Participantes.DsLoginN1
+,Participantes.Gerente
+,Participantes.Grupo
+,Participantes.Faixa_Efetivacao
+,Producao.NuAnoMes
+,Producao.NuCnpjLojaFavorecido
+,Producao.NmParceiroComercialFavorecido
+,Sum(Producao.VrProducao) as VrProducao
+,Count(NuContrato) as Qt_Contratos
+,Sum(Producao.FlBvMais) as Qt_SPF
+,Sum(Producao.FlCAP) as Qt_AP
+,Sum(Producao.FlPlacaSolar) as Qt_PlacaSolar
+,Calculated Qt_SPF + Calculated Qt_AP + Calculated Qt_PlacaSolar as Qt_Seguros
+,Case
+	When Participantes.Faixa_Efetivacao = '1 a 2 meses sem efetivar' and  Calculated Qt_Contratos < 3 Then Calculated Qt_Contratos * 100
+	When Participantes.Faixa_Efetivacao = '1 a 2 meses sem efetivar' and Calculated Qt_Contratos >= 3 Then Calculated Qt_Contratos * 150
+
+	When Participantes.Faixa_Efetivacao = '3 a 4 meses sem efetivar' and  Calculated Qt_Contratos < 3 Then Calculated Qt_Contratos * 250
+	When Participantes.Faixa_Efetivacao = '3 a 4 meses sem efetivar' and Calculated Qt_Contratos >= 3 Then Calculated Qt_Contratos * 350
+
+	When Participantes.Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' and Calculated Qt_Contratos < 3 Then Calculated Qt_Contratos * 250
+	When Participantes.Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' and Calculated Qt_Contratos >= 3 Then Calculated Qt_Contratos * 350
+
+	When Participantes.Faixa_Efetivacao = 'Nunca efetivou' and Calculated Qt_Contratos < 3 Then Calculated Qt_Contratos * 250
+	When Participantes.Faixa_Efetivacao = 'Nunca efetivou' and Calculated Qt_Contratos >= 3 Then Calculated Qt_Contratos * 350
+
+	Else 0
+End as Premio_Contratos
+
+,Case
+	When Participantes.Faixa_Efetivacao = '1 a 2 meses sem efetivar' and Calculated Qt_Seguros > 0 Then Calculated Qt_Seguros * 25
+	When Participantes.Faixa_Efetivacao = '3 a 4 meses sem efetivar' and Calculated Qt_Seguros > 0 Then Calculated Qt_Seguros * 50
+	When Participantes.Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' and Calculated Qt_Seguros > 0 Then Calculated Qt_Seguros * 50
+	When Participantes.Faixa_Efetivacao = 'Nunca efetivou' and Calculated Qt_Seguros > 0 Then Calculated Qt_Seguros * 50
+	Else 0
+End as Premio_Seguros
+
+From Base_PDV_Participantes as Participantes
+Inner join tmp.TBPRODUCAO as Producao
+ 	   	On Producao.NuCnpjLojaFavorecido = Participantes.CNPJ and Participantes.NuAnomes = Producao.NuAnomes
+Where Producao.NmGrupoProdutoMeta = 'Solar' and Participantes.Grupo in ('Grupo 3', 'Grupo 4')
+Group By 1,2,3,4,5,6,7,8,9
+;Quit;
+
+/*Calculando a pontuação de cada Gr nos devidos Grupos/PDVs*/
+Proc Sql;
+Create Table Base_Campanha_G3e4_Regras as
+Select Distinct
+NuAnomes
+,DtAtualizacao
+,Canal
+,Gerente
+,DsLoginN1
+,Grupo
+,Sum(Qt_Contratos) as Qt_Contratos
+,Sum(Qt_Seguros) as Qt_Seguros
+,Sum(Premio_Contratos) as Premio_Contratos
+,Sum(Premio_Seguros) as Premio_Seguros
+
+,Sum(
+		Case
+		 When Faixa_Efetivacao = '1 a 2 meses sem efetivar' Then Qt_Contratos * 1
+		 When Faixa_Efetivacao = '3 a 4 meses sem efetivar' Then Qt_Contratos * 3
+		 When Faixa_Efetivacao = 'Mais de 4 meses sem efetivar' Then Qt_Contratos * 3
+		 When Faixa_Efetivacao = 'Nunca efetivou' Then Qt_Contratos * 3
+		 Else 0
+
+End) as Total_Pontos
+From Base_Producao_PDVs_G3e4
+Group by 1,2,3,4,5
+;Quit;
+
+/*Reralizando o Ranking para calculo das Milhas*/
+PROC SORT DATA=Base_Campanha_G3e4_Regras OUT=Base_Campanha_G3e4_Regras_RKG;
+BY NuAnoMes Grupo DESCENDING Total_Pontos;
+;RUN;
+
+proc rank data=Base_Campanha_G3e4_Regras_RKG descending out=Base_Campanha_G3e4_Regras_RKG2 ties=dense;
+    var Total_Pontos;
+    ranks RKG_Pontos;
+    by NuAnoMes Grupo;
+run;
+
+/*Gerando base final com os Pontos, Premiações e Milhas*/
+Proc Sql;
+Create Table Base_Campanha_G3e4_Final as
+Select
+NuAnomes
+,Canal
+,Gerente
+,DsLoginN1
+,Grupo
+,Qt_Contratos
+,Qt_Seguros
+,Premio_Contratos
+,Premio_Seguros
+,Total_Pontos
+,RKG_Pontos
+,Case
+	When RKG_Pontos = 1 then 15
+	When RKG_Pontos = 2 then 13
+	When RKG_Pontos = 3 then 11
+	When RKG_Pontos = 4 then 9
+	When RKG_Pontos = 5 then 7
+	When RKG_Pontos = 6 then 5
+	When RKG_Pontos = 7 then 3
+	When RKG_Pontos >= 8 then 1
+	Else 0
+End as Milhas
+,DtAtualizacao
+
+From Base_Campanha_G3e4_Regras_RKG2
+;Quit;

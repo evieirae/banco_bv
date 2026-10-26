@@ -1,0 +1,374 @@
+START_METADATA
+PROJECT: SAS_UC4__tbrelatoriosgerenciais
+FILE_SAS: tbrelatoriosgerenciais.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:04 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 50)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 20
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (2x | +40), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 273
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SORT, SQL, TRANSPOSE
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAtualizacaoProducao
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], BASES.TBMETA [SAS/Local], BASES.TBMETAMCN [SAS/Local], BASES.TBSEGUROSPRODUCAOCANCELADOS [SAS/Local], BASES.TBTEMPODATA [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASES.TBMETA [PROC SQL - FROM], BASES.TBMETAMCN [PROC SQL - FROM], BASES.TBSEGUROSPRODUCAOCANCELADOS [PROC SQL - FROM], BASES.TBTEMPODATA [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbRelatorioExecutivo.csv, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbRelatorioExecutivo.csv
+TEMP/DISCARDED OUTPUTS: TBCONSOLIDADO, TBCONSOLIDADOSEGUROS, TBCONSOLIDADOSEGUROSUNPIVOT, TBDIASUTEIS, TBMETA, TBPRODUCAO, TBPRODUCAOMCN, TBRELATORIOEXECUTIVO, TBSEGUROS, TBSEGUROSCANCELADOS, TBSEGUROSPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (csv: 1, sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbRelatorioExecutivo.csv
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* Manutenção em 17-11-2020 | Ana Lazarini | Adição de novos campos*/
+/* Manutenção em 04-12-2020 | Ana Lazarini | Adição de campo de spread com rebate*/
+/* Manutenção em 28-01-2021 | Ana Lazarini | Adição do VrAutoTotal no cálculo do 'Demais' para o orçamento de Seguros*/
+/* Manutenção em 08-02-2021 | Ana Lazarini | Adição do campo VrProducaoLiquida */
+/* Manutenção em 25-02-2021 | Ana Lazarini | Alterações nas consultas de seguros */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+							 		/*TRAZ META*/
+
+PROC SQL;
+CREATE TABLE TbMeta AS
+SELECT distinct
+	 Meta.NuAnoMes
+	,Meta.NmGrupoProdutoMeta
+	,Meta.DsTipoCanalProducao
+	,CASE
+		WHEN Meta.TpValor like '%SPF%' THEN 'SPF'
+		WHEN Meta.TpValor like '%Cap%' THEN 'Cap'
+		WHEN Meta.TpValor like '%Demais%' THEN 'Demais'
+        WHEN Meta.TpValor = 'VrAutoTotal' THEN  'Completo' /* altered on feb 24 2021 */
+		END AS TpSeguro
+									/*META*/
+
+	,sum(case when Meta.Tipo = 'Meta'	and Meta.TpValor = 'VrProducao' then Meta.VrMedida else 0 end ) as VrProducaoMeta
+	,sum(case when Meta.Tipo = 'Meta'	and Meta.TpValor = 'VrMargemContribuicao' then Meta.VrMedida else 0 end ) as VrMargemContribuicaoMeta
+	,sum(case when Meta.Tipo = 'Meta'	and Meta.TpValor = 'VrFaturamento' then Meta.VrMedida else 0 end ) as VrFaturamentoMeta
+	,sum(case when Meta.Tipo = 'Meta'	and Meta.TpValor = 'VpTxFinanciamento' then Meta.VrMedida else 0 end ) as VpTxFinanciamentoMeta
+
+	,sum(case when Meta.Tipo = 'Meta'	and Meta.TpValor in ('VrDemais','VrCap','VrSPF','VrAutoTotal') then Meta.VrMedida else 0 end ) as VrPremioMeta
+	,max(case when Meta.Tipo = 'Meta'	and Meta.TpValor in ('PcSPF','PcCap','PcDemais','PcAutoTotal') then Meta.VrMedida else 0 end ) as PcSegurosMeta
+
+									/*ORÇAMENTO*/
+
+	,sum(case when Meta.Tipo = 'Orçamento'  and Meta.TpValor = 'VrProducao' then Meta.VrMedida else 0 end ) as VrProducaoOrcado
+	,sum(case when Meta.Tipo = 'Orçamento'	and Meta.TpValor = 'VrMargemContribuicao' then Meta.VrMedida else 0 end ) as VrMargemContribuicaoOrcado
+	,sum(case when Meta.Tipo = 'Orçamento'	and Meta.TpValor = 'VpTxSpread' then Meta.VrMedida else 0 end ) as VpTxSpreadOrcado
+	,sum(case when Meta.Tipo = 'Orçamento'	and Meta.TpValor = 'VpTxFinanciamento' then Meta.VrMedida else 0 end ) as VpTxFinanciamentoOrcado
+
+	,sum(case when Meta.Tipo = 'Orçamento'	and Meta.TpValor in ('VrDemais','VrCap','VrSPF','VrAutoTotal') then Meta.VrMedida else 0 end ) as VrPremioOrcado
+	,sum(case when Meta.Tipo = 'Orçamento' 	and Meta.TpValor in ('PcSPF','PcCap','PcDemais','PcAutoTotal') then Meta.QtNumerador else 0 end ) as QtSegurosNumerador
+	,sum(case when Meta.Tipo = 'Orçamento' 	and Meta.TpValor in ('PcSPF','PcCap','PcDemais','PcAutoTotal') then Meta.QtDenominador else 0 end ) as QtSegurosQtDenominador
+
+									/*BEST NUMBER*/
+
+	,sum(case when Meta.Tipo = 'BN' 		and Meta.TpValor = 'VrProducao' then Meta.VrMedida else 0 end ) as VrProducaoBN
+
+FROM bases.TbMeta Meta
+WHERE Meta.NuAnoMes >= 201901
+
+group by 1,2,3,4
+;run;
+									/*TRAZ PRODUCAO*/
+
+PROC SQL;
+CREATE TABLE TbProducao AS
+SELECT
+									/*Producao*/
+	producao.NuAnoMes
+	,producao.NmGrupoProdutoMeta
+	,producao.DsTipoCanalProducao
+	,producao.FxIdade
+	,sum(producao.VrProducao) as VrProducao
+	,sum(producao.VrProducaoLiquida) as VrProducaoLiquida
+	,sum(producao.VrMargem) as VrMargemContribuicao
+	,sum(case when producao.NuContrato is not null then 1 else 0 end) as QtContrato
+	,sum(producao.VrProducaoProjetado) as VrProducaoProjetado
+	,sum(producao.VpTirContabil) as VpTirContabil
+	,sum(producao.VpTxGerencial) as VpTxGerencial
+	,sum(producao.VrTarifaCadastro) as VrTarifaCadastro
+	,sum(producao.VrTarifaAvaliacaoBem) as VrTarifaAvaliacaoBem
+	,sum(CASE WHEN Producao.VrTarifaCadastro > 0 THEN 1 ELSE 0 END) AS QtTarifaCadastro
+	,sum(CASE WHEN Producao.VrTarifaAvaliacaoBem > 0 THEN 1 ELSE 0 END) AS QtTarifaAvaliacaoBem
+	,sum(case when producao.StData = 1 then producao.VrProducao else 0 end) as VrProducaoDia
+	,sum(producao.VrProducaoDiaUtil) as VrProducaoDiaUtil
+	,max(producao.QtTotalDiaUtilMes) as QtTotalDiaUtilMes
+	,max(producao.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes
+	,sum(producao.VrComissaoTotal) as VrComissaoTotal
+	,sum(producao.VrComissaoParcelada) as VrComissaoParcelada
+    ,sum(producao.VrFinanciamento) as VrFinanciamento
+	,sum(producao.VrPerdaEstimada) as VrPerdaEstimada
+    ,sum(producao.VpSpreadRebate) as VpSpreadRebate
+	,sum(producao.VpSpread) as VpSpread
+
+FROM tmp.TbProducao producao
+
+WHERE producao.NuAnoMes >= 201901
+group by 1,2,3,4
+;run;
+
+										/*TRAZ SEGUROS*/
+
+PROC SQL;
+CREATE TABLE TbSeguros AS
+SELECT
+										/*Seguros*/
+	producao.NuAnoMes
+	,producao.NmGrupoProdutoMeta
+	,producao.DsTipoCanalProducao
+	,sum(producao.VrBVMais) as VrSPF
+	,sum(producao.VrCap) as VrCap
+	,sum(producao.VrDemais) as VrDemais
+	,sum(producao.VrBVMaisProjetado) as VrSPFProjetado
+	,sum(producao.VrCapProjetado) as VrCapProjetado
+	,sum(producao.VrDemaisProjetado) as VrDemaisProjetado
+	,sum(producao.VrDemaisSemCompletoMaxProjetado) AS VrDemaisSCProjetado /* add on feb 24 2021 */
+	,sum(producao.VrCompletoProjetado) AS VrCompletoProjetado /* add on feb 24 2021 */
+	,sum(case when producao.StData = 1 then producao.VrBVMais else 0 end) as VrSPFDia
+	,sum(case when producao.StData = 1 then producao.VrCap else 0 end) as VrCapDia
+	,sum(case when producao.StData = 1 then producao.VrDemais else 0 end) as VrDemaisDia
+	,sum(producao.FlBVMais) as QtSPF
+	,sum(producao.FlCap) as QtCap
+	,sum(producao.FlDemais) as QtDemais
+	,sum(producao.FlDemaisSemCompleto) as QtDemaisSC
+	,sum(producao.FlCompleto) as QtCompleto
+	,sum(CASE WHEN producao.FlBVMais = 1 OR /* add on feb 24 2021 */
+                   producao.FlCap = 1 OR /* add on feb 24 2021 */
+                   producao.FlDemais = 1 OR /* add on feb 24 2021 */
+                   producao.FlDemaisSemCompleto = 1 OR /* add on feb 24 2021 */
+                   producao.FlCompleto = 1 /* add on feb 24 2021 */
+              THEN 1 ELSE 0 END) as QtContratosSeguros /* add on feb 24 2021 */
+	,sum(producao.FlBVMaisEleg) as QtSPFEleg
+	,sum(producao.FlCapEleg) as QtCapEleg
+	,sum(producao.FlDemaisEleg) as QtDemaisEleg
+	,sum(producao.FlDemaisEleg) as QtCompletoEleg
+	,sum(producao.VrComissaoTotal) as VrComissaoTotal
+	,sum(producao.VrComissaoParcelada) as VrComissaoParcelada
+    ,sum(producao.VrFinanciamento) as VrFinanciamento
+	,sum(producao.VrPerdaEstimada) as VrPerdaEstimada
+	,sum(producao.VpSpreadRebate) as VpSpreadRebate
+	,sum(producao.VpSpread) as VpSpread
+
+FROM tmp.TbProducao producao
+
+WHERE producao.NuAnoMes >= 201901
+group by 1,2,3
+;run;
+
+										/*Seguros Cancelados*/
+proc sql;
+create table TbSegurosCancelados as
+select
+	 SegurosCancelados.NuAnoMes
+	,SegurosCancelados.NmGrupoProdutoMeta
+	,SegurosCancelados.DsTipoCanalProducao
+
+	,sum(SegurosCancelados.VrBVMais) as VrSPFCancelados
+	,sum(SegurosCancelados.VrCap) as VrCapCancelados
+	,sum(SegurosCancelados.VrDemais) as VrDemaisCancelados
+
+	,sum(SegurosCancelados.FlBVMais) as QtSPFCancelados
+	,sum(SegurosCancelados.FlCap) as QtCapCancelados
+	,sum(SegurosCancelados.FlDemais) as QtDemaisCancelados
+
+from bases.TbSegurosProducaoCancelados SegurosCancelados
+Where SegurosCancelados.NuAnoMes < year(today())*100+month(today())
+group by 1,2,3
+;run;
+
+data TbConsolidadoSeguros;
+	set TbSeguros
+		TbSegurosCancelados
+	;run;
+
+proc sort data=TbConsolidadoSeguros;
+by NuAnoMes NmGrupoProdutoMeta DsTipoCanalProducao
+;run;
+
+proc transpose data=TbConsolidadoSeguros out=TbConsolidadoSegurosUnpivot
+(drop=_LABEL_ rename=_NAME_=TpValor rename=COL1=VrMedida rename=COL2=VrMedidaCancelado where=(VrMedida<>0));
+by NuAnoMes NmGrupoProdutoMeta DsTipoCanalProducao
+;run;
+
+PROC SQL;
+CREATE TABLE TbSegurosProducao as
+SELECT
+	 SegurosUnpivot.NuAnoMes
+	,SegurosUnpivot.NmGrupoProdutoMeta
+	,SegurosUnpivot.DsTipoCanalProducao
+	,CASE
+		WHEN SegurosUnpivot.TpValor like '%SPF%' THEN 'SPF'
+		WHEN SegurosUnpivot.TpValor like '%Cap%' THEN 'Cap'
+		WHEN SegurosUnpivot.TpValor like '%Demais%' THEN 'Demais'
+		WHEN SegurosUnpivot.TpValor like '%Completo%' THEN 'Completo'
+		END AS TpSeguro
+
+	,SUM(CASE WHEN TpValor in ('VrSPF','VrCap','VrDemais') then VrMedida else 0 end) as VrPremio
+	,SUM(CASE WHEN TpValor in ('VrSPFProjetado','VrCapProjetado','VrDemaisSCProjetado','VrCompletoProjetado') then VrMedida else 0 end) as VrPremioProjetado /* altered on feb 24 2021 */
+	,SUM(CASE WHEN TpValor in ('VrSPFDia','VrCapDia ','VrDemaisDia') then VrMedida else 0 end) as VrPremioDia
+
+	,SUM(CASE WHEN TpValor in ('QtSPF','QtCap','QtDemaisSC','QtCompleto') then VrMedida else 0 end) as QtSeguros /* altered on feb 24 2021 */
+	,SUM(CASE WHEN TpValor in ('QtSPFEleg','QtCapEleg','QtDemaisEleg','QtCompletoEleg') then VrMedida else 0 end) as QtSegurosElegiveis /* altered on feb 24 2021 */
+
+	,SUM(CASE WHEN TpValor in ('QtSPFCancelados','QtCapCancelados','QtDemaisCancelados') then VrMedidaCancelado else 0 end) as QtSegurosCancelados
+	,SUM(CASE WHEN TpValor in ('VrSPFCancelados','VrCapCancelados','VrDemaisCancelados') then VrMedidaCancelado else 0 end) as VrPremioCancelados
+
+	,SUM(CASE WHEN TpValor in ('QtContratosSeguros') then VrMedida else 0 end) as QtContratosSeguros
+FROM TbConsolidadoSegurosUnpivot SegurosUnpivot
+GROUP BY 1,2,3,4
+;RUN;
+
+PROC SQL;
+	CREATE TABLE TbDiasUteis AS
+		SELECT
+			NuAnoMes
+			,MAX(QtCorridosDiaUtilMes) AS  QtCorridosDiaUtilMes
+			,MAX(QtTotalDiaUtilMes) AS QtTotalDiaUtilMes
+		FROM bases.TbTempoData
+		WHERE DtTempo <  today()
+			AND DtTempo >= '01Jan2019'd
+		GROUP BY 1
+
+;RUN;
+
+										/*MCN*/
+PROC SQL;
+	CREATE TABLE  TbProducaoMCN  as
+	SELECT
+	 McnProducao.NuAnoMes
+	,McnProducao.NmGrupoProdutoMeta
+	,McnProducao.DsTipoCanalProducao
+	,DiasUteis.QtTotalDiaUtilMes
+	,DiasUteis.QtCorridosDiaUtilMes
+	,SUM(CASE WHEN McnProducao.TpValor = 'VrMcn' THEN McnProducao.vrMedida END) AS VrProducao
+	,SUM(CASE WHEN McnProducao.TpValor = 'VrMcn' THEN McnProducao.vrMedida END)/DiasUteis.QtCorridosDiaUtilMes as VrProducaoDiaUtil
+
+	FROM bases.TbMetaMCN McnProducao
+			LEFT JOIN TbDiasUteis DiasUteis
+				ON McnProducao.nuAnoMes =  DiasUteis.nuAnoMes
+
+	WHERE McnProducao.nuAnoMes >=201901
+
+	GROUP BY 1,2,3,4,5
+;run;
+
+								/*Consolidada todas as bases*/
+data TbConsolidado;
+set TbMeta
+	TbProducao
+	TbSegurosProducao
+	TbProducaoMCN
+;run;
+
+proc sql noprint;
+SELECT MAX(DtAtualizacao) into: DtAtualizacaoProducao
+FROM tmp.TbProducao;
+quit;
+
+proc sql;
+create table TbRelatorioExecutivo as
+select
+	 &DtAtualizacaoProducao. AS DtAtualizacaoProducao format date9.
+	,Consolidado.NuAnoMes
+	,Consolidado.NmGrupoProdutoMeta
+	,Consolidado.DsTipoCanalProducao
+	,Consolidado.TpSeguro
+	,consolidado.Fxidade
+	,SUM(Consolidado.VrProducaoMeta) as VrProducaoMeta format 18.2
+	,SUM(Consolidado.VrMargemContribuicaoMeta) as VrMargemContribuicaoMeta format 18.2
+	,SUM(Consolidado.VrFaturamentoMeta) as VrFaturamentoMeta format 18.2
+	,SUM(Consolidado.VrProducao) as VrProducao format 18.2
+	,SUM(Consolidado.VrProducaoLiquida) as VrProducaoLiquida format 18.2
+	,SUM(Consolidado.VrMargemContribuicao) as VrMargemContribuicao format 18.2
+	,SUM(Consolidado.QtContrato) as QtContrato format 18.0
+	,SUM(Consolidado.VrProducaoProjetado) as VrProducaoProjetado format 18.2
+	,SUM(Consolidado.VpTirContabil) as VpTirContabil format 18.2
+	,SUM(Consolidado.VpTxGerencial) as VpTxGerencial format 18.2
+	,SUM(Consolidado.VrTarifaCadastro) as VrTarifaCadastro format 18.2
+	,SUM(Consolidado.VrTarifaAvaliacaoBem) as VrTarifaAvaliacaoBem format 18.2
+	,SUM(Consolidado.QtTarifaCadastro) as QtTarifaCadastro format 18.0
+	,SUM(Consolidado.QtTarifaAvaliacaoBem) as QtTarifaAvaliacaoBem format 18.0
+	,SUM(Consolidado.VrProducaoDia) as VrProducaoDia format 18.2
+	,SUM(Consolidado.VrProducaoDiaUtil) as VrProducaoDiaUtil format 18.2
+	,SUM(Consolidado.QtTotalDiaUtilMes) as QtTotalDiaUtilMes format 18.0
+	,SUM(Consolidado.QtCorridosDiaUtilMes) as QtCorridosDiaUtilMes format 18.0
+
+	,SUM(Consolidado.VrProducaoOrcado) as VrProducaoOrcado format 18.2
+	,SUM(Consolidado.VrMargemContribuicaoOrcado) as VrMargemContribuicaoOrcado format 18.2
+	,SUM(Consolidado.VpTxSpreadOrcado) as VpTxSpreadOrcado format 18.2
+
+	,SUM(Consolidado.VrPremioMeta) as VrPremioMeta format 18.2
+	,MAX(Consolidado.PcSegurosMeta) as PcSegurosMeta format 18.2
+
+	,SUM(Consolidado.VrPremioOrcado) as VrPremioOrcado format 18.2
+	,SUM(Consolidado.QtSegurosNumerador) as QtSegurosNumerador format 18.0
+	,SUM(Consolidado.QtSegurosQtDenominador) as QtSegurosDenominador format 18.0
+	,SUM(Consolidado.VrProducaoBN) as VrProducaoBN format 18.2
+
+	,SUM(Consolidado.VrPremio) as VrPremio format 18.2
+	,SUM(Consolidado.VrPremioProjetado) as VrPremioProjetado format 18.2
+	,SUM(Consolidado.VrPremioDia) as VrPremioDia format 18.2
+	,SUM(Consolidado.QtSeguros) as QtSeguros format 18.0
+	,SUM(Consolidado.QtContratosSeguros) as QtContratosSeguros format 18.0
+	,SUM(Consolidado.QtSegurosElegiveis) as QtSegurosElegiveis format 18.0
+	,SUM(Consolidado.QtSegurosCancelados) as QtSegurosCancelados format 18.0
+	,SUM(Consolidado.VrPremioCancelados) as VrPremioCancelados format 18.2
+    ,SUM(Consolidado.VpTxFinanciamentoMeta) as VpTxFinanciamentoMeta format 18.2
+	,SUM(Consolidado.VpTxFinanciamentoOrcado) as VpTxFinanciamentoOrcado format 18.2
+	,SUM(Consolidado.VrComissaoTotal) as VrComissaoTotal format 18.2
+	,SUM(Consolidado.VrComissaoParcelada) as VrComissaoParcelada format 18.2
+    ,SUM(Consolidado.VrFinanciamento) as VrFinanciamento format 18.2
+    ,SUM(Consolidado.VrPerdaEstimada) as VrPerdaEstimada format 18.2
+	,sum(Consolidado.VpSpreadRebate) as VpSpreadRebate format 18.2
+	,sum(Consolidado.VpSpread) as VpSpread format 18.2
+
+	from TbConsolidado Consolidado
+	/*where Consolidado.NuAnoMes <= year(today()-1)*100+month(today()-1) | removed on feb 25 2021 */
+
+	group by 1,2,3,4,5,6
+	;run;
+
+proc export
+data=TbRelatorioExecutivo
+file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbRelatorioExecutivo.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbRelatorioExecutivo.csv  /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/ ";

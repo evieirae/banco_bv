@@ -1,0 +1,325 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-simu
+FILE_SAS: 01-simulacoes.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 243
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM1, safraXM
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AQUISIC.PREANALISE_SIMU_PROP [SAS/Local], AUXL.TBRATINGSIMULACAO [SAS/Local], AUXL.TBROLLOUTMENSAGERIA [SAS/Local], BASEGRC.TBCLASSIFICACAORISCOSPDVS [SAS/Local], BASEGRC.TBDEPARARECUSASCREDITO [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], CONTRATO.CONTRATACAO_C2C [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local], CRM.SIMU_PROP_AQUISICAO [SAS/Local], CRM.SIMU_PROP_LEADS [SAS/Local], LEADSDIG.LEADS_DIGITAIS_24 [SAS/Local], LEADSDIG.LEADS_DIGITAIS_25 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AQUISIC.PREANALISE_SIMU_PROP [DATA Step - SET], AUXL.TBRATINGSIMULACAO [DATA Step - SET], AUXL.TBROLLOUTMENSAGERIA [PROC SQL - JOIN], BASEGRC.TBCLASSIFICACAORISCOSPDVS [PROC SQL - JOIN], BASEGRC.TBDEPARARECUSASCREDITO [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - FROM; PROC SQL - JOIN], CONTRATO.CONTRATACAO_C2C [PROC SQL - JOIN], CONVSIMU.TBSIMULACOES [PROC SQL - FROM], CRM.SIMU_PROP_AQUISICAO [PROC SQL - FROM], CRM.SIMU_PROP_LEADS [PROC SQL - FROM], LEADSDIG.LEADS_DIGITAIS_24 [PROC SQL - FROM], LEADSDIG.LEADS_DIGITAIS_25 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LEADS, LEADS_V01, LEADS_V02, LEADS_V03, MSGPROPOSTA, SIMULACOES, TBONDABVO, TBPDECLEVESPROP, TBPDECLEVESPROPENRIQ, TBPDECLEVESPROPSORT, TBPDECLEVESSIMU, TBPDECLEVESSIMUENRIQ, TBPDECLEVESSIMUSORT, TBRATINGSIMULACAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*options DLDMGACTION=REPAIR;*/
+/* |	Alteração:	Incluido Origem PPAR2								 				| */
+/* |	Resp: 		Gustavo Domingues - MIS IGE											| */
+/* |	Data:		04/03/2025															| */
+/* ====================================================================================== */
+
+proc sql;
+create table TbOndaBVO as
+select
+	  cdparceirocomercial,
+	  min(nuanomes) as Nuanomes
+from BASEGRC.TbLevesNovosBVO
+group by cdparceirocomercial
+;run;
+
+DATA TbRatingSimulacao;
+SET AUXL.TbRatingSimulacao;
+  WHERE NuAnoMes >= &safraM1.;
+RUN;
+
+DATA TbPdecLevesProp;SET AQUISIC.PREANALISE_SIMU_PROP;WHERE DtTransacaoFluxoDecisao >= "01JAN2024"d AND NuProposta NE .; RUN;
+DATA TbPdecLevesSimu;SET AQUISIC.PREANALISE_SIMU_PROP;WHERE DtTransacaoFluxoDecisao >= "01JAN2024"d AND NuProposta EQ .; RUN;
+
+PROC SORT  DATA=TbPdecLevesProp OUT=TbPdecLevesPropSort NODUPKEY; BY NuProposta; RUN;
+PROC SORT  DATA=TbPdecLevesSimu OUT=TbPdecLevesSimuSort NODUPKEY; BY NuCpfCNPJ DtTransacaoFluxoDecisao CdLoja; RUN;
+
+PROC SQL;
+	CREATE TABLE TbPdecLevesPropEnriq AS
+	SELECT
+		A.*
+		,B.recusa_tratada
+	FROM
+		TbPdecLevesPropSort as A
+		LEFT JOIN BASEGRC.TbDeParaRecusasCredito as B
+			ON A.RecusaPrioritaria = B.RecusaPrioritaria AND A.MotivoRecusaBlaze = B.MotivoRecusaBlaze AND A.DsMotivoRecusa1 = B.DsMotivoRecusa1
+;RUN;
+
+PROC SQL;
+	CREATE TABLE TbPdecLevesSimuEnriq AS
+	SELECT
+		A.*
+		,B.recusa_tratada
+	FROM
+		TbPdecLevesSimuSort as A
+		LEFT JOIN BASEGRC.TbDeParaRecusasCredito as B
+			ON A.RecusaPrioritaria = B.RecusaPrioritaria AND A.MotivoRecusaBlaze = B.MotivoRecusaBlaze AND A.DsMotivoRecusa1 = B.DsMotivoRecusa1
+;RUN;
+
+PROC SQL;
+CREATE TABLE Simulacoes AS
+  SELECT DISTINCT
+    'CONVS' AS TpDados,
+    CVS.DtAtualizacao AS DtAtualizacaoSimulacao FORMAT=mmddyy10.,
+    CVS.NuAnoMes,
+    CVS.SistemaInicial,
+    YEAR(CVS.DtSimulacaoFinal)*100 + MONTH(CVS.DtSimulacaoFinal) AS SafraSimulacaoFinal,
+    CVS.SistemaFinal,
+    CASE WHEN CVS.DtSimulacaoInicial >= TODAY() - 30 THEN DtSimulacaoInicial
+         ELSE INTNX('MONTH', CVS.DtSimulacaoInicial, 0, 'BEGINNING')
+         END AS DtReferencia FORMAT=mmddyy10.,
+    CVS.NmParceiroComercial AS ParceiroComercial,
+    '' AS Porte,
+    CVS.Filial AS NmAreaEstruturaComercial,
+    CVS.Regional AS NmSubEstruturaComercialA,
+    CVS.Canal AS DsTipoCanalProducao,
+    CVS.FxEntrada,
+    CVS.FxIdade,
+case when BVO.CdParceiroComercial<>. and
+    CVS.FxIdade ='ZeroKM' then 'Leves-BVO' else CVS.Produto end as NmGrupoProdutoMeta,
+     CVS.NuCpfCnpj,
+    0 AS FlagDelta,
+    0 AS DeltaTeorico,
+    CVS.FaixaScore,
+    CVS.StatusSimulacao,
+    CVS.ProbabilidadeAprovacao,
+    CASE WHEN CVS.ProbabilidadeAprovacao < 5 THEN 'SCORE < 5'
+         WHEN CVS.ProbabilidadeAprovacao >= 5 and CVS.ProbabilidadeAprovacao < 6 then 'SCORE 5 - 5.5'
+         WHEN CVS.ProbabilidadeAprovacao >= 6 and CVS.ProbabilidadeAprovacao < 7 then 'SCORE 6 - 6.5'
+         WHEN CVS.ProbabilidadeAprovacao >= 7 and CVS.ProbabilidadeAprovacao < 8 then 'SCORE 7 - 7.5'
+         WHEN CVS.ProbabilidadeAprovacao >= 8 and CVS.ProbabilidadeAprovacao < 9 then 'SCORE 8 - 8.5'
+         WHEN CVS.ProbabilidadeAprovacao >= 9 and CVS.ProbabilidadeAprovacao <= 10 then 'SCORE 9 - 10'
+         END AS Fx_Score,
+    CVS.TpPessoa,
+    CVS.Banco,
+    CVS.CompraLeads,
+    CVS.Fl_ESG AS Combustivel,
+    COALESCE(CVS.Mensageria,'9. Não houve mensageria') AS Mensageria,
+    CVS.Mensageria2,
+    COMPRESS(put(CVS.QtParcela,3.)) as FxParcela,
+    MBV.Onda AS FlOndaMotorBV,
+    MBV.DataRollout as DataRollout FORMAT=mmddyy10.,
+    CVS.FlSimuValidaEfet,
+    CASE WHEN COALESCE(CVS.RatingCliente, RTS.RatingCliente) <> . THEN 1 ELSE 0 END AS FlRatingC,
+	CASE WHEN COALESCE(CVS.RatingSimulacao, RTS.RatingSimulacao) <> . THEN 1 ELSE 0 END AS FlRatingS,
+	CVS.SubSistemaOrigem as SubSistemaOrigem,
+	CASE WHEN CVS.NuProposta = C2C.NuProposta THEN 'S' ELSE 'N' END AS FlC2C,
+	case when BVOonda.CdParceiroComercial<>. then 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.) else 'Demais' end as FlGrupoBVO,
+	Case when YEAR(CVS.DtSimulacaoInicial)>=2024 and CVS.FlPAP = 'Sim' then 'S'
+	     when YEAR(CVS.DtSimulacaoInicial)>=2024 and CVS.FlPAP = 'Não' then 'N'
+    end as FlPAP,
+
+	Coalesce(B.MotivoRecusaElegibilidade,B.MotivoRecusaSimulacao,B.MotivoRecusaPolitica
+		, C.MotivoRecusaElegibilidade,C.MotivoRecusaSimulacao,C.MotivoRecusaPolitica
+		, CVS.MotivoRecusa) as  MotivoRecusa,
+
+	Coalesce(B.RecusaPrioritaria, C.RecusaPrioritaria) as  RecusaPrioritaria,
+
+	Coalesce(B.MotivoRecusaBlaze, C.MotivoRecusaBlaze) as  MotivoRecusaBlaze,
+
+	Coalesce(B.DsMotivoRecusa1, C.DsMotivoRecusa1) as  DsMotivoRecusa1,
+
+	Coalesce(B.recusa_tratada, C.recusa_tratada) as recusa_tratada,
+
+	Coalesce(B.MotivoRecusaPropostaAgp, C.MotivoRecusaSimulacaoAgp) as MotivoRecusaPropostaAgp,
+
+	CASE WHEN CVS.DtSimulacaoInicial >= D.DtInclusao_BVO AND CALCULATED NmGrupoProdutoMeta = 'Leves-BVO' THEN 1 ELSE 0 END AS FlBVOCredito,
+
+	COUNT(DISTINCT CVS.CdSimulacaoFinal) AS QtdSimulacaoFinal,
+    COUNT(DISTINCT CVS.CdSimulacaoInicial) AS CdSimulacaoInicial,
+    COUNT(DISTINCT CVS.NuProposta) AS QtdProposta,
+    SUM(CVS.FlPropostaOriginada) AS FlPropostaOriginada,
+    SUM(CVS.FlPropostaAprovada) AS FlPropostaAprovada,
+    SUM(CVS.FlPropostaEfetivada) AS FlPropostaEfetivada,
+    SUM(CVS.FlPropostaPaga) AS FlPropostaPaga,
+    SUM(CVS.FlSimulacao) AS FlSimulacao,
+    SUM(CVS.FlCard) AS FlCard,
+    SUM(CVS.FlConcorrente) AS FlConcorrente,
+    SUM(CVS.FlConversao) AS FlConversao,
+    SUM(CVS.VrProposta) AS VrProposta_Simulacao FORMAT=num18.2,
+    SUM(CVS.VrProposta) AS VrLiberado FORMAT=num18.2,
+    SUM((CVS.TxInicioFinanciamento/100) * CVS.VrProposta) AS VpTxGerencial FORMAT=num18.2,
+    SUM(CVS.VrEntrada) AS VpEntrada FORMAT=num18.2,
+    SUM(CVS.ProbabilidadeAprovacao * CVS.VrProposta) AS VpScore FORMAT=num18.2,
+    SUM(CVS.IdadeBem * CVS.VrProposta) AS VpIdade FORMAT=num18.2,
+    SUM(CVS.QtParcela * CVS.VrProposta) AS VpPrazo FORMAT=num18.2,
+	SUM(CVS.PcEntradaMinima * CVS.VrProposta) AS VpEntradaMinima FORMAT=num18.2,
+    SUM(COALESCE(CVS.RatingCliente, RTS.RatingCliente) * CVS.VrProposta) AS VpRatingCliente FORMAT=num18.2,
+	SUM(COALESCE(CVS.RatingSimulacao, RTS.RatingSimulacao) * CVS.VrProposta) AS VpRatingSimulacao FORMAT=num18.2
+  FROM CONVSIMU.TBSIMULACOES CVS
+  LEFT JOIN
+    AUXL.TBROLLOUTMENSAGERIA MBV
+	ON MBV.CdParceiroComercial = CVS.CdParceiroComercial
+  LEFT JOIN TbRatingSimulacao RTS
+    ON CVS.DtSimulacaoInicial = RTS.DtSimulacao
+    AND CVS.NuCpfCnpj = RTS.NuCpfCnpj
+  LEFT JOIN CONTRATO.CONTRATACAO_C2C C2C
+    	ON CVS.NuProposta = C2C.NuProposta
+	  LEFT JOIN
+       BASEGRC.TbLevesNovosBVO BVO
+	ON BVO.CdParceiroComercial = CVS.CdParceiroComercial
+	   and bvo.nuanomes = CVS.nuanomes
+
+	LEFT JOIN TbOndaBVO BVOonda
+	ON BVOonda.CdParceiroComercial = CVS.CdParceiroComercial
+
+	LEFT JOIN TbPdecLevesPropEnriq B
+		ON CVS.NuProposta NE . AND CVS.NuProposta = B.NuProposta AND CVS.Produto = 'Leves-BVO'
+  	LEFT JOIN TbPdecLevesSimuEnriq  C
+  		ON CVS.NuProposta EQ . AND INPUT(CVS.NuCpfCnpj, 14.) = C.NuCpfCnpj
+			AND CVS.DtSimulacaoInicial = C.DtTransacaoFluxoDecisao AND CVS.CdParceiroComercial = C.CdLoja
+	LEFT JOIN basegrc.TbClassificacaoRiscosPDVs D
+		on CVS.CdParceiroComercial = D.CdLoja
+
+  WHERE CVS.NuAnoMes >= &safraXM.
+     AND CVS.SistemaInicial IN
+('ACOM','APAR','PPAR','PPAR2','SMICSTVE', 'MOBIAUTO', 'SIMUMLVL', 'SIMUMCVL', 'SIMUVEIC'
+,'CRSMINTLV','SIMUSCVL','SIMUSCMT','SIMUKVVL','SIMUKVMT','SIMUDVVL','SIMUAPPBV'
+,'SIMUBVIVL','SIMUBVIMT','SIMUBVIPD')
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,
+    11,12,13,14,15,16,17,18,19,20,
+    21,22,23,24,25,26,27,28,29,30,
+    31,32,33,34,35,36,37,38,39,40,41,42,43,44;
+RUN;
+
+PROC SQL; CREATE INDEX NuAnoMes ON Simulacoes; QUIT;
+PROC SQL; CREATE INDEX NmGrupoProdutoMeta ON Simulacoes; QUIT;
+PROC SQL; CREATE INDEX ParceiroComercial ON Simulacoes; QUIT;
+
+/*PROC SORT DATA=Simulacoes FORCE NODUPKEY;
+BY TpDados DtAtualizacaoSimulacao NuAnoMes SistemaInicial SafraSimulacaoFinal SistemaFinal NmGrupoProdutoMeta ParceiroComercial StatusSimulacao FlSimuValidaEfet;
+RUN;*/
+
+PROC SQL;
+SELECT MAX(DtAtualizacaoSimulacao) INTO :DtSimu FROM Simulacoes;
+RUN;
+
+PROC SQL;
+CREATE TABLE MsgProposta AS
+  SELECT DISTINCT
+    Num_Proposta AS NuProposta,
+    CASE WHEN Msg_Dash = '9. Sem CdSimuPrazofnnco' THEN '9. Não houve mensageria' ELSE Msg_Dash END AS Mensageria,
+    Msg_2 AS Mensageria2
+  FROM CRM.SIMU_PROP_AQUISICAO
+  WHERE
+    AnoMes >= PUT(&safraXM.,6.)
+    AND Num_Proposta <> .
+    AND (calculated Mensageria || Msg_2) IS NOT NULL;
+RUN;
+
+PROC SORT DATA=MsgProposta NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC SQL; CREATE INDEX NuProposta ON MsgProposta; QUIT;
+
+/* Buscar informações de leads  */
+
+PROC SQL;
+CREATE TABLE Leads_V01 AS
+  SELECT DISTINCT
+    num_proposta as NuProposta,
+    Sistema_Origem as CompraLeads,
+	CASE WHEN flag_comissao = 1 AND Sistema_Origem IN ('DRYVE','Dryve sem Simul.','Escale sem Simul.','KARVI','ICARROS','MERCADO_LIVRE','MOBIAUTO','USADOSBR','SO_CARRAO') THEN 1
+		 WHEN Sistema_Origem IN ('SITE_BV','MEU_CARRO_NOVO','APP','NA_PISTA') THEN 1
+		 ELSE 0
+    END AS FlagProducao,
+	campanha_agrup as OrigemSiteBV
+  FROM
+    CRM.SIMU_PROP_LEADS
+  WHERE
+    num_proposta <> .
+    AND Sistema_Origem IS NOT NULL
+    AND AnoMes >= PUT(&safraXM.,6.)
+	AND AnoMes <= '202411';
+RUN;
+
+PROC SQL;
+CREATE TABLE Leads_V02 AS
+  SELECT DISTINCT
+    NuProposta as NuProposta,
+    upcase(DsSistemaInicial) as CompraLeads,
+	CASE WHEN FlComissao = 'Sim' AND upcase(DsSistemaInicial) IN ('DRYVE','DRYVE SEM SIMUL.','ESCALE SEM SIMUL.','KARVI','ICARROS','MERCADO_LIVRE','MOBIAUTO','USADOSBR','SO_CARRAO') THEN 1
+		 WHEN UPCASE(DSSISTEMAINICIAL) IN ('SITE_BV','MEU_CARRO_NOVO','APP','NA_PISTA') THEN 1
+		 ELSE 0
+    END AS FlagProducao,
+	DsMidiaOrigem as OrigemSiteBV
+  FROM
+    LEADSDIG.LEADS_DIGITAIS_24
+  WHERE
+    NuProposta <> .
+    AND DsSistemaInicial IS NOT NULL
+    AND NuAnoMes_Simu >= &safraXM.;
+RUN;
+
+PROC SQL;
+CREATE TABLE Leads_V03 AS
+  SELECT DISTINCT
+    NuProposta as NuProposta,
+    upcase(DsSistemaInicial) as CompraLeads,
+	CASE WHEN FlComissao = 'Sim' AND upcase(DsSistemaInicial) IN ('DRYVE','DRYVE SEM SIMUL.','ESCALE SEM SIMUL.','KARVI','ICARROS','MERCADO_LIVRE','MOBIAUTO','USADOSBR','SO_CARRAO') THEN 1
+		 WHEN UPCASE(DSSISTEMAINICIAL) IN ('SITE_BV','MEU_CARRO_NOVO','APP','NA_PISTA') THEN 1
+		 ELSE 0
+    END AS FlagProducao,
+	DsMidiaOrigem as OrigemSiteBV
+  FROM
+    LEADSDIG.LEADS_DIGITAIS_25
+  WHERE
+    NuProposta <> .
+    AND DsSistemaInicial IS NOT NULL
+    AND NuAnoMes_Simu >= &safraXM.;
+RUN;
+
+Data Leads;
+set Leads_V01
+	Leads_V02
+	Leads_V03
+	;run;
+
+PROC SORT DATA=Leads NODUPKEY;
+BY NuProposta;
+RUN;
+
+PROC SQL; CREATE INDEX NuProposta ON Leads; QUIT;

@@ -1,0 +1,439 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 08 - Originacao_PJ.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 356
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBORIGINACAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBORIGINACAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_ORIGINACAO_PJ_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_ORIG_PJ_CANAL_SEM, BASE_ORIG_PJ_CANAL_TOTAL, BASE_ORIG_PJ_FILIAL_SEM, BASE_ORIG_PJ_FILIAL_TOTAL, BASE_ORIG_PJ_GRS_SEM, BASE_ORIG_PJ_GRS_TOTAL, BASE_ORIG_PJ_PDVS_SEM, BASE_ORIG_PJ_PDVS_TOTAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+
+Proc Sql;
+Create Table Base_Orig_PJ_Canal_Total as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"Canal" as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,"Canal Solar" as Dimensao1
+,"Canal Solar" as Dimensao2
+,"Canal Solar" as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Orig_PJ_Canal_Sem as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"Canal" as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,"Canal Solar" as Dimensao1
+,"Canal Solar" as Dimensao2
+,"Canal Solar" as Dimensao3
+,Case
+	When Day(Orig.DtEntradaProposta) <=07 Then '01 á 07 dias'
+	When Day(Orig.DtEntradaProposta) <=14 Then '08 á 14 dias'
+	When Day(Orig.DtEntradaProposta) <=21 Then '15 á 21 dias'
+	When Day(Orig.DtEntradaProposta) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Orig_PJ_Filial_Total as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"Filial" as Visao
+,"" as DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmAreaEstruturaComercialC as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Orig_PJ_Filial_Sem as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"Filial" as Visao
+,"" as DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmAreaEstruturaComercialC as Dimensao3
+,Case
+	When Day(Orig.DtEntradaProposta) <=07 Then '01 á 07 dias'
+	When Day(Orig.DtEntradaProposta) <=14 Then '08 á 14 dias'
+	When Day(Orig.DtEntradaProposta) <=21 Then '15 á 21 dias'
+	When Day(Orig.DtEntradaProposta) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Orig_PJ_Grs_Total as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"GRs" as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmColaboradorC as Dimensao3
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Orig_PJ_Grs_Sem as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"GRs" as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,"Canal Solar" as Dimensao1
+,Orig.NmAreaEstruturaComercialC as Dimensao2
+,Orig.NmColaboradorC as Dimensao3
+,Case
+	When Day(Orig.DtEntradaProposta) <=07 Then '01 á 07 dias'
+	When Day(Orig.DtEntradaProposta) <=14 Then '08 á 14 dias'
+	When Day(Orig.DtEntradaProposta) <=21 Then '15 á 21 dias'
+	When Day(Orig.DtEntradaProposta) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Orig_PJ_PDVs_Total as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"Cobans" as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,Orig.NmAreaEstruturaComercialC as Dimensao1
+,Orig.NmColaboradorC as Dimensao2
+,Case
+	When Orig.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Orig.CdParceiroComercial,8.) || '-' || Orig.NmParceiroComercial
+End as Dimensao3
+/*,put(Orig.CdParceiroComercial, 8.) || '-' || Orig.NmParceiroComercial as Dimensao3*/
+,'Mês Fechado' as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Cobans_Solar_Saida as Parc On Orig.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Proc Sql;
+Create Table Base_Orig_PJ_PDVs_Sem as
+Select
+'Originacao_PJ' as Base
+,Orig.NuAnoMes
+,"Cobans" as Visao
+,Orig.DsLoginN1C
+,Orig.DsLoginN2C
+,Orig.DsLoginN3C
+,Orig.NmAreaEstruturaComercialC as Dimensao1
+,Orig.NmColaboradorC as Dimensao2
+,Case
+	When Orig.CdParceiroComercial = 418254 and Parc.CdParceiroComercial NE . Then Put(Parc.CdParceiroComercial,8.) || '-' || Parc.NmParceiroComercial
+	Else Put(Orig.CdParceiroComercial,8.) || '-' || Orig.NmParceiroComercial
+End as Dimensao3
+/*,put(Orig.CdParceiroComercial, 8.) || '-' || Orig.NmParceiroComercial as Dimensao3*/
+,Case
+	When Day(Orig.DtEntradaProposta) <=07 Then '01 á 07 dias'
+	When Day(Orig.DtEntradaProposta) <=14 Then '08 á 14 dias'
+	When Day(Orig.DtEntradaProposta) <=21 Then '15 á 21 dias'
+	When Day(Orig.DtEntradaProposta) > 21 Then 'Demais dias'
+End as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Orig.QtCorridosDiaUtilMes
+
+,Max(DatePart(Parc.DtCadastro)) as DtCadastro Format ddmmyy10.
+
+,Sum(Case When FlPropostaOriginada = 1 Then 1 Else 0 End) as QtPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then 1 Else 0 End) as QtPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then 1 Else 0 End) as QtPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then 1 Else 0 End) as QtPropostaAPNP
+
+,Sum(Case When FlPropostaOriginada = 1 Then VrPropostaOriginada Else 0 End) as VrPropostaOriginada
+,Sum(Case When FlPropostaAprovada = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAprovada
+,Sum(Case When FlPropostaEfetivada = 1 Then VrPropostaEfetivada Else 0 End) as VrPropostaEfetivada
+,Sum(Case When FlPropostaAPNP = 1 Then VrPropostaAprovada Else 0 End) as VrPropostaAPNP
+,Max(DtAtualizacao) as DataBase Format DDMMYY10.
+
+From Bases.TbOriginacao as Orig
+Left Join Base_Cobans_Solar_Saida as Parc On Orig.NuCnpjLojaFavorecido = Parc.NuCnpjLoja
+Left Join Base_Porte_Cobans_CNPJ as Porte On Orig.NuCnpjLojaFavorecido = Porte.NuCnpjLojaFavorecido and Orig.NuAnomes = Porte.NuAnomes
+Where Orig.NuANomes >= &Base_m5. and Orig.NmGrupoProdutoMeta = 'Solar' and Orig.TpPessoa = "J" and Orig.NmCanalEstruturaComercial = 'Canal Solar' and Orig.FlPropostaOriginada = 1 and
+		Orig.NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11,12,13
+;Quit;
+
+Data ritosol.Base_Originacao_PJ_Solar;
+Set
+	Base_Orig_PJ_PDVs_Total
+/*	Base_Orig_PJ_PDVs_Sem*/
+
+	Base_Orig_PJ_Grs_Total
+/*	Base_Orig_PJ_Grs_Sem*/
+
+	Base_Orig_PJ_Filial_Total
+/*	Base_Orig_PJ_Filial_Sem*/
+
+	Base_Orig_PJ_Canal_Total
+/*	Base_Orig_PJ_Canal_Sem*/
+;Run;

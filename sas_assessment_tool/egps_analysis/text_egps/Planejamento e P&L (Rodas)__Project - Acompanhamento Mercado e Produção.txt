@@ -1,0 +1,262 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - Acompanhamento Mercado e Produção
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 171
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBPRODUCAO [SAS/Local], BASES.TBRESULTADOMARKETSHARE [SAS/Local], FENAB.TB_FENABRAVE_EMPLACAMENTOS [SAS/Local], FENAB.TB_FENABRAVE_TRANSACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBPRODUCAO [PROC SQL - FROM], BASES.TBRESULTADOMARKETSHARE [PROC SQL - FROM], FENAB.TB_FENABRAVE_EMPLACAMENTOS [PROC SQL - FROM], FENAB.TB_FENABRAVE_TRANSACOES [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: FENABRAVE_NOVOS, FENABRAVE_USADOS, MERCADO, TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Comercializados */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Comercializados */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-aBduRzM9RjiGxTdv/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE FENABRAVE_NOVOS AS
+   SELECT t1.NmArquivo,
+          t1.Segmento,
+
+          
+            (COUNT(t1.Numero_Placa)) AS COUNT_of_Numero_Placa,
+          
+            (COUNT(t1.Numero_Chassis)) AS COUNT_of_Numero_Chassis
+      FROM FENAB.TB_FENABRAVE_EMPLACAMENTOS t1
+
+where t1.NmArquivo in (
+'Emplacamentos_2025_09.txt')
+      GROUP BY t1.NmArquivo,
+               t1.Segmento
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE FENABRAVE_USADOS AS
+   SELECT t1.NmArquivo,
+          t1.Segmento,
+
+
+
+          
+            (COUNT(t1.Numero_Chassis)) AS COUNT_of_Numero_Chassis,
+          
+            (COUNT(t1.Numero_Placa)) AS COUNT_of_Numero_Placa
+      FROM FENAB.TB_FENABRAVE_TRANSACOES t1
+ where t1.nmarquivo in (
+'Transacoes_2025_09.txt')
+group by
+			  1,2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Comercializados */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Financiados */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Financiados */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ds86gi3dZ3qsV7ZM/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE Mercado AS
+   SELECT
+
+          t1.NuAnoMes,
+          t1.StVeiculo,
+          t1.FxIdade,
+          t1.TpVeiculo,
+            (SUM(t1.GravBV)) AS GravBV,
+            (SUM(t1.GravTotal)) AS GravTotal
+
+      FROM BASES.TBRESULTADOMARKETSHARE t1
+
+ where t1.nuanomes between 202506 and 202509
+
+AND t1.TpArquivo = 'mf' AND t1.TpVeiculo in ('Leves', 'Motos', 'Pesados')
+
+GROUP BY 1,2,3,4
+
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE Mercado AS
+   SELECT
+      t1.NuAnoMes,
+      t1.StVeiculo,
+      t1.FxIdade,
+      CASE
+         WHEN t1.TpVeiculo = 'Leves' THEN 'EGV Leves'
+         WHEN t1.TpVeiculo = 'Pesados' THEN 'EGV Pesados'
+         ELSE ''
+      END AS produto,
+      SUM(t1.GravBV) AS GravBV,
+      SUM(t1.GravTotal) AS GravTotal
+   FROM BASES.TBRESULTADOMARKETSHARE t1
+   WHERE t1.NuAnoMes BETWEEN 202506 AND 202506
+     AND t1.TpArquivo = 'mf'
+     AND t1.TpVeiculo IN ('Leves', 'Pesados')
+     AND t1.flcvg = 'S'
+   GROUP BY t1.NuAnoMes, t1.StVeiculo, t1.FxIdade, t1.TpVeiculo;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Financiados */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 4 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-jLtqGcG6nQKdsRXh/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE TBPRODUCAO AS
+   SELECT
+
+          t1.nuanomes,
+          case when t1.NmGrupoProdutoMeta = 'Leves-BVO' then 'Leves' else t1.NmGrupoProdutoMeta end as NmGrupoProdutoMeta,
+          t1.DsTipoCanalProducao,
+		  t1.NmSubEstruturaComercialC,
+		  t1.NmCanalEstruturaComercial,
+		  t1.NmAreaEstruturaComercialC,
+
+          case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+
+		  case when t1.NmGrupoProdutoMeta in ('Leves', 'Motos', 'Pesados') then 'Rodas' when t1.NmGrupoProdutoMeta = 'Solar' then 'Solar' else 'Empréstimos' end as Grupo_Produto,
+
+            (COUNT(t1.NuContrato)) AS QtdeContrato,
+            (SUM(t1.VrProducao)) AS VrProducao,
+            (SUM(t1.VrProducaoProjetado)) AS VrProducaoProjetado
+
+      FROM bases.TBPRODUCAO t1
+
+	  where t1.NuAnoMes BETWEEN 202501 AND 202504
+
+	  and t1.NmGrupoProdutoMeta in ('Leves', 'Motos', 'Pesados', 'Leves-BVO', 'CVG Leves', 'CVG Pesados')
+      GROUP BY
+	  1,2,3,4,5,6,7,8;
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE Mercado AS
+   SELECT
+
+          t1.NuAnoMes,
+          t1.StVeiculo,
+          t1.FxIdade,
+          t1.TpVeiculo,
+            (SUM(t1.GravBV)) AS GravBV,
+            (SUM(t1.GravTotal)) AS GravTotal
+
+      FROM BASES.TBRESULTADOMARKETSHARE t1
+
+ where t1.nuanomes between 202506 and 202509
+
+AND t1.TpArquivo = 'mf' AND t1.TpVeiculo in ('Leves', 'Motos', 'Pesados')
+
+GROUP BY 1,2,3,4
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE FENABRAVE_USADOS AS
+   SELECT t1.NmArquivo,
+          t1.Segmento,
+
+
+
+          
+            (COUNT(t1.Numero_Chassis)) AS COUNT_of_Numero_Chassis,
+          
+            (COUNT(t1.Numero_Placa)) AS COUNT_of_Numero_Placa
+      FROM FENAB.TB_FENABRAVE_TRANSACOES t1
+ where t1.nmarquivo in (
+'Transacoes_2025_09.txt')
+group by
+			  1,2;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,532 @@
+START_METADATA
+PROJECT: SAS_UC4__Monitoramento_Carga_Behavior_Consig
+FILE_SAS: Monitoramento_Carga_Behavior_Consig.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:59 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -24
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), PROC DATASETS (4x | +80), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 435
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SQL
+HAS_DATA_STEP: Yes (18x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: BHCHECK = /projetos/ctrcredito/modelos/results; CONSIG = /projetos/ctrcredito/modelos/historico/bhconsignado
+DETECTED_MACROS_DEFINED: DataRef1, DataRef2, DataRef3, DataRef4, DataRef5, DataRef6, trab
+DETECTED_MACROS_USED: Consig_INSS_AnoMes_1, Consig_INSS_AnoMes_2, Consig_INSS_AnoMes_3, Consig_INSS_AnoMes_4, Consig_INSS_AnoMes_5, Consig_INSS_AnoMes_6, Consig_Privado_AnoMes_1, Consig_Privado_AnoMes_2, Consig_Privado_AnoMes_3, Consig_Privado_AnoMes_4, Consig_Privado_AnoMes_5, Consig_Privado_AnoMes_6, Consig_Publico_AnoMes_1, Consig_Publico_AnoMes_2, Consig_Publico_AnoMes_3, Consig_Publico_AnoMes_4, Consig_Publico_AnoMes_5, Consig_Publico_AnoMes_6, DataRef1, DataRef2, DataRef3, DataRef4, DataRef5, DataRef6, Produto, Variavel
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: PRODUTO, VARIAVEL
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CPC.TBCONTRATO [SYBASEIQ]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: &VARIAVEL, BHCHECK
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): &VARIAVEL._TOTAL [PROC SQL - JOIN; Resolved qualified read (%LET)], CPC.TBCONTRATO [Pass-Through Native (SYBASEIQ) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): &VARIAVEL._TOTAL, BHCHECK.MONITOR_CARGA_BHCONSIG
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: &VARIAVEL, ANALISEIEP, ANALISEMIX, BASESPROD_CONSIG, BASESVARIAVEIS_CONSIG, BASE_MONIT_PROD_CONSIG, BHS&PRODUTO, CONSIG_INSS_ANOMES_1, CPC_TBCONTRATO, DATAIEP_CONSIG, DATAIEP_CONSIG_1, DATAIEP_CONSIG_2, DATAIEP_CONSIG_3, DATAIEP_CONSIG_4, DATAIEP_CONSIG_5, DATAIEP_CONSIG_6, IEP_&VARIAVEL, MESANTERIOR_CONSIG, MESATUAL_CONSIG, MIGRACAO_CONSIG, MIGRACAO_PROD, MIGRACAO_RUFINAL, MIXMEDIO, MIXMEDIO_TOTAL, MIX_&VARIAVEL, MONIT_PROD_CONSIG_VOL, TEMOSMISSING_CONSIG
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*
++-------------------------------------------------------------------------------------------------+
+| Programa   | Monitoramento Carga Behavior Rodas                                                 |
+| Autor      | Vitor Colombo Liberato                                                             |
+| Objetivo   |     Verificar se os dados gerados pelo modelo Behavior Rodas estão de acordo com o |
+|            | esperado.                                                                          |
++-------------------------------------------------------------------------------------------------+
+| HISTÓRICO                                                                                       |
++-------------------------------------------------------------------------------------------------+
+|    DATA    | Responsável                       |            Alteração                           |
+| 08/01/2019 | Ana Lazarini                      | Unificação / Organização códs.                 |
+|            |                                   | Adaptação para alimentar Dashboards Tableau    |
++-------------------------------------------------------------------------------------------------+
+| OUTPUTS SAS                                                                                     |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                       | Nome                          |
+| bhcheck    | /sustentacaomodelos/relatoriosmalha1/bases         | monitor_carga_bhconsig        |
++-------------------------------------------------------------------------------------------------+
+| INPUTS SAS                                                                                      |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                       | Nome                          |
+| CONSIG     | /projetos/ctrcredito/modelos/historico/bhrodas     | BH_CONSIG_PRIVADO1_&safra     |
+|            |                                                    | BH_CONSIG_PUBLICO_&safra      |
+|            |                                                    | BH_CONSIG_INSS_&safra         |
++-------------------------------------------------------------------------------------------------+
+*/
+
+/*** ETAPA 1 - Declaração de libnames ***/
+LIBNAME BHCHECK '/projetos/ctrcredito/modelos/results';
+LIBNAME CONSIG '/projetos/ctrcredito/modelos/historico/bhconsignado';
+
+/* Salvar endereço da Work */
+%LET trab  =  %SYSFUNC(getoption(work));
+
+/* Definir bases que serão utilizadas */
+%LET DataRef1 = INTNX('month',DATE(),-1, 'end');
+%LET DataRef2 = INTNX('month',DATE(),-2, 'end');
+%LET DataRef3 = INTNX('month',DATE(),-3, 'end');
+%LET DataRef4 = INTNX('month',DATE(),-4, 'end');
+%LET DataRef5 = INTNX('month',DATE(),-5, 'end');
+%LET DataRef6 = INTNX('month',DATE(),-6, 'end');
+
+DATA DataIEP_Consig_1; Seq = 1; FORMAT Ref ddmmyy10.; Ref = &DataRef1.; RUN;
+DATA DataIEP_Consig_2; Seq = 2; FORMAT Ref ddmmyy10.; Ref = &DataRef2.; RUN;
+DATA DataIEP_Consig_3; Seq = 3; FORMAT Ref ddmmyy10.; Ref = &DataRef3.; RUN;
+DATA DataIEP_Consig_4; Seq = 4; FORMAT Ref ddmmyy10.; Ref = &DataRef4.; RUN;
+DATA DataIEP_Consig_5; Seq = 5; FORMAT Ref ddmmyy10.; Ref = &DataRef5.; RUN;
+DATA DataIEP_Consig_6; Seq = 6; FORMAT Ref ddmmyy10.; Ref = &DataRef6.; RUN;
+
+DATA DataIEP_Consig;
+SET DataIEP_Consig_1
+    DataIEP_Consig_2
+    DataIEP_Consig_3
+    DataIEP_Consig_4
+    DataIEP_Consig_5
+    DataIEP_Consig_6;
+
+    Mes = MONTH(Ref);
+    Ano = YEAR(Ref);
+
+    IF mes <= 9 THEN Consig_Privado_AnoMes = COMPRESS('consig.BH_CONSIG_PRIVADO1_'||Ano||'0'||mes); ELSE
+    IF mes >  9 THEN Consig_Privado_AnoMes = COMPRESS('consig.BH_CONSIG_PRIVADO1_'||Ano||mes);
+
+    IF mes <= 9 THEN Consig_Publico_AnoMes = COMPRESS('consig.BH_CONSIG_PUBLICO_'||Ano||'0'||mes); ELSE
+    IF mes >  9 THEN Consig_Publico_AnoMes = COMPRESS('consig.BH_CONSIG_PUBLICO_'||Ano||mes);
+
+    IF mes <= 9 THEN Consig_INSS_AnoMes = COMPRESS('consig.BH_CONSIG_INSS_'||Ano||'0'||mes); ELSE
+    IF mes >  9 THEN Consig_INSS_AnoMes = COMPRESS('consig.BH_CONSIG_INSS_'||Ano||mes);
+RUN;
+
+/* Adicionar bases que serão consultadas às macro variáveis */
+DATA _NULL_;
+SET DataIEP_Consig;
+   CALL SYMPUT(COMPRESS("Consig_Privado_AnoMes_"!!Seq), Consig_Privado_AnoMes);
+   CALL SYMPUT(COMPRESS("Consig_Publico_AnoMes_"!!Seq), Consig_Publico_AnoMes);
+   CALL SYMPUT(COMPRESS("Consig_INSS_AnoMes_"!!Seq), Consig_INSS_AnoMes);
+RUN;
+
+/* Separa os produtos, DtBase e informações de atraso e se é recente ou não o contrato */
+DATA BasesProd_Consig;
+SET &Consig_Privado_AnoMes_1.
+    &Consig_Privado_AnoMes_2.
+    &Consig_Privado_AnoMes_3.
+    &Consig_Privado_AnoMes_4.
+    &Consig_Privado_AnoMes_5.
+    &Consig_Privado_AnoMes_6.
+    &Consig_INSS_AnoMes_1.
+    &Consig_INSS_AnoMes_2.
+    &Consig_INSS_AnoMes_3.
+    &Consig_INSS_AnoMes_4.
+    &Consig_INSS_AnoMes_5.
+    &Consig_INSS_AnoMes_6.
+    &Consig_Publico_AnoMes_1.
+    &Consig_Publico_AnoMes_2.
+    &Consig_Publico_AnoMes_3.
+    &Consig_Publico_AnoMes_4.
+    &Consig_Publico_AnoMes_5.
+    &Consig_Publico_AnoMes_6.;
+
+    KEEP NuContrato DtProcessamento Produto;
+RUN;
+
+DATA BasesProd_Consig;
+SET BasesProd_Consig;
+    FORMAT DtBase DDMMYY10.;
+    DtBase = intnx('month',DtProcessamento ,0,'end');
+    DROP DtProcessamento;
+RUN;
+
+PROC SQL;
+CREATE TABLE Base_Monit_Prod_Consig AS
+    SELECT produto,
+           DtBase,
+    COUNT(NuContrato) AS Quantidade
+    FROM BasesProd_Consig
+    GROUP BY produto, DtBase;
+QUIT;
+
+/* Monitoramento por produto */
+PROC SQL;
+CREATE TABLE Monit_Prod_Consig_Vol AS
+    SELECT 'Volume mensal' AS Analise,
+           DtBase,
+           Quantidade AS Valor,
+           produto AS Medida,
+           '' AS Submedida
+    FROM Base_Monit_Prod_Consig;
+QUIT;
+
+DATA Consig_INSS_AnoMes_1;
+SET &Consig_INSS_AnoMes_1.;
+    x_beta = soma;
+RUN;
+
+/* Quantidade de Missing */
+DATA MesAtual_Consig;
+SET &Consig_Privado_AnoMes_1.
+    Consig_INSS_AnoMes_1
+    &Consig_Publico_AnoMes_1.;
+
+    FORMAT DtBase DDMMYY10.;
+        DtBase = INTNX('month',DtProcessamento ,0,'end');
+
+    IF RU_Privado <> . THEN RU = RU_Privado;
+    IF RU_Publico <> . THEN RU = RU_Publico;
+    IF RU_INSS    <> . THEN RU = RU_INSS;
+RUN;
+
+PROC SQL;
+CREATE TABLE TemosMissing_Consig AS
+    SELECT 'Análise de Missing' AS Analise,
+           &DataRef1. FORMAT DDMMYY10. AS DtBase,
+           COUNT(NuContrato) AS Valor,
+           '' AS Medida,
+           '' AS Submedida
+    FROM MesAtual_Consig
+    WHERE X_BETA = .;
+QUIT;
+
+/*** Matriz de migração ***/
+DATA MesAnterior_Consig;
+SET &Consig_Privado_AnoMes_2.
+    &Consig_INSS_AnoMes_2.
+    &Consig_Publico_AnoMes_2.;
+
+    FORMAT DtBase DDMMYY10.;
+        DtBase = INTNX('month',DtProcessamento ,0,'end');
+
+    IF RU_Privado <> . THEN RU = RU_Privado;
+    IF RU_Publico <> . THEN RU = RU_Publico;
+    IF RU_INSS <> .    THEN RU = RU_INSS;
+RUN;
+
+PROC SQL;
+CREATE TABLE Migracao_Consig AS
+    SELECT a.NuContrato AS NuContrato_Antes,
+           b.NuContrato  AS NuContrato_Agora,
+           b.DtContrato,
+           a.Produto AS Prod_Antes,
+           b.Produto AS Prod_Agora,
+           a.atraso_t0 AS AtrasoAtual_Antes,
+           b.atraso_t0 AS AtrasoAtual_Agora,
+           a.RU AS RU_Antes,
+           b.RU AS RU_Agora,
+           a.RU_FINAL AS RUFinal_Antes,
+           b.RU_FINAL AS RUFinal_Agora
+FROM MesAnterior_Consig AS a
+LEFT JOIN MesAtual_Consig AS b on a.NuContrato = b.NuContrato;
+QUIT;
+
+PROC SQL;
+CONNECT TO sybaseiq AS dbcon (host='pta-iqprd01' server=ptaiqprd db=PTAIQCONT user=lgettEtlExtracaoPepr password="{sas002}AC224E4749A76DA011090FAB3B023BCA2730CA040D35CB2F00BDDD352FB437DC");
+CREATE TABLE CPC_TbContrato AS
+    SELECT * FROM connection TO dbcon
+    (
+        SELECT NuContrato,
+               DtLiquidacaoEfetiva,
+               DtCancelamento AS DtCancelamento_
+        FROM CPC.tbcontrato
+    );
+QUIT;
+
+DATA CPC_TbContrato;
+SET CPC_TbContrato;
+    FORMAT DtLiquidacao ddmmyy10.;
+        DtLiquidacao = DATEPART(DtLiquidacaoEfetiva);
+
+    FORMAT DtCancelamento ddmmyy10.;
+        DtCancelamento = DATEPART(DtCancelamento_);
+RUN;
+
+PROC SQL;
+CREATE TABLE Migracao_Consig AS
+    SELECT a.*,
+           b.DtLiquidacao,
+           b.DtCancelamento
+    FROM Migracao_Consig AS a
+    LEFT JOIN CPC_TbContrato AS b on a.NuContrato_Antes = b.NuContrato;
+QUIT;
+
+DATA Migracao_Consig;
+SET Migracao_Consig;
+    IF Prod_Agora = '' AND DtLiquidacao <> .   THEN Prod_Agora = 'LIQUIDADO';
+    IF Prod_Agora = '' AND DtCancelamento <> . THEN Prod_Agora = 'CANCELADO';
+    IF Prod_Agora = ''                         THEN Prod_Agora = 'OUTROS';
+RUN;
+
+PROC SQL;
+CREATE TABLE Migracao_RUFINAL AS
+    SELECT 'Migração de RU Final' AS Analise,
+           &DataRef1. FORMAT DDMMYY10. AS DtBase,
+           COUNT(NuContrato_Antes) AS Valor,
+           STRIP(RUFinal_Antes)||"%%"||STRIP(RUFinal_Agora) AS Medida,
+           '' AS Submedida
+    FROM Migracao_Consig
+    GROUP BY Medida;
+QUIT;
+
+PROC SQL;
+CREATE TABLE Migracao_PROD AS
+    SELECT 'Migração de Prod' AS Analise,
+           &DataRef1. FORMAT DDMMYY10. AS DtBase,
+           COUNT(NuContrato_Antes) AS Valor,
+           UPPER(STRIP(Prod_Antes))||"%%"||STRIP(Prod_Agora) AS Medida,
+           '' AS Submedida
+    FROM Migracao_Consig
+    GROUP BY Medida;
+QUIT;
+
+/*** Acompanhamento das variáveis (Farol) ***/
+DATA BasesVariaveis_Consig;
+SET &Consig_Privado_AnoMes_1.
+    &Consig_Privado_AnoMes_2.
+    &Consig_Privado_AnoMes_3.
+    &Consig_Privado_AnoMes_4.
+    &Consig_Privado_AnoMes_5.
+    &Consig_Privado_AnoMes_6.
+    &Consig_INSS_AnoMes_1.
+    &Consig_INSS_AnoMes_2.
+    &Consig_INSS_AnoMes_3.
+    &Consig_INSS_AnoMes_4.
+    &Consig_INSS_AnoMes_5.
+    &Consig_INSS_AnoMes_6.
+    &Consig_Publico_AnoMes_1.
+    &Consig_Publico_AnoMes_2.
+    &Consig_Publico_AnoMes_3.
+    &Consig_Publico_AnoMes_4.
+    &Consig_Publico_AnoMes_5.
+    &Consig_Publico_AnoMes_6.;
+
+    WHERE atraso_t0 < 91
+    AND DtContrato <= &DataRef2.;
+
+    FORMAT DtBase DDMMYY10.;
+        DtBase = INTNX('month',DtProcessamento ,0,'end');
+
+    DROP Rating               CdLoja                    NmCidade               CdUf
+         VrTotalReceitas      dtNascimento              cdsexo                 DtPrimeiroVencimento
+         uf                   NmCidade1                 cli_qt_contr_reneg_cpf cli_qt_contr_reneg_ct
+         DtContratoFinanceiro NmLoja                    NmFantasia             ParcelasPagasCF
+         AtrasoMax            SqContratoFinanceiroAtivo CdModalidadeProduto    NuCpfCnpj
+         NuProposta           DtEntradaProposta         CdPessoaSobAnalise     QtParcelas_PrSq
+         VrParcela            PIB_adm                   emp_subsegmento        qtmesesemprego
+         SqContratoFinanceiro Cnpj_Convenio             NmConvenio             QtPontoBV;
+
+    /* Renomear */
+    cat_MaiAtrasoPG_ctrt = cat_MaiAtrasoPG_ctrtAtual;
+    C_cli_prop_restr_r = C_cli_prop_restr_renda;
+    C_contr_prop_p = C_contr_prop_pgto_atual;
+    C_incr_PF_QT_R = C_incr_PF_QT_REFIN;
+    cat_MaiAtrasoP = cat_MaiAtrasoPG_ctrtAtual1;
+RUN;
+
+/* Macro para selecionar a base por produto / População */
+%MACRO BaseMonitoramento_Consig(Produto);
+/*macro*/ DATA Bhs&Produto.;
+/*macro*/ SET BasesVariaveis_Consig;
+/*macro*/ WHERE Produto = "&Produto.";
+/*macro*/ RUN;
+%MEND;
+
+%MACRO VariaveisConsig(Produto, Variavel);
+/*macro*/ /* Encontrar o MIX médio dos ultimos meses (sem contar a referência) */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio AS
+/*macro*/     SELECT &Variavel.,
+/*macro*/            COUNT(NuContrato) AS Contador
+/*macro*/     FROM Bhs&Produto.
+/*macro*/     WHERE DtBase >=&DataRef6. AND DtBase <=&DataRef2.
+/*macro*/     GROUP BY &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Total do MIX médio */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio_Total AS
+/*macro*/     SELECT COUNT(NuContrato) AS Total
+/*macro*/     FROM Bhs&Produto.
+/*macro*/     WHERE DtBase >=&DataRef6. AND DtBase <=&DataRef2.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Encotrar o Percentual do MIX Médio */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio AS
+/*macro*/     SELECT a.&Variavel.,
+/*macro*/            a.Contador/b.Total AS MixMedio
+/*macro*/     FROM MIXMedio AS a
+/*macro*/     FULL JOIN MIXMedio_Total AS b ON a.Contador;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Sumarizar por categoria/DtBase para calcular o MIX */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel. AS
+/*macro*/     SELECT DtBase,
+/*macro*/            &Variavel.,
+/*macro*/            COUNT(NuContrato) AS Contador
+/*macro*/     FROM Bhs&Produto.
+/*macro*/     GROUP BY DtBase, &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Total por DtBase para o MIX */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel._Total AS
+/*macro*/     SELECT DtBase,
+/*macro*/            SUM(Contador) AS Total
+/*macro*/     FROM &Variavel.
+/*macro*/     GROUP BY DtBase;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Cálculo do MIX e do Mix Médio para IEP e volume */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel. AS
+/*macro*/     SELECT DISTINCT
+/*macro*/            a.DtBase,
+/*macro*/            a.&Variavel.,
+/*macro*/            a.Contador/b.Total AS Mix,
+/*macro*/            c.MixMedio
+/*macro*/     FROM &Variavel. AS a
+/*macro*/     LEFT JOIN &Variavel._Total AS b ON a.DtBase = b.DtBase
+/*macro*/     LEFT JOIN MIXMedio as c ON a.&Variavel. = c.&Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIX_&Variavel. AS
+/*macro*/     SELECT 'MIX - ' || PUT(CATS("&Produto."),$32.) AS Analise,
+/*macro*/            DtBase,
+/*macro*/            Mix AS Valor,
+/*macro*/            PUT(CATS("&Variavel."),$32.) AS Medida,
+/*macro*/            PUT(CATS(&Variavel.),$32.) AS Submedida
+/*macro*/     FROM &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Calculos e ajuste para o calculo do IEP */
+/*macro*/ DATA &Variavel.;
+/*macro*/ SET &Variavel.;
+/*macro*/     IF MixMedio = . THEN MixMedio = 2;
+/*macro*/     IF Mix = 0 THEN Mix = 1;
+/*macro*/
+/*macro*/     dif = MixMedio - Mix;
+/*macro*/     LNdif = log(MixMedio/Mix);
+/*macro*/     Produto = dif * LNdif;
+/*macro*/ RUN;
+/*macro*/
+/*macro*/ /* Sumarizar o IEP por DtBase para colocar no acompanhamento */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE IEP_&Variavel. AS
+/*macro*/     SELECT 'IEP - ' || PUT(CATS("&Produto."),$32.) AS Analise,
+/*macro*/            DtBase,
+/*macro*/            SUM(Produto) AS Valor,
+/*macro*/            PUT(CATS("&Variavel."),$32.) AS Medida,
+/*macro*/            PUT(CATS(&Variavel.),$32.) AS Submedida
+/*macro*/     FROM &Variavel.
+/*macro*/     WHERE DtBase = &DataRef1.
+/*macro*/     GROUP BY Submedida;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ PROC DATASETS; APPEND base=analiseIEP data=IEP_&Variavel. FORCE;
+/*macro*/ PROC DATASETS; APPEND base=analiseMIX data=MIX_&Variavel. FORCE;
+%MEND;
+
+PROC DATASETS LIBRARY=WORK;
+   DELETE analiseIEP analiseMIX;
+RUN;
+
+/* Privado */
+%BaseMonitoramento_Consig(Privado);
+    %VariaveisConsig(Privado, PD);
+    %VariaveisConsig(Privado, C_cli_qt_contr_reneg );
+    %VariaveisConsig(Privado, int_pgcontr_pripar);
+    %VariaveisConsig(Privado, C_qtmesesemprego);
+    %VariaveisConsig(Privado, C_cli_prop_restr_r);
+    %VariaveisConsig(Privado, ct_emp_minatraso_t0);
+    %VariaveisConsig(Privado, C_idade);
+    %VariaveisConsig(Privado, C_renda_faixa);
+    %VariaveisConsig(Privado, c1_emp_subsegmento);
+    %VariaveisConsig(Privado, flag_sem_atrasos);
+    %VariaveisConsig(Privado, C_incr_PF_QT_CCF);
+    %VariaveisConsig(Privado, ct_cli_restr_totais);
+    %VariaveisConsig(Privado, cat_MaiAtrasoPG_ctrt);
+
+/* INSS */
+%BaseMonitoramento_Consig(INSS);
+    %VariaveisConsig(INSS, PD);
+    %VariaveisConsig(INSS, cat_prop_renda_sm);
+    %VariaveisConsig(INSS, cat_reg);
+    %VariaveisConsig(INSS, cat_sexobenef);
+    %VariaveisConsig(INSS, atraso2_cli);
+
+/* Publico */
+%BaseMonitoramento_Consig(Publico);
+    %VariaveisConsig(Publico, PD);
+    %VariaveisConsig(Publico, flag_reneg_cpf);
+    %VariaveisConsig(Publico, int_atremp);
+    %VariaveisConsig(Publico, c_flag_pref);
+    %VariaveisConsig(Publico, C_incr_PF_QT_R);
+    %VariaveisConsig(Publico, C1_idade1);
+    %VariaveisConsig(Publico, cat_MaiAtrasoP);
+    %VariaveisConsig(Publico, C_qtmesesemprego);
+    %VariaveisConsig(Publico, C_cli_prop_restr_r);
+    %VariaveisConsig(Publico, int_gov_pg);
+    %VariaveisConsig(Publico, C_contr_prop_p);
+
+/* Limpar strings */
+PROC SQL;
+CREATE TABLE analiseIEP as
+    SELECT STRIP(Analise) AS Analise,
+           DtBase,
+           Valor,
+           STRIP(Medida) AS Medida,
+           STRIP(SubMedida) AS SubMedida
+    FROM analiseIEP;
+QUIT;
+
+PROC SQL;
+CREATE TABLE analiseMIX as
+    SELECT STRIP(Analise) AS Analise,
+           DtBase,
+           Valor,
+           STRIP(Medida) AS Medida,
+           STRIP(SubMedida) AS SubMedida
+    FROM analiseMIX;
+QUIT;
+
+/********************************************************/
+/************** UNIFICAÇÃO PARA O TABLEAU ***************/
+/********************************************************/
+PROC SQL;
+CREATE TABLE BHCHECK.monitor_carga_bhconsig AS
+    SELECT * FROM Monit_Prod_Consig_Vol UNION ALL
+    SELECT * FROM TemosMissing_Consig UNION ALL
+    SELECT * FROM Migracao_PROD UNION ALL
+    SELECT * FROM Migracao_RUFINAL UNION ALL
+    SELECT * FROM analiseIEP UNION ALL
+    SELECT * FROM analiseMIX;
+RUN;
+/********************************************************/
+/********************************************************/
+
+/* Limpar work */
+PROC DATASETS LIB=WORK
+    KILL;
+RUN;

@@ -1,0 +1,125 @@
+START_METADATA
+PROJECT: Rodas__originacao-du
+FILE_SAS: 03-exportar-bases.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 6
+ODS_OUTPUTS_DETECTED: csv, html
+TRIGGERS: DATA _NULL_ (1x | +80), FILENAME  (1x | +12), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 58
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, EXPORT, ODSTEXT, REPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_dur, W_fim
+DETECTED_MACROS_USED: W_dur, W_fim, W_ini, dt_atu
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.MAX_DATA
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: IGELOG
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_FINAL, WORK.MAX_DATA
+TABLE_READ_PROVENANCE (Flow): WORK.BASE_FINAL [PROC SQL - FROM], WORK.MAX_DATA [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/tmp/IGE_TbOriginacao_Rodas_Regional.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): IGELOG.LOGEXECUCAOPROCESSOS
+APPEND_ONLY_OUTPUTS: IGELOG.LOGEXECUCAOPROCESSOS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): IGELOG.LOGEXECUCAOPROCESSOS
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/tmp/IGE_TbOriginacao_Rodas_Regional.csv
+TEMP/DISCARDED OUTPUTS: LOGEXE, MAX_DATA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/tmp/IGE_TbOriginacao_Rodas_Regional.csv
+
+END_METADATA
+================================================================================
+proc export
+data=BASE_FINAL
+file='/riscosbvf/BA/processos/tmp/IGE_TbOriginacao_Rodas_Regional.csv' replace
+/*file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/IGE_TbOriginacao_Rodas_Regional.csv' replace*/
+dbms=dlm;
+delimiter=';';
+run;
+
+X 'mv /riscosbvf/BA/processos/tmp/IGE_TbOriginacao_Rodas_Regional.csv /riscosbvf/BA/processos/output/';
+/*X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/IGE_TbOriginacao_Rodas_Regional.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/*/
+
+/* Envio de Email */
+
+PROC SQL;
+CREATE TABLE MAX_DATA AS
+SELECT
+max(DtEntradaProposta) as max_data format ddmmyy10.
+FROM WORK.BASE_FINAL
+;RUN;
+
+DATA _NULL_;
+SET WORK.MAX_DATA;
+
+CALL SYMPUT ('dt_atu', PUT(max_data,DDMMYY10.));
+;run;
+%put &dt_atu;
+
+/* Calcular tempo de processamento total */
+%LET W_fim = %SYSFUNC(datetime());
+%LET W_dur = %SYSFUNC(intck(SECOND, &W_ini, &W_fim), tod8.);
+
+/* Enviar e-mail de finalização da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+    TYPE="text/html"
+    SUBJECT="Painel informativo de originação | Fim da atualização";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+PROC REPORT DATA=MAX_DATA nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 9pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 9pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 9pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS max_data;
+RUN;
+
+PROC ODSTEXT;
+   p "Prezados,";
+   p "";
+   p "A base do painel informativo de originação foi atualizada.";
+   p "A geração da base demorou &W_dur. para ser concluída.";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+
+DATA LOGEXE;
+  IdProcesso = 'PAINORIG';
+  LENGTH Processo $40.;
+  Processo = 'Painel informativo de originação';
+  FORMAT Inicio Final DATETIME18.;
+  Inicio = &W_ini.;
+  Final = &W_fim.;
+  Duracao = "&W_dur.";
+RUN;
+
+PROC APPEND DATA=LOGEXE BASE=IGELOG.LogExecucaoProcessos; RUN;

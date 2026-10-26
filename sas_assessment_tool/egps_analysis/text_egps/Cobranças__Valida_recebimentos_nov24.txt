@@ -1,0 +1,302 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Valida_recebimentos_nov24
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:53 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 216
+CODE_TASKS_COUNT: 5
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: dt_fim, dt_inicio
+DETECTED_MACROS_USED: dt_fim, dt_inicio
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [BIGQUERY], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [BIGQUERY], BV-PDBD-PRD.DVRY_CORE.TBPARCELARECEBIMENTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.RECEBIMENTOS
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.RECEBIMENTOS
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.DVRY_CORE.TBCONTRATO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.DVRY_CORE.TBPARCELA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], BV-PDBD-PRD.DVRY_CORE.TBPARCELARECEBIMENTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_DBCRED.TBPROPOSTA [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], WORK.RECEBIMENTOS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: RECEBIMENTOS, WORK.QUERY_FOR_RECEBIMENTOS, WORK.QUERY_FOR_RECEBIMENTOS_0000, WORK.QUERY_FOR_RECEBIMENTOS_0001
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET dt_inicio='2024-02-01';
+%LET dt_fim='2025-10-31';
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Valida_volumes_recebimentos */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 5 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Valida_volumes_recebimentos */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1hh7EWFu3Sed1Jvg/code.sas */
+/* =========================INÍCIO TASK========================= */
+%let dt_inicio = '2024-11-01'; 
+%let dt_fim = '2024-11-30'; 
+
+
+PROC SQL;
+connect to bigquery as perm (
+project     = 'bv-sadi-dtm'
+credfile    = '/projetos/acessos/bq/di/sadi-dtm.json'
+schema      = 'bv-pdbd-prd'
+READ_MODE   = storage
+ALLOW_LARGE_RESULTS = must
+MAX_CHAR_LEN = 40
+);
+
+CREATE TABLE RECEBIMENTOS AS
+SELECT DISTINCT
+A.*,
+A.DtProcessamento AS DT_PROC_PAG
+
+FROM CONNECTION TO perm(
+
+		SELECT
+		CAST(A.CD_CONTRATO AS INT64) AS NUCONTRATO,
+		A.SQ_CONTRATO_FINANCEIRO AS SQCONTRATOFINANCEIRO,
+		A.DT_PROCESSAMENTO AS DtProcessamento,
+		A.DT_RECEBIMENTO,
+		'GCON' AS SISTEMA,
+		Count(A.Nu_Parcela) AS QtdParcelas,
+		SUM(A.Vr_Recebido) AS TotalRecebido,
+		SUM(A.Vr_Principal_Baixado) AS TotalBaixado,
+		SUM(A.Vr_Comissao_Permanencia_Baixada) AS TotalMora,
+		SUM(A.Vr_Multa_Baixada) AS TotalMulta
+		FROM bv-pdbd-prd.dvry_core.tbparcelarecebimento AS A
+		LEFT JOIN bv-pdbd-prd.dvry_core.tbparcela AS B ON A.CD_CONTRATO = B.CD_CONTRATO
+			AND A.SQ_CONTRATO_FINANCEIRO = B.SQ_CONTRATO_FINANCEIRO
+			AND A.Nu_Parcela = B.Nu_Parcela
+		LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato AS C
+			ON A.CD_CONTRATO = C.CD_CONTRATO
+		LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+			ON A.CD_CONTRATO = D.NUCONTRATOGESTAO
+		WHERE A.DT_RECEBIMENTO >= &dt_inicio. AND  A.DT_RECEBIMENTO <= &dt_fim. AND Fl_Estornado = FALSE AND
+		((C.CD_PRODUTO = '12') OR (C.CD_PRODUTO = '14'))
+		GROUP BY A.CD_CONTRATO, A.SQ_CONTRATO_FINANCEIRO
+		, A.Dt_Processamento, A.DT_RECEBIMENTO
+
+     ) A;
+QUIT;
+
+
+%let dt_inicio = '2024-02-01'; 
+%let dt_fim = '2025-10-31'; 
+
+
+PROC SQL;
+connect to bigquery as perm (
+project     = 'bv-sadi-dtm'
+credfile    = '/projetos/acessos/bq/di/sadi-dtm.json'
+schema      = 'bv-pdbd-prd'
+READ_MODE   = storage
+ALLOW_LARGE_RESULTS = must
+MAX_CHAR_LEN = 40
+);
+
+CREATE TABLE RECEBIMENTOS AS
+SELECT DISTINCT
+A.*,
+A.DtProcessamento AS DT_PROC_PAG
+
+FROM CONNECTION TO perm(
+
+		SELECT
+		CAST(A.CD_CONTRATO AS INT64) AS NUCONTRATO,
+		A.SQ_CONTRATO_FINANCEIRO AS SQCONTRATOFINANCEIRO,
+		A.DT_PROCESSAMENTO AS DtProcessamento,
+		A.DT_RECEBIMENTO,
+		'GCON' AS SISTEMA,
+		Count(A.Nu_Parcela) AS QtdParcelas,
+		SUM(A.Vr_Recebido) AS TotalRecebido,
+		SUM(A.Vr_Principal_Baixado) AS TotalBaixado,
+		SUM(A.Vr_Comissao_Permanencia_Baixada) AS TotalMora,
+		SUM(A.Vr_Multa_Baixada) AS TotalMulta
+		FROM bv-pdbd-prd.dvry_core.tbparcelarecebimento AS A
+		LEFT JOIN bv-pdbd-prd.dvry_core.tbparcela AS B ON A.CD_CONTRATO = B.CD_CONTRATO
+			AND A.SQ_CONTRATO_FINANCEIRO = B.SQ_CONTRATO_FINANCEIRO
+			AND A.Nu_Parcela = B.Nu_Parcela
+		LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato AS C
+			ON A.CD_CONTRATO = C.CD_CONTRATO
+		LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+			ON A.CD_CONTRATO = D.NUCONTRATOGESTAO
+		WHERE A.DT_RECEBIMENTO >= &dt_inicio. AND  A.DT_RECEBIMENTO <= &dt_fim. AND Fl_Estornado = FALSE AND
+		((C.CD_PRODUTO = '12') OR (C.CD_PRODUTO = '14'))
+		GROUP BY A.CD_CONTRATO, A.SQ_CONTRATO_FINANCEIRO
+		, A.Dt_Processamento, A.DT_RECEBIMENTO
+
+     ) A;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Valida_volumes_recebimentos */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%let dt_inicio = '2024-02-01'; 
+%let dt_fim = '2025-10-31'; 
+
+
+PROC SQL;
+connect to bigquery as perm (
+project     = 'bv-sadi-dtm'
+credfile    = '/projetos/acessos/bq/di/sadi-dtm.json'
+schema      = 'bv-pdbd-prd'
+READ_MODE   = storage
+ALLOW_LARGE_RESULTS = must
+MAX_CHAR_LEN = 40
+);
+
+CREATE TABLE RECEBIMENTOS AS
+SELECT DISTINCT
+A.*,
+A.DtProcessamento AS DT_PROC_PAG
+
+FROM CONNECTION TO perm(
+
+		SELECT
+		CAST(A.CD_CONTRATO AS INT64) AS NUCONTRATO,
+		A.SQ_CONTRATO_FINANCEIRO AS SQCONTRATOFINANCEIRO,
+		A.DT_PROCESSAMENTO AS DtProcessamento,
+		A.DT_RECEBIMENTO,
+		'GCON' AS SISTEMA,
+		Count(A.Nu_Parcela) AS QtdParcelas,
+		SUM(A.Vr_Recebido) AS TotalRecebido,
+		SUM(A.Vr_Principal_Baixado) AS TotalBaixado,
+		SUM(A.Vr_Comissao_Permanencia_Baixada) AS TotalMora,
+		SUM(A.Vr_Multa_Baixada) AS TotalMulta
+		FROM bv-pdbd-prd.dvry_core.tbparcelarecebimento AS A
+		LEFT JOIN bv-pdbd-prd.dvry_core.tbparcela AS B ON A.CD_CONTRATO = B.CD_CONTRATO
+			AND A.SQ_CONTRATO_FINANCEIRO = B.SQ_CONTRATO_FINANCEIRO
+			AND A.Nu_Parcela = B.Nu_Parcela
+		LEFT JOIN bv-pdbd-prd.dvry_core.tbcontrato AS C
+			ON A.CD_CONTRATO = C.CD_CONTRATO
+		LEFT JOIN bv-pdbd-prd.trusted_dbcred.tbproposta AS D
+			ON A.CD_CONTRATO = D.NUCONTRATOGESTAO
+		WHERE A.DT_RECEBIMENTO >= &dt_inicio. AND  A.DT_RECEBIMENTO <= &dt_fim. AND Fl_Estornado = FALSE AND
+		((C.CD_PRODUTO = '12') OR (C.CD_PRODUTO = '14'))
+		GROUP BY A.CD_CONTRATO, A.SQ_CONTRATO_FINANCEIRO
+		, A.Dt_Processamento, A.DT_RECEBIMENTO
+
+     ) A;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_RECEBIMENTOS_0000);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_RECEBIMENTOS_0000 AS
+   SELECT DISTINCT t1.DT_RECEBIMENTO,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO
+      FROM WORK.RECEBIMENTOS t1
+      GROUP BY t1.DT_RECEBIMENTO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_RECEBIMENTOS_0001);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_RECEBIMENTOS_0001 AS
+   SELECT DISTINCT t1.DtProcessamento,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO
+      FROM WORK.RECEBIMENTOS t1
+      GROUP BY t1.DtProcessamento;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_RECEBIMENTOS);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_RECEBIMENTOS AS
+   SELECT DISTINCT t1.DT_RECEBIMENTO,
+          
+            (COUNT(t1.NUCONTRATO)) AS COUNT_of_NUCONTRATO
+      FROM WORK.RECEBIMENTOS t1
+      GROUP BY t1.DT_RECEBIMENTO;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */

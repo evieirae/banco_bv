@@ -1,0 +1,243 @@
+START_METADATA
+PROJECT: Rodas__Rito_RC-Tatico
+FILE_SAS: 6 - Gera Output POTENCIAL COMERCIAL.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: -1
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 181
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TMP = /projetos/MISV/data/bases/tmp; TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv, trim1, trim2, trim3, trim4, trim_anterior, trim_atual
+DETECTED_MACROS_USED: dir_csv, mindata, trim1, trim2, trim3, trimestres
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): TMP.TBPOTENCIALCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: TMP
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): TMP.TBPOTENCIALCOMERCIAL [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): TMP.TBPOTENCIALCOMERCIAL
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./BASE_FINAL_RC_TATICO_POTENC_COM.csv
+TEMP/DISCARDED OUTPUTS: BASE_FINAL_RC_TATICO_POTENC_COM, BASE_POTENCIAL_COMERCIAL_1, DATE9, RESUMO_MES_POTENC_COMERC, RESUMO_TRI_POTENC_COMERC, WORK.BASE_POTENCIAL_COMERCIAL
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+* ====================================================================================== */
+/* | Programa: 	Gera OutPut Potencial Comercia Rito RC Tatico.sas														| */
+/* | Descricao: Programa gerar o output Potencial Comercial para Rito RC Tatico.					| */
+/* | Objetivo: 	Apuração do Rito RC Tatico					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+libname tmp '/projetos/MISV/data/bases/tmp';
+
+/* ======================================================================================*/
+/* =====================Atualiza Processo=============================================*/
+/* ======================================================================================*/
+
+PROC SQL;
+   CREATE TABLE WORK.BASE_POTENCIAL_COMERCIAL AS
+   SELECT t1.NuAnoMes,
+		  t1.Dtatualizacao,
+          t1.TpBase,
+          t1.FlAtivo,
+          t1.NmCanalEstruturaComercialC,
+          t1.NmGrupoProduto,
+          t1.FxIdade,
+		  t1.cdparceirocomercial,
+          t1.NmTipoParceiroComercial,
+          t1.NmSubEstruturaComercialC,
+          t1.NmAreaEstruturaComercialC,
+		  t1.NmColaboradorC,
+		  t1.DsLoginN1C,
+          t1.DsLoginN2C,
+          t1.DsLoginN3C,
+          t1.LstColaboradorFocal,
+          t1.LstSubstituicaoC,
+		  t1.NmAutoShopping,
+		  t1.FlPorteA,
+          t1.QtContratoBV,
+          t1.QtGravamesMercado
+      FROM tmp.TbPotencialComercial t1
+      WHERE t1.TpBase = 1
+      and nuanomes <= &mindata.;
+QUIT;
+
+data BASE_POTENCIAL_COMERCIAL_1;
+    set BASE_POTENCIAL_COMERCIAL;
+    /* Ajuste conforme sua variável de data */
+   	data = input(put((nuAnoMes*100)+1, 8.), yymmdd8.);
+    format data date9.;
+    ano = year(data);
+    trimestre = qtr(data);
+    mes = month(data);
+run;
+
+proc sql print;
+    select distinct cats(ano, trimestre)
+    into :trimestres SEPARATED BY ' '
+    from BASE_POTENCIAL_COMERCIAL_1
+    order by ano desc, trimestre desc;
+quit;
+
+%let trim1 = %scan(&trimestres, 1);
+%let trim2 = %scan(&trimestres, 2);
+%let trim3 = %scan(&trimestres, 3);
+%let trim4= %scan(&trimestres, 4);
+%let trim_atual = %scan(&trimestres, 1);
+%let trim_anterior = %scan(&trimestres, 2);
+
+proc sql;
+    create table RESUMO_TRI_POTENC_COMERC as
+    select
+		"BASE_TRI" AS TP_BASE,
+        ano,
+		. as NuAnoMes,
+		ano*100+trimestre as NuAnoTri,
+/*		put(ano*100+trimestre,best.)||"t" as NuAnoMes_t,*/
+        trimestre,
+		TpBase,
+		FlAtivo,
+		NmCanalEstruturaComercialC,
+		NmGrupoProduto,
+		FxIdade,
+		NmTipoParceiroComercial,
+		NmSubEstruturaComercialC,
+		NmAreaEstruturaComercialC,
+		NmColaboradorC,
+		DsLoginN1C as DsLoginN1,
+		DsLoginN2C as DsLoginN2,
+		DsLoginN3C as DsLoginN3,
+		LstColaboradorFocal,
+		LstSubstituicaoC as LstSubstituicao,
+		NmAutoShopping,
+		FlPorteA,
+		max(DtAtualizacao) as DtAtualizacao Format ddmmyy10.,
+		count(distinct(cdparceirocomercial)) as Ttl_pdv,
+		SUM(QtContratoBV) AS QtContratoBV FORMAT COMMAX12.2,
+        SUM(QtGravamesMercado) AS QtGravamesMercado FORMAT COMMAX12.2
+      FROM BASE_POTENCIAL_COMERCIAL_1
+	   where cats(ano, trimestre) in ("&trim1", "&trim2","&trim3")
+GROUP BY
+        ano,
+		ano*100+trimestre,
+/*		put(ano*100+trimestre,best.)||"t" as NuAnoMes_t,*/
+		trimestre,
+		TpBase,
+		FlAtivo,
+		NmCanalEstruturaComercialC,
+		DsLoginN1C,
+		DsLoginN2C,
+		DsLoginN3C,
+		LstColaboradorFocal,
+		LstSubstituicaoC,
+		NmGrupoProduto,
+		FxIdade,
+		NmTipoParceiroComercial,
+		NmSubEstruturaComercialC,
+		NmAreaEstruturaComercialC,
+		NmColaboradorC,
+		NmAutoShopping,
+		FlPorteA;
+quit;
+
+proc sql;
+    create table RESUMO_MES_POTENC_COMERC as
+	select
+		"BASE_MES" AS TP_BASE,
+        ano,
+		NuAnomes,
+		ano*100+trimestre as NuAnoTri,
+	    trimestre,
+		TpBase,
+		FlAtivo,
+		NmCanalEstruturaComercialC,
+		NmGrupoProduto,
+		FxIdade,
+		NmTipoParceiroComercial,
+		NmSubEstruturaComercialC,
+		NmAreaEstruturaComercialC,
+		NmColaboradorC,
+		DsLoginN1C as DsLoginN1,
+		DsLoginN2C as DsLoginN2,
+		DsLoginN3C as DsLoginN3,
+		LstColaboradorFocal,
+		LstSubstituicaoC as LstSubstituicao,
+		NmAutoShopping,
+		FlPorteA,
+		max(DtAtualizacao) as DtAtualizacao Format ddmmyy10.,
+		count(distinct(cdparceirocomercial)) as Ttl_pdv,
+		SUM(QtContratoBV) AS QtContratoBV FORMAT COMMAX12.2,
+        SUM(QtGravamesMercado) AS QtGravamesMercado FORMAT COMMAX12.2
+     FROM BASE_POTENCIAL_COMERCIAL_1
+	 where cats(ano, trimestre) in ("&trim1", "&trim2","&trim3")
+		GROUP BY
+        ano,
+		NuAnomes,
+		ano*100+trimestre,
+		trimestre,
+		TpBase,
+		FlAtivo,
+		NmCanalEstruturaComercialC,
+		NmGrupoProduto,
+		FxIdade,
+		NmTipoParceiroComercial,
+		NmSubEstruturaComercialC,
+		NmAreaEstruturaComercialC,
+		NmColaboradorC,
+		DsLoginN1C,
+		DsLoginN2C,
+		DsLoginN3C,
+		LstColaboradorFocal,
+		LstSubstituicaoC,
+		NmAutoShopping,
+		FlPorteA;
+	quit;
+
+data BASE_FINAL_RC_TATICO_POTENC_COM;
+    set RESUMO_TRI_POTENC_COMERC RESUMO_MES_POTENC_COMERC;
+run;
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+PROC EXPORT
+		DATA= BASE_FINAL_RC_TATICO_POTENC_COM
+		outfile="&dir_csv./BASE_FINAL_RC_TATICO_POTENC_COM.csv" REPLACE
+   		dbms=dlm
+    		replace;
+    		delimiter=';';
+    		putnames=yes;
+run;

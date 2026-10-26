@@ -1,0 +1,693 @@
+START_METADATA
+PROJECT: Rodas__tbpropostas-hh
+FILE_SAS: 202506 - 02-tbpropostaonline.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:28 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 529
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: INFOGRC = /infogrc/
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], BASEGRC.TBGRUPOPRODUTOMETA [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], BASEGRC.TBTABELASFINANCIAMENTO [SAS/Local], BASES.TBCETIPCONVERSAO [SAS/Local], BASES.TBCOLABORADOR [SAS/Local], BASES.TBESTRUTURACOMERCIAL [SAS/Local], BASES.TBPROPOSTACOMPLEMENTOPARCEIRO [SAS/Local], BASES.TBTEMPODATA [SAS/Local], DBA.TBFILIAL [DBCON], DBA.TBLOJA [DBCON], DBA.TBPARCEIROCOMERCIAL [DBCON], DBA.TBPESSOASOBANALISE [DBCON], DBA.TBPROPGARANTIAMAQEQUIP [DBCON], DBA.TBPROPOSTA [DBCON], DBA.TBPROPOSTACOMPLEMENTO [DBCON], DBA.TBREGIAO [DBCON], DBA.TBSUBPRODUTO [DBCON], DBCOR.TBTIPOCOBRANCA [DBCON], DBCRED.TBENDERECOTBPESSOASOBANALISE [DBCON], DBCRED.TBPROPOSTACONSIGNADO [DBCON], DBCRED.TBPROPOSTACORRESPONDENTEBNCRO [DBCON], DBCRED.TBPROPOSTAFINANCEIRO [DBCON], TBCOLABORADOR [DBCON], TMP.EXTRACAO_CTR_PROPOSTAALTERACAO [SAS/Local], TMP.TBINTEGRACAOPROPOSTA [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: INFOGRC
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBGRUPOPRODUTOMETA [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - JOIN], BASEGRC.TBTABELASFINANCIAMENTO [PROC SQL - JOIN], BASES.TBCETIPCONVERSAO [PROC SQL - JOIN], BASES.TBCOLABORADOR [PROC SQL - JOIN], BASES.TBESTRUTURACOMERCIAL [PROC SQL - JOIN], BASES.TBPROPOSTACOMPLEMENTOPARCEIRO [PROC SORT - DATA=; PROC SQL - JOIN], BASES.TBTEMPODATA [PROC SQL - JOIN], DBA.TBFILIAL [Pass-Through Native (DBCON) - FROM; Pass-Through Native (DBCON) - JOIN], DBA.TBLOJA [Pass-Through Native (DBCON) - JOIN], DBA.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN], DBA.TBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPGARANTIAMAQEQUIP [Pass-Through Native (DBCON) - JOIN], DBA.TBPROPOSTA [Pass-Through Native (DBCON) - FROM], DBA.TBPROPOSTACOMPLEMENTO [Pass-Through Native (DBCON) - JOIN], DBA.TBREGIAO [Pass-Through Native (DBCON) - JOIN], DBA.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTIPOCOBRANCA [Pass-Through Native (DBCON) - JOIN], DBCRED.TBENDERECOTBPESSOASOBANALISE [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTACONSIGNADO [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTACORRESPONDENTEBNCRO [Pass-Through Native (DBCON) - JOIN], DBCRED.TBPROPOSTAFINANCEIRO [Pass-Through Native (DBCON) - JOIN], TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN], TMP.EXTRACAO_CTR_PROPOSTAALTERACAO [PROC SQL - JOIN], TMP.TBINTEGRACAOPROPOSTA [PROC SQL - JOIN], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): INFOGRC.TBPROPOSTA_ONLINE
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBFILIAL, TBPROPOSTAAPROVADAPAGA, TBPROPOSTACOMPLEMENTOPARCEIRO, TBPROPOSTAONLINE, TBTIPOCANALPRODUCAOPROPOSTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/libname.sas';
+%include '/infogrc/utils/IQ.sas';
+
+libname infogrc '/infogrc/';
+
+/* ====================================================================================== */
+/* |	Atualizacao:	05/11/2024														| */
+/* |	Responsavel: 	Bruno Neves - Infomacoes gerenciais estrategicas    		 	| */
+/* |	Alt. Realizada:	- Alterações para incluir Produto e estrutura comercial Solar   | */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================= Extracao PTAIQCOUNT ================== */
+/* ======================================================== */
+%CRIAVARDB;
+PROC SQL;
+%CONECTADB(server=PTA);
+CREATE TABLE TbPropostaOnline AS
+SELECT * FROM connection to dbcon
+(
+WITH TbColaborador as
+(
+	SELECT DISTINCT
+		 Colaborador.CdOperador
+		,first_value(Colaborador.CdColaborador) over (partition BY Colaborador.CdOperador ORDER BY CASE WHEN (Colaborador.NmColaborador LIKE 'DUP%' OR Colaborador.DsLogin LIKE 'DUP%') THEN 1 ELSE 0 END) AS CdColaborador
+		,first_value(Colaborador.CdFilial) over (partition BY Colaborador.CdOperador ORDER BY CASE WHEN (Colaborador.NmColaborador LIKE 'DUP%' OR Colaborador.DsLogin LIKE 'DUP%') THEN 1 ELSE 0 END) AS CdFilial
+
+	FROM DBA.TbColaborador Colaborador
+	WHERE Colaborador.CdColaborador > 0
+	AND Colaborador.CdOperador > 0
+)
+	SELECT
+			 year(DATE(Proposta.DtEntradaProposta))*100+month(DATE(Proposta.DtEntradaProposta)) NuAnoMes
+			,DATE(Proposta.DtEntradaProposta) DtEntradaProposta
+			,DATE(Proposta.DtStatusProposta) DtStatusProposta
+			,DATETIME(Proposta.DtStatusProposta) DtStatusProposta_ajustada
+			,DATE(CASE WHEN Proposta.StProposta in ('A','PA') THEN today()-1 ELSE Proposta.DtStatusProposta end) as DtTirReferencia
+			,CASE WHEN SubProduto.CdModalidadeProduto = 57 THEN 6 else 1 end as CdTipoTaxaMercadoOrigem
+			,Proposta.NuProposta
+			,Proposta.StProposta
+			,Proposta.NuContratoGestao
+			,PropostaFinanceiro.CdTipoCobranca
+			,TipoCobranca.NmTipoCobranca
+			,Colaborador.CdColaborador
+			,CASE WHEN Colaborador.CdColaborador <> ColaboradorPromotor.CdColaborador then ColaboradorPromotor.CdColaborador end as CdColaboradorPromotor
+			,CASE WHEN SubProduto.CdProduto = 11 or Proposta.CdLoja = 418254 THEN Colaborador.CdFilial ELSE Regiao.CdFilial END AS CdFilial
+			,CASE WHEN SubProduto.CdProduto = 11 or Proposta.CdLoja = 418254 THEN FilialColaborador.DsFilial ELSE Filial.DsFilial END AS DsFilial
+
+			,Proposta.CdLoja CdParceiroComercial
+			,Proposta.CdPessoa CdParceiroComercialCoban
+			,PessoaSobAnalise.CdPessoaSobAnalise CdPessoa
+			,PessoaSobAnalise.NmPessoaSobAnalise NmPessoa
+			,PessoaSobAnalise.TpPessoa
+			,PessoaSobAnalise.NuCpfCnpj
+			,EnderecoTbPessoaSobAnalise.CdUf as CdUfPessoa
+			,EnderecoTbPessoaSobAnalise.NmCidade as NmCidadePessoa
+			,Proposta.PcCoeficiente
+			,Proposta.QtDiasCarencia
+			,CASE
+				WHEN Proposta.QtParcelas >  60 THEN '60+'
+				WHEN Proposta.QtParcelas >  48 THEN '60'
+				WHEN Proposta.QtParcelas >  36 THEN '48'
+				WHEN Proposta.QtParcelas >  24 THEN '36'
+				WHEN Proposta.QtParcelas >  18 THEN '24'
+				WHEN Proposta.QtParcelas >  12 THEN '18'
+				WHEN Proposta.QtParcelas >   0 THEN '12'
+			 END AS FxParcela
+
+			,CASE WHEN SubProduto.CdProduto > 11 THEN PropostaFinanceiro.PcEntradaMolicar END PcEntradaMolicar
+			,CASE WHEN SubProduto.CdProduto > 11 THEN Proposta.PcEntrada END PcEntrada
+
+			,CASE
+				WHEN SubProduto.CdProduto IN (10,11) THEN NULL
+				WHEN Proposta.PcEntrada > 50 THEN '07 - Acima 50%'
+				WHEN Proposta.PcEntrada > 40 THEN '06 - Ate 50%'
+				WHEN Proposta.PcEntrada > 30 THEN '05 - Ate 40%'
+				WHEN Proposta.PcEntrada > 20 THEN '04 - Ate 30%'
+				WHEN Proposta.PcEntrada > 10 THEN '03 - Ate 20%'
+				WHEN Proposta.PcEntrada > 0 THEN '02 - Ate 10%'
+				ELSE '01 - Sem entrada'
+			 END AS FxEntrada
+
+			,Garantia.AaFabricacao
+			,Garantia.AaModelo
+			,Garantia.CdMarca
+			,Garantia.CdModelo
+
+			,CASE WHEN Garantia.FlZeroKm = ' ' THEN 'N' ELSE FlZeroKm END FlZeroKm
+			,CASE
+				WHEN Garantia.FlZeroKm = 'S' then 'ZeroKM'
+				WHEN Garantia.QtAnosIdade >  10 THEN 'Acima de 10 anos'
+				WHEN Garantia.QtAnosIdade >   7 THEN '8 a 10 anos'
+				WHEN Garantia.QtAnosIdade >   2 THEN '3 a 7 anos'
+				WHEN Garantia.QtAnosIdade >  -1 THEN '0 a 2 anos'
+			 END FxIdade
+
+			,PropostaFinanceiro.TpOrigemTaxa
+			,case when PropostaFinanceiro.TpOrigemTaxa='A' then 1 else 0 end as FlTxAlterada
+			,SubProduto.CdProduto*1000000 + SubProduto.CdModalidadeProduto*1000 + coalesce(SubProduto.CdTipoBem,0) CdGrupoSubProduto
+			,Proposta.CdSubProduto
+			,SubProduto.DsSubProduto
+			,PropostaComplemento.CdSistemaOrigem
+			,Proposta.CdTabelaFinanciamento
+			,case when PropostaCorrespondenteBncro.NuProposta is not null then 1 else 0 end as FlPropostaBipartida
+			,case when FlUtilizacaoFgts = 'S' then 1 else 0 end as FlPropostaUtilizacaoFgts
+			,Garantia.NuChassis
+			,CASE WHEN nullif(Garantia.NuChassis,'') IS NOT NULL THEN 'CCB' END AS FlCCB
+			,Proposta.StAverbacao
+			,CASE WHEN Proposta.TpProposta <> '3' THEN 'S' ELSE 'N' END AS FlPropostaValida
+			,Proposta.VrProposta
+			,Proposta.VrEntrada
+			,(PropostaFinanceiro.PcEntradaMolicar/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpEntrada
+
+			,(Proposta.VrProposta-Proposta.VrEntrada) as VrLiberado
+			,Proposta.PcMargemLiquida
+			,(Proposta.PcMargemLiquida * (Proposta.VrProposta - Proposta.VrEntrada) / 100 ) AS VrMargemLiquida
+			,Proposta.VrPDD
+			,Proposta.VrFinanciamento
+			,Proposta.VrPrestacao
+			,Proposta.VrRetencao
+			,Proposta.VrTac
+			,Proposta.VrIofCpmfIss
+
+			,PropostaFinanceiro.TxGerencial
+			,(PropostaFinanceiro.TxGerencial/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxGerencial
+
+			,Proposta.TxPactuada
+			,(Proposta.TxPactuada/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxPactuada
+
+			,Proposta.TxCetCalculada
+			,(Proposta.TxCetCalculada/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxCetCalculada
+			,Proposta.TxFinanciamento
+			,(Proposta.TxFinanciamento/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxFinanciamento
+			,Proposta.TxNet
+			,(Proposta.TxNet/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxNet
+			,PropostaFinanceiro.PcTaxaAlterada AS TxAlterada
+			,(PropostaFinanceiro.PcTaxaAlterada/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxAlterada
+			,PropostaFinanceiro.TxOriginalProposta AS TxOriginalProposta
+			,(PropostaFinanceiro.TxOriginalProposta/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxOriginalProposta
+			,PropostaFinanceiro.PcTaxaRetorno as TxRetorno
+			,(PropostaFinanceiro.PcTaxaRetorno/100)*(Proposta.VrProposta-Proposta.VrEntrada) as VpTxRetorno
+
+			,case when PessoaSobAnalise.NuScoreFim = 99 then 1 else PessoaSobAnalise.NuScoreFim end as NuScoreFim
+			,(case when PessoaSobAnalise.NuScoreFim = 99 then 1 else PessoaSobAnalise.NuScoreFim end) * (Proposta.VrProposta-Proposta.VrEntrada) as VpScore
+
+			,Garantia.QtAnosIdade
+			,Garantia.QtAnosIdade*(Proposta.VrProposta-Proposta.VrEntrada) as VpIdade
+
+			,Proposta.QtParcelas
+			,Proposta.QtParcelas*(Proposta.VrProposta-Proposta.VrEntrada) as VpPrazo
+			,Proposta.tsreplicacao
+
+	FROM DBA.TbProposta Proposta
+
+		LEFT JOIN DBA.TbSubProduto SubProduto
+			ON Proposta.CdSubProduto = SubProduto.CdSubProduto
+
+		LEFT JOIN DBCRED.TbPropostaFinanceiro PropostaFinanceiro
+			on Proposta.NuProposta = PropostaFinanceiro.NuProposta
+
+			LEFT JOIN DBCOR.TbTipoCobranca TipoCobranca
+				ON  PropostaFinanceiro.CdTipoCobranca = TipoCobranca.CdTipoCobranca
+
+		LEFT JOIN DBA.TbPessoaSobAnalise PessoaSobAnalise
+			ON  Proposta.NuProposta = PessoaSobAnalise.NuProposta
+			AND PessoaSobAnalise.CdPapel = 1
+
+			LEFT JOIN DBCRED.TbEnderecoTbPessoaSobAnalise EnderecoTbPessoaSobAnalise
+				ON  PessoaSobAnalise.CdPessoaSobAnalise = EnderecoTbPessoaSobAnalise.CdPessoaSobAnalise
+				AND EnderecoTbPessoaSobAnalise.CdTipoEndereco = 1
+
+		LEFT JOIN DBA.TbPropostaComplemento PropostaComplemento
+			ON Proposta.NuProposta = PropostaComplemento.NuProposta
+
+		LEFT JOIN DBCRED.TbPropostaCorrespondenteBncro PropostaCorrespondenteBncro
+			on  Proposta.NuProposta = PropostaCorrespondenteBncro.NuProposta
+
+		LEFT JOIN DBCRED.TbPropostaConsignado PropostaConsignado
+			on  Proposta.NuProposta = PropostaConsignado.NuProposta
+
+		LEFT JOIN DBA.TbPropGarantiaMaqEquip Garantia
+			ON  Proposta.NuProposta = Garantia.NuProposta
+			AND Garantia.CdPropostaGarantia = 1
+
+		LEFT JOIN DBA.TbLoja Loja
+			ON Proposta.CdLoja = Loja.CdLoja
+
+			LEFT JOIN DBA.TbRegiao Regiao
+				ON  Loja.CdRegiao = Regiao.CdRegiao
+
+				LEFT JOIN DBA.TbFilial Filial
+					on  Regiao.CdFilial = Filial.CdFilial
+
+		LEFT JOIN DBA.TbParceiroComercial ParceiroComercial
+			ON Proposta.CdLoja = ParceiroComercial.CdParceiroComercial
+
+		LEFT JOIN TbColaborador Colaborador
+			ON  Proposta.CdOperador = Colaborador.CdOperador
+
+			LEFT JOIN DBA.TbFilial FilialColaborador
+				on  Colaborador.CdFilial = FilialColaborador.CdFilial
+
+		LEFT JOIN TbColaborador ColaboradorPromotor
+			ON  Proposta.CdPromotor = ColaboradorPromotor.CdOperador
+
+	WHERE 1=1
+	and  Proposta.DtEntradaProposta >= today()-30
+	ORDER BY Proposta.NuProposta
+
+)
+;RUN;
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=PTA);
+CREATE TABLE TbFilial AS
+SELECT * FROM connection to dbcon
+(
+    SELECT
+         CdFilial
+        ,DsFilial
+    FROM DBA.TbFilial
+)
+;RUN;
+
+proc sql;
+create table TbPropostaAprovadaPaga as
+select
+	 TbPropostaOnline.NuProposta
+	,TbPropostaOnline.DtEntradaProposta
+	,TbPropostaOnline.DtStatusProposta
+	,count(*)-1 as QtDiasUteisEfetivacao
+from TbPropostaOnline TbPropostaOnline
+
+	left join bases.TbTempoData TempoData
+		on  TempoData.DtTempo between TbPropostaOnline.DtEntradaProposta and TbPropostaOnline.DtStatusProposta
+		and TempoData.FlDiaUtil = 'S'
+where TbPropostaOnline.StProposta = 'AP'
+group by
+	 TbPropostaOnline.NuProposta
+	,TbPropostaOnline.DtEntradaProposta
+	,TbPropostaOnline.DtStatusProposta
+;quit;
+
+proc sort data=bases.TbPropostaComplementoParceiro(where=(CdParceiroComercial is not null)) out=TbPropostaComplementoParceiro nodupkey;by NuCnpjLoja;run;
+
+/*Trechos comentados para permitir que o produto solar apareça no Cubo*/
+/*proc sql;delete from TbPropostaComplementoParceiro where NuCnpjLoja = '38407430000103';run;
+proc sql;delete from TbPropostaComplementoParceiro where NuCnpjLoja = '18947568000180';run;*/
+
+proc sql;
+create table TbTipoCanalProducaoProposta as
+select distinct
+	Proposta.NuProposta
+    ,case
+        when Proposta.CdColaborador =  2826 then 'CONCILIACAO'
+        when Proposta.CdColaborador in (56380,11308) then 'TELEMARKETING'
+        when Proposta.CdColaborador = 1000000 then 'CANAL DIGITAL'
+		when Proposta.CdParceiroComercial IN (378215,451012) then 'CANAL DIGITAL'
+		when ParceiroComercial.CdParceiroComercial = 365352	then 'PRAVALER'
+        when Proposta.CdFilial = 1 then 'BV FINANCEIRA - OPERACAO ESPECIAL'
+        when Proposta.CdFilial in (275,276) then 'NEGOCIOS CENTRALIZADOS'
+		when Filial.DsFilial like 'CP CONS%' then 'CANAL PRIVADO'
+		when Filial.DsFilial like 'CP SOLAR%' then 'CANAL SOLAR'
+		when Proposta.CdSubProduto = 70
+			and Filial.DsFilial not like '% SOLAR %'
+			and Proposta.CdParceiroComercial not in (418254,378215)
+			then 'CANAL DIGITAL SOLAR'
+	    when ParceiroComercial.CdTipoParceiroComercial = 12 then 'LOJA CANAL NEGOCIOS'
+		when ParceiroComercial.CdTipoParceiroComercial in (3,4,6) and upper(ParceiroComercialCoban.NmPromotora) like 'BV %' then 'LOJA CANAL NEGOCIOS'
+        when ParceiroComercial.CdTipoParceiroComercial in (3,4,6) and upper(ParceiroComercialCoban.NmPromotora) not like 'BV %' then 'PROMOTORA'
+        when Filial.DsFilial like 'CP %' and ParceiroComercialCoban.NmPromotora is null then 'LOJA CANAL NEGOCIOS'
+        when Filial.DsFilial like 'CP %' and upper(ParceiroComercialCoban.NmPromotora) like 'BV %' then 'LOJA CANAL NEGOCIOS'
+        when Filial.DsFilial like 'CP %' and upper(ParceiroComercialCoban.NmPromotora) not like 'BV %' then 'PROMOTORA'
+        when Filial.DsFilial not like 'CP %' and ParceiroComercial.CdTipoParceiroComercial = 2 then 'CONCESSIONARIAS'
+        when Filial.DsFilial not like 'CP %' and ParceiroComercial.CdTipoParceiroComercial = 5 then 'MULTIMARCAS'
+     end as DsTipoCanalProducao
+	 ,case
+        when Proposta.CdColaborador =  2826 then 'CONCILIACAO'
+        when Proposta.CdColaborador in (56380,11308) then 'TELEMARKETING'
+        when Proposta.CdColaborador = 1000000 then 'CANAL DIGITAL'
+		when Proposta.CdParceiroComercial IN (378215,451012) then 'CANAL DIGITAL'
+		when ParceiroComercial.CdParceiroComercial = 365352	then 'PRAVALER'
+        when Proposta.CdFilial = 1 then 'BV FINANCEIRA - OPERACAO ESPECIAL'
+        when Proposta.CdFilial in (275,276) then 'NEGOCIOS CENTRALIZADOS'
+		when upper(ParceiroComercial.NmParceiroComercial) like '%GR CONSULTOR%' then 'GR CONSULTOR'
+		when Proposta.CdParceiroComercial = 418254 then 'MEU FINANCIAMENTO SOLAR'
+		when Proposta.CdParceiroComercial = 378215 then 'PORTAL SOLAR'
+		when Filial.DsFilial like '% SOLAR %' then 'CANAL SOLAR'
+		when Proposta.CdSubProduto = 70
+			and Filial.DsFilial not like '% SOLAR %'
+			and Proposta.CdParceiroComercial not in (418254,378215)
+			then 'CANAL DIGITAL SOLAR'
+	    when ParceiroComercial.CdTipoParceiroComercial = 12 then 'LOJA CANAL NEGOCIOS'
+		when ParceiroComercial.CdTipoParceiroComercial in (3,4,6) and upper(ParceiroComercialCoban.NmPromotora) like 'PARLA %' then 'PARLA'
+		when ParceiroComercial.CdTipoParceiroComercial in (3,4,6) and Proposta.FlPropostaBiPartida = 1 then 'BIPARTIDO'
+		when ParceiroComercial.CdTipoParceiroComercial in (3,4,6) and upper(ParceiroComercialCoban.NmPromotora) like 'BV %' then 'LOJA CANAL NEGOCIOS'
+        when ParceiroComercial.CdTipoParceiroComercial in (3,4,6) and upper(ParceiroComercialCoban.NmPromotora) not like 'BV %' then 'PROMOTORA'
+        when Filial.DsFilial like 'CP %' and ParceiroComercialCoban.NmPromotora is null then 'LOJA CANAL NEGOCIOS'
+        when Filial.DsFilial like 'CP %' and upper(ParceiroComercialCoban.NmPromotora) like 'BV %' then 'LOJA CANAL NEGOCIOS'
+        when Filial.DsFilial like 'CP %' and upper(ParceiroComercialCoban.NmPromotora) not like 'BV %' then 'PROMOTORA'
+        when Filial.DsFilial not like 'CP %' and ParceiroComercial.CdTipoParceiroComercial = 2 then 'CONCESSIONARIAS'
+        when Filial.DsFilial not like 'CP %' and ParceiroComercial.CdTipoParceiroComercial = 5 then 'MULTIMARCAS'
+     end as DsTipoSubCanalProducao
+
+from TbPropostaOnline Proposta
+
+    left join TbFilial Filial
+        on Proposta.CdFilial = Filial.CdFilial
+
+    left join tmp.TbParceiroComercial ParceiroComercial
+        on  Proposta.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+	left join tmp.TbParceiroComercial ParceiroComercialCoban
+        on  Proposta.CdParceiroComercialCoban = ParceiroComercialCoban.CdParceiroComercial
+
+;run;
+
+proc sql;
+
+create table infogrc.TBPROPOSTA_ONLINE as
+/*create table tbOriginacao_Online as*/
+select
+     TbPropostaOnline.tsreplicacao,today() format=date9. as DataGeracao
+	,TIME() format= time5.  as HoraGeracao
+	,TbPropostaOnline.NuAnoMes
+	,TbPropostaOnline.NuProposta
+	,TbPropostaOnline.DtEntradaProposta
+	,TbPropostaOnline.StProposta
+	,TbPropostaOnline.DtStatusProposta
+	,TbPropostaOnline.DtStatusProposta_ajustada
+	,TbPropostaOnline.NuContratoGestao
+	,TbPropostaOnline.CdColaboradorPromotor
+	,case when TbPropostaOnline.CdColaborador <> coalesce(TbPropostaOnline.CdColaboradorPromotor,TbPropostaOnline.CdColaborador) then
+		case
+			when ColaboradorPromotor.CdGrupoCargoColaborador = 5 and GrupoProdutoMeta.NmGrupoProdutoMeta = 'Privado' then 1
+			when ColaboradorPromotor.CdGrupoCargoColaborador = 2 and GrupoProdutoMeta.NmGrupoProdutoMeta = 'CIG' then 1
+		else 0 end
+	 else 0 end as FlProducaoHibrida
+	,TipoCanalProducao.DsTipoCanalProducao
+	,TipoCanalProducao.DsTipoSubCanalProducao
+	,EstruturaComercial.NmCanalEstruturaComercial
+	,TbPropostaOnline.CdColaborador
+	,Colaborador.NmColaborador
+	,EstruturaComercialN1.NmGrupoCargo as NmGrupoCargoColaborador
+	,Colaborador.DsLogin as DsLoginN1
+	,coalesce(PropostaSinergia.CdColaboradorC, ParceiroComercial.CdColaboradorC) as CdColaboradorC
+	,coalesce(PropostaSinergia.NmColaboradorC, ParceiroComercial.NmColaboradorC) as NmColaboradorC
+	,coalesce(PropostaSinergia.DsLoginN1C, ParceiroComercial.DsLoginN1C) as DsLoginN1C
+
+	,TbPropostaOnline.CdFilial
+	,TbPropostaOnline.DsFilial
+	,EstruturaComercial.CdAreaEstruturaComercial
+	,EstruturaComercial.NmAreaEstruturaComercial
+	,EstruturaComercial.DsLoginN2A
+	,EstruturaComercial.DsLoginN2H
+
+	,coalesce(PropostaSinergia.CdFilialC, ParceiroComercial.CdFilialC) as CdFilialC
+	,coalesce(PropostaSinergia.NmFilialC, ParceiroComercial.NmFilialC) as NmFilialC
+
+	,coalesce(PropostaSinergia.CdAreaEstruturaComercialC, ParceiroComercial.CdAreaEstruturaComercialC) as CdAreaEstruturaComercialC
+	,coalesce(PropostaSinergia.NmAreaEstruturaComercialC, ParceiroComercial.NmAreaEstruturaComercialC) as NmAreaEstruturaComercialC
+	,coalesce(PropostaSinergia.DsLoginN2C, ParceiroComercial.DsLoginN2C) as DsLoginN2C
+
+	,EstruturaComercial.NmSubEstruturaComercialA
+	,EstruturaComercial.NmSubEstruturaComercialH
+	,EstruturaComercial.DsLoginN3A
+	,EstruturaComercial.DsLoginN3H
+
+	,coalesce(PropostaSinergia.NmSubEstruturaComercialC, ParceiroComercial.NmSubEstruturaComercialC) as NmSubEstruturaComercialC
+	,coalesce(PropostaSinergia.DsLoginN3C, ParceiroComercial.DsLoginN3C) as DsLoginN3C
+
+	,EstruturaComercial.LstSubstituicao
+	,ParceiroComercial.LstSubstituicaoC
+
+/*	,GrupoProdutoMeta.NmGrupoProdutoMeta*/
+
+	,case when BVO.CdParceiroComercial<>. and GrupoProdutoMeta.NmGrupoProdutoMeta = 'Leves' and
+    	TbPropostaOnline.FlZeroKm ='S' then 'Leves-BVO' else GrupoProdutoMeta.NmGrupoProdutoMeta end as NmGrupoProdutoMeta
+
+	,case
+		when GrupoProdutoMeta.NmGrupoProdutoMeta = 'Solar' then coalesce(ParceiroSinergia.NuCnpjLoja,PropostaSinergia.NuCnpjLoja,ParceiroComercial.NuCnpjLoja)
+	 end as NuCnpjLojaFavorecido
+
+	,case
+		when GrupoProdutoMeta.NmGrupoProdutoMeta <> 'Solar' then ''
+		when TbPropostaOnline.CdParceiroComercial = 418254 and ParceiroSinergia.NmParceiroComercial is null then 'Parceiro não cadastrado'
+		when TbPropostaOnline.CdParceiroComercial <> 418254 then ParceiroComercial.NmParceiroComercial
+	 else ParceiroSinergia.NmParceiroComercial end as NmParceiroComercialFavorecido
+	,case
+		when GrupoProdutoMeta.NmGrupoProdutoMeta <> 'Solar' then .
+		when PropostaSinergia.NuProposta is null then 0
+	 else 1 end as FlPropostaSinergia
+
+	,ParceiroComercial.NuCnpjLoja
+	,TbPropostaOnline.CdParceiroComercial
+	,ParceiroComercial.NmParceiroComercial
+	,ParceiroComercial.NmTipoParceiroComercial
+	,case when IntegracaoProposta.NuProposta is null then 0 else 1 end as FlIntegracaoPropostaFeI
+	,ParceiroComercial.FlIntegracaoParceiroFeI
+
+	,TbPropostaOnline.CdParceiroComercialCoban
+	,ParceiroComercialCoban.NmParceiroComercial as NmParceiroComercialCoban
+	,ParceiroComercialCoban.NmPromotora
+	,ParceiroComercialCoban.DsTipoCanalPromotora
+
+	,TbPropostaOnline.CdPessoa
+	,TbPropostaOnline.NmPessoa
+	,TbPropostaOnline.TpPessoa
+	,TbPropostaOnline.NuCpfCnpj
+	,TbPropostaOnline.CdUfPessoa
+	,TbPropostaOnline.NmCidadePessoa
+
+	,PropostaAprovadaPaga.QtDiasUteisEfetivacao
+	,TbPropostaOnline.CdTipoCobranca
+	,TbPropostaOnline.NmTipoCobranca
+	,TbPropostaOnline.CdTabelaFinanciamento
+	,TabelasFinanciamento.NmTipoTabelaFinanciamento
+	,TbPropostaOnline.StAverbacao
+
+	,TbPropostaOnline.QtAnosIdade
+	,TbPropostaOnline.FxIdade
+	,TbPropostaOnline.QtParcelas
+	,TbPropostaOnline.FxParcela
+	,TbPropostaOnline.PcEntradaMolicar
+	,TbPropostaOnline.PcEntrada
+	,TbPropostaOnline.FxEntrada
+	,TbPropostaOnline.NuScoreFim
+	,'SCORE '||case
+		when TbPropostaOnline.NuScoreFim >= 9 then '9-10'
+		when TbPropostaOnline.NuScoreFim >= 8 then '8-8'
+		when TbPropostaOnline.NuScoreFim >= 7 then '7-8'
+		when TbPropostaOnline.NuScoreFim >= 6 then '6-7'
+		when TbPropostaOnline.NuScoreFim >= 5 then '5-6'
+	 else '< 5' end as FxScoreFim
+
+	,TbPropostaOnline.CdMarca
+	,TbPropostaOnline.CdModelo
+	,TbPropostaOnline.AaModelo
+	,TbPropostaOnline.AaFabricacao
+	,TbPropostaOnline.FlCCB
+
+	,TbPropostaOnline.TpOrigemTaxa
+	,TbPropostaOnline.FlTxAlterada
+	,PropostaAlteracao.QtAlteracao
+	,TbPropostaOnline.PcCoeficiente
+	,TbPropostaOnline.QtDiasCarencia
+	,TbPropostaOnline.VrProposta
+	,TbPropostaOnline.VrLiberado
+	,TbPropostaOnline.VrEntrada
+	,TbPropostaOnline.VrFinanciamento
+	,TbPropostaOnline.VrPrestacao
+	,TbPropostaOnline.VrRetencao
+	,TbPropostaOnline.VrTac
+	,TbPropostaOnline.VrIofCpmfIss
+
+	,case when TbPropostaOnline.StProposta IN ('A','AP','PA','CA','N') then 1 else 0 end as FlPropostaOriginada
+	,case when TbPropostaOnline.StProposta IN ('N') then 1 else 0 end as FlPropostaNegada
+	,case when TbPropostaOnline.StProposta IN ('A','AP','PA','CA') then 1 else 0 end as FlPropostaAprovada
+	,case when TbPropostaOnline.StProposta IN ('A','PA') then 1 else 0 end as FlPropostaAPNP
+	,case when TbPropostaOnline.StProposta IN ('AP') then 1 else 0 end as FlPropostaEfetivada
+
+	,case when TbPropostaOnline.StProposta IN ('A','AP','PA','CA','N') then TbPropostaOnline.VrLiberado else 0 end as VrPropostaOriginada
+	,case when TbPropostaOnline.StProposta IN ('N') then TbPropostaOnline.VrLiberado else 0 end as VrPropostaNegada
+	,case when TbPropostaOnline.StProposta IN ('A','AP','PA','CA') then TbPropostaOnline.VrLiberado else 0 end as VrPropostaAprovada
+	,case when TbPropostaOnline.StProposta IN ('A','PA') then TbPropostaOnline.VrLiberado else 0 end as VrPropostaAPNP
+	,case when TbPropostaOnline.StProposta IN ('AP') then TbPropostaOnline.VrLiberado else 0 end as VrPropostaEfetivada
+
+	,coalesce(CetipConversao.FlBancoBrasil,0) as FlBancoBrasil
+	,coalesce(CetipConversao.FlBradesco,0) as FlBradesco
+	,coalesce(CetipConversao.FlItau,0) as FlItau
+	,coalesce(CetipConversao.FlPan,0) as FlPan
+	,coalesce(CetipConversao.FlSafra,0) as FlSafra
+	,coalesce(CetipConversao.FlSantander,0) as FlSantander
+	,coalesce(CetipConversao.FlMontadoras,0) as FlMontadoras
+	,coalesce(CetipConversao.FlOutros,0) as FlOutros
+	,coalesce(CetipConversao.FlConcorrente,0) as FlConcorrente
+	,CetipConversao.pgto_loja
+
+	,TbPropostaOnline.CdSistemaOrigem
+	,TbPropostaOnline.FlPropostaBipartida
+	,TbPropostaOnline.FlPropostaUtilizacaoFgts
+
+	,TbPropostaOnline.TxRetorno
+
+	,TbPropostaOnline.PcMargemLiquida
+	,TbPropostaOnline.VrMargemLiquida
+
+	,TbPropostaOnline.TxPactuada
+	,TbPropostaOnline.VpTxPactuada
+
+	,TbPropostaOnline.TxFinanciamento
+	,TbPropostaOnline.VpTxFinanciamento
+
+	,TbPropostaOnline.TxGerencial
+	,TbPropostaOnline.VpTxGerencial
+
+	,case when TbPropostaOnline.VrRetencao > 1 then (Finance('RATE', TbPropostaOnline.QtParcelas, TbPropostaOnline.VrPrestacao, -((TbPropostaOnline.VrProposta-TbPropostaOnline.VrRetencao)+TbPropostaOnline.VrIofCpmfIss+TbPropostaOnline.VrTac))*case when TbPropostaOnline.StProposta IN ('AP') then TbPropostaOnline.VrLiberado else 0 end) ELSE TbPropostaOnline.VpTxGerencial END as VpTxGerencialRebate
+
+	,TaxaMercado.TxTirDivulgada
+	,(TaxaMercado.TxTirDivulgada/100) * (TbPropostaOnline.VrLiberado) as VpTirDivulgada
+
+	,TaxaMercado.TxTirContabil
+	,(TaxaMercado.TxTirContabil/100) * (TbPropostaOnline.VrLiberado) as VpTirContabil
+
+	,((1+(TbPropostaOnline.VpTxGerencial/TbPropostaOnline.VrLiberado)) / (1+(((TaxaMercado.TxTirContabil/100) * (TbPropostaOnline.VrLiberado))/TbPropostaOnline.VrLiberado)) -1 ) * TbPropostaOnline.VrLiberado AS VpSpread
+	,((1+((case when TbPropostaOnline.VrRetencao > 1 then (Finance('RATE', TbPropostaOnline.QtParcelas, TbPropostaOnline.VrPrestacao, -((TbPropostaOnline.VrProposta-TbPropostaOnline.VrRetencao)+TbPropostaOnline.VrIofCpmfIss+TbPropostaOnline.VrTac))*case when TbPropostaOnline.StProposta IN ('AP') then TbPropostaOnline.VrLiberado else 0 end) ELSE TbPropostaOnline.VpTxGerencial END)/TbPropostaOnline.VrLiberado)) / (1+(((TaxaMercado.TxTirContabil/100) * (TbPropostaOnline.VrLiberado))/TbPropostaOnline.VrLiberado)) -1 ) * TbPropostaOnline.VrLiberado AS VpSpreadRebate
+
+	,(TbPropostaOnline.VrLiberado/TempoData.QtCorridosDiaUtilMes) as VrLiberadoDiaUtil
+	,(TbPropostaOnline.VrLiberado/TempoData.QtCorridosDiaUtilMes) * TempoData.QtTotalDiaUtilMes as VrLiberadoProjetado
+
+	,TbPropostaOnline.VrPdd
+	,TbPropostaOnline.VpEntrada
+	,TbPropostaOnline.VpScore
+	,TbPropostaOnline.VpIdade
+	,TbPropostaOnline.VpPrazo
+	,TempoData.StData
+	,TempoData.QtTotalDiaUtilMes
+	,TempoData.QtCorridosDiaUtilMes
+	,TempoData.QtDiasUteisMaturacao
+	,TempoData.FlDiasUteisMaturacao
+
+	/*,CASE WHEN GrupoProdutoMeta.NmGrupoProdutoMeta LIKE 'CVG%' THEN */
+		,CASE    WHEN compress(ParceiroComercial.NmParceiroComercial,' ')  LIKE '%GRCONSUL%' OR ParceiroComercial.NmParceiroComercial LIKE '%COCKPIT%'
+					AND TipoCanalProducao.DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS')
+						THEN 'GR CONSULTOR'
+
+				WHEN compress(ParceiroComercial.NmParceiroComercial,' ')  LIKE '%CPGARANTIA%' OR compress(ParceiroComercial.NmParceiroComercial,' ')  LIKE '%BVPARTICULAR%'
+					AND TipoCanalProducao.DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS')
+						THEN 'BALCÃO'
+
+			    WHEN ParceiroComercial.NmParceiroComercial  LIKE '%FINANZERO%' OR compress(ParceiroComercial.NmParceiroComercial,' ') LIKE '%QUEROFINANCIAR%'
+						OR compress(ParceiroComercial.NmParceiroComercial,' ') LIKE '%TATOSGESTAODENEGOCIOS%'
+						OR compress(ParceiroComercial.NmParceiroComercial,' ') LIKE '%BOMPRACRÉDITO%'
+						OR compress(ParceiroComercial.NmParceiroComercial,' ') LIKE '%GRINGOOMELHOR%'
+					OR TbPropostaOnline.CdParceiroComercial in (449109,452671,455884,460298,448756,454428,462320,460903,462486,419715,467954,468906,468957,469033,469213,468126,469532,
+														430045,443648,459426,473566,463084,465690,465799,470511,469570,470698,471098,471160,471162,471164,471181,471422,471505,
+														472133,467403,472245,472263,408614,399597,466805,472167,472169,472170,466803,469125,471076,472182,472188,472168,474095,
+														474220,474560,474561,474596,472246,472247,472259,472260,472262,472244,472676,472229,472234,472239,472241,472242,416042,
+														416043,463762,466785,472559,472630,441821,441826,441829,442926,443698,443699,443700,473258,465047,474839,412345,412970,
+														412971,412972,413732,414401,414420,433211,443941,444528,448742,448744,450421,453649,461517,461648,461879,462438,474598,
+														323874,323875,323876,323877,323878,474594,315029,317427,474836,449354,450120,466778,469712,474970,470696,416041,474822,
+														474404,473856,474077,437971,437973,437977,437978,437981,443678,451110,451123,466802,426042,426043,426045,426046)
+					OR (TbPropostaOnline.CdParceiroComercial = 441823 AND TbPropostaOnline.DtEntradaProposta  >= '01OCT2024'd)
+						THEN 'PARCEIRO DIGITAL'
+
+					WHEN (TbPropostaOnline.CdParceiroComercial = 407516 AND TbPropostaOnline.DtEntradaProposta  BETWEEN '01JUL2020'd AND '31AUG2020'd)
+                         OR (TbPropostaOnline.CdParceiroComercial = 416382 AND TbPropostaOnline.DtEntradaProposta  >= '01AUG2020'd)
+                         THEN 'JUST'
+
+					WHEN compress(ParceiroComercial.NmParceiroComercial,' ') LIKE '%CPGARANTMLKT%'
+						OR ParceiroComercial.CdParceiroComercial IN(466807,418607,468271,472272) THEN 'TELEMARKETING'
+
+					WHEN TbPropostaOnline.CdParceiroComercial = 414643
+						THEN 'MINHA BV'
+
+					WHEN TbPropostaOnline.CdParceiroComercial in(424584,452470,465399)
+						THEN 'CVG ÁREA ABERTA SITE'
+
+					WHEN TipoCanalProducao.DsTipoCanalProducao IN ('LOJA CANAL NEGOCIOS','PROMOTORA','BV FINANCEIRA - OPERACAO ESPECIAL')
+						 AND (ParceiroComercial.NmParceiroComercial NOT LIKE '%FINANZERO%' OR compress(ParceiroComercial.NmParceiroComercial,' ') NOT LIKE '%QUEROFINANCIAR%')
+                         AND (TbPropostaOnline.CdParceiroComercial not in (407516) AND TbPropostaOnline.DtEntradaProposta  BETWEEN '01JUL2020'd AND '31AUG2020'd)
+                        THEN 'CANAL NEGOCIOS'
+
+                    WHEN TipoCanalProducao.DsTipoCanalProducao IN ('MULTIMARCAS','CONCESSIONARIAS')
+						THEN 'CANAL VEICULOS'
+
+					WHEN TipoCanalProducao.DsTipoCanalProducao IN ('CANAL SOLAR','CANAL DIGITAL SOLAR')
+						THEN 'CANAL SOLAR'
+
+                    ELSE 'CANAL NEGOCIOS'
+/*                    END ELSE 'OUTROS PRODUTOS'*/
+		   END AS FiltroCVG
+
+from TbPropostaOnline TbPropostaOnline
+	left join basegrc.TbGrupoProdutoMeta GrupoProdutoMeta
+		on  TbPropostaOnline.CdGrupoSubProduto = GrupoProdutoMeta.CdGrupoSubProduto
+
+	left join TbDimTaxaMercado TaxaMercado
+		on  TbPropostaOnline.DtTirReferencia = TaxaMercado.DtReferencia
+		and TbPropostaOnline.QtParcelas = TaxaMercado.QtParcelas
+		and TbPropostaOnline.CdTipoTaxaMercadoOrigem = TaxaMercado.CdTipoTaxaMercadoOrigem
+
+	left join bases.TbEstruturaComercial EstruturaComercial
+		on  TbPropostaOnline.CdFilial = EstruturaComercial.CdFilial
+		and TbPropostaOnline.NuAnoMes  = EstruturaComercial.NuAnoMes
+		and EstruturaComercial.NmNivel = 'N2'
+
+	left join TbTipoCanalProducaoProposta TipoCanalProducao
+		on TbPropostaOnline.NuProposta = TipoCanalProducao.NuProposta
+
+	left join bases.TbColaborador Colaborador
+		on  TbPropostaOnline.CdColaborador = Colaborador.CdColaborador
+
+	left join bases.TbColaborador ColaboradorPromotor
+		on  TbPropostaOnline.CdColaboradorPromotor = ColaboradorPromotor.CdColaborador
+
+	left join bases.TbEstruturaComercial EstruturaComercialN1
+			on  Colaborador.CdColaboradorBI = EstruturaComercialN1.CdColaboradorBI
+			and TbPropostaOnline.NuAnoMes  = EstruturaComercialN1.NuAnoMes
+			and EstruturaComercialN1.CdColaboradorBI is not null
+			and EstruturaComercialN1.NmNivel = 'N1'
+
+	left join tmp.TbParceiroComercial ParceiroComercial
+		on  TbPropostaOnline.CdParceiroComercial = ParceiroComercial.CdParceiroComercial
+
+	left join tmp.TbParceiroComercial ParceiroComercialCoban
+		on  TbPropostaOnline.CdParceiroComercialCoban = ParceiroComercialCoban.CdParceiroComercial
+
+	left join bases.TbPropostaComplementoParceiro PropostaSinergia
+		on  TbPropostaOnline.NuProposta = PropostaSinergia.NuProposta
+
+	left join TbPropostaComplementoParceiro ParceiroSinergia
+		on  coalesce(PropostaSinergia.NuCnpjLoja, ParceiroComercial.NuCnpjLoja) = ParceiroSinergia.NuCnpjLoja
+
+	left join tmp.TbIntegracaoProposta IntegracaoProposta
+		on  TbPropostaOnline.NuProposta = IntegracaoProposta.NuProposta
+
+	left join TbPropostaAprovadaPaga PropostaAprovadaPaga
+		on  TbPropostaOnline.NuProposta = PropostaAprovadaPaga.NuProposta
+
+	left join basegrc.TbTabelasFinanciamento TabelasFinanciamento
+		on TbPropostaOnline.CdTabelaFinanciamento = TabelasFinanciamento.CdTabelaFinanciamento
+
+	left join tmp.extracao_ctr_PropostaAlteracao PropostaAlteracao
+		on  TbPropostaOnline.NuProposta = PropostaAlteracao.NuProposta
+
+	left join bases.TbCetipConversao CetipConversao
+		on  TbPropostaOnline.NuProposta = CetipConversao.NuProposta
+
+	left join bases.TbTempoData TempoData
+		on  TbPropostaOnline.DtEntradaProposta = TempoData.DtTempo
+
+	LEFT JOIN BASEGRC.TbLevesNovosBVO BVO
+    	ON BVO.CdParceiroComercial = TbPropostaOnline.CdParceiroComercial
+		and BVO.nuanomes = TbPropostaOnline.NuAnoMes
+
+	where NmGrupoProdutoMeta in ('Leves','Leves-BVO','Motos','Pesados','CVG Leves','CVG Pesados','Solar')
+
+		order by TbPropostaOnline.tsreplicacao desc
+		;run;

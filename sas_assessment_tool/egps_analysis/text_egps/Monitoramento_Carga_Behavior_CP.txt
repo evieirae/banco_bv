@@ -1,0 +1,442 @@
+START_METADATA
+PROJECT: SAS_UC4__Monitoramento_Carga_Behavior_CP
+FILE_SAS: Monitoramento_Carga_Behavior_CP.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:04 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -17
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), PROC DATASETS (4x | +80), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 354
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, SQL
+HAS_DATA_STEP: Yes (15x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: BHCHECK = /projetos/ctrcredito/modelos/results; INFRA2 = /projetos/ctrcredito/modelos/historico/bhrodas
+DETECTED_MACROS_DEFINED: DataRef1, DataRef2, DataRef3, DataRef4, DataRef5, DataRef6, trab
+DETECTED_MACROS_USED: CP_AnoMes_1, CP_AnoMes_2, CP_AnoMes_3, CP_AnoMes_4, CP_AnoMes_5, CP_AnoMes_6, DataRef1, DataRef2, DataRef3, DataRef4, DataRef5, DataRef6, DtRef1, DtRef2, DtRef3, DtRef4, DtRef5, DtRef6, Variavel
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: PRODUTO, VARIAVEL
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CP.TBCONTRATO [SYBASEIQ]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: &VARIAVEL, BHCHECK
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): &VARIAVEL._TOTAL [PROC SQL - JOIN; Resolved qualified read (%LET)], CP.TBCONTRATO [Pass-Through Native (SYBASEIQ) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): &VARIAVEL._TOTAL, BHCHECK.MONITOR_CARGA_BHCP
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: &VARIAVEL, ANALISEIEP, ANALISEMIX, BASESPROD_CP, BASESVARIAVEIS_CP, BASE_MONIT_PROD_CP, CP_MIGRA_PROD, CP_MIGRA_RUCP, CP_MIGRA_RUFINAL, CP_TBCONTRATO, DATAIEP_CP, DATAIEP_CP_1, DATAIEP_CP_2, DATAIEP_CP_3, DATAIEP_CP_4, DATAIEP_CP_5, DATAIEP_CP_6, IEP_&VARIAVEL, MESANTERIOR_CP, MESATUAL_CP, MIGRACAO_CP, MIXMEDIO, MIXMEDIO_TOTAL, MIX_&VARIAVEL, TEMOSMISSING_CP
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*
++-------------------------------------------------------------------------------------------------+
+| Programa   | Monitoramento Carga Behavior CP                                                    |
+| Autor      | Vitor Colombo Liberato                                                             |
+| Objetivo   |     Verificar se os dados gerados pelo modelo Behavior CP estão de acordo com o    |
+|            | esperado.                                                                          |
++-------------------------------------------------------------------------------------------------+
+| HISTÓRICO                                                                                       |
++-------------------------------------------------------------------------------------------------+
+|    DATA    | Responsável                       |            Alteração                           |
+| 23/01/2019 | Ana Lazarini                      | Unificação / Organização códs.                 |
+|            |                                   | Adaptação para alimentar Dashboards Tableau    |
++-------------------------------------------------------------------------------------------------+
+| OUTPUTS SAS                                                                                     |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                       | Nome                          |
+| bhcheck    | /sustentacaomodelos/relatoriosmalha1/bases         | monitor_carga_bhcp            |
++-------------------------------------------------------------------------------------------------+
+| INPUTS SAS                                                                                      |
++-------------------------------------------------------------------------------------------------+
+| Alias      | Library Path                                       | Nome                          |
+| infra2     | /projetos/ctrcredito/modelos/historico/bhrodas     | BH_CP_&safra                  |
++-------------------------------------------------------------------------------------------------+
+*/
+
+/*** Declarar Libnames necessárias ***/
+LIBNAME infra2 '/projetos/ctrcredito/modelos/historico/bhrodas';
+LIBNAME bhcheck '/projetos/ctrcredito/modelos/results';
+
+/* Colocar o link da Work em Macro variável */
+%LET trab = %SYSFUNC(getoption(work));
+
+/* Definir datas que serão analisadas */
+%LET DataRef1 = INTNX('month',DATE(),-1, 'end');
+%LET DataRef2 = INTNX('month',DATE(),-2, 'end');
+%LET DataRef3 = INTNX('month',DATE(),-3, 'end');
+%LET DataRef4 = INTNX('month',DATE(),-4, 'end');
+%LET DataRef5 = INTNX('month',DATE(),-5, 'end');
+%LET DataRef6 = INTNX('month',DATE(),-6, 'end');
+
+/* Parametrizar bases que serão consultadas */
+DATA DataIEP_CP_1; Seq = 1; FORMAT Ref ddmmyy10.; Ref = &DataRef1.; RUN;
+DATA DataIEP_CP_2; Seq = 2; FORMAT Ref ddmmyy10.; Ref = &DataRef2.; RUN;
+DATA DataIEP_CP_3; Seq = 3; FORMAT Ref ddmmyy10.; Ref = &DataRef3.; RUN;
+DATA DataIEP_CP_4; Seq = 4; FORMAT Ref ddmmyy10.; Ref = &DataRef4.; RUN;
+DATA DataIEP_CP_5; Seq = 5; FORMAT Ref ddmmyy10.; Ref = &DataRef5.; RUN;
+DATA DataIEP_CP_6; Seq = 6; FORMAT Ref ddmmyy10.; Ref = &DataRef6.; RUN;
+
+DATA DataIEP_CP;
+SET DataIEP_CP_1
+    DataIEP_CP_2
+    DataIEP_CP_3
+    DataIEP_CP_4
+    DataIEP_CP_5
+    DataIEP_CP_6;
+
+    Mes = MONTH(Ref);
+    Ano = YEAR(Ref);
+
+    IF mes <= 9 THEN CP_AnoMes = COMPRESS('infra2.BH_CP_'||Ano||'0'||mes); ELSE
+    IF mes >  9 THEN CP_AnoMes = COMPRESS('infra2.BH_CP_'||Ano||mes);
+
+    IF mes <= 9 THEN DtRef = COMPRESS('DtRef_'||Ano||'0'||mes); ELSE
+    IF mes >  9 THEN DtRef = COMPRESS('DtRef_'||Ano||mes);
+RUN;
+
+DATA _NULL_;
+SET DataIEP_CP;
+   CALL SYMPUT(COMPRESS("CP_AnoMes_"!!Seq), CP_AnoMes);
+   CALL SYMPUT(COMPRESS("DtRef"!!Seq), DtRef);
+RUN;
+
+/* Separa os produtos, DtBase e informações de atraso e se é recente ou não o contrato */
+DATA BasesProd_CP;
+SET &CP_AnoMes_1.
+    &CP_AnoMes_2.
+    &CP_AnoMes_3.
+    &CP_AnoMes_4.
+    &CP_AnoMes_5.
+    &CP_AnoMes_6.;
+
+    FORMAT DtBase DDMMYY10.;
+
+    IF &DtRef1. <> . THEN DtBase = &DtRef1.;
+    IF &DtRef2. <> . THEN DtBase = &DtRef2.;
+    IF &DtRef3. <> . THEN DtBase = &DtRef3.;
+    IF &DtRef4. <> . THEN DtBase = &DtRef4.;
+    IF &DtRef5. <> . THEN DtBase = &DtRef5.;
+    IF &DtRef6. <> . THEN DtBase = &DtRef6.;
+RUN;
+
+/* Monitoramento por produto (Volume) */
+PROC SQL;
+CREATE TABLE Base_Monit_Prod_CP AS
+    SELECT 'Volume' AS Analise,
+	       DtBase,
+           COUNT(NuContrato) as Valor,
+		   '' AS Medida,
+		   '' AS SubMedida
+    FROM BasesProd_CP
+    GROUP by DtBase;
+QUIT;
+
+/* Análise de Missing */
+PROC SQL;
+CREATE TABLE TemosMissing_CP AS
+    SELECT DISTINCT
+           'Missing' AS Analise,
+		   &DataRef1. FORMAT DDMMYY10. AS DtBase,
+	       COUNT(NuContrato) AS Valor,
+		   '' AS Medida,
+		   '' AS SubMedida
+    FROM &CP_AnoMes_1.
+    WHERE Score = .;
+QUIT;
+
+/* Matriz de migração */
+DATA MesAnterior_CP;
+SET &CP_AnoMes_2.;
+    Prod = "CP";
+RUN;
+
+DATA MesAtual_CP;
+SET &CP_AnoMes_1.;
+    Prod = "CP";
+RUN;
+
+PROC SQL;
+CREATE TABLE Migracao_CP AS
+    SELECT DISTINCT
+	       a.NuContrato AS NuContrato_Antes,
+           a.Prod AS Prod_Antes,
+           PUT(CATS(b.Prod),$32.) AS Prod_Agora,
+	       a.RU_Final AS RUFinal_Antes,
+           b.RU_Final AS RUFinal_Agora,
+           a.RU_CP AS RUCP_Antes,
+           b.RU_CP AS RUCP_Agora
+    FROM MesAnterior_CP AS a
+    LEFT JOIN MesAtual_CP AS b on a.NuContrato = b.NuContrato;
+QUIT;
+
+PROC SQL;
+CONNECT TO SYBASEIQ AS DBCON (host='pta-iqprd01' server=ptaiqprd db=PTAIQCONT user=lgettEtlExtracaoPepr password="{sas002}AC224E4749A76DA011090FAB3B023BCA2730CA040D35CB2F00BDDD352FB437DC");
+CREATE TABLE CP_TbContrato AS
+    SELECT * FROM connection TO dbcon
+    (
+        SELECT NuContrato,
+               DtLiquidacaoEfetiva,
+               DtCancelamento AS DtCancelamento_
+        FROM cp.tbcontrato
+    );
+QUIT;
+
+DATA CP_TbContrato;
+SET CP_TbContrato;
+    FORMAT DtLiquidacao DDMMYY10.;
+        DtLiquidacao = DATEPART(DtLiquidacaoEfetiva);
+
+    FORMAT DtCancelamento DDMMYY10.;
+        DtCancelamento = DATEPART(DtCancelamento_);
+RUN;
+
+PROC SQL;
+CREATE TABLE Migracao_CP AS
+    SELECT a.*,
+           b.DtLiquidacao,
+           b.DtCancelamento
+    FROM Migracao_CP AS a
+    LEFT JOIN CP_TbContrato AS b on a.NuContrato_Antes = b.NuContrato;
+QUIT;
+
+DATA Migracao_CP;
+SET Migracao_CP;
+    IF Prod_Agora = '' AND DtLiquidacao <> .   THEN Prod_Agora = 'LIQUIDADO';
+    IF Prod_Agora = '' AND DtCancelamento <> . THEN Prod_Agora = 'CANCELADO';
+    IF Prod_Agora = ''                         THEN Prod_Agora = 'OUTROS';
+RUN;
+
+PROC SQL;
+CREATE TABLE CP_Migra_Prod AS
+    SELECT 'Migração PROD' AS Analise,
+	       &DataRef1. FORMAT DDMMYY10. AS DtBase,
+           COUNT(*) as Valor,
+		   STRIP(Prod_Antes)||"%%"||STRIP(Prod_Agora) AS Medida,
+		   '' AS SubMedida
+    FROM Migracao_CP
+    GROUP BY Medida;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CP_Migra_RUCP AS
+    SELECT 'Migração RU' AS Analise,
+	       &DataRef1. FORMAT DDMMYY10. AS DtBase,
+           COUNT(*) as Valor,
+		   STRIP(RUCP_Antes)||"%%"||STRIP(RUCP_Agora) AS Medida,
+		   '' AS SubMedida
+    FROM Migracao_CP
+    GROUP BY Medida;
+QUIT;
+
+PROC SQL;
+CREATE TABLE CP_Migra_RUFinal AS
+    SELECT 'Migração RU Final' AS Analise,
+	       &DataRef1. FORMAT DDMMYY10. AS DtBase,
+           COUNT(*) as Valor,
+		   STRIP(RUFinal_Antes)||"%%"||STRIP(RUFinal_Agora) AS Medida,
+		   '' AS SubMedida
+    FROM Migracao_CP
+    GROUP BY Medida;
+QUIT;
+
+/* Acompanhamento das variáveis */
+DATA BasesVariaveis_CP;
+SET &CP_AnoMes_1.
+    &CP_AnoMes_2.
+    &CP_AnoMes_3.
+    &CP_AnoMes_4.
+    &CP_AnoMes_5.
+    &CP_AnoMes_6.;
+
+    WHERE atraso_t0 < 91;
+
+    FORMAT DtBase DDMMYY10.;
+
+    IF &DtRef1. <> . THEN DtBase = &DtRef1.;
+    IF &DtRef2. <> . THEN DtBase = &DtRef2.;
+    IF &DtRef3. <> . THEN DtBase = &DtRef3.;
+    IF &DtRef4. <> . THEN DtBase = &DtRef4.;
+    IF &DtRef5. <> . THEN DtBase = &DtRef5.;
+    IF &DtRef6. <> . THEN DtBase = &DtRef6.;
+
+    QtInstAnotMesAnt_C     = QtInstituicaoAnotacaoMesAnt_C    ;
+    QtRest3MesesAt_ALT_C   = QtRestricao3MesesAtiva_ALT_C     ;
+    QtTempPriPend_C        = QtTempoPrimeiraPendencia_C       ;
+    QtTempMaxRestAber_C    = QtTempoMaximoRestricaoAberto_C   ;
+RUN;
+
+%MACRO VariaveisCP(Produto, Variavel);
+/*macro*/ /* Encontrar o MIX médio dos ultimos meses (sem contar a referência) */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio AS
+/*macro*/     SELECT &Variavel.,
+/*macro*/            COUNT(NuContrato) AS Contador
+/*macro*/     FROM BasesVariaveis_CP
+/*macro*/     WHERE DtBase >=&DataRef6. AND DtBase <=&DataRef2.
+/*macro*/     GROUP BY &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Total do MIS médio */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio_Total AS
+/*macro*/     SELECT COUNT(NuContrato) AS Total
+/*macro*/     FROM BasesVariaveis_CP
+/*macro*/     WHERE DtBase >= &DataRef6. AND DtBase <=&DataRef2.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Encotrar o Percentual do MIX Médio */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIXMedio AS
+/*macro*/     SELECT a.&Variavel.,
+/*macro*/            a.Contador/b.Total AS MixMedio
+/*macro*/     FROM MIXMedio AS a
+/*macro*/     FULL JOIN MIXMedio_Total AS b on a.Contador;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Sumarizar por categoria/DtBase para calcular o MIX */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel. AS
+/*macro*/     SELECT DtBase,
+/*macro*/            &Variavel.,
+/*macro*/            COUNT(NuContrato) AS Contador
+/*macro*/     FROM BasesVariaveis_CP
+/*macro*/     GROUP BY DtBase, &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /*Total por DtBase para o MIX*/
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel._Total AS
+/*macro*/     SELECT DtBase,
+/*macro*/            SUM(Contador) AS Total
+/*macro*/     FROM &Variavel.
+/*macro*/     GROUP BY DtBase;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Calculo do MIX e do Mix Médio para IEP e volume */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE &Variavel. AS
+/*macro*/     SELECT DISTINCT
+/*macro*/            a.DtBase,
+/*macro*/            a.&Variavel.,
+/*macro*/            a.Contador/b.Total AS Mix,
+/*macro*/            c.MixMedio
+/*macro*/     FROM &Variavel. AS a
+/*macro*/     LEFT JOIN &Variavel._Total AS b on a.DtBase = b.DtBase
+/*macro*/     LEFT JOIN MIXMedio AS c on a.&Variavel. = c.&Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE MIX_&Variavel. AS
+/*macro*/     SELECT 'MIX' AS Analise,
+/*macro*/            DtBase,
+/*macro*/            Mix AS Valor,
+/*macro*/            PUT(CATS("&Variavel."),$32.) AS Medida,
+/*macro*/            PUT(CATS(&Variavel.),$32.) AS Submedida
+/*macro*/     FROM &Variavel.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ /* Calculos e ajuste para o calculo do IEP */
+/*macro*/ DATA &Variavel.;
+/*macro*/ SET &Variavel.;
+/*macro*/     IF MixMedio = . THEN MixMedio = 2;
+/*macro*/     IF Mix = 0 THEN Mix = 1;
+/*macro*/
+/*macro*/     dif = MixMedio - Mix;
+/*macro*/     LNdif = log(MixMedio/Mix);
+/*macro*/     Produto = dif * LNdif;
+/*macro*/ RUN;
+/*macro*/
+/*macro*/ /* Sumarizar o IEP por DtBase para colocar no acompanhamento */
+/*macro*/ PROC SQL;
+/*macro*/ CREATE TABLE IEP_&Variavel. AS
+/*macro*/     SELECT DISTINCT
+/*macro*/            'IEP' AS Analise,
+/*macro*/            DtBase,
+/*macro*/            SUM(Produto) AS Valor,
+/*macro*/            PUT(CATS("&Variavel."),$32.) AS Medida,
+/*macro*/            '' AS Submedida
+/*macro*/     FROM &Variavel.
+/*macro*/     WHERE DtBase = &DataRef1.;
+/*macro*/ QUIT;
+/*macro*/
+/*macro*/ PROC DATASETS; APPEND base=analiseIEP data=IEP_&Variavel. FORCE;
+/*macro*/ PROC DATASETS; APPEND base=analiseMIX data=MIX_&Variavel. FORCE;
+%MEND;
+
+PROC DATASETS LIBRARY=WORK;
+   DELETE analiseIEP analiseMIX;
+RUN;
+
+%VariaveisCP(CP, GH);
+%VariaveisCP(CP, RU_CP);
+%VariaveisCP(CP, Pct_Pago_Atual_C);
+%VariaveisCP(CP, QtInstAnotMesAnt_C);
+%VariaveisCP(CP, QtRest3MesesAt_ALT_C);
+%VariaveisCP(CP, QtTempPriPend_C);
+%VariaveisCP(CP, QtTempMaxRestAber_C);
+%VariaveisCP(CP, Grupo_produto_C);
+%VariaveisCP(CP, Forma_Pagamento_C);
+%VariaveisCP(CP, RU_SemCP_C);
+
+/* Limpar strings */
+PROC SQL;
+CREATE TABLE analiseIEP as
+    SELECT STRIP(Analise) AS Analise,
+           DtBase,
+           Valor,
+           STRIP(Medida) AS Medida,
+           STRIP(SubMedida) AS SubMedida
+    FROM analiseIEP;
+QUIT;
+
+PROC SQL;
+CREATE TABLE analiseMIX as
+    SELECT STRIP(Analise) AS Analise,
+           DtBase,
+           Valor,
+           STRIP(Medida) AS Medida,
+           STRIP(SubMedida) AS SubMedida
+    FROM analiseMIX;
+QUIT;
+
+/********************************************************/
+/************** UNIFICAÇÃO PARA O TABLEAU ***************/
+/********************************************************/
+PROC SQL;
+CREATE TABLE BHCHECK.monitor_carga_bhcp AS
+    SELECT * FROM Base_Monit_Prod_CP UNION ALL
+	SELECT * FROM TemosMissing_CP UNION ALL
+	SELECT * FROM CP_Migra_Prod UNION ALL
+	SELECT * FROM CP_Migra_RUCP UNION ALL
+	SELECT * FROM CP_Migra_RUFinal UNION ALL
+	SELECT * FROM analiseIEP UNION ALL
+	SELECT * FROM analiseMIX;
+RUN;
+/********************************************************/
+/********************************************************/
+
+/* Limpar work */
+PROC DATASETS LIB=WORK
+    KILL;
+RUN;

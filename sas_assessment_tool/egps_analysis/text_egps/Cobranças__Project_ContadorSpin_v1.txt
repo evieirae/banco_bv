@@ -1,0 +1,100 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project_ContadorSpin_v1
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:12 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 50
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CONTADOR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 2 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-W6SsDccLW9DatFaq/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+
+CONNECT TO BIGQUERY AS PERM(project='bv-sadi-dtm' 
+credfile='/projetos/acessos/bq/di/sadi-dtm.json' 
+schema='bv-pdbd-prd' READ_MODE=storage);
+
+CREATE TABLE CONTADOR AS SELECT *
+FROM CONNECTION TO PERM (WITH HIST_GOE as (
+
+         select distinct
+            nm_assessoria,
+            format_timestamp('%Y-%m-%d', A.dt_acionamento) as Dt,
+            format_timestamp('%Y-%m-%d %H:%M:%S',
+               timestamp(concat(cast(A.dt_acionamento as string), ' ', cast(A.hr_inicio_acionamento as string)))) as Dth,
+            A.tp_resultado_acionamento as tp_resultado_acionamento,
+            A.cd_cpf_cnpj,
+            A.cd_contrato,
+            A.ds_ocorrencia_chamada,
+            substr(cast(A.cd_telefone_contato as string), 1, 2) as DDD,
+            substr(cast(A.cd_telefone_contato as string), 3, 10) as Numero,
+            case
+               when substr(cast(A.cd_telefone_contato as string), 3, 1) = '9' then 'CELULAR'
+               else 'FIXO'
+            end as Tipo_Numero
+         from `bv-pdbd-prd.dvry_corp_cobranca.assessoria_acionamentos_cobranca_fato` as A
+         where cast(A.dt_acionamento as date) = '2025-01-02'
+           AND A.tp_resultado_acionamento IS NOT NULL
+           and cast(A.cd_assessoria as int64) = 220
+           and A.cd_contrato is not null
+      )
+
+      select *,
+         row_number() over (
+         partition by cd_contrato, Dt, DDD, Numero order by Dth) as SPIN,
+         case when tp_resultado_acionamento > '0' then 1 else 0 end as Flag_Registro,
+         case when tp_resultado_acionamento >= '2' then 1 else 0 end as Flag_HitRate,
+         case when tp_resultado_acionamento >= '3' then 1 else 0 end as Flag_Alo,
+         case when tp_resultado_acionamento >= '4' then 1 else 0 end as Flag_CPC,
+         case when tp_resultado_acionamento = '6' then 1 else 0 end as Flag_Promessa
+      from HIST_GOE
+      order by Dth asc);quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

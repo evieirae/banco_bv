@@ -1,0 +1,279 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__script_datamart_contacartao
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:49 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 80)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -16
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80)
+----------------------------------------
+LINES_OF_CODE: 201
+CODE_TASKS_COUNT: 2
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: EMER = /riscosbvf/fraude/PESSOAL/EMERSON; MIS = /riscosbvf/pol_empcr/fatigatte/MIS
+DETECTED_MACROS_DEFINED: fim, inicio
+DETECTED_MACROS_USED: Hora_fim, Hora_inicio, Tempo_Total, fim, inicio
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DWBI_DIME.TBDIMCONTACARTAO [SASIOSIQ], DWBI_DIME.TBDIMPESSOA [SASIOSIQ], DWBI_DIME.TBDIMPLASTICO [SASIOSIQ], DWBI_DIME.TBDIMPROPOSTACARTAOCREDITO [SASIOSIQ], DWBI_DMOC.TBFATOCONTACARTAO [SASIOSIQ], DWBI_DTWH.TBPLASTICO [SASIOSIQ], MIS.BASEUNICACARTOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BS_UNICA_NODUP, WORK.PROP_MISSING
+IMPORTED_LIBNAMES: MIS
+EXPORTED_LIBNAMES: EMER
+IMPORTED FILES (Requires Ingestion): N:\DRSC\GRCF\GRF\GRF (NOVA ESTRUTURA)\04_Pastas Pessoais\Emerson\cartoes\datamarts\EGScript1.vbs
+TEMP/DISCARDED_TABLE_INPUT: WORK.BS_UNICA_NODUP, WORK.PROP_MISSING
+TABLE_READ_PROVENANCE (Flow): DWBI_DIME.TBDIMCONTACARTAO [Pass-Through Native (SASIOSIQ) - JOIN], DWBI_DIME.TBDIMPESSOA [Pass-Through Native (SASIOSIQ) - JOIN], DWBI_DIME.TBDIMPLASTICO [Pass-Through Native (SASIOSIQ) - JOIN], DWBI_DIME.TBDIMPROPOSTACARTAOCREDITO [Pass-Through Native (SASIOSIQ) - JOIN], DWBI_DMOC.TBFATOCONTACARTAO [Pass-Through Native (SASIOSIQ) - FROM], DWBI_DTWH.TBPLASTICO [Pass-Through Native (SASIOSIQ) - JOIN], EMER.CONTA_CARTAO [DATA Step - SET], MIS.BASEUNICACARTOES [PROC SQL - JOIN], WORK.BS_UNICA_NODUP [PROC SQL - FROM], WORK.PROP_MISSING [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): EMER.CONTA_CARTAO
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): EMER.CONTA_CARTAO
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BS_UNICA, BS_UNICA_NODUP, CASOS, PROP_MISSING
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|N:\DRSC\GRCF\GRF\GRF (NOVA ESTRUTURA)\04_Pastas Pessoais\Emerson\cartoes\datamarts\EGScript1.vbs|N:/DRSC/GRCF/GRF/GRF (NOVA ESTRUTURA)/04_PASTAS PESSOAIS/EMERSON/CARTOES/DATAMARTS|EGSCRIPT1.VBS||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 3 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ZSfBiUcNaZXUjhOX/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname emer '/riscosbvf/fraude/PESSOAL/EMERSON';
+libname mis '/riscosbvf/pol_empcr/fatigatte/MIS';
+
+options compress=yes;
+PROC SQL BUFFERSIZE=256000;
+	sysecho "Gerando base Conta-Cartao do IQPRDBI";
+
+	CONNECT TO sasiosiq AS dbcon
+	(HOST="iqprdbi"
+	SERVER=iqprdbi
+	USER='lgettRiscoPrevencaoFraude'
+	PASSWORD='1o4ANrTKKe4isVam');
+
+	CREATE TABLE emer.conta_cartao AS
+	SELECT *
+	FROM CONNECTION TO DBCON (
+		SELECT
+			A.*
+			,mod(F.CdContaCartao, 1000000000) AS Nu_Conta_Cartao
+			,C.DtAberturaContaCartao AS Dt_Abertura_Conta
+			,C.DtPrimeiroDesbloqueio AS Dt_Desbloqueio
+			,C.NmEstadoContaCartao as Status_ContaCartao_Atual
+			,C.NmEstadoContaCartaoAnterior as Status_ContaCartao_Anter
+			,C.DtAlteracaoEstadoContaCartao as Dt_Alter_Estado_ContaCartao
+			,C.DtPrimeiraCompra as Dt_Primeira_Compra
+			,E.CdPropostaCartaoCrdtoStmaOrgm AS Num_Proposta
+			,D.NuCPFCNPJ
+
+			,convert(CHAR(6),F.NuBINPlastico)+ '******' + RIGHT(trim(convert(CHAR(17),F.CdPlastico)),4) AS nu_plast_cartao
+			,G.NuPlastico
+  		    ,G.NuBINPlastico
+		    
+		    ,F.NuOrdemTitularidadePlastico as Ordem_Titular
+			,CASE WHEN F.NuOrdemTitularidadePlastico = 0 THEN 'TITULAR'
+       		ELSE F.NuOrdemTitularidadePlastico || ' ADICIONAL' end as Desc_Portador
+			,G.NmTipoCartao
+
+		    ,G.DtEmissaoPlastico
+			,G.DtDesbloqueioPlastico
+			,G.NmEstadoPlastico as Status_PlastCartao
+			,G.DtAlteracaoEstadoPlastico as Dt_Alter_Status_PlastCartao
+			,G.FlVersaoVigente
+			,G.DtValidadePlastico
+		FROM (
+			SELECT *
+			FROM (
+				SELECT
+					RANK() OVER(partition BY AAA.CdDimContaCartao ORDER BY AAA.CdDimContaCartao, AAA.DtReferencia desc) AS RANK
+					,AAA.CdDimContaCartao
+					,AAA.CdDimContaCartaoVersao
+					,AAA.cdpropostacartaocredito
+					,AAA.DtReferencia
+					,AAA.VrLimiteContaCartaoGeral
+					,AAA.VrSaldoAtual
+					,AAA.CdPessoaTitularConta
+          		FROM DWBI_DMOC.TbFatoContaCartao AS AAA
+				 ) AS AA
+          	WHERE AA.rank = 1) AS A
+			LEFT JOIN DWBI_DIME.TbDimContaCartao AS C
+				ON A.CdDimContaCartaoVersao = C.CdDimContaCartaoVersao
+			LEFT JOIN DWBI_DIME.TbDimPropostaCartaoCredito AS E
+				ON A.cdpropostacartaocredito = E.cdpropostacartaocredito
+			LEFT JOIN DWBI_DIME.TbDimPessoa AS D
+				ON A.CdPessoaTitularConta = D.CdPessoa
+
+
+			LEFT JOIN DWBI_DTWH.TbPlastico AS F
+				on A.CdDimContaCartao = F.CdContaCartao
+			LEFT JOIN DWBI_DIME.TbDimPlastico AS G
+				ON F.cdplastico = G.cddimplastico
+			WHERE G.FlVersaoVigente = 'S' and C.DtAberturaContaCartao >= '2018-01-01'
+	);
+disconnect from DBCON;
+QUIT;
+options compress=no;
+
+data prop_missing;
+sysecho 'Filtrando Casos missing';
+set emer.conta_cartao(
+where=(Dt_Abertura_Conta >= '01jan2021'd and upcase(num_proposta) in ('WS','')));
+run;
+
+proc sql;
+sysecho 'Cruzamento Base Unica';
+	create table bs_unica as
+	select
+		strip(put(b.nuproposta, 15.)) as proposta
+		,b.nucpfcnpj as cpf_bu
+		,a.*
+	from work.prop_missing as a
+	inner join mis.baseunicacartoes as b
+		on a.cddimcontacartao = b.cddimcontacartao
+	order by a.cddimcontacartao
+	;
+quit;
+proc sort data=bs_unica out=bs_unica_nodup nodupkey; by cddimcontacartao; run;
+
+%let inicio = %sysfunc(time());
+
+proc sql ;
+sysecho 'Update casos no Datamart Conta-Cartao';
+	update emer.conta_cartao as a
+	set
+	num_proposta = (select proposta from work.bs_unica_nodup as b where a.cddimcontacartao = b.cddimcontacartao)
+
+	where cddimcontacartao in (select cddimcontacartao from work.bs_unica_nodup)
+	;
+quit;
+
+%let fim = %sysfunc(time());
+
+data _null_;
+Inicio = &inicio.;
+Fim = &fim.;
+tempo = &fim - &inicio;
+
+call symput('Hora_inicio', Inicio);
+call symput('Hora_fim', Fim);
+call symput('Tempo_Total', tempo);
+run;
+
+%put >>>>>>> %sysfunc(putn(&Hora_inicio., time8.));
+%put >>>>>>> %sysfunc(putn(&Hora_fim., time8.));
+%put >>>>>>> %sysfunc(putn(&Tempo_Total., time8.));
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+libname emer '/riscosbvf/fraude/PESSOAL/EMERSON';
+libname mis '/riscosbvf/pol_empcr/fatigatte/MIS';
+
+options compress=yes;
+PROC SQL BUFFERSIZE=256000;
+	sysecho "Gerando base Conta-Cartao do IQPRDBI";
+
+	CONNECT TO sasiosiq AS dbcon
+	(HOST="iqprdbi"
+	SERVER=iqprdbi
+	USER='lgettRiscoPrevencaoFraude'
+	PASSWORD='1o4ANrTKKe4isVam');
+
+	CREATE TABLE emer.conta_cartao AS
+	SELECT *
+	FROM CONNECTION TO DBCON (
+		SELECT
+			A.*
+			,mod(F.CdContaCartao, 1000000000) AS Nu_Conta_Cartao
+			,C.DtAberturaContaCartao AS Dt_Abertura_Conta
+			,C.DtPrimeiroDesbloqueio AS Dt_Desbloqueio
+			,C.NmEstadoContaCartao as Status_ContaCartao_Atual
+			,C.NmEstadoContaCartaoAnterior as Status_ContaCartao_Anter
+			,C.DtAlteracaoEstadoContaCartao as Dt_Alter_Estado_ContaCartao
+			,C.DtPrimeiraCompra as Dt_Primeira_Compra
+			,E.CdPropostaCartaoCrdtoStmaOrgm AS Num_Proposta
+			,D.NuCPFCNPJ
+
+			,convert(CHAR(6),F.NuBINPlastico)+ '******' + RIGHT(trim(convert(CHAR(17),F.CdPlastico)),4) AS nu_plast_cartao
+			,G.NuPlastico
+  		    ,G.NuBINPlastico
+		    
+		    ,F.NuOrdemTitularidadePlastico as Ordem_Titular
+			,CASE WHEN F.NuOrdemTitularidadePlastico = 0 THEN 'TITULAR'
+       		ELSE F.NuOrdemTitularidadePlastico || ' ADICIONAL' end as Desc_Portador
+			,G.NmTipoCartao
+
+		    ,G.DtEmissaoPlastico
+			,G.DtDesbloqueioPlastico
+			,G.NmEstadoPlastico as Status_PlastCartao
+			,G.DtAlteracaoEstadoPlastico as Dt_Alter_Status_PlastCartao
+			,G.FlVersaoVigente
+			,G.DtValidadePlastico
+		FROM (
+			SELECT *
+			FROM (
+				SELECT
+					RANK() OVER(partition BY AAA.CdDimContaCartao ORDER BY AAA.CdDimContaCartao, AAA.DtReferencia desc) AS RANK
+					,AAA.CdDimContaCartao
+					,AAA.CdDimContaCartaoVersao
+					,AAA.cdpropostacartaocredito
+					,AAA.DtReferencia
+					,AAA.VrLimiteContaCartaoGeral
+					,AAA.VrSaldoAtual
+					,AAA.CdPessoaTitularConta
+          		FROM DWBI_DMOC.TbFatoContaCartao AS AAA
+				 ) AS AA
+          	WHERE AA.rank = 1) AS A
+			LEFT JOIN DWBI_DIME.TbDimContaCartao AS C
+				ON A.CdDimContaCartaoVersao = C.CdDimContaCartaoVersao
+			LEFT JOIN DWBI_DIME.TbDimPropostaCartaoCredito AS E
+				ON A.cdpropostacartaocredito = E.cdpropostacartaocredito
+			LEFT JOIN DWBI_DIME.TbDimPessoa AS D
+				ON A.CdPessoaTitularConta = D.CdPessoa
+
+
+			LEFT JOIN DWBI_DTWH.TbPlastico AS F
+				on A.CdDimContaCartao = F.CdContaCartao
+			LEFT JOIN DWBI_DIME.TbDimPlastico AS G
+				ON F.cdplastico = G.cddimplastico
+			WHERE G.FlVersaoVigente = 'S' and C.DtAberturaContaCartao >= '2018-01-01'
+	);
+disconnect from DBCON;
+QUIT;
+options compress=no;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */

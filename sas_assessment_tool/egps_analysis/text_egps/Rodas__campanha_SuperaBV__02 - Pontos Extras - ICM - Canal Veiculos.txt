@@ -1,0 +1,139 @@
+START_METADATA
+PROJECT: Rodas__campanha_SuperaBV
+FILE_SAS: 02 - Pontos Extras - ICM - Canal Veiculos.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:31 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 75)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: ARRAY (5x | +75)
+----------------------------------------
+LINES_OF_CODE: 63
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_Mes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CSBV.BASE_MEDIA_ICM_CV [SAS/Local], ICOM.TBGRCOMISSAOICM [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_CALCULO_ICM_1, WORK.BASE_ICM_CRESCIMENTO_1
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_CALCULO_ICM_1, WORK.BASE_ICM_CRESCIMENTO_1, WORK.BASE_ICM_CRESCIMENTO_2, WORK.ESTRUTURA_COMERCIAL_01
+TABLE_READ_PROVENANCE (Flow): CSBV.BASE_MEDIA_ICM_CV [PROC SQL - JOIN], ICOM.TBGRCOMISSAOICM [PROC SQL - FROM], WORK.BASE_CALCULO_ICM_1 [PROC SQL - FROM], WORK.BASE_ICM_CRESCIMENTO_1 [DATA Step - SET], WORK.BASE_ICM_CRESCIMENTO_2 [PROC SQL - FROM], WORK.ESTRUTURA_COMERCIAL_01 [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_CALCULO_ICM_1, BASE_CALCULO_ICM_2, BASE_ICM_CRESCIMENTO_1, WORK.BASE_ICM_CRESCIMENTO_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**************************************************/
+/*VERIFICAR SE O MÊS ATUAL TEVE CRESCIMENTO DE ICM*/
+/*BASE DO MÊS ATUAL DA CAMPANHA PARA VER O CRESCIMENTO DE ICM*/
+/**************************************************/
+/*PRECISAMOS ALTERAR A DATA DA CONSULTA PARA JUL-AGO-SET QUE SÃO OS MESES DA CAMPANHA*/
+
+PROC SQL;
+CREATE TABLE BASE_ICM_CRESCIMENTO_1 AS
+SELECT
+
+NuAnoMes,
+DsLoginn1,
+ICM as VrICM
+
+FROM ICOM.TBGRCOMISSAOICM
+
+where NUANOMES = &Base_Mes.
+
+order by 2,1
+
+;run;
+
+/*SUBSTITUI TUDO QUE FOI "MISSING OU '.' POR '0'*/
+/*ALGUNS CASOS ESTÃO "VAZIOS" AO FINALIZAR O SCRIPT*/
+
+data work.BASE_ICM_CRESCIMENTO_2;
+	set work.BASE_ICM_CRESCIMENTO_1;
+
+	array num_array _numeric_;
+	do over num_array;
+		if missing(num_array) then num_array = 0;
+	end;
+run;
+
+PROC SQL;
+CREATE TABLE BASE_CALCULO_ICM_1 AS
+SELECT
+
+&Base_Mes. AS NuAnoMes,
+c.DtAdmissaoColaborador,
+c.NmEstadoColaborador,
+A.DsLoginN1,
+C.NmGrupoCargo AS NmGrupoCargoColaborador,
+C.CdColaboradorAtivo AS CdColaborador,
+'ICM' AS ICM,
+A.VrICM*100 as VrICM format commax20.8,
+B.media_ICM AS MEDIA_ORIG,/**/
+CASE WHEN (B.media_ICM*100) IN (., 0) THEN 90 ELSE (B.media_ICM*100) END as media_ICM,
+
+CASE WHEN CALCULATED media_ICM = 90 and (B.media_ICM*100) NOT IN (., 0) THEN 90 ELSE CALCULATED media_ICM + 10 END AS ICM_Meta
+
+/*CASE WHEN VrICM >= CALCULATED ICM_Meta THEN 1 ELSE 0 END AS Fl_Ating_ICM,*/
+/**/
+/*CASE WHEN CALCULATED Fl_Ating_ICM = 1 THEN 20 ELSE 0 END AS VrPontosExtra*/
+
+FROM WORK.BASE_ICM_CRESCIMENTO_2 A /*BASE ICM DO MÊS*/
+
+LEFT JOIN CSBV.BASE_MEDIA_ICM_CV B ON B.DSLOGINN1 = A.DSLOGINN1 /*BASE FIXA COM O CALCULA DA MÉDIA DO TRIMESTRE*/
+LEFT JOIN WORK.ESTRUTURA_COMERCIAL_01 C ON C.DsLoginN1 = A.DsLoginN1 AND C.NUANOMES = &Base_Mes. /*ESTRUTURA COMERCIAL PARA TRAZER O CARGO*/
+
+;RUN;
+
+PROC SQL;
+CREATE TABLE BASE_CALCULO_ICM_2 AS
+SELECT
+
+NuAnoMes,
+DtAdmissaoColaborador,
+NmEstadoColaborador,
+A.DsLoginN1,
+a.NmGrupoCargoColaborador,
+a.CdColaborador,
+A.ICM,
+ROUND(A.VrICM,0.01) AS VrICM,
+ROUND(A.media_ICM, 0.01) AS media_ICM,
+
+ROUND(A.ICM_Meta, 0.01) AS ICM_Meta,
+
+CASE WHEN ROUND(VrICM, 0.01) >= ROUND(ICM_Meta, 0.01) THEN 1 ELSE 0 END AS Fl_Ating_ICM,
+
+CASE WHEN CALCULATED Fl_Ating_ICM = 1 THEN 20 ELSE 0 END AS VrPontosExtra
+
+FROM WORK.BASE_CALCULO_ICM_1 A
+
+WHERE a.NmGrupoCargoColaborador in ('Gerente Relacionamento Veiculos')
+
+;RUN;

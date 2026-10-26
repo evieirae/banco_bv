@@ -1,0 +1,746 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - Waterfall + KPIs MS v3
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:37 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 618
+CODE_TASKS_COUNT: 11
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: AUXL = /infogrc/utils/bases; BASES = /projetos/MISV/data/bases; CAMP = /infogrc/campanhas/historico; CONVPROP = /infogrc/apnp/propostas; FENAB = /infogrc/fenabrave; INFCVS = /infogrc/convsimu; INFOGRC = /infogrc/precoxrisco; MKTSHARE = /infogrc/marketshare/bases; PPDV = /infogrc/Porte_PDV; SEGUROS = /seguros/dados; SOLITMP = /infogrc/solicitacaopontual/tmp
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASEGRC.TBNAPISTAINDICADORPDV [SAS/Local], BASES.TBPOTENCIALRODAS [SAS/Local], BASES.TBPRODUCAO [SAS/Local], BASES.TBRESULTADOMARKETSHARE [SAS/Local], MKTSHARE.TBMARKETSHAREDIARIAABERTA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: BASES, MKTSHARE
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASEGRC.TBNAPISTAINDICADORPDV [PROC SQL - FROM], BASES.TBPOTENCIALRODAS [PROC SQL - FROM], BASES.TBPRODUCAO [PROC SQL - FROM], BASES.TBRESULTADOMARKETSHARE [PROC SQL - FROM], MKTSHARE.TBMARKETSHAREDIARIAABERTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: GRAVAMES_ANO_PRODUTOEGV_ESTADO, INDICADORESNAPISTA, MERCADO_MS_S, MERCADO_S, MS_PDV, TBPRODUCAO, WORK.BD_MS, WORK.MERCADOCETIP, WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE, WORK.QUERY_FOR_TBMSSEMANAL, WORK.QUERY_FOR_TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Waterfall */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Waterfall */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1gY2KXvzk3qYvLnE/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE TBPRODUCAO AS
+   SELECT
+
+          t1.nuanomes,
+          case when t1.NmGrupoProdutoMeta = 'Leves-BVO' then 'Leves' else t1.NmGrupoProdutoMeta end as Produto,
+          t1.DsTipoCanalProducao,
+		  t1.NmSubEstruturaComercialC,
+		  t1.NmCanalEstruturaComercial,
+		  t1.NmAreaEstruturaComercialC,
+
+          case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+
+		  case when t1.NmGrupoProdutoMeta in ('Leves', 'Leves-BVO',  'Motos', 'Pesados') then 'Rodas' when t1.NmGrupoProdutoMeta = 'Solar' then 'Solar' else 'Empréstimos' end as Grupo_Produto,
+
+            (COUNT(t1.NuContrato)) AS QtdeContrato,
+            (SUM(t1.VrProducao)) AS VrProducao,
+            (SUM(t1.VrProducaoProjetado)) AS VrProducaoProjetado
+
+      FROM bases.TBPRODUCAO t1
+
+	  where t1.NuAnoMes BETWEEN 202601 AND 202602
+
+	  and t1.NmGrupoProdutoMeta in ('Leves', 'Leves-BVO', 'Motos', 'Pesados', 'CVG Leves', 'CVG Pesados')
+      GROUP BY
+	  1,2,3,4,5,6,7,8;
+
+QUIT;
+
+PROC SQL;
+   CREATE TABLE Mercado_S AS
+   SELECT
+          t1.NuAnoMes,
+          t1.StVeiculo,
+          t1.FxIdade,
+          t1.TpVeiculo,
+		  t1.FlCVG,
+SUM(CASE WHEN Bancos = 'BV' THEN GravTotal ELSE 0 END) AS GravBV,
+SUM(GravTotal) AS GravTotal,
+SUM(CASE WHEN Bancos = 'COOPERATIVA' THEN GravTotal ELSE 0 END) AS Gracooperativa,
+SUM(CASE WHEN Bancos = 'BANCO DO BRASIL' THEN GravTotal ELSE 0 END) AS GravBB,
+SUM(CASE WHEN Bancos = 'BRADESCO' THEN GravTotal ELSE 0 END) AS GravBrad,
+SUM(CASE WHEN Bancos = 'ITAU' THEN GravTotal ELSE 0 END) AS GravItau,
+SUM(CASE WHEN Bancos = 'PANAMERICANO' THEN GravTotal ELSE 0 END) AS GravPan,
+SUM(CASE WHEN Bancos = 'SAFRA' THEN GravTotal ELSE 0 END) AS GravSafra,
+SUM(CASE WHEN Bancos = 'SANTANDER' THEN GravTotal ELSE 0 END) AS GravSantander,
+SUM(CASE WHEN Bancos = 'MONTADORAS' THEN GravTotal ELSE 0 END) AS GravMontadoras,
+SUM(CASE WHEN Bancos = 'C6' THEN GravTotal ELSE 0 END) AS GravC6,
+SUM(CASE WHEN Bancos = 'CREDITAS' THEN GravTotal ELSE 0 END) AS GravCreditas,
+SUM(CASE WHEN Bancos = 'OUTROS' THEN GravTotal ELSE 0 END) AS GravOutros
+FROM MKTSHARE.tbmarketsharediariaaberta t1
+where t1.nuanomes between 202601 and 202602 and TpAgenteProdutoMIS <> '3'
+AND t1.TpArquivo = 'mf' AND t1.TpVeiculo in ('Leves', 'Motos', 'Pesados') and statusgravame = 'Ativo'
+GROUP BY 1,2,3,4,5
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.MercadoCetip AS
+   SELECT
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      CASE
+         WHEN t1.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+      END AS Estado_Bem,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      SUM(t1.QtContrato) AS SUM_of_QtContrato,
+      SUM(t1.VrProducao) AS SUM_of_VrProducao,
+      SUM(t1.QtGravamesMercado) AS SUM_of_QtGravamesMercado,
+      SUM(t1.VrGravamesMercado) AS SUM_of_VrGravamesMercado
+   FROM BASES.TBPOTENCIALRODAS t1
+   WHERE t1.NuAnoMes >= 202501
+     AND t1.NmGrupoProduto = 'Leves'
+     AND t1.FlAtualizacaoMercado = 1
+     AND t1.FxIdade <> 'ZeroKM'
+   GROUP BY
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      calculated Estado_Bem,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Waterfall */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Market Share */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Market Share */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-cm3zgy3NFspvHMVL/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME MKTSHARE '/infogrc/marketshare/bases';
+
+
+PROC SQL;
+   CREATE TABLE WORK.BD_MS AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.Regional,
+          t1.Filial,
+          t1.UF2,
+          t1.bancos,
+          t1.FlCvg,
+		  t1.StatusGravame,
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+      WHERE TpAgenteProdutoMIS <> '3' AND t1.NuAnoMes >= 202501
+	    AND t1.TpArquivo = 'mf'
+      GROUP BY t1.NuAnoMes,
+               t1.TpVeiculo,
+               t1.StVeiculo,
+               t1.Regional,
+               t1.Filial,
+               t1.UF2,
+               t1.bancos,
+               t1.FlCvg,
+			   t1.StatusGravame;
+
+QUIT;
+
+
+
+PROC SQL;
+   CREATE TABLE Mercado_MS_S AS
+   SELECT
+          t1.NuAnoMes,
+          t1.Regional,
+          t1.Filial,
+          t1.UF2,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.FxIdade,
+          t1.FlCVG,
+SUM(GravTotal) AS GravTotal,
+SUM(CASE WHEN Bancos = 'BV' THEN GravTotal ELSE 0 END) AS GravBV,
+SUM(CASE WHEN Bancos = 'BANCO DO BRASIL' THEN GravTotal ELSE 0 END) AS GravBB,
+SUM(CASE WHEN Bancos = 'BRADESCO' THEN GravTotal ELSE 0 END) AS GravBrad,
+SUM(CASE WHEN Bancos = 'ITAU' THEN GravTotal ELSE 0 END) AS GravItau,
+SUM(CASE WHEN Bancos = 'PANAMERICANO' THEN GravTotal ELSE 0 END) AS GravPan,
+SUM(CASE WHEN Bancos = 'SAFRA' THEN GravTotal ELSE 0 END) AS GravSafra,
+SUM(CASE WHEN Bancos = 'SANTANDER' THEN GravTotal ELSE 0 END) AS GravSantander,
+SUM(CASE WHEN Bancos = 'COOPERATIVA' THEN GravTotal ELSE 0 END) AS Gracooperativa,
+SUM(CASE WHEN Bancos = 'CREDITAS' THEN GravTotal ELSE 0 END) AS GravCreditas,
+SUM(CASE WHEN Bancos = 'C6' THEN GravTotal ELSE 0 END) AS GravC6,
+SUM(CASE WHEN Bancos = 'VOLKSWAGEN' THEN GravTotal ELSE 0 END) AS GravVW,
+SUM(CASE WHEN Bancos = 'OMNI' THEN GravTotal ELSE 0 END) AS GravOMNI,
+SUM(CASE WHEN Bancos = 'MONTADORAS' THEN GravTotal ELSE 0 END) AS GravMontadoras,
+SUM(CASE WHEN Bancos = 'OUTROS' THEN GravTotal ELSE 0 END) AS GravOutros
+FROM MKTSHARE.tbmarketsharediariaaberta t1
+where t1.nuanomes between 202602 and 202602 and TpAgenteProdutoMIS <> '3'
+AND t1.TpVeiculo in ('Leves', 'Motos', 'Pesados') and statusgravame = 'Ativo'
+GROUP BY 1,2,3,4,5,6,7,8
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.bancos,
+		  t1.FxIdade,
+		  t1.Regional,
+		  t1.FlCVG,
+		  t1.StatusGravame,
+
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where TpAgenteProdutoMIS <> '3' and t1.NuAnoMes BETWEEN 202601 AND 202603
+      GROUP BY 1,2,3,4,5,6,7,8;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMSSEMANAL AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.UF2,
+		  t1.TpArquivo,
+		  t1.bancos,
+		  t1.FlCVG,
+		  t1.StatusGravame,
+
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where TpAgenteProdutoMIS <> '3' and t1.NuAnoMes BETWEEN 202602 AND 202602
+      GROUP BY 1,2,3,4,5,6,7,8;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.MercadoCetip AS
+   SELECT
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      CASE
+         WHEN t1.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+      END AS Estado_Bem,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      SUM(t1.QtContrato) AS SUM_of_QtContrato,
+      SUM(t1.VrProducao) AS SUM_of_VrProducao,
+      SUM(t1.QtGravamesMercado) AS SUM_of_QtGravamesMercado,
+      SUM(t1.VrGravamesMercado) AS SUM_of_VrGravamesMercado
+   FROM BASES.TBPOTENCIALRODAS t1
+   WHERE t1.NuAnoMes >= 202501
+     AND t1.NmGrupoProduto = 'Leves'
+     AND t1.FlAtualizacaoMercado = 1
+     AND t1.FxIdade <> 'ZeroKM'
+   GROUP BY
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      calculated Estado_Bem,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Market Share */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Report Campanhas */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Report Campanhas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-5kgQZqC9vBvNQaq5/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE MS_PDV AS
+   SELECT t1.NuAnoMes,
+		  t1.NmGrupoProduto,
+		  	t1.NmAreaEstruturaComercialC,
+			t1.NmSubEstruturaComercialC,
+			t1.NmCanalEstruturaComercialC,
+			t1.FlAtivo,
+		  case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+            (SUM(t1.QtGravamesMercado)) AS QtGravamesMercado,
+ 			(SUM(t1.VrGravamesMercado)) AS VrGravamesMercado,
+            (SUM(t1.QtContrato)) AS QTCTRSBV,
+			(SUM(t1.VrProducao)) AS VrProducao
+      FROM BASES.TBPOTENCIALRODAS t1
+      WHERE t1.NuAnoMes BETWEEN 202301 AND 202602
+	  AND t1.FlAtualizacaoMercado = 1 AND t1.FlAtivo = 'S'
+      GROUP BY 1,2,3,4,5,6,7
+;QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.MercadoCetip AS
+   SELECT
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      CASE
+         WHEN t1.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+      END AS Estado_Bem,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC,
+      SUM(t1.QtContrato) AS SUM_of_QtContrato,
+      SUM(t1.VrProducao) AS SUM_of_VrProducao,
+      SUM(t1.QtGravamesMercado) AS SUM_of_QtGravamesMercado,
+      SUM(t1.VrGravamesMercado) AS SUM_of_VrGravamesMercado
+   FROM BASES.TBPOTENCIALRODAS t1
+   WHERE t1.NuAnoMes >= 202501
+     AND t1.NmGrupoProduto = 'Leves'
+     AND t1.FlAtualizacaoMercado = 1
+     AND t1.FxIdade <> 'ZeroKM'
+   GROUP BY
+      t1.NuAnoMes,
+      t1.NmGrupoProduto,
+      calculated Estado_Bem,
+      t1.FlAtivo,
+      t1.FlPorteA,
+      t1.NmAreaEstruturaComercialC,
+      t1.NmSubEstruturaComercialC,
+      t1.NmCanalEstruturaComercialC
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Report Campanhas */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-OiNDs7c1BDxxKlAb/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE TBPRODUCAO AS
+   SELECT
+
+          t1.nuanomes,
+          case when t1.NmGrupoProdutoMeta = 'Leves-BVO' then 'Leves' else t1.NmGrupoProdutoMeta end as Produto,
+          t1.DsTipoCanalProducao,
+		  t1.NmSubEstruturaComercialC,
+		  t1.NmCanalEstruturaComercial,
+		  t1.NmAreaEstruturaComercialC,
+		  t1.QtParcelas,
+		  t1.fxidade,
+
+          case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+
+		  case when t1.NmGrupoProdutoMeta in ('Leves', 'Leves-BVO',  'Motos', 'Pesados') then 'Rodas' when t1.NmGrupoProdutoMeta = 'Solar' then 'Solar' else 'Empréstimos' end as Grupo_Produto,
+
+            (COUNT(t1.NuContrato)) AS QtdeContrato,
+            (SUM(t1.VrProducao)) AS VrProducao,
+            (SUM(t1.VrProducaoProjetado)) AS VrProducaoProjetado
+
+      FROM bases.TBPRODUCAO t1
+
+	  where t1.NuAnoMes BETWEEN 202501 AND 202511
+
+	  and t1.NmGrupoProdutoMeta in ('Leves', 'Leves-BVO', 'Motos', 'Pesados', 'CVG Leves', 'CVG Pesados')
+      GROUP BY
+	  1,2,3,4,5,6,7,8,9,10;
+
+QUIT;
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.bancos,
+		  t1.FxIdade,
+		  t1.Regional,
+		  t1.FlCVG,
+		  t1.StatusGravame,
+		  t1.FxPrazo,
+
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where t1.tparquivo = 'mf' and TpAgenteProdutoMIS <> '3' and t1.NuAnoMes BETWEEN 202501 AND 202512
+      GROUP BY 1,2,3,4,5,6,7,8,9;
+
+	  PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.bancos,
+		  t1.FxIdade,
+		  t1.Regional,
+		  t1.FlCVG,
+		  t1.StatusGravame,
+		  t1.FxPrazo,
+
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where t1.tparquivo = 'mf' and TpAgenteProdutoMIS <> '3' and t1.NuAnoMes BETWEEN 202501 AND 202512
+      GROUP BY 1,2,3,4,5,6,7,8,9;
+
+	  PROC SQL;
+CREATE TABLE IndicadoresNaPista AS
+SELECT NuAnoMes,
+CNPJ,
+ID_BV AS CdParceiroComercial,
+Nome_Loja AS NmParceiroComercial,
+Id_Loja AS CdParceiroNaPista,
+Porte_Loja AS Porte,
+Regional AS Regional,
+Filial AS Filial,
+Qtd_Classificados
+FROM BASEGRC.TbNaPistaIndicadorPDV
+WHERE NuAnoMes = 202512
+
+;RUN;
+
+PROC SQL;
+   CREATE TABLE Gravames_Ano_ProdutoEGV_Estado AS
+   SELECT
+          FLOOR(t1.NuAnoMes/100) AS Ano,
+
+          
+          CASE
+            WHEN UPCASE(STRIP(t1.FlCVG)) = 'S' AND t1.TpVeiculo IN ('Leves','Motos')   THEN 'EGV Leves'
+            WHEN UPCASE(STRIP(t1.FlCVG)) = 'S' AND t1.TpVeiculo =  'Pesados'           THEN 'EGV Pesados'
+            ELSE t1.TpVeiculo
+          END AS Produto_Reclass,
+
+          
+          CASE WHEN UPCASE(STRIP(t1.StVeiculo)) IN ('NOVO','NOVOS') THEN 'Novos'
+               ELSE 'Usados'
+          END AS Estado_Bem,
+
+          SUM(t1.GravTotal) AS GravTotal,
+          SUM(t1.GravBV)    AS GravBV
+     FROM BASES.TBRESULTADOMARKETSHARE t1
+    WHERE t1.NuAnoMes BETWEEN 202001 AND 202612
+      AND t1.TpArquivo = 'mf'
+      
+      AND t1.TpVeiculo IN ('Leves','Motos','Pesados')
+    GROUP BY 1,2,3
+    ORDER BY 1,2,3;
+QUIT;
+
+PROC SQL;
+   CREATE TABLE Mercado_MS_S AS
+   SELECT
+          t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.FlCVG,
+SUM(GravTotal) AS GravTotal,
+SUM(CASE WHEN Bancos = 'BV' THEN GravTotal ELSE 0 END) AS GravBV
+FROM MKTSHARE.tbmarketsharediariaaberta t1
+where t1.nuanomes between 202301 and 202602 and TpAgenteProdutoMIS <> '3'
+AND t1.TpVeiculo in ('Leves', 'Motos', 'Pesados') and statusgravame in('', 'Ativo')
+GROUP BY 1,2,3,4
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: LIBNAMES */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 11 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: LIBNAMES */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-GW9xmhneiDAee5A2/code.sas */
+/* =========================INÍCIO TASK========================= */
+options mlogic fullstimer compress=yes;
+LIBNAME BASES '/projetos/MISV/data/bases';
+LIBNAME AUXL '/infogrc/utils/bases';
+LIBNAME CONVPROP '/infogrc/apnp/propostas';
+LIBNAME INFCVS '/infogrc/convsimu';
+libname FENAB '/infogrc/fenabrave';
+libname MKTSHARE'/infogrc/marketshare/bases';
+LIBNAME SOLITMP '/infogrc/solicitacaopontual/tmp';
+LIBNAME PPDV '/infogrc/Porte_PDV';
+Libname CAMP '/infogrc/campanhas/historico';
+LIBNAME INFOGRC '/infogrc/precoxrisco';
+LIBNAME SEGUROS '/seguros/dados';
+LIBNAME BASES '/projetos/MISV/data/bases';
+
+/* =========================FIM TASK=========================== */
+/* TASK: LIBNAMES */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBMARKETSHAREDIARIAABE AS
+   SELECT t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.bancos,
+		  t1.FxIdade,
+		  t1.Regional,
+		  t1.FlCVG,
+		  t1.StatusGravame,
+
+          
+            (SUM(t1.GravTotal)) AS SUM_of_GravTotal
+      FROM MKTSHARE.TBMARKETSHAREDIARIAABERTA t1
+	  where TpAgenteProdutoMIS <> '3' and t1.NuAnoMes BETWEEN 202601 AND 202603
+      GROUP BY 1,2,3,4,5,6,7,8;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE TBPRODUCAO AS
+   SELECT
+
+          t1.nuanomes,
+          case when t1.NmGrupoProdutoMeta = 'Leves-BVO' then 'Leves' else t1.NmGrupoProdutoMeta end as Produto,
+          t1.DsTipoCanalProducao,
+		  t1.NmSubEstruturaComercialC,
+		  t1.NmCanalEstruturaComercial,
+		  t1.NmAreaEstruturaComercialC,
+
+          case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+
+		  case when t1.NmGrupoProdutoMeta in ('Leves', 'Leves-BVO',  'Motos', 'Pesados') then 'Rodas' when t1.NmGrupoProdutoMeta = 'Solar' then 'Solar' else 'Empréstimos' end as Grupo_Produto,
+
+            (COUNT(t1.NuContrato)) AS QtdeContrato,
+            (SUM(t1.VrProducao)) AS VrProducao,
+            (SUM(t1.VrProducaoProjetado)) AS VrProducaoProjetado
+
+      FROM bases.TBPRODUCAO t1
+
+	  where t1.NuAnoMes BETWEEN 202601 AND 202602
+
+	  and t1.NmGrupoProdutoMeta in ('Leves', 'Leves-BVO', 'Motos', 'Pesados', 'CVG Leves', 'CVG Pesados')
+      GROUP BY
+	  1,2,3,4,5,6,7,8;
+
+QUIT;
+
+PROC SQL;
+   CREATE TABLE Mercado_S AS
+   SELECT
+          t1.NuAnoMes,
+          t1.StVeiculo,
+          t1.FxIdade,
+          t1.TpVeiculo,
+		  t1.FlCVG,
+SUM(CASE WHEN Bancos = 'BV' THEN GravTotal ELSE 0 END) AS GravBV,
+SUM(GravTotal) AS GravTotal,
+SUM(CASE WHEN Bancos = 'COOPERATIVA' THEN GravTotal ELSE 0 END) AS Gracooperativa,
+SUM(CASE WHEN Bancos = 'BANCO DO BRASIL' THEN GravTotal ELSE 0 END) AS GravBB,
+SUM(CASE WHEN Bancos = 'BRADESCO' THEN GravTotal ELSE 0 END) AS GravBrad,
+SUM(CASE WHEN Bancos = 'ITAU' THEN GravTotal ELSE 0 END) AS GravItau,
+SUM(CASE WHEN Bancos = 'PANAMERICANO' THEN GravTotal ELSE 0 END) AS GravPan,
+SUM(CASE WHEN Bancos = 'SAFRA' THEN GravTotal ELSE 0 END) AS GravSafra,
+SUM(CASE WHEN Bancos = 'SANTANDER' THEN GravTotal ELSE 0 END) AS GravSantander,
+SUM(CASE WHEN Bancos = 'MONTADORAS' THEN GravTotal ELSE 0 END) AS GravMontadoras,
+SUM(CASE WHEN Bancos = 'C6' THEN GravTotal ELSE 0 END) AS GravC6,
+SUM(CASE WHEN Bancos = 'CREDITAS' THEN GravTotal ELSE 0 END) AS GravCreditas,
+SUM(CASE WHEN Bancos = 'OUTROS' THEN GravTotal ELSE 0 END) AS GravOutros
+FROM MKTSHARE.tbmarketsharediariaaberta t1
+where t1.nuanomes between 202601 and 202602 and TpAgenteProdutoMIS <> '3'
+AND t1.TpArquivo = 'mf' AND t1.TpVeiculo in ('Leves', 'Motos', 'Pesados') and statusgravame = 'Ativo'
+GROUP BY 1,2,3,4,5
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE MS_PDV AS
+   SELECT t1.NuAnoMes,
+		  t1.NmGrupoProduto,
+		  	t1.NmAreaEstruturaComercialC,
+			t1.NmSubEstruturaComercialC,
+			t1.NmCanalEstruturaComercialC,
+			t1.FlAtivo,
+		  case when t1.fxidade = 'ZeroKM' then 'Novos' else 'Usados' end as Estado_bem,
+            (SUM(t1.QtGravamesMercado)) AS QtGravamesMercado,
+ 			(SUM(t1.VrGravamesMercado)) AS VrGravamesMercado,
+            (SUM(t1.QtContrato)) AS QTCTRSBV,
+			(SUM(t1.VrProducao)) AS VrProducao
+      FROM BASES.TBPOTENCIALRODAS t1
+      WHERE t1.NuAnoMes BETWEEN 202301 AND 202602
+	  AND t1.FlAtualizacaoMercado = 1 AND t1.FlAtivo = 'S'
+      GROUP BY 1,2,3,4,5,6,7
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPRODUCAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBPRODUCAO AS
+   SELECT t1.NuAnoMes,
+          t1.CdParceiroComercial,
+          t1.VrProducao,
+          t1.NmGrupoProdutoMeta,
+          t1.FxIdade
+      FROM BASES.TBPRODUCAO t1
+      WHERE t1.NuAnoMes BETWEEN 202501 AND 202509;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE Mercado_MS_S AS
+   SELECT
+          t1.NuAnoMes,
+          t1.TpVeiculo,
+          t1.StVeiculo,
+          t1.FlCVG,
+SUM(GravTotal) AS GravTotal,
+SUM(CASE WHEN Bancos = 'BV' THEN GravTotal ELSE 0 END) AS GravBV
+FROM MKTSHARE.tbmarketsharediariaaberta t1
+where t1.nuanomes between 202301 and 202602 and TpAgenteProdutoMIS <> '3'
+AND t1.TpVeiculo in ('Leves', 'Motos', 'Pesados') and statusgravame in('', 'Ativo')
+GROUP BY 1,2,3,4
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+LIBNAME BASES '/projetos/MISV/data/bases';
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */

@@ -1,0 +1,140 @@
+START_METADATA
+PROJECT: Rodas__Bases_Planejamento_pesados
+FILE_SAS: 05 - Gera Base Final.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:30 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 80
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): (none)
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEPOTENCIALFINAL_P, PRODUCAOIDEALPESADOS, SHARE01_P, SHARE02_P, SHARE_P, VALIDA_P
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+proc sql;
+create table Share01_P as
+select
+NmCanalEstruturaComercialC,
+Case when NmCanalEstruturaComercialC in ("Canal Negocios","Canal Pesados","Canal Veiculos") then 1  end as PercCanal,
+
+Strip(FxIdade)||Strip(Regiao)||Strip(PorteCidade)||Strip(FaixaBancos)
+	|| Strip(Canal) ||Strip(NmSubEstruturaComercialC) as Chave,
+coalesce(Sum(QtdContratos_ProjSab) / Sum(QtGravamesMercadoAjustado),0) as Share,
+Sum(QtdContratos_ProjSab) as a,
+Sum(QtGravamesMercadoAjustado) as b,
+coalesce(
+Case when calculated Share < 0.01 then 0.01 else
+		case when calculated Share > calculated PercCanal then calculated PercCanal else calculated Share
+		end end,calculated Share) as ShareFinal
+from POTENCIAL_RODAS_04_P
+where  1=1
+/*and calculated chave = 'Acima de 10 anosRegião Centro-OestePequeno4Canal VeículosCanal Rodas e EGV II - Regional V'*/
+group by 1,2,3
+order by NmCanalEstruturaComercialC
+;run;
+
+proc sql;
+create table Share02_P as
+select distinct
+ Chave,
+ ShareFinal
+from Share01_P
+where  1=1
+/*and calculated chave = 'Acima de 10 anosRegião SudesteGrandeSem InfoCanal Veículos'*/
+order by NmCanalEstruturaComercialC
+;run;
+
+proc sort data=Share02_P out=Share_P nodupkey;
+by Chave;run;
+
+proc sql;
+create table BasePotencialFinal_P as
+select
+Strip(a.FxIdade)||Strip(a.Regiao)||Strip(a.PorteCidade)||Strip(a.FaixaBancos)
+	|| Strip(a.Canal) ||Strip(a.NmSubEstruturaComercialC) as Chave,
+A.NuCnpjLoja,
+a.nuanomes,
+a.cdparceirocomercial,
+b.ShareFinal,
+c.TicletFinalCap,
+a.QtGravamesMercadoAjustado,
+B.ShareFinal * a.QtGravamesMercadoAjustado as ContratosIdeias,
+CALCULATED ContratosIdeias * c.TicletFinalCap as ProdIdeal
+
+from POTENCIAL_RODAS_04_P as A
+
+	left join Share_P as B
+	on Strip(a.FxIdade)||Strip(a.Regiao)||Strip(a.PorteCidade)||Strip(a.FaixaBancos)
+	|| Strip(a.Canal) ||Strip(a.NmSubEstruturaComercialC)  = b.Chave
+
+	left join BASE_TICKET_01_P as C
+	on a.ChaveCdParceiro_FxIdade = c.ChaveCdParceiro_FxIdade
+
+where  1=1
+/*and a.NuCnpjLoja = '07796847000173'*/
+/*and a.cdparceirocomercial = 1086*/
+/*and catt(a.Chave1,a.NmSubEstruturaComercialC) = '1 ou 2ConcessionariaPequenoRegião Sul3 a 7 anosCanal Rodas e EGV II - Regional VI'*/
+;run;
+
+proc sql;
+create table ProducaoIdealPesados as
+select
+A.cdparceirocomercial,
+Sum(a.QtGravamesMercadoAjustado) as Gravames,
+Sum(a.ContratosIdeias) as Contratos,
+Sum(ProdIdeal) as Producao
+from BasePotencialFinal_P as A
+where  1=1
+/*and a.NuCnpjLoja = '08330275000103'*/
+group by 1
+;run;
+
+proc sql;
+create table Valida_P as
+select
+0,
+Sum(a.Gravames) as Gravames,
+Sum(a.Contratos) as Contratos,
+Sum(Producao) as Producao
+from ProducaoIdealPesados as A
+where  1=1
+/*and a.NuCnpjLoja = '08330275000103'*/
+group by 1
+;run;

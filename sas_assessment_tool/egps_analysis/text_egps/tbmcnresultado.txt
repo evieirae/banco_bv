@@ -1,0 +1,1291 @@
+START_METADATA
+PROJECT: SAS_UC4__tbmcnresultado
+FILE_SAS: tbmcnresultado.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:08 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 1218
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DVRY
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbrelatorioapnp.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-INDICADORES-VAREJO/SCRIPTS/TBRELATORIOAPNP.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbrelatorioapnp.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbrelatorioapnp.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbrelatorioapnp.sas
+
+END_METADATA
+================================================================================
+/*options fullstimer notes  mprint mlogic symbolgen source source2  ;*/
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+/*option compress = binary;*/
+/*options validvarname=any  fullstimer notes  mprint mlogic symbolgen ;*/
+
+/***********************************************************/
+/* Caminho dos programas de libnames, conexões e parmetros */
+/***********************************************************/
+/**/
+/*%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';*/
+/*%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';*/
+/*LIBNAME MCN '/riscosbvf/coaching/tribo_veiculos/SAS/MeuCarroNovo/bases';*/
+/*LIBNAME dvry SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_veiculos USER= _SAS_VEICULOS	PASSWORD="{SAS002}6F63681B5258C9D15BB1A44A31C3DA5C524E367D11CE356E4478F47E";*/
+/**/
+/*proc sql;*/
+/*select*/
+/*	  DtFechamento*/
+/*	 ,compress(put(DtFechamento,6.)) as DsFechamento*/
+/*into :DtFechamento,:DsFechamento*/
+/*from BASEGRC.TbMcnDataFechamento*/
+/*;quit;*/
+
+/* ======================================================== */
+/* ======================== Apnp ========================== */
+/* ======================================================== */
+
+%include '/projetos/MISV/sas-misv-base-indicadores-varejo/scripts/tbrelatorioapnp.sas';
+
+/* ======================================================== */
+/* ======================== Meta ========================== */
+/* ======================================================== */
+
+/*proc sql;*/
+/*create table TbMcnMeta as*/
+/*select*/
+/*	 NuAnoMes*/
+/*	,NmGrupoProdutoMeta*/
+/*	,CdColaborador*/
+/*	,NmColaborador*/
+/*	,DsLoginN1*/
+/*	,CdFilial*/
+/*	,VrMetaN1*/
+/*	,VrMetaN2*/
+/*from bases.TbMetaColaborador*/
+/*where TpValor = 'VrMcn'*/
+/*  and NuAnoMes >= 201801*/
+/*group by 1,2,3,4,5,6*/
+/**/
+/*union all*/
+/*select*/
+/*	 NuAnoMes*/
+/*	,'(Tudo)' as NmGrupoProdutoMeta*/
+/*	,CdColaborador*/
+/*	,NmColaborador*/
+/*	,DsLoginN1*/
+/*	,CdFilial*/
+/*	,VrMetaN1*/
+/*	,VrMetaN2*/
+/*from bases.TbMetaColaborador*/
+/*where TpValor = 'VrMcn'*/
+/*  and NuAnoMes >= 201801*/
+/*group by 1,2,3,4,5,6*/
+/*;quit;*/
+/* ======================================================== */
+/* ================= Extracao Clientes BI ================= */
+/* ======================================================== */
+
+/**/
+/*%CRIAVARDB;*/
+/*proc sql;*/
+/*%CONECTADB(server=BI);*/
+/*create table mcn_biclientes as */
+/*select * from connection to dbcon*/
+/*(*/
+/*	SELECT*/
+/*		 NmArquivo as arquivo*/
+/*		,CdLojaMCN as codigo_mcn*/
+/*		,CdParceiroMCN as codigo_parceiro_bv*/
+/*		,TpPessoa as tipo_pessoa*/
+/*		,NuCpfCnpj as cpf_cnpj*/
+/*		,NmRazaoSocial as razao_social*/
+/*		,DsLogradouro as logradouro_principal*/
+/*		,CdCEP as cep_principal*/
+/*		,NuDDD as ddd*/
+/*		,NuTelefone as telefone*/
+/*		,DsEmail as email*/
+/*		,DsUf as uf*/
+/*		,NmCidade as cidade*/
+/*		,NmFilialAnuncioVeiculo as filial*/
+/*		,DsGerenteRelacionamento as gr*/
+/*		,FlGrupoLoja as grupo_loja*/
+/*		,CdGrupoLoja as id_grupo_loja*/
+/*		,FlMatriz as matriz*/
+/*		,DsFaixaRegiao as faixa_regiao*/
+/*		,DtCadastro as data_cadastro*/
+/*		,DtAtualizacao as data_atualizacao*/
+/*		,CdStatusMCN as status_mcn*/
+/*		,CdColaborador as cod_colaborador*/
+/*		,CdFilial as cd_filial*/
+/*		,NmFantasia as nome_fantasia*/
+/*		,DtCargaArquivoMCN AS data_arquivo*/
+/*	FROM DWBI_DTWH.TbClienteAnuncioVeiculoMCN*/
+/*	WHERE DtCargaArquivoMCN >= '20180101'*/
+/*)*/
+/*;run;*/
+
+/* ======================================================== */
+/* ============= Cadastro Alteração Manual ================ */
+/* ======================================================== */
+/**/
+/*proc sql;*/
+/*create table TbMcnAlteracaoFechamentoFilial as*/
+/*select distinct */
+/*	 AlteracaoFechamento.NuAnoMes*/
+/*	,AlteracaoFechamento.CdLojaMCN*/
+/*	,AlteracaoFechamento.CdOperador*/
+/*	,Colaborador.CdColaborador*/
+/*	,Colaborador.NmColaborador*/
+/*	,Colaborador.DsLogin as DsLoginN1*/
+/*	,coalesce(EstruturaComercial.CdFilial,Clientes.cd_filial) as CdFilial*/
+/*	,coalesce(EstruturaComercial.NmFilial,Clientes.filial) as NmFilial*/
+/**/
+/*from basegrc.TbMcnAlteracaoFechamento AlteracaoFechamento*/
+/**/
+/* 	left join bases.TbColaborador Colaborador*/
+/* 		on  AlteracaoFechamento.CdOperador = Colaborador.CdOperador*/
+/*		and Colaborador.CdOperador > 0*/
+/* 		*/
+/* 		left join bases.TbEstruturacomercial EstruturaComercial*/
+/* 			on  AlteracaoFechamento.NuAnoMes = EstruturaComercial.NuAnoMes*/
+/* 			and Colaborador.CdColaboradorBI = EstruturaComercial.CdColaboradorBI*/
+/* 			and EstruturaComercial.CdCanalEstruturaComercial = 1*/
+/* 			and EstruturaComercial.CdColaboradorBI is not null*/
+/**/
+/*	left join mcn_biclientes Clientes*/
+/*		on  AlteracaoFechamento.CdLojaMCN = Clientes.codigo_mcn*/
+/*		and AlteracaoFechamento.NuAnoMes = input(substr(Clientes.Arquivo,24,6),6.)*/
+/*;run;*/
+/**/
+/**/
+/*proc sql;*/
+/*create table TbMcnAbaValidacaoErros as*/
+/*select*/
+/*	**/
+/*from TbMcnAlteracaoFechamentoFilial McnAlteracaoFechamentoFilial*/
+/*where NuAnoMes = &DtFechamento*/
+/*group by NuAnoMes,CdLojaMCN*/
+/*having count(*) > 1*/
+/*    or max(CdColaborador) is null*/
+/*    or max(CdFilial) is null*/
+/*order by CdLojaMCN*/
+/*;run;*/
+/**/
+/*proc export*/
+/*data= TbMcnAbaValidacaoErros*/
+/*file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaValidacaoErros.csv' replace*/
+/*dbms=dlm;*/
+/*delimiter=';';*/
+/*run;*/
+/**/
+/*X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaValidacaoErros.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/';*/
+/**/
+/*proc sql;*/
+/*create table TbMcnAlteracaoFechamentoFilial as*/
+/*select*/
+/*	**/
+/*from TbMcnAlteracaoFechamentoFilial a*/
+/*	*/
+/*	left join TbMcnAbaValidacaoErros b*/
+/*		on  a.NuAnoMes = b.NuAnoMes*/
+/*		and a.CdLojaMCN = b.CdLojaMCN*/
+/*		and a.CdOperador = b.CdOperador*/
+/**/
+/*where b.CdLojaMCN is null*/
+/*;run; */
+
+/* ======================================================== */
+/* =========== Cadastro Arquivo Clientes ================== */
+/* ======================================================== */
+/**/
+/*proc sql;*/
+/*CREATE TABLE TbMcnClientesFilial as*/
+/*SELECT DISTINCT*/
+/*				 input(substr(Clientes.Arquivo,24,6),6.) as NuAnoMes*/
+/*				,Clientes.codigo_mcn as CdLojaMCN*/
+/*				,Colaborador.CdOperador*/
+/*				,Clientes.cod_colaborador as CdColaborador*/
+/*				,Colaborador.NmColaborador*/
+/*				,Colaborador.DsLogin as DsLoginN1*/
+/*				,Clientes.cd_filial as CdFilial*/
+/*				,Clientes.filial as NmFilial*/
+/*				,Clientes.status_mcn as StatusMCN*/
+/*FROM mcn_biclientes Clientes*/
+/**/
+/* 	LEFT JOIN bases.TbColaborador Colaborador*/
+/* 		ON  Clientes.cod_colaborador = Colaborador.CdColaborador*/
+/**/
+/*WHERE Clientes.cod_colaborador IS NOT NULL*/
+/*ORDER BY 2,1*/
+/*;run;*/
+/**/
+/*data TbMcnCadastro;*/
+/*set*/
+/*	TbMcnAlteracaoFechamentoFilial*/
+/*	TbMcnClientesFilial*/
+/*;run;*/
+/**/
+/*proc sort data=TbMcnCadastro(where=(NuAnoMes>=201801)) nodupkey;by NuAnoMes CdLojaMCN;run;*/
+/*proc sort data=TbMcnCadastro;by CdLojaMCN descending NuAnoMes;run;*/
+/**/
+/*data TbMcnCadastro;*/
+/*set TbMcnCadastro;*/
+/*by CdLojaMCN;*/
+/*FlVigente=first.CdLojaMCN;*/
+/*run;*/
+/**/
+/*proc sort data=mcn_biclientes out=mcn_clientes;by codigo_mcn descending arquivo;run;*/
+/*proc sort data=mcn_clientes nodupkey;by codigo_mcn;run;*/
+/**/
+/*proc sql;*/
+/*create table TbMcnCadastroFinal as*/
+/*select*/
+/*	 Cadastro.NuAnoMes*/
+/*	,case when Cadastro.FlVigente = 1 then 999999 else NuAnoMes end as NuAnoMesFim*/
+/*	,Cadastro.CdLojaMCN*/
+/*	,Clientes.codigo_parceiro_bv as CdParceiroBV*/
+/*	,Clientes.razao_social as RazaoSocial*/
+/*	,Clientes.nome_fantasia as NmFantasia*/
+/*	,Clientes.cpf_cnpj as NuCpfCnpj*/
+/*	,Clientes.status_mcn as StatusMCN*/
+/*	,Clientes.tipo_pessoa as TpPessoa*/
+/*	,Cadastro.CdColaborador	*/
+/*	,Cadastro.NmColaborador	*/
+/*	,Cadastro.DsLoginN1	*/
+/*	,Cadastro.CdFilial	*/
+/*	,Cadastro.FlVigente*/
+/**/
+/*from TbMcnCadastro Cadastro*/
+/**/
+/*	left join mcn_clientes Clientes*/
+/*		on  Cadastro.CdLojaMCN = Clientes.codigo_mcn*/
+/**/
+/*order by 1,2*/
+/*;run;*/
+
+/* ======================================================== */
+/* ==================== Tabela de Data ==================== */
+/* ======================================================== */
+/**/
+/*%CRIAVARDB;*/
+/*proc sql;*/
+/*%CONECTADB(server=BI);*/
+/*create table TbTempoData as */
+/*select * from connection to dbcon*/
+/*(*/
+/*	SELECT*/
+/*		 NuAnoMes*/
+/*		,DtTempo*/
+/*		,FlDiaUtil*/
+/*		,SgDiaSemana*/
+/*		,dateadd(month,1,DtTempo-day(DtTempo))+16 DtLimiteRecebimento*/
+/*	FROM DWBI_DIME.TbDimTempoData*/
+/*	WHERE DtTempo >= '20180101'*/
+/*	  AND DtTempo  < dateadd(month,5,today()-day(today()))+1*/
+/*)*/
+/*;run;*/
+
+/* ======================================================== */
+/* ================= Extração Pagamentos BI =============== */
+/* ======================================================== */
+/*%CRIAVARDB;*/
+/*proc sql;*/
+/*	%CONECTADB(server=BI);*/
+/*	create table mcn_pagamentosBI1 as*/
+/*		select * from connection to dbcon*/
+/*			(*/
+/**/
+/*		SELECT*/
+/*			   NmArquivo */
+/*			  ,CdOrdemMCN */
+/*	          ,TpPessoa */
+/*	          ,CdLojaMCN */
+/*	          ,DsMetodoPagamentoMCN */
+/*	          ,DsTipoPagamentoMCN */
+/*	          ,QtParcelasPagamentoMCN */
+/*	          ,CdNossoNumeroBoletoFatura */
+/*	          ,VrBruto */
+/*	          ,VrLiquido */
+/*	          ,VrPagamento */
+/*	          ,NmPacoteAnuncioVeiculo */
+/*	          ,VrPacote */
+/*	          ,QtAnuncio */
+/*	          ,cast(DtInicioPacote as date) as DtInicioPacote */
+/*	          ,cast(DtFimPacote as date) as DtFimPacote */
+/*	          ,cast(DtEmissao as date) as DtEmissao */
+/*	          ,cast(DtVencimento as date) as DtVencimento */
+/*	          ,NmCupomDescontoMcn */
+/*	          ,VrCupomDesconto */
+/*	          ,cast(DtPagamento as date) as DtPagamento */
+/*	          ,DsOrigemMCN*/
+/*	          ,DtCargaArquivoMCN*/
+/*	          ,napista*/
+/**/
+/*		FROM DWBI_DTWH.TbPagamentoAnuncioVeiculoMCN*/
+/**/
+/*			)*/
+/*	;*/
+/*quit;*/
+/**/
+/*proc sql;*/
+/*	create table mcn_pagamentos as */
+/*	 select */
+/*			 NmArquivo*/
+/*			,CdOrdemMCN*/
+/*			,TpPessoa*/
+/*			,CdLojaMCN*/
+/*			,DsMetodoPagamentoMCN*/
+/*			,DsTipoPagamentoMCN*/
+/*			,QtParcelasPagamentoMCN*/
+/*			,CdNossoNumeroBoletoFatura*/
+/*			,VrBruto*/
+/*			,VrLiquido*/
+/*			,VrPagamento*/
+/*			,NmPacoteAnuncioVeiculo*/
+/*			,VrPacote*/
+/*			,QtAnuncio*/
+/*			,DtInicioPacote*/
+/*			,DtFimPacote*/
+/*			,DtEmissao*/
+/*			,DtVencimento*/
+/*			,NmCupomDescontoMcn*/
+/*			,VrCupomDesconto*/
+/*			,DtPagamento*/
+/*			,'MCN'             as DsOrigemMCN*/
+/*			,DtCargaArquivoMCN*/
+/*			,0                 as napista*/
+/**/
+/*	from mcn_pagamentosBI1*/
+/*;run;*/
+/**/
+/*proc sql;*/
+/*	create table napista_pagamentos as */
+/*		select */
+/*			 NmArquivo*/
+/*			,orders_id         as CdOrdemMCN*/
+/*			,tp_pessoa         as TpPessoa*/
+/*			,codigo_loja       as CdLojaMCN*/
+/*			,metodo_pagamento  as DsMetodoPagamentoMCN*/
+/*			,tipo_pagamento    as DsTipoPagamentoMCN*/
+/*			,qtde_parcelas     as QtParcelasPagamentoMCN*/
+/*			,nosso_numero      as CdNossoNumeroBoletoFatura*/
+/*			,valor_bruto       as VrBruto*/
+/*			,valor_liquido     as VrLiquido*/
+/*			,valor_pago        as VrPagamento*/
+/*			,tipo_pacote       as NmPacoteAnuncioVeiculo*/
+/*			,valor_pacote      as VrPacote*/
+/*			,qtde_anuncios     as QtAnuncio*/
+/*			,data_inicio_plano as DtInicioPacote*/
+/*			,data_fim_plano    as DtFimPacote*/
+/*			,data_emissao      as DtEmissao*/
+/*			,data_vencimento   as DtVencimento*/
+/*			,data_pagamento    as DtPagamento*/
+/*			,''                as NmCupomDescontoMcn*/
+/*			,.                 as VrCupomDesconto*/
+/*			,data_pagamento    as DtPagamento*/
+/*			,'naPista'         as DsOrigemMCN*/
+/*			,.                 as DtCargaArquivoMCN*/
+/*			,1                 as napista*/
+/**/
+/**/
+/*		from basegrc.TbPagamentosnaPista*/
+/*;run;*/
+/**/
+/*data mcn_pagamentosBI;*/
+/*set*/
+/*	mcn_pagamentos*/
+/*	napista_pagamentos*/
+/*;run;*/
+
+/* ======================================================== */
+/* ====================== ABA CARGA ======================= */
+/* ======================================================== */
+/*proc sql;*/
+/*	create table TbMcnAbaCarga1 as*/
+/*		select*/
+/*			TempoData.DtTempo*/
+/*			,TempoData.FlDiaUtil*/
+/*			,Pagamentos.NmArquivo*/
+/*			,Pagamentos.CdLojaMCN*/
+/*			,Pagamentos.DtPagamento*/
+/*			,Pagamentos.DtInicioPacote	*/
+/*			,Pagamentos.DtFimPacote*/
+/*			,Pagamentos.NmPacoteAnuncioVeiculo*/
+/*			,Pagamentos.VrPagamento*/
+/**/
+/*		from TbTempoData TempoData*/
+/**/
+/*		left join mcn_pagamentosBI Pagamentos*/
+/*			on TempoData.DtTempo = input(substr(Pagamentos.NmArquivo,26,8),yymmdd8.)*/
+/**/
+/*		where TempoData.DtTempo >= intnx('month',today(),-12)*/
+/*			and TempoData.DtTempo <= today()*/
+/*	;*/
+/*run;*/
+
+/* ======================================================== */
+/* ====================== ABA CARGA  ======================= */
+/* ======================================================== */
+/*proc sql;*/
+/*	create table TbMcnAbaCarga2 as*/
+/*		select*/
+/*			TempoData.DtTempo*/
+/*			,TempoData.FlDiaUtil*/
+/*			,Pagamentos.NmArquivo*/
+/*			,Pagamentos.CdLojaMCN*/
+/*			,Pagamentos.DtPagamento*/
+/*			,Pagamentos.DtInicioPacote	*/
+/*			,Pagamentos.DtFimPacote*/
+/*			,Pagamentos.NmPacoteAnuncioVeiculo*/
+/*			,Pagamentos.VrPagamento*/
+/**/
+/*		from TbTempoData TempoData*/
+/**/
+/*		left join mcn_pagamentosBI Pagamentos*/
+/*			on TempoData.DtTempo = input(substr(Pagamentos.NmArquivo,20,8),yymmdd8.)*/
+/**/
+/*		where TempoData.DtTempo >= intnx('month',today(),-12)*/
+/*			and TempoData.DtTempo <= today()*/
+/*	;*/
+/*run;*/
+/*data TbMcnAbaCarga;*/
+/*set TbMcnAbaCarga1*/
+/*	TbMcnAbaCarga2;run;*/
+/**/
+/*proc export*/
+/*	data= TbMcnAbaCarga*/
+/*	file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaCarga.csv' replace*/
+/*	dbms=dlm;*/
+/*	delimiter=';';*/
+/*run;*/
+/**/
+/*X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaCarga.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/';*/
+
+/* ======================================================== */
+/* ================ PAGAMENTO COMPETÊNCIA ================= */
+/* ======================================================== */
+/*proc sql;*/
+/*	create table mcn_pagamentos1 as*/
+/*		select*/
+/*			NmArquivo*/
+/*			,input(substr(NmArquivo,26,8),yymmdd8.) as DtRecebimentoArquivo format yymmdd10.*/
+/*			,CdOrdemMCN as IdOrdem*/
+/*			,TpPessoa*/
+/*			,CdLojaMCN*/
+/*			,DsMetodoPagamentoMCN as MetodoPgto*/
+/*			,CdNossoNumeroBoletoFatura as NossoNumero*/
+/*			,VrBruto*/
+/*			,VrLiquido*/
+/*			,VrPagamento as VrPago*/
+/*			,NmPacoteAnuncioVeiculo as TpPacote*/
+/*			,VrPacote*/
+/*			,DtInicioPacote  */
+/*			,DtFimPacote */
+/*			,DtPagamento as DtPagamento  */
+/**/
+/*			,(((DtInicioPacote)+1)-DtFimPacote) as QtDiasCorridos*/
+/**/
+/*			,(VrCupomDesconto*-1)/((DtFimPacote+1)-(DtInicioPacote)) as VdDesconto*/
+/*			,(VrPagamento)/((DtFimPacote+1)-(DtInicioPacote)) as VdPago*/
+/*			,(coalesce(VrCupomDesconto,0)+VrPagamento)/((DtFimPacote+1)-(DtInicioPacote)) as VdBruto*/
+/**/
+/*			,NmCupomDescontoMcn as DsVoucherDesconto*/
+/*			,VrCupomDesconto as VrDesconto*/
+/*			,napista */
+/*			,DsOrigemMCN as origem*/
+/*		from mcn_pagamentosBI*/
+/*			where DtFimPacote >= DtInicioPacote */
+/*			 and TpPessoa <> 'F'*/
+/*			 and napista = 0*/
+/*			order by NmArquivo*/
+/*	;*/
+/*run;*/
+/**/
+/*proc sql;*/
+/*	create table mcn_pagamentos2 as*/
+/*		select*/
+/*			NmArquivo*/
+/*			,input(substr(NmArquivo,20,8),yymmdd8.) as DtRecebimentoArquivo format yymmdd10.*/
+/*			,CdOrdemMCN as IdOrdem*/
+/*			,TpPessoa*/
+/*			,CdLojaMCN*/
+/*			,DsMetodoPagamentoMCN as MetodoPgto*/
+/*			,CdNossoNumeroBoletoFatura as NossoNumero*/
+/*			,VrBruto*/
+/*			,VrLiquido*/
+/*			,VrPagamento as VrPago*/
+/*			,NmPacoteAnuncioVeiculo as TpPacote*/
+/*			,VrPacote*/
+/*			,DtInicioPacote as DtInicioPacote */
+/*			,DtFimPacote  */
+/*			,DtPagamento as DtPagamento  */
+/**/
+/*			,(((DtInicioPacote)+1)-DtFimPacote) as QtDiasCorridos*/
+/**/
+/*			,(VrCupomDesconto*-1)/((DtFimPacote+1)-(DtInicioPacote)) as VdDesconto*/
+/*			,(VrPagamento)/((DtFimPacote+1)-(DtInicioPacote)) as VdPago*/
+/*			,(coalesce(VrCupomDesconto,0)+VrPagamento)/((DtFimPacote+1)-(DtInicioPacote)) as VdBruto*/
+/**/
+/*			,NmCupomDescontoMcn as DsVoucherDesconto*/
+/*			,VrCupomDesconto as VrDesconto*/
+/*			,napista*/
+/*			,DsOrigemMCN as origem*/
+/*		from mcn_pagamentosBI*/
+/*			where DtFimPacote >= DtInicioPacote*/
+/*				and TpPessoa <> 'F'*/
+/*				and napista = 1*/
+/*			order by NmArquivo*/
+/*	;run;*/
+/**/
+/*data mcn_pagamentos;*/
+/*set mcn_pagamentos1*/
+/*	mcn_pagamentos2;run;*/
+/**/
+/*proc sort data=mcn_pagamentos nodupkey;*/
+/*	by IdOrdem DtInicioPacote DtFimPacote;*/
+/*run;*/
+/**/
+/*proc sort data=mcn_pagamentos;*/
+/*	by descending NmArquivo;*/
+/*run;*/
+/**/
+/*proc sort data=mcn_pagamentos nodupkey;*/
+/*	by IdOrdem;*/
+/*run;*/
+/**/
+/*proc sort data=mcn_pagamentos;*/
+/*	by NmArquivo;*/
+/*run;*/
+/**/
+/*proc sql;*/
+/*	create table DtAtualizacao as*/
+/*		select */
+/*			max(DtPagamento) as DtAtualizacao format date9. */
+/*			,max(NmArquivo) as NmArquivo*/
+/*			,max(datetime()) as TsProcessamento format datetime20.*/
+/*		from mcn_pagamentos*/
+/*		where NmArquivo like 'pagamentos%'*/
+/*;run;*/
+/**/
+/*proc sql;*/
+/*	create table mcn_competencia as*/
+/*		select*/
+/*			TempoData.NuAnoMes*/
+/*			,Pagamentos.IdOrdem*/
+/*			,Pagamentos.CdLojaMCN*/
+/*			,Pagamentos.DtPagamento*/
+/*			,CASE */
+/*			WHEN Pagamentos.TpPacote like '%Publicidade%'     and dtpagamento <= '01jan2024'd then 'MCN - Publicidade' */
+/*			WHEN Pagamentos.TpPacote not like '%Publicidade%' and dtpagamento <= '01jan2024'd then 'MCN - Anuncio'*/
+/*			WHEN Pagamentos.TpPacote like '%Publicidade%'     and dtpagamento >= '01jan2024'd then 'NaPista' */
+/*			WHEN Pagamentos.TpPacote not like '%Publicidade%' and dtpagamento >= '01jan2024'd then 'NaPista'*/
+/*			WHEN Pagamentos.TpPacote = 'Mensalidade NaPista'  and dtpagamento >= '01jan2024'd then 'NaPista'*/
+/*			else 'NaPista' end as NmGrupoProdutoMeta*/
+/*		,sum(Pagamentos.VdPago) as VrPago format 18.2*/
+/*		,sum(Pagamentos.VdDesconto) as VrDesconto format 18.2*/
+/*		,sum(Pagamentos.VdBruto) as VrBruto format 18.2*/
+/*	from mcn_pagamentos Pagamentos*/
+/*		inner join TbTempoData TempoData*/
+/*			on  TempoData.DtTempo >= Pagamentos.DtInicioPacote*/
+/*			and TempoData.DtTempo <= Pagamentos.DtFimPacote*/
+/*		where Pagamentos.DtRecebimentoArquivo < TempoData.DtLimiteRecebimento*/
+/*			group by 1,2,3,4,5*/
+/*	;run;*/
+
+/* ======================================================== */
+/* ======================= PAGAMENTO ====================== */
+/* ======================================================== */
+/*proc sql;*/
+/*	create table TbMcnPagamentos as*/
+/*		select*/
+/*			Pagamentos.NuAnoMes*/
+/*			,mdy(input(substr(put(Pagamentos.NuAnoMes,6.),5,2),2.),1,input(substr(put(Pagamentos.NuAnoMes,6.),1,4),4.)) as DtReferencia format date9.*/
+/*			,Pagamentos.DtPagamento*/
+/*			,Pagamentos.IdOrdem*/
+/*			,Pagamentos.NmGrupoProdutoMeta*/
+/*			,Pagamentos.CdLojaMCN*/
+/*			,CadastroFinal.CdParceiroBV*/
+/*			,CadastroFinal.RazaoSocial*/
+/*			,CadastroFinal.NmFantasia*/
+/*			,CadastroFinal.NuCpfCnpj*/
+/*			,CadastroFinal.CdColaborador*/
+/*			,CadastroFinal.NmColaborador*/
+/*			,CadastroFinal.DsLoginN1*/
+/*			,CadastroFinal.CdFilial*/
+/*			,sum(Pagamentos.VrPago) as VrPago*/
+/*			,sum(Pagamentos.VrDesconto) as VrDesconto*/
+/*			,sum(Pagamentos.VrBruto) as VrBruto*/
+/*		from mcn_competencia Pagamentos*/
+/**/
+/*		left join TbMcnCadastroFinal CadastroFinal*/
+/*			on  Pagamentos.NuAnoMes >= CadastroFinal.NuAnoMes*/
+/*			and Pagamentos.NuAnoMes <= CadastroFinal.NuAnoMesFim*/
+/*			and Pagamentos.CdLojaMCN = CadastroFinal.CdLojaMCN*/
+/**/
+/**/
+/*		group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14*/
+/*	;*/
+/*run;*/
+/**/
+/*proc sql;*/
+/*	create table bases.TbMetaMcn as*/
+/*		select*/
+/*			Pagamentos.NuAnoMes*/
+/*			,Pagamentos.CdColaborador*/
+/*			,Pagamentos.NmColaborador*/
+/*			,'Gerente Relacionamento Veiculos' as NmGrupoCargoColaborador*/
+/*			,Pagamentos.DsLoginN1*/
+/*			,Pagamentos.NmGrupoProdutoMeta*/
+/*			,'MULTIMARCAS' as DsTipoCanalProducao*/
+/*			,Pagamentos.CdFilial*/
+/*			,Atualizacao.DtAtualizacao*/
+/*			,'VrMcn' as TpValor*/
+/*			,sum(Pagamentos.VrPago) as VrMedida*/
+/*		from TbMcnPagamentos Pagamentos*/
+/*			left join DtAtualizacao Atualizacao*/
+/*				on 1 = 1*/
+/**/
+/*			where Pagamentos.NuAnoMes >= 201801*/
+/*				and Pagamentos.NuAnoMes <= year(today()-1)*100+month(today()-1)*/
+/**/
+/*			group by 1,2,3,4,5,6,7,8,9,10*/
+/*	;*/
+/*run;*/
+
+/* ======================================================== */
+/* ================= CARTEIRA RESULTADO =================== */
+/* ======================================================== */
+/*proc sql;*/
+/*	create table TbMcnCarteiraResultado as*/
+/*		select*/
+/*			NuAnoMes*/
+/*			,'(Tudo)' as NmGrupoProdutoMeta*/
+/*			,CdColaborador*/
+/*			,NmColaborador*/
+/*			,DsLoginN1*/
+/*			,CdFilial*/
+/*			,count(distinct CdLojaMCN) as QtLojasMCN*/
+/*			,sum(VrPago) as VrPago*/
+/*			,sum(VrDesconto) as VrDesconto*/
+/*			,sum(VrBruto) as VrBruto*/
+/*		from TbMcnPagamentos*/
+/*			group by 1,2,3,4,5,6*/
+/**/
+/*				union all*/
+/**/
+/*			select*/
+/*				NuAnoMes*/
+/*				,NmGrupoProdutoMeta*/
+/*				,CdColaborador*/
+/*				,NmColaborador*/
+/*				,DsLoginN1*/
+/*				,CdFilial*/
+/*				,count(distinct CdLojaMCN) as QtLojasMCN*/
+/*				,sum(VrPago) as VrPago*/
+/*				,sum(VrDesconto) as VrDesconto*/
+/*				,sum(VrBruto) as VrBruto*/
+/*			from TbMcnPagamentos*/
+/*				group by 1,2,3,4,5,6*/
+/*	;*/
+/*run;*/
+
+/* ======================================================== */
+/* ===================== CARTEIRA BV ====================== */
+/* ======================================================== */
+/*%CRIAVARDB;*/
+/**/
+/*proc sql;*/
+/*	%CONECTADB(server=BI);*/
+/*	create table TbCarteiraBI as*/
+/*		select * from connection to dbcon*/
+/*			(*/
+/*		SELECT*/
+/*			TempoData.NuAnoMes*/
+/*			,Colaborador.CdColaboradorSistemaOrigem CdColaborador*/
+/*			,upper(HierarquiaComercial.NmColaborador) AS NmColaborador*/
+/*			,lower(HierarquiaComercial.DsLogin) AS DsLoginN1	   */
+/*			,FilialColaborador.CdFilialSistemaOrigem AS CdFilial*/
+/*			,FilialColaborador.NmFilial*/
+/*			,count(1) AS QtParceiroBV*/
+/**/
+/*		FROM DWBI_DTWH.TbPessoaRelacaoPessoa PessoaRelacaoPessoa5*/
+/**/
+/*		INNER JOIN DWBI_DIME.TbDimTempoData TempoData*/
+/*			ON  TempoData.DtTempo >= PessoaRelacaoPessoa5.DtInicioVigencia*/
+/*			AND TempoData.DtTempo  < PessoaRelacaoPessoa5.DtFimVigencia*/
+/*			AND TempoData.NuAnoMes >= 201801*/
+/*			AND TempoData.NuAnoMes <= year(today())*100+month(today())*/
+/*			AND TempoData.QtDiaFaltanteFinalMes = 0*/
+/**/
+/*		LEFT JOIN*/
+/*			(*/
+/**/
+/*		SELECT*/
+/*			year(DtReferencia)*100+month(DtReferencia) NuAnoMes*/
+/*			,CdParceiroComercial*/
+/*		FROM DWBI_DMOC.TbFatoPropostaVeiculoCP*/
+/*			WHERE DtReferencia >= '20180101'*/
+/*				GROUP BY*/
+/*					year(DtReferencia)*100+month(DtReferencia)*/
+/*					,CdParceiroComercial*/
+/**/
+/*			) ParceiroComercialProposta*/
+/*			ON  PessoaRelacaoPessoa5.CdPessoa = ParceiroComercialProposta.CdParceiroComercial*/
+/*			AND TempoData.NuAnoMes = ParceiroComercialProposta.NuAnoMes*/
+/**/
+/*		INNER JOIN DWBI_DTWH.TbPessoaJuridica PessoaJuridica*/
+/*			ON  PessoaRelacaoPessoa5.CdPessoa = PessoaJuridica.CdPessoa*/
+/**/
+/*		INNER JOIN DWBI_DTWH.TbRegiaoUnidadeNegocio Regiao*/
+/*			ON  PessoaJuridica.CdRegiaoUnidadeNegocio = Regiao.CdRegiaoUnidadeNegocio*/
+/*			AND Regiao.CdSistemaOrigem = 209*/
+/**/
+/*		INNER JOIN DWBI_DTWH.TbFilial Filial*/
+/*			ON  Regiao.CdFilialOrigem = Filial.CdFilialSistemaOrigem*/
+/*			AND Filial.CdSistemaOrigem = 209*/
+/**/
+/*		INNER JOIN DWBI_DIME.TbDimParceiroComercial ParceiroComercial*/
+/*			ON  PessoaJuridica.CdPessoa = ParceiroComercial.CdParceiroComercial	*/
+/**/
+/*		INNER JOIN DWBI_DTWH.TbPessoaRelacaoPessoa PessoaRelacaoPessoa7*/
+/*			ON  PessoaRelacaoPessoa5.CdPessoaRelacao = PessoaRelacaoPessoa7.CdPessoa*/
+/*			AND PessoaRelacaoPessoa7.CdTipoRelacaoPessoa = 7*/
+/*			AND TempoData.DtTempo >= PessoaRelacaoPessoa7.DtInicioVigencia*/
+/*			AND TempoData.DtTempo  < PessoaRelacaoPessoa7.DtFimVigencia*/
+/**/
+/*		LEFT JOIN DWBI_DIME.TbDimHierarquiaComercial HierarquiaComercial*/
+/*			ON  PessoaRelacaoPessoa7.CdPessoaRelacao = HierarquiaComercial.CdColaborador*/
+/*			AND today() BETWEEN HierarquiaComercial.DtInicioVigencia AND HierarquiaComercial.DtFimVigencia*/
+/**/
+/*		LEFT JOIN DWBI_DTWH.TbCargoColaborador CargoColaborador*/
+/*			ON  HierarquiaComercial.CdCargoColaborador = CargoColaborador.CdCargoColaborador*/
+/**/
+/*		LEFT JOIN DWBI_DTWH.TbAreaEstruturaComercial AreaEstruturaComercial*/
+/*			ON  HierarquiaComercial.CdAreaEstruturaComercial = AreaEstruturaComercial.CdAreaEstruturaComercial*/
+/**/
+/*		LEFT JOIN DWBI_DTWH.TbDeParaFilial DeParaFilial*/
+/*			ON  AreaEstruturaComercial.CdAreaEstruturaCmrclStmaOrgm = DeParaFilial.CdAreaEstruturaComercial*/
+/**/
+/**/
+/*		LEFT JOIN DWBI_DTWH.TbFilial FilialColaborador*/
+/*			ON  DeParaFilial.CdFilial = FilialColaborador.CdFilialSistemaOrigem*/
+/*			AND FilialColaborador.CdSistemaOrigem = 209 */
+/**/
+/*		LEFT JOIN DWBI_DTWH.TbColaborador Colaborador*/
+/*			ON  PessoaRelacaoPessoa5.CdPessoaRelacao = Colaborador.CdPessoa*/
+/*			AND today() BETWEEN Colaborador.DtInicioVigencia AND Colaborador.DtFimVigencia*/
+/**/
+/*		WHERE 1 = 1*/
+/*			AND (PessoaJuridica.FlAtivo = 'S' OR ParceiroComercialProposta.CdParceiroComercial IS NOT NULL)*/
+/*			AND ParceiroComercial.CdTipoParceiroComercial IN (2,5)*/
+/*			AND PessoaRelacaoPessoa5.CdTipoRelacaoPessoa = 5*/
+/*			AND CargoColaborador.CdCargoColaboradorStmaOrgm in (SELECT DISTINCT CdCargoColaborador FROM DWBI_DTWH.TbDeParaHierarquia WHERE CdGrupoCargo = 2)	*/
+/**/
+/*		GROUP BY*/
+/*			TempoData.NuAnoMes*/
+/*			,Colaborador.CdColaboradorSistemaOrigem*/
+/*			,upper(HierarquiaComercial.NmColaborador)*/
+/*			,lower(HierarquiaComercial.DsLogin)	   */
+/*			,FilialColaborador.CdFilialSistemaOrigem*/
+/*			,FilialColaborador.NmFilial*/
+/**/
+/*			)*/
+/*	;*/
+/*quit;*/
+/**/
+/*proc sql;*/
+/*	delete from TbCarteiraBI where CdFilial not in (select CdFilial from bases.TbEstruturaComercial where CdCanalEstruturaComercial =1);*/
+/*run;*/
+/**/
+/*proc sql;*/
+/*	create table TbMcnCarteira as*/
+/*		select*/
+/*			NuAnoMes*/
+/*			,'(Tudo)' as NmGrupoProdutoMeta*/
+/*			,CdColaborador*/
+/*			,NmColaborador*/
+/*			,DsLoginN1*/
+/*			,CdFilial*/
+/*			,QtParceiroBV*/
+/*		from TbCarteiraBI*/
+/**/
+/*			union all*/
+/**/
+/*		select*/
+/*			NuAnoMes*/
+/*			,'MCN - Anuncio' as NmGrupoProdutoMeta*/
+/*			,CdColaborador*/
+/*			,NmColaborador*/
+/*			,DsLoginN1*/
+/*			,CdFilial*/
+/*			,QtParceiroBV*/
+/*		from TbCarteiraBI*/
+/**/
+/*			union all*/
+/**/
+/*		select*/
+/*			NuAnoMes*/
+/*			,'MCN - Publicidade' as NmGrupoProdutoMeta*/
+/*			,CdColaborador*/
+/*			,NmColaborador*/
+/*			,DsLoginN1*/
+/*			,CdFilial*/
+/*			,QtParceiroBV*/
+/*		from TbCarteiraBI*/
+/**/
+/*				union all*/
+/**/
+/*		select*/
+/*			NuAnoMes*/
+/*			,'NaPista' as NmGrupoProdutoMeta*/
+/*			,CdColaborador*/
+/*			,NmColaborador*/
+/*			,DsLoginN1*/
+/*			,CdFilial*/
+/*			,QtParceiroBV*/
+/*		from TbCarteiraBI*/
+/*	;*/
+/*quit;*/
+
+/* ======================================================== */
+/* =================== ABA RESULTADO ====================== */
+/* ======================================================== */
+/*data TbMcnConsolidado;*/
+/*	set */
+/*		TbMcnMeta*/
+/*		TbMcnCarteiraResultado*/
+/*		TbMcnCarteira*/
+/*	;*/
+/*run;*/
+/**/
+/*proc sql;*/
+/*	create table TbMcnConsolidado as*/
+/*		select*/
+/*			NuAnoMes*/
+/*			,mdy(input(substr(put(NuAnoMes,6.),5,2),2.),1,input(substr(put(NuAnoMes,6.),1,4),4.)) as DtReferencia format date9.*/
+/*			,NmGrupoProdutoMeta*/
+/*			,CdColaborador*/
+/*			,NmColaborador*/
+/*			,DsLoginN1*/
+/*			,CdFilial*/
+/*			,VrMetaN1*/
+/*			,VrMetaN2*/
+/*			,QtLojasMCN*/
+/*			,VrPago*/
+/*			,VrDesconto*/
+/*			,VrBruto*/
+/*			,QtParceiroBV*/
+/**/
+/*		from TbMcnConsolidado*/
+/*	;*/
+/*run;*/
+/**/
+/*proc sql;*/
+/*	CREATE TABLE bases.TbMcnAbaResultado as*/
+/*		SELECT*/
+/*			Consolidado.NuAnoMes*/
+/*			,Consolidado.NmGrupoProdutoMeta*/
+/*			,Consolidado.CdColaborador*/
+/*			,Consolidado.NmColaborador*/
+/*			,Consolidado.DsLoginN1*/
+/*			,Consolidado.CdFilial*/
+/*			,EstruturaComercial.CdAreaEstruturaComercial*/
+/*			,EstruturaComercial.NmAreaEstruturaComercial*/
+/*			,EstruturaComercial.NmColaboradorN2H*/
+/*			,EstruturaComercial.NmColaboradorN2A*/
+/*			,EstruturaComercial.DsLoginN2H*/
+/*			,EstruturaComercial.DsLoginN2A*/
+/*			,EstruturaComercial.NmSubEstruturaComercialH*/
+/*			,EstruturaComercial.NmSubEstruturaComercialA*/
+/*			,EstruturaComercial.NmColaboradorN3H*/
+/*			,EstruturaComercial.NmColaboradorN3A*/
+/*			,EstruturaComercial.NmColaboradorMCN*/
+/*			,EstruturaComercial.DsLoginN3H*/
+/*			,EstruturaComercial.DsLoginN3A*/
+/*			,EstruturaComercial.DsLoginMCN*/
+/*			,EstruturaComercial.LstSubstituicao*/
+/*			,Atualizacao.DtAtualizacao*/
+/*			,Atualizacao.NmArquivo*/
+/*			,Atualizacao.TsProcessamento*/
+/*			,sum(Consolidado.QtLojasMCN) as QtLojasMCN format 18.0*/
+/*			,sum(Consolidado.QtParceiroBV) as QtParceiroBV format 18.0*/
+/*			,sum(Consolidado.VrPago) as VrPago format 18.2*/
+/*			,sum(Consolidado.VrDesconto) as VrDesconto format 18.2*/
+/*			,sum(Consolidado.VrBruto) as VrBruto format 18.2*/
+/*			,sum(Consolidado.VrMetaN1) as VrMetaN1 format 18.2*/
+/*			,sum(Consolidado.VrMetaN2) as VrMetaN2 format 18.2*/
+/**/
+/*		FROM TbMcnConsolidado Consolidado*/
+/**/
+/*		LEFT JOIN bases.TbEstruturaComercial EstruturaComercial*/
+/*			ON Consolidado.DtReferencia BETWEEN EstruturaComercial.DtInicioVigencia */
+/*			AND EstruturaComercial.DtFimVigencia*/
+/*			AND Consolidado.CdFilial = EstruturaComercial.CdFilial*/
+/*			AND EstruturaComercial.NmNivel = 'N2'*/
+/**/
+/*		LEFT JOIN DtAtualizacao Atualizacao*/
+/*			ON 1 = 1*/
+/**/
+/*		WHERE Consolidado.NuAnoMes >= 201801*/
+/*			AND Consolidado.NuAnoMes <= year(intnx('month',today()-1,1))*100+month(intnx('month',today()-1,1))*/
+/**/
+/*		GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24*/
+/**/
+/*	;*/
+/*run;*/
+/**/
+/*proc export*/
+/*	data=bases.TbMcnAbaResultado*/
+/*	file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaResultado.csv' replace*/
+/*	dbms=dlm;*/
+/*	delimiter=';';*/
+/*run;*/
+/**/
+/*X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaResultado.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/';*/
+
+/* ======================================================== */
+/* ================== ABA PAGAMENTOS ====================== */
+/* ======================================================== */
+/*proc sql;*/
+/*	create table bases.TbMcnAbaPagamentos as*/
+/*		select*/
+/*			Pagamentos.NuAnoMes*/
+/*			,Pagamentos.DtPagamento*/
+/*			,Pagamentos.IdOrdem*/
+/*			,Pagamentos.NmGrupoProdutoMeta*/
+/*			,Pagamentos.CdLojaMCN*/
+/*			,Pagamentos.CdParceiroBV*/
+/*			,Pagamentos.RazaoSocial*/
+/*			,Compress(Pagamentos.NmFantasia,,"kw") AS NmFantasia*/
+/*			,Pagamentos.NuCpfCnpj*/
+/*			,Pagamentos.CdColaborador*/
+/*			,Pagamentos.NmColaborador*/
+/*			,Pagamentos.DsLoginN1*/
+/*			,EstruturaComercial.CdFilial*/
+/*			,EstruturaComercial.CdAreaEstruturaComercial*/
+/*			,EstruturaComercial.NmAreaEstruturaComercial*/
+/*			,EstruturaComercial.NmColaboradorN2H*/
+/*			,EstruturaComercial.NmColaboradorN2A*/
+/*			,EstruturaComercial.DsLoginN2H*/
+/*			,EstruturaComercial.DsLoginN2A*/
+/*			,EstruturaComercial.NmSubEstruturaComercialH*/
+/*			,EstruturaComercial.NmSubEstruturaComercialA*/
+/*			,EstruturaComercial.NmColaboradorN3H*/
+/*			,EstruturaComercial.NmColaboradorN3A*/
+/*			,EstruturaComercial.DsLoginN3H*/
+/*			,EstruturaComercial.DsLoginN3A*/
+/*			,EstruturaComercial.NmColaboradorMCN*/
+/*			,EstruturaComercial.DsLoginMCN*/
+/*			,EstruturaComercial.LstSubstituicao*/
+/*			,Pagamentos.VrPago*/
+/*			,Pagamentos.VrDesconto*/
+/*			,Pagamentos.VrBruto*/
+/**/
+/*		from TbMcnPagamentos Pagamentos*/
+/**/
+/*		left join bases.TbEstruturaComercial EstruturaComercial*/
+/*			on  Pagamentos.DtReferencia between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia*/
+/*			and Pagamentos.CdFilial = EstruturaComercial.CdFilial*/
+/*			and EstruturaComercial.NmNivel = 'N2'*/
+/**/
+/*		where Pagamentos.NuAnoMes >= 201801*/
+/*			and Pagamentos.NuAnoMes <= year(intnx('month',today()-1,1))*100+month(intnx('month',today()-1,1))*/
+/*	;*/
+/*run;*/
+/**/
+/*proc export*/
+/*	data=Basegrc.TbMcnAbaPagamentosHist*/
+/*	file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaPagamentos.csv' replace*/
+/*	dbms=dlm;*/
+/*	delimiter=';';*/
+/*run;*/
+/**/
+/*X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaPagamentos.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/';*/
+
+/* ======================================================== */
+/* ================== ABA RECORRENCIA ===================== */
+/* ======================================================== */
+/**/
+/*proc sql;*/
+/*create table TbMcnRecorrencia_aux01 as*/
+/*select*/
+/*		 Pagamentos.NuAnoMes	*/
+/*		,Pagamentos.DtPagamento*/
+/*		,Pagamentos.IdOrdem*/
+/*		,Pagamentos.NmGrupoProdutoMeta*/
+/*		,Pagamentos.CdLojaMCN*/
+/*		,CadastroFinal.CdParceiroBV*/
+/*		,CadastroFinal.RazaoSocial*/
+/*		,CadastroFinal.NmFantasia*/
+/*		,CadastroFinal.NuCpfCnpj*/
+/*		,CadastroFinal.CdColaborador*/
+/*		,CadastroFinal.NmColaborador*/
+/*		,CadastroFinal.DsLoginN1*/
+/*		,CadastroFinal.CdFilial*/
+/*		,sum(Pagamentos.VrPago) as VrPago*/
+/*		,sum(Pagamentos.VrDesconto) as VrDesconto*/
+/*		,sum(Pagamentos.VrBruto) as VrBruto*/
+/**/
+/*from mcn_competencia Pagamentos*/
+/**/
+/*	left join TbMcnCadastroFinal CadastroFinal*/
+/*		on  Pagamentos.CdLojaMCN = CadastroFinal.CdLojaMCN*/
+/*		and CadastroFinal.FlVigente = 1*/
+/**/
+/*where Pagamentos.NuAnoMes >= year(intnx('month', today(), -12, 'b'))*100+month(intnx('month', today(), -12, 'b'))*/
+/*  and Pagamentos.NuAnoMes  < year(intnx('month', today(),   2, 'b'))*100+month(intnx('month', today(),  2, 'b'))*/
+/*group by 1,2,3,4,5,6,7,8,9,10,11,12,13*/
+/*;run;*/
+/**/
+/**/
+/*proc sql;*/
+/*create table TbMcnRecorrencia_aux02 as*/
+/*select*/
+/*	 Pagamentos.CdLojaMCN	 	*/
+/*	 ,'X'*/
+/*	||max(case when Pagamentos.NuAnoMes >= input(put(intnx('month',today(),-12),yymmn6.),6.) and Pagamentos.NuAnoMes < input(put(intnx('month',today(),-2),yymmn6.),6.) then '1' else '0' end)*/
+/*	||max(case when Pagamentos.NuAnoMes  = input(put(intnx('month',today(),-2),yymmn6.),6.) then '1' else '0' end)*/
+/*	||max(case when Pagamentos.NuAnoMes  = input(put(intnx('month',today(),-1),yymmn6.),6.) then '1' else '0' end)*/
+/*	||max(case when Pagamentos.NuAnoMes  = input(put(intnx('month',today(),-0),yymmn6.),6.) then '1' else '0' end)*/
+/*	||max(case when Pagamentos.NuAnoMes  = input(put(intnx('month',today(), 1),yymmn6.),6.) then '1' else '0' end) as StPagamento*/
+/*from mcn_competencia Pagamentos*/
+/**/
+/*	left join TbMcnCadastroFinal CadastroFinal*/
+/*		on  Pagamentos.CdLojaMCN = CadastroFinal.CdLojaMCN*/
+/*		and CadastroFinal.FlVigente = 1*/
+/**/
+/*where Pagamentos.NuAnoMes >= year(intnx('month', today(), -12, 'b'))*100+month(intnx('month', today(), -12, 'b'))*/
+/*  and Pagamentos.NuAnoMes  < year(intnx('month', today(),   2, 'b'))*100+month(intnx('month', today(),  2, 'b'))*/
+/*group by 1;*/
+/**/
+/**/
+/*proc sql;*/
+/*create table TbMcnAbaRecorrencia as*/
+/*select*/
+/*	 aux01.NuAnoMes format 18.0*/
+/*	,aux01.DtPagamento*/
+/*	,aux01.IdOrdem format 18.0*/
+/*	,aux01.NmGrupoProdutoMeta*/
+/*	,aux01.CdLojaMCN format 18.0*/
+/*	,aux01.CdParceiroBV format 18.0*/
+/*	,aux01.RazaoSocial*/
+/*	,Compress(aux01.NmFantasia,,"kw") AS NmFantasia*/
+/*	,aux01.NuCpfCnpj*/
+/*	,aux01.VrPago format 18.2*/
+/*	,aux01.VrDesconto format 18.2*/
+/*	,aux01.VrBruto format 18.2*/
+/*	,aux01.CdColaborador format 18.0*/
+/*	,aux01.NmColaborador*/
+/*	,aux01.DsLoginN1*/
+/*	,aux01.CdFilial*/
+/*	,EstruturaComercial.CdAreaEstruturaComercial*/
+/*	,EstruturaComercial.NmAreaEstruturaComercial*/
+/*	,EstruturaComercial.NmColaboradorN2A*/
+/*	,EstruturaComercial.DsloginN2A*/
+/*	,EstruturaComercial.NmSubEstruturaComercialA*/
+/*	,EstruturaComercial.NmSubEstruturaComercialH*/
+/*	,EstruturaComercial.NmColaboradorN3A*/
+/*	,EstruturaComercial.NmColaboradorMCN*/
+/*	,EstruturaComercial.DsloginN3A*/
+/*	,EstruturaComercial.DsLoginMCN*/
+/*	,EstruturaComercial.LstSubstituicao*/
+/*	,aux02.StPagamento*/
+/**/
+/*from TbMcnRecorrencia_aux01 aux01*/
+/*	left join TbMcnRecorrencia_aux02 aux02*/
+/*		on aux01.CdLojaMCN = aux02.CdLojaMCN*/
+/**/
+/*	left join bases.TbEstruturaComercial EstruturaComercial*/
+/*		on  aux01.CdFilial = EstruturaComercial.CdFilial*/
+/*		and today() between EstruturaComercial.DtInicioVigencia and EstruturaComercial.DtFimVigencia*/
+/*		and EstruturaComercial.NmNivel = 'N2'*/
+/*;run;*/
+/**/
+/*proc export*/
+/*	data=TbMcnAbaRecorrencia*/
+/*	file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaRecorrencia.csv' replace*/
+/*	dbms=dlm;*/
+/*	delimiter=';';*/
+/*run;*/
+/**/
+/*X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaRecorrencia.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/';*/
+
+/* ======================================================== */
+/* ====================== VALIDACAO ======================= */
+/* ======================================================== */
+/**/
+/*proc sql;*/
+/*create table TbMcnAbaValidacaoFechamento as*/
+/*select distinct*/
+/* 	 Pagamentos.NuAnoMes*/
+/* 	,Pagamentos.CdLojaMCN*/
+/* 	,Pagamentos.CdParceiroBV*/
+/* 	,Pagamentos.NmFantasia*/
+/* 	,Pagamentos.RazaoSocial*/
+/*	,ColaboradorAlteracaoFechamento.CdOperador as CdURA*/
+/*	,coalesce(ColaboradorAlteracaoFechamento.CdColaborador,Colaborador.CdColaborador) as CdColaborador*/
+/*	,coalesce(ColaboradorAlteracaoFechamento.NmColaborador,Colaborador.NmColaborador) as NmColaborador*/
+/**/
+/*	,ColaboradorPreFechamento.CdOperador as CdURA_Anterior*/
+/*	,ColaboradorPreFechamento.CdColaborador as CdColaborador_Anterior*/
+/*	,ColaboradorPreFechamento.NmColaborador as NmColaborador_Anterior*/
+/**/
+/* 	,case*/
+/* 		when ColaboradorAlteracaoFechamento.CdColaborador is not null then 'ALTERAÇÃO MANUAL'*/
+/* 		when Pagamentos.CdColaborador is null then 'SEM MARCAÇÃO DE GR'*/
+/*		when coalesce(ColaboradorAlteracaoFechamento.CdColaborador,Colaborador.CdColaborador) is null then 'SEM MARCAÇÃO DE GR'*/
+/* 		when PreFechamento.cod_colaborador is null then 'INCLUSÃO RECENTE DE GR'*/
+/* 		when coalesce(EstruturaComercial.QtDiasFerias,EstruturaComercial.QtDiasOutros,0) > 0 then 'GR SEM ATIVIDADE NO PERIODO'*/
+/* 		when PreFechamento.cod_colaborador <> Pagamentos.CdColaborador then 'ALTERAÇÃO RECENTE DE GR'*/
+/* 		when PreFechamento.cod_colaborador =  Pagamentos.CdColaborador then 'SEM ALTERAÇÃO RECENTE DE GR'*/
+/* 	 end as Tipo_Alteracao*/
+/**/
+/* 	,Pagamentos.NmAreaEstruturaComercial*/
+/* 	,Pagamentos.NmSubEstruturaComercialH*/
+/*	,EstruturaComercial.QtDiasAtividadeNormal	*/
+/*	,EstruturaComercial.QtDiasFerias*/
+/*	,EstruturaComercial.QtDiasOutros*/
+/* 	,sum(case when Pagamentos.NmGrupoProdutoMeta = 'MCN - Publicidade' then Pagamentos.VrPago end) as  VrPublicidade format 18.2*/
+/* 	,sum(case when Pagamentos.NmGrupoProdutoMeta = 'MCN - Anuncio'     then Pagamentos.VrPago end) as  VrAnuncio  format 18.2*/
+/*	,sum(case when Pagamentos.NmGrupoProdutoMeta = 'NaPista'           then Pagamentos.VrPago end) as  VrnaPista  format 18.2*/
+/*from bases.TbMcnAbaPagamentos Pagamentos*/
+/**/
+/* 	left join basegrc.TbMcnArquivoCadastro PreFechamento*/
+/* 		on  Pagamentos.NuAnoMes = PreFechamento.NuAnoMes*/
+/* 		and Pagamentos.CdLojaMCN = PreFechamento.codigo_mcn*/
+/**/
+/*		left join bases.TbColaborador ColaboradorPreFechamento*/
+/*			on  PreFechamento.cod_colaborador = ColaboradorPreFechamento.CdColaborador*/
+/**/
+/*	left join bases.TbEstruturaComercial EstruturaComercial*/
+/*		on  Pagamentos.NuAnoMes = EstruturaComercial.NuAnoMes*/
+/*		and Pagamentos.CdColaborador = EstruturaComercial.CdColaboradorAtivo*/
+/*		and EstruturaComercial.CdColaboradorAtivo is not null*/
+/**/
+/*	left join basegrc.TbMcnAlteracaoFechamento AlteracaoFechamento*/
+/*		on  Pagamentos.NuAnoMes = AlteracaoFechamento.NuAnoMes*/
+/*		and Pagamentos.CdLojaMCN = AlteracaoFechamento.CdLojaMCN*/
+/**/
+/*		left join bases.TbColaborador ColaboradorAlteracaoFechamento*/
+/*			on  AlteracaoFechamento.CdOperador = ColaboradorAlteracaoFechamento.CdOperador*/
+/*			and ColaboradorAlteracaoFechamento.CdOperador > 0*/
+/**/
+/*	left join bases.TbColaborador Colaborador*/
+/*		on  Pagamentos.CdColaborador = Colaborador.CdColaborador*/
+/**/
+/*where Pagamentos.NuAnoMes = &DtFechamento*/
+/**/
+/* group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17*/
+/* order by*/
+/* 	 case*/
+/* 		when Pagamentos.CdColaborador is null then 1*/
+/*		when  coalesce(ColaboradorAlteracaoFechamento.CdColaborador,Colaborador.CdColaborador) is null then 2*/
+/* 		when ColaboradorAlteracaoFechamento.CdColaborador is not null then 3*/
+/* 		when PreFechamento.cod_colaborador is null then 4*/
+/* 		when coalesce(EstruturaComercial.QtDiasFerias,EstruturaComercial.QtDiasOutros,0) > 0 then 5*/
+/* 		when PreFechamento.cod_colaborador <> Pagamentos.CdColaborador then 6*/
+/* 		when PreFechamento.cod_colaborador = Pagamentos.CdColaborador then 7*/
+/* 	 end*/
+/*;run;*/
+/**/
+/*proc export*/
+/*	data= TbMcnAbaValidacaoFechamento*/
+/*	file='/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaValidacaoFechamento.csv' replace*/
+/*	dbms=dlm;*/
+/*	delimiter=';';*/
+/*run;*/
+/**/
+/*X 'mv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/TbMcnAbaValidacaoFechamento.csv /projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/';*/
+/**/
+
+/* ======================================================== */
+/* ================== FECHAMENTO FINANÇAS ================= */
+/* ======================================================== */
+/**/
+/*proc sql;*/
+/*create table bco_meta_mcn as*/
+/*select*/
+/*	 mod(Pagamentos.NuAnoMes, 1000) as 'Mês base'n*/
+/*	,input(substr(put(Pagamentos.NuAnoMes,6.),1,4),4.) as 'Ano Base'n*/
+/*	,Colaborador.IdMatricula as 'ID RH'n*/
+/*	,5673 as 'Código do indicador / Produto'n*/
+/*	,sum(Pagamentos.VrPago) as Valor format commax18.2*/
+/**/
+/*from bases.TbMcnAbaPagamentos Pagamentos*/
+/**/
+/*	left join bases.TbColaborador Colaborador*/
+/*		on  Pagamentos.CdColaborador = Colaborador.CdColaborador*/
+/**/
+/*where Pagamentos.NuAnoMes = &DtFechamento*/
+/*  and Pagamentos.NmGrupoProdutoMeta <> '(Tudo)'*/
+/**/
+/**/
+/*group by 1,2,3,4*/
+/*;run;*/
+/**/
+/*proc export*/
+/*data=bco_meta_mcn*/
+/*file="/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/bco_meta_mcn_&DsFechamento..csv" replace*/
+/*dbms=dlm;*/
+/*delimiter=';';*/
+/*run;*/
+
+/* ======================================================== */
+/* ===================== BASE OPERAÇÕES =================== */
+/* ======================================================== */
+/**/
+/*proc sql;*/
+/*create table Base_Cadastro_Operacoes as*/
+/*select*/
+/*	 NuAnoMes*/
+/*	,CdLojaMCN */
+/*	,CdParceiroBV*/
+/*	,RazaoSocial*/
+/*	,NmColaborador as GR*/
+/*	,StatusMCN*/
+/*	,NuCPfCnpj*/
+/*	,CdColaborador*/
+/*from TbMcnCadastroFinal Cadastro*/
+/*where TpPessoa <> 'F'*/
+/*  and NuAnoMes = &DtFechamento*/
+/*;run;*/
+/**/
+/*proc export*/
+/*data=Base_Cadastro_Operacoes*/
+/*file="/projetos/MISV/sas-misv-base-indicadores-varejo/outbound/processados/Base_Cadastro_Operacoes_&DsFechamento..csv" replace*/
+/*dbms=dlm;*/
+/*delimiter=';';*/
+/*run;*/

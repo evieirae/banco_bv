@@ -1,0 +1,121 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: TI__Extração - APNP Mercado
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:34:09 UTC
+BUSINESS_AREA: TI
+TARGET_ARCH: DBT_BQ (Score: 5)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 44
+CODE_TASKS_COUNT: 1
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: CONVSIMU = /infogrc/convsimu
+DETECTED_MACROS_DEFINED: DtRef
+DETECTED_MACROS_USED: DtRef, DtRef_fim, DtRef_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: DTREF_FIM, DTREF_INI
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CONVSIMU.TBSIMULACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_CONCORRENTE_&DTREF._PROD
+IMPORTED_LIBNAMES: CONVSIMU
+EXPORTED_LIBNAMES: BASE_CONCORRENTE_&DTREF
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_CONCORRENTE_&DTREF._PROD
+TABLE_READ_PROVENANCE (Flow): BASE_CONCORRENTE_&DTREF._PROD [PROC SORT - DATA=; Resolved qualified read (%LET)], CONVSIMU.TBSIMULACOES [DATA Step - SET], WORK.BASE_CONCORRENTE_&DTREF._PROD [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASE_CONCORRENTE_&DTREF._PROD
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_CONCORRENTE, WORK.BASE_CONCORRENTE_&DTREF
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ PROJECT LETS (Global Parameters) ]]
+%LET DtRef=%eval(&DtRef. + 88);
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 6 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-AsU8vYdg4NuclerI/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname convsimu '/infogrc/convsimu';
+
+
+
+
+
+
+%macro BASE_CONCORRENTE(DtRef_ini, DtRef_fim);
+
+	data base_concorrente;
+		set _null_;
+	run;
+
+	%let DtRef = &DtRef_ini.;
+	%do %while (&DtRef. <= &DtRef_fim.);
+
+		data base_concorrente_&DtRef._prod;
+
+			set convsimu.tbsimulacoes;
+
+			
+
+			keep NuAnoMes NuProposta DtEntradaProposta NuContrato DtContrato FlPropostaPaga VrProducao;
+
+			where NuAnoMes = &DtRef.;
+
+		run;
+
+		
+
+		proc sort data =  base_concorrente_&DtRef._prod nodupkey;
+			by NuProposta;
+		run;
+
+		
+		proc sql;
+
+		CREATE TABLE WORK.base_concorrente_&DtRef. AS
+   		SELECT t1.NuProposta,
+          t1.NuContrato,
+          t1.NuAnoMes,
+          t1.DtEntradaProposta FORMAT=DDMMYY10. AS DtEntradaProposta,
+          t1.DtContrato FORMAT=DDMMYY10. AS DtContrato,
+          t1.FlPropostaPaga,
+          t1.VrProducao
+      	FROM WORK.BASE_CONCORRENTE_&DtRef._PROD t1;
+
+		QUIT;
+
+		
+		%let DtRef = %eval(&DtRef. + 1);
+		%if %sysfunc(mod(&DtRef., 100)) = 13 %then %let DtRef = %eval(&DtRef. + 88);
+
+	%end;
+
+%mend();
+%BASE_CONCORRENTE(202510, 202510);
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */

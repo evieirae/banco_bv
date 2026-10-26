@@ -1,0 +1,174 @@
+START_METADATA
+PROJECT: Rodas__agent_space
+FILE_SAS: CriacaoGrupoControle.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:32 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 10)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -6
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: INFILE  (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 108
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: safraM6
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /RISCOSBVF/BA/PROCESSOS/MANUAIS/IMPORTS/INSGH29092025.CSV [SAS/Local], INPO.TBINSIGHTS [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /riscosbvf/BA/processos/manuais/Imports/Insgh29092025.csv
+TABLE_READ_PROVENANCE (Flow): INPO.TBINSIGHTS [PROC SQL - FROM], TMP.TBPOTENCIALRODAS [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/manuais/Imports/Insgh29092025.csv
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: AGRUPAMENTO, AGRUPAMENTO_CONTROLE, CRIAGRUPOCONTROLE, DDMMYY10, INSGTSNOVO, PDV, POTENCIALRODASSHARE, TBINSIGHTS_NOVO, VALIDA_QTD, VALIDA_QTD_CONTROLE, VALIDA_QTD_CONTROLENOVO, VALIDA_QTD_NOVO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/manuais/Imports/Insgh29092025.csv
+
+END_METADATA
+================================================================================
+proc sql;
+create table Valida_qtd_Controle as
+select
+data,
+Agrupamento_Controle,
+count(1) as qtd
+from Inpo.TbInsights
+where 1=1
+group by 1,2
+;run;
+
+proc sql;
+create table Valida_qtd as
+select
+data,
+Agrupamento,
+count(1) as qtd
+from Inpo.TbInsights
+where 1=1
+group by 1,2
+;run;
+
+PROC SQL;
+CREATE TABLE PotencialRodasShare AS
+  SELECT
+     POT.CdParceiroComercial
+	,SUM(POT.QtContrato) AS Part_ContratosBV
+    ,SUM(POT.QtGravamesMercado) AS Part_Mercado
+	,SUM(POT.QtContrato) / SUM(POT.QtGravamesMercado) as Share
+  FROM   TMP.TbPotencialRodas POT
+
+  WHERE 1=1
+    AND POT.NuAnoMes >= &safraM6.
+    AND POT.FlAtualizacaoMercado = 1
+	And CASE WHEN POT.FxIdade IS NULL THEN ''
+         WHEN POT.FxIdade = 'ZeroKM' THEN 'Novos'
+         ELSE 'Usados'
+         END = 'Usados'
+	and Pot.NmGrupoProduto = 'Leves'
+	and POT.NmCanalEstruturaComercialC = 'Canal Veiculos'
+	and POT.FlAtivo = 'S'
+	and POT.NmTipoParceiroComercial in ('Concessionaria','Loja')
+GROUP BY   1
+;run;
+
+proc sql;
+create table CriaGrupoControle as
+select
+a.*,
+b.Share
+from Inpo.TbInsights as a
+	left join PotencialRodasShare as b
+	on a.pdv = b.CdParceiroComercial
+where 1=1
+and data >= today()
+and Agrupamento <> ''
+and Agrupamento not in('Mais de 40% de Pdvs C\Gravame e S\Contrato BV','Mais de 30% de Pdvs C\Gravame e S\Contrato BV','Mais de 30% de Pdvs C\Gravame e S\Contrato BV no mes anterior') /*TbInsight5*/
+/*Or data >= '02JUN2025'd and Agrupamento_Controle <> ''*/
+;run;
+
+/*importa insight novo*/
+
+data InsgtsNOVO;
+    infile "/riscosbvf/BA/processos/manuais/Imports/Insgh29092025.csv"
+        dlm=';'
+        dsd
+        firstobs=2
+        lrecl=32767
+        encoding='utf-8';
+
+    informat Data ddmmyy10.;  /* Define como ler a data */
+    format Data ddmmyy10.;    /* Define como exibir a data */
+
+    length
+        PDV 8.
+        Agrupamento $100
+        Agrupamento_Controle $100;
+
+    input
+        Data
+        PDV : 8.
+        Agrupamento : $100.
+        Agrupamento_Controle : $100.;
+run;
+
+data TbInsights_NOVO;
+set
+	InsgtsNOVO
+	TbInsight5
+	TbInsightsVazia
+	;run;
+
+proc sql;
+create table Valida_qtd_ControleNovo as
+select
+data,
+Agrupamento_Controle,
+count(1) as qtd
+from TbInsights_NOVO
+where 1=1
+group by 1,2
+;run;
+
+proc sql;
+create table Valida_qtd_Novo as
+select
+data,
+Agrupamento,
+count(1) as qtd
+from TbInsights_NOVO
+where 1=1
+group by 1,2
+;run;
+
+/*
+
+data inpo.TbInsights;
+set inpo.TbInsights_BKP
+	TbInsights_NOVO
+	TbInsight5
+;run;
+
+*/

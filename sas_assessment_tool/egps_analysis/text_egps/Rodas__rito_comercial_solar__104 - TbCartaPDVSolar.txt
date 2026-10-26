@@ -1,0 +1,116 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 104 - TbCartaPDVSolar.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -12
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 60
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ANEEL = /infogrc/TbMercadoSolar/input; BASESRC = /riscosbvf/mis_varejo/integracao; RITOSOL = /infogrc/rito_comercial_solar
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m0
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): RITOSOL.BASE_COBANS_SOLAR_SAIDA [SAS/Local], RITOSOL.BASE_FUNIL_SOLAR [SAS/Local], RITOSOL.BASE_TARGET_SOLAR [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: RITOSOL
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): RITOSOL.BASE_COBANS_SOLAR_SAIDA [PROC SQL - FROM], RITOSOL.BASE_FUNIL_SOLAR [PROC SQL - JOIN], RITOSOL.BASE_TARGET_SOLAR [PROC SQL - JOIN], RITOSOL.CARTA_PDV_SOLAR [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/output/cartapdvsolar.csv
+INTERNAL READS (Temp/Local): RITOSOL.CARTA_PDV_SOLAR
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RITOSOL.BASE_COBANS_SOLAR_SAIDA, RITOSOL.BASE_FUNIL_SOLAR, RITOSOL.BASE_TARGET_SOLAR, RITOSOL.CARTA_PDV_SOLAR
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.CARTA_PDV_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/cartapdvsolar.csv
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/output/cartapdvsolar.csv
+
+END_METADATA
+================================================================================
+Libname BASESRC '/riscosbvf/mis_varejo/integracao'; /*Caminho compartilhado com demais áreas para salvar arquivos para MIS Varejo utilizar*/
+Libname ANEEL '/infogrc/TbMercadoSolar/input';
+/*Libname ONESOLAR '/infogrc/one_one_solar';*/
+Libname ritosol '/infogrc/rito_comercial_solar';
+
+/**Gerar base da Carta PDV**/
+Proc Sql;
+Create table ritosol.Carta_PDV_Solar as
+Select
+	&Base_m0. as Anomes
+	,TbParc.CdParceiroComercial
+	,TbParc.NmParceiroComercial
+	,TbParc.NmAreaEstruturaComercialC
+	,put(TbParc.CdParceiroComercial, 8.) || '-' || TbParc.NmParceiroComercial as Dimensao3
+	,TbParc.NmColaboradorC
+	,TbParc.DsLoginN1C
+	,TbParc.DsLoginN2C
+	,TbParc.DsLoginN3C
+	,TbParc.NuCnpjLoja
+	,TbParc.DtCadastro as DtCadastro Format DDMMYY10.
+	,TbParc.FlAtivo
+	,TbParc.Porte
+	,TbParc.TipoParceiro
+
+	,intck('year', TbParc.DtCadastro, today()) as Tempo_Parceria
+	,Sum(Target.QtContratos_Target) as QtContratos Format COMMAX10.
+	,Sum(Target.Potencial) as Potencial Format COMMAX10.2
+	,Sum(Target.Target) as Target Format COMMAX10.2
+	,Sum(Target.VrProducao_Target) as VrProducao Format COMMAX10.2
+	,Sum(Target.VrProducaoDiaUtil) as VrProducaoDiaUtil Format COMMAX10.2
+	,Sum(Target.VrProducaoProjetado) as VrProducaoProjetado Format COMMAX10.2
+	,Sum(Target.VrMargem) as VrMargem Format COMMAX10.2
+
+	,Sum(Funil.QtdSimulação) as  QtdSimulação Format COMMAX10.
+	,Sum(Funil.FlMSGPositiva) as FlMSGPositiva Format COMMAX10.
+	,Sum(Funil.FlPropostaOriginada) as FlPropostaOriginada Format COMMAX10.
+	,Sum(Funil.FlPropostaAprovada) as FlPropostaAprovada Format COMMAX10.
+	,Sum(Funil.FlPropostaEfetivada) as FlPropostaEfetivada Format COMMAX10.
+/*
+	,Sum(PosVendas.QtContratos) as QtContratos_Elegiveis_PosVenda Format COMMAX10.
+	,Sum(PosVendas.QtContratos_PosVenda) as QtContratos_PosVenda Format COMMAX10.
+	,Sum(PosVendas.QtdSemInteracao) as QtdSemInteracao Format COMMAX10.
+	,Sum(PosVendas.QtdProjetoConcluido) as QtdProjetoConcluido Format COMMAX10.
+	,Sum(PosVendas.QtdNaoRespondeuPesquisa) as QtdNaoRespondeuPesquisa Format COMMAX10.
+	,Sum(PosVendas.QtdNaoEntregue) as QtdNaoEntregue Format COMMAX10.
+	,Sum(PosVendas.QtdNaoContratou) as QtdNaoContratou Format COMMAX10.
+	,Sum(PosVendas.QtdEntregueNaoInstalado) as QtdEntregueNaoInstalado Format COMMAX10.
+	,Sum(PosVendas.VrProducao) as VrProducao_Pos_Vendas Format COMMAX12.2
+*/
+From ritosol.Base_Cobans_Solar_Saida as TbParc
+	Left Join ritosol.Base_Target_Solar as Target On put(TbParc.CdParceiroComercial, 8.) || '-' || TbParc.NmParceiroComercial = Target.Dimensao3 and Target.Visao = 'Cobans' and Target.NuAnomes = &Base_m0. and Target.Semana = 'Mês Fechado'
+	Left Join ritosol.Base_Funil_Solar as Funil On put(TbParc.CdParceiroComercial, 8.) || '-' || TbParc.NmParceiroComercial = Funil.Dimensao3 and Funil.Visao = 'Cobans' and Funil.NuAnomes = &Base_m0. and Funil.Semana = 'Mês Fechado'
+/*	Left Join Base_Pos_Venda_Final as PosVendas On put(TbParc.CdParceiroComercial, 8.) || '-' || TbParc.NmParceiroComercial = PosVendas.Dimensao3 and PosVendas.NuAnomes = &Base_m0.*/
+Where TbParc.FlAtivo = 'S'
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+;Quit;
+
+proc export
+data = ritosol.Carta_PDV_Solar
+file = '/riscosbvf/BA/processos/output/cartapdvsolar.csv' replace
+dbms = dlm;
+delimiter = ';';
+run;
+
+X "mv  /riscosbvf/BA/processos/output/cartapdvsolar.csv  /riscosbvf/BA/processos/output/ ";

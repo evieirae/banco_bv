@@ -1,0 +1,41 @@
+---
+description: Pré-ambiente do terminal — carregar .env e garantir venv ativa antes de qualquer comando Bash no converter (sem exceção)
+alwaysApply: true
+---
+
+# Pré-ambiente (obrigatório antes de qualquer comando no terminal)
+
+**Sem exceção:** toda vez que o agente **invocar o terminal** ao trabalhar neste módulo, na **mesma** invocação do Bash (`-lc '…'`), **antes** do comando principal (incluindo `ls`, `git`, `python`, `pip`, scripts, `dbt`, `tools/*`, etc.), execute **sempre** os passos abaixo na ordem:
+
+1. **`cd` para a raiz do módulo `converter/`** (onde existem `.env`, `venv/` e `requirements.txt`).
+2. **Carregar variáveis de ambiente** sem interromper a cadeia se `.env` não existir: `set -a && { [ ! -f .env ] || . ./.env; } && set +a`  
+   - Exporta as variáveis do `.env` para o processo (ex.: `GCP_*`, `GITHUB_*`, `GOOGLE_APPLICATION_CREDENTIALS`).
+3. **Ativar a venv do projeto** quando existir `venv/Scripts/activate` (Windows) ou `venv/bin/activate` (Unix), com o padrão `{ [ ! -f … ] || source …; }` para **não** abortar o restante do `&&` se a venv ainda não foi criada.  
+   - Inclua **sempre** no mesmo script: reexecutar o `source` na mesma venv é **idempotente** e evita comparar caminhos `VIRTUAL_ENV` entre estilos POSIX/Windows.
+
+Se o comando precisar rodar em outro diretório, faça isso **depois** do prelúdio (por exemplo: `… && cd .. && git status` a partir da raiz do monorepo).
+
+## Modelo de one-liner (Git Bash + PowerShell `&`)
+
+Encaixe o seu comando **depois** do último `&&`, mantendo o padrão de `CLAUDE.md` para o caminho do `bash.exe`:
+
+```bash
+cd "<raiz-do-converter>" && set -a && { [ ! -f .env ] || . ./.env; } && set +a && { [ ! -f venv/Scripts/activate ] || source venv/Scripts/activate; } && { [ ! -f venv/bin/activate ] || . venv/bin/activate; } && <seu-comando-aqui>
+```
+
+Em máquinas só Windows, o bloco `venv/bin/activate` não faz nada além de um teste rápido de arquivo inexistente.
+
+## Aspas, `-lc` e impressão de variáveis
+
+No mesmo literal Bash passado em `-lc '…'` (via PowerShell `& … -lc '…'`):
+
+- **Não use os caracteres `<` ou `>` como texto “decorativo”** (ex.: placeholder `<empty>`). O Bash trata `<` como **redirecionamento de entrada**; expressões como `${VAR:-<empty>}` geram **erro de sintaxe** (`syntax error near unexpected token`).
+- **Evite** defaults em `${VAR:-…}` com `|`, `>`, `<` ou aspas aninhadas no fim da cadeia, se não tiver certeza do fechamento do literal.
+- **Padrão seguro** para inspecionar variável já exportada pelo `.env`:
+  - `printf '%s\n' "GCP_DATASET=$GCP_DATASET"`
+  - ou `echo "GCP_DATASET=$GCP_DATASET"`
+- Se precisar de default quando vazio, use texto **sem** `<`/`>`, por exemplo `${GCP_DATASET:-unset}` ou teste explícito com `[ -n "${GCP_DATASET:-}" ]`.
+
+## Motivo
+
+Sessões do agente costumam **não** manter estado entre chamadas ao terminal; o prelúdio garante cwd, credenciais e o mesmo `python` em **toda** execução, inclusive comandos “simples”, para evitar divergência de ambiente.

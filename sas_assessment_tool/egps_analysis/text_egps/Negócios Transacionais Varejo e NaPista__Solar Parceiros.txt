@@ -1,0 +1,2317 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Negócios Transacionais Varejo e NaPista__Solar Parceiros
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:38:03 UTC
+BUSINESS_AREA: Negócios Transacionais Varejo e NaPista
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 2153
+CODE_TASKS_COUNT: 20
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBFUNILSIMULACAO_SOLAR [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local], BASES.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.SIMULACAOCANAL_2
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.PARCEIROSATIVOS, WORK.SIMULACAOCANAL_2
+TABLE_READ_PROVENANCE (Flow): BASES.TBFUNILSIMULACAO_SOLAR [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - FROM], BASES.TBPRODUCAO [PROC SQL - FROM], WORK.PARCEIROSATIVOS [PROC SQL - FROM], WORK.SIMULACAOCANAL_2 [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: APURACAOCAMPANHA_, PRODCANALDIARIA_, PRODCANAL_, PRODMISSAO, PRODSAZONAL, SIMULACAOCANAL, SIMULACAOCANAL_, SIMULACAOCANAL_2, WORK.CNPJ, WORK.FILTER_FOR_PARCEIROSATIVOS, WORK.FILTER_FOR_SIMULACAOCANAL_2, WORK.PARCEIROS, WORK.PARCEIROSATIVOS, WORK.QUERY_FOR_PARCEIROSATIVOS, WORK.QUERY_FOR_SIMULACAOCANAL_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Parceiros */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Parceiros */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Ji8T4GGvQx7WHeGU/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.PARCEIROSATIVOS AS
+   SELECT t1.CdParceiroComercial,
+		  t1.NmParceiroComercial,
+		  t1.NuCnpjLoja,
+		  t1.DsAtividadeFinanciamento,
+          t1.NmTipoParceiroComercial,
+		  t1.NmParceiroComercial,
+          t1.CdUf,
+		  t1.NmCidade,
+		  t1.CdCep,
+          t1.CdColaboradorC,
+		  t1.NmColaboradorC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+          t1.DtCadastro,
+		  t1.DtUltimaAtualizacao,
+          t1.FlAtivo
+      FROM BASES.TBPARCEIROCOMERCIAL t1
+      WHERE t1.NmCanalEstruturaComercialC = 'Canal Solar' AND t1.DsAtividadeFinanciamento = 'MAQ. EQUIPAMENTOS' AND t1.FlAtivo = 'S';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Parceiros */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-74Ovx9UM7QrNak21/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table prodcanal_ as select
+
+NuAnoMes,
+CanalProducaoSolar,
+
+NmAreaEstruturaComercialC,
+NuCnpjLoja,
+NuCnpjLojaFavorecido,
+CdParceiroComercial,
+count(nucontrato) as qtdcontratos,
+sum(VrProducao) as VrProducao,
+sum(VrMargemContribuicao) as VrMargemContribuicao,
+sum(QtSeguros) as QtSeguros,
+sum(VrSeguros) as VrSeguros,
+sum(FlBVMais) as QtBVMais,
+sum(VrBVMais) as VrBVMais,
+sum(FlCap) as QtCap,
+sum(VrCap) as VrCap,
+sum(FlPlacaSolar) as QtPlacaSolar,
+sum(VrPlacaSolar) as VrPlacaSolar
+
+
+
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND NuAnoMes >= 202501
+
+group by 1,2,3,4,5,6;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-O6P7THQfrPPrdv74/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table simulacaocanal_ as select
+
+NuAnoMesSimu,
+CdParceiroComercial,
+NmAreaEstruturaComercialC,
+QtTotalDiaUtilMes,
+Count (distinct NuCpfCNPJSimu) as QtCPFSimulado,
+Count (decisao = 'aprovada') as QtAprovada,
+sum(FlPropostaOriginada) as QtPropostaOriginada,
+sum(FlPropostaAprovada) as QtPropostaAprovada,
+sum(FlPropostaEfetivada) as QtPropostaEfetivada,
+sum(VrSimulacao) as VrSimulacao,
+sum(VrPropostaOriginada) as VrPropostaOriginada,
+sum(VrPropostaAprovada) as VrPropostaAprovada,
+sum(VrPropostaEfetivada) as VrPropostaEfetivada
+
+from bases.tbfunilsimulacao_solar
+WHERE NuAnoMesSimu >= 202505
+
+group by 1,2,3,4;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-rt44uNnvVZ43k2V5/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+    create table simulacaocanal as
+    select
+        NuAnoMesSimu,
+        CdParceiroComercial,
+        NmAreaEstruturaComercialC,
+        QtTotalDiaUtilMes,
+        count(distinct NuCpfCNPJSimu) as QtCPFSimulado,
+        
+        (select count(distinct NuCpfCNPJSimu)
+         from bases.tbfunilsimulacao_solar as b
+         where b.decisao = 'aprovada'
+           and b.NuAnoMesSimu = a.NuAnoMesSimu
+           and b.CdParceiroComercial = a.CdParceiroComercial
+           and b.NmAreaEstruturaComercialC = a.NmAreaEstruturaComercialC) as QtAprovada,
+        sum(FlPropostaOriginada) as QtPropostaOriginada,
+        sum(FlPropostaAprovada) as QtPropostaAprovada,
+        sum(FlPropostaEfetivada) as QtPropostaEfetivada,
+        sum(VrSimulacao) as VrSimulacao,
+        sum(VrPropostaOriginada) as VrPropostaOriginada,
+        sum(VrPropostaAprovada) as VrPropostaAprovada,
+        sum(VrPropostaEfetivada) as VrPropostaEfetivada
+    from bases.tbfunilsimulacao_solar as a
+    where NuAnoMesSimu >= 202501
+    group by 1,2,3,4;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Efetivada/Aprovada - Copy */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Efetivada/Aprovada - Copy */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-w28u3XwNtUKxm22t/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table simulacaocanal as select
+  NuAnoMesSimu,
+  CdParceiroComercial,
+  NmAreaEstruturaComercialC,
+  QtTotalDiaUtilMes,
+  Decisao,
+  count(distinct NuCpfCNPJSimu) as QtCpfDistintos,
+  count(distinct case when FlPropostaOriginada > 0 then NuCpfCNPJSimu end) as QtPropostaOriginada,
+  sum(FlPropostaAprovada) as QtPropostaAprovada,
+  sum(FlPropostaEfetivada) as QtPropostaEfetivada,
+  sum(VrSimulacao) as VrSimulacao,
+  sum(VrPropostaOriginada) as VrPropostaOriginada,
+  sum(VrPropostaAprovada) as VrPropostaAprovada,
+  sum(VrPropostaEfetivada) as VrPropostaEfetivada
+
+from bases.tbfunilsimulacao_solar
+where NuAnoMesSimu >= 202506 and Decisao = 'APROVADA'
+
+group by 1,2,3,4,5;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Efetivada/Aprovada - Copy */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Efetivada/Aprovada */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Efetivada/Aprovada */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-Qk4LsqZE58tVkoPg/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table simulacaocanal_2 as select
+
+NuAnoMesSimu,
+CdParceiroComercial,
+NmAreaEstruturaComercialC,
+QtTotalDiaUtilMes,
+NuCpfCNPJSimu,
+Decisao,
+sum(FlPropostaOriginada) as QtPropostaOriginada,
+sum(FlPropostaAprovada) as QtPropostaAprovada,
+sum(FlPropostaEfetivada) as QtPropostaEfetivada,
+sum(VrSimulacao) as VrSimulacao,
+sum(VrPropostaOriginada) as VrPropostaOriginada,
+sum(VrPropostaAprovada) as VrPropostaAprovada,
+sum(VrPropostaEfetivada) as VrPropostaEfetivada
+
+from bases.tbfunilsimulacao_solar
+WHERE NuAnoMesSimu >= 202509 AND FlPropostaOriginada >=1
+
+group by 1,2,3,4,5,6;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Efetivada/Aprovada */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (3) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-wupkwkLhib1xiavV/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table prodcanaldiaria_ as select
+
+DtContrato,
+
+NmAreaEstruturaComercialC,
+
+NuCnpjLojaFavorecido,
+
+count(nucontrato) as qtdcontratos,
+sum(VrProducao) as VrProducao,
+sum(VrMargemContribuicao) as VrMargemContribuicao,
+sum(QtSeguros) as QtSeguros,
+sum(VrSeguros) as VrSeguros,
+sum(FlBVMais) as QtBVMais,
+sum(VrBVMais) as VrBVMais,
+sum(FlCap) as QtCap,
+sum(VrCap) as VrCap,
+sum(FlPlacaSolar) as QtPlacaSolar,
+sum(VrPlacaSolar) as VrPlacaSolar
+
+
+
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND DtContrato >= '01Jul2025'd
+
+group by 1,2,3;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (4) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (4) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-c5GVwQoXnoHLD6dB/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.PARCEIROS AS
+   SELECT t1.CdParceiroComercial,
+		  t1.NmParceiroComercial,
+		  t1.NuCnpjLoja,
+		  t1.DsAtividadeFinanciamento,
+          t1.NmTipoParceiroComercial,
+		  t1.NmParceiroComercial,
+          t1.CdUf,
+		  t1.NmCidade,
+		  t1.CdCep,
+          t1.CdColaboradorC,
+		  t1.NmColaboradorC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+		  t1.DtUltimaAtualizacao,
+          t1.DtCadastro,
+          t1.FlAtivo
+      FROM BASES.TBPARCEIROCOMERCIAL t1
+      WHERE t1.CdParceiroComercial in (
+414958
+471702
+443314
+470173
+449553
+413461
+);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (4) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: CNPJ */
+/* ORDEM EXECUÇÃO: 009 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: CNPJ */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-k3UgZsArcFCOUEH9/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.CNPJ AS
+   SELECT t1.CdParceiroComercial,
+		  t1.NmParceiroComercial,
+		  t1.NuCnpjLoja,
+
+
+
+
+
+
+
+
+
+
+
+
+          t1.FlAtivo
+      FROM BASES.TBPARCEIROCOMERCIAL t1
+      WHERE t1.CdParceiroComercial in (
+432228
+402424
+413976
+469219
+414195
+410314
+410598
+412164
+472099
+446900
+397370
+445805
+412615
+445615
+418197
+441954
+453205
+422266
+413792
+463593
+400655
+424208
+449608
+468082
+477928
+414127
+466468
+414404
+472151
+422417
+459196
+431974
+414102
+453597
+454228
+469090
+472363
+469492
+447099
+445823
+473278
+470356
+414488
+412096
+476324
+464637
+478359
+464021
+434249
+450181
+470359
+446683
+445692
+470492
+414532
+415610
+443473
+472104
+473380
+477916
+439614
+449968
+459448
+399593
+473602
+475121
+412515
+448954
+419718
+412713
+463831
+434050
+402521
+453383
+475486
+473035
+415779
+429794
+399580
+471724
+402837
+458676
+457588
+470305
+467834
+415729
+448825
+475344
+439009
+470951
+470051
+460679
+417359
+435042
+450839
+459548
+418200
+472847
+433859
+443532
+416350
+415185
+453454
+403024
+416742
+452486
+473112
+423427
+439829
+442658
+460831
+433905
+464199
+400967
+465628
+400558
+421703
+469650
+432097
+453575
+424974
+460067
+462493
+466928
+452456
+414083
+433391
+414834
+472777
+468002
+412190
+414452
+413644
+413241
+460204
+442044
+414141
+446431
+473507
+412795
+442343
+474729
+475230
+475904
+472362
+430902
+469336
+449446
+440432
+469862
+420945
+461878
+446010
+468127
+464360
+432605
+473187
+464812
+475704
+401445
+453042
+424985
+430010
+451927
+452157
+475599
+413252
+473405
+463354
+412377
+412925
+460635
+463185
+470869
+443624
+473200
+452274
+461369
+415394
+470230
+466302
+420812
+429153
+452703
+475151
+404937
+470491
+453088
+471038
+452447
+466137
+471679
+469364
+466574
+435338
+477925
+465196
+420912
+432565
+473335
+466263
+466515
+412791
+458629
+411614
+453543
+475056
+463171
+403467
+463860
+399200
+465482
+420841
+474299
+472669
+472727
+423025
+445986
+446318
+449638
+453261
+439070
+462142
+474321
+411683
+411809
+469728
+478134
+453829
+413467
+465176
+473583
+420974
+467798
+445755
+426328
+423554
+412161
+448997
+414274
+470333
+461215
+426796
+404091
+470410
+466020
+470982
+473923
+464678
+462631
+449039
+472747
+423836
+469670
+474870
+445743
+403390
+471397
+478056
+400528
+432719
+449440
+463275
+466690
+466139
+465998
+473033
+435785
+415224
+470019
+413639
+414440
+471734
+402882
+464451
+435709
+472173
+426004
+405417
+464366
+448824
+472312
+472707
+470226
+461977
+471217
+452811
+470602
+466110
+443365
+470173
+464412
+462608
+460701
+433561
+478109
+422018
+464820
+474504
+443337
+471920
+453112
+414748
+412684
+466912
+469981
+462937
+401044
+415552
+431399
+450962
+466698
+448922
+443067
+420739
+446208
+446103
+400607
+476780
+473163
+471654
+415305
+403398
+432736
+464607
+472132
+402898
+477149
+465550
+465935
+463023
+451165
+474973
+470906
+473986
+433048
+472081
+475307
+471881
+403731
+452159
+463645
+473526
+415688
+443314
+445693
+426140
+471452
+453903
+474386
+421479
+470523
+432976
+448122
+471495
+453197
+476616
+426466
+474993
+474769
+470339
+470267
+442322
+461801
+471132
+414912
+453949
+400014
+463893
+471694
+470522
+418752
+443490
+399020
+450776
+439200
+475548
+411124
+467836
+442520
+450579
+400122
+414173
+451202
+462935
+414873
+427968
+446452
+449985
+453637
+475901
+415175
+420255
+442697
+411681
+444709
+451013
+474923
+410352
+414958
+418270
+467913
+470181
+472062
+451720
+449566
+449489
+468892
+449708
+466241
+444679
+402330
+457449
+433493
+446522
+476062
+404094
+448807
+475953
+470319
+455767
+475517
+471562
+471657
+469680
+415932
+410878
+465213
+471212
+466770
+455347
+465512
+475066
+477958
+473461
+469779
+465826
+464000
+426702
+475478
+475559
+414185
+448303
+426501
+414037
+462399
+473597
+449929
+477832
+470608
+470497
+470591
+466513
+469882
+465027
+472528
+433051
+477019
+470116
+466372
+470346
+459147
+413506
+473546
+474448
+412937
+470249
+466673
+445100
+463010
+474467
+414626
+464361
+429081
+437433
+475110
+453564
+477909
+463238
+477729
+400942
+452686
+459001
+415893
+399573
+470905
+471658
+417845
+432779
+470719
+471391
+477896
+477691
+478263
+411617
+417954
+471879
+419331
+415721
+470605
+445460
+425596
+416718
+463273
+477690
+430956
+414077
+477914
+471703
+461104
+453160
+471207
+451688
+421291
+453585
+442098
+472063
+475469
+466667
+442685
+404135
+462419
+453343
+476918
+468527
+453673
+470340
+414458
+450415
+416339
+415144
+453797
+464621
+439889
+415237
+470437
+478100
+468051
+448513
+470162
+422603
+461597
+470105
+462143
+477910
+446858
+471192
+449871
+420819
+403587
+477987
+474374
+404434
+404139
+432633
+415804
+468218
+436435
+411303
+471986
+415322
+450288
+430425
+445537
+470034
+446555
+453740
+470212
+464047
+401147
+450116
+477918
+478290
+460905
+472726
+463200
+465852
+475967
+475016
+477741
+438625
+398989
+471666
+419149
+414035
+440253
+431972
+470814
+417350
+469996
+471584
+419502
+477513
+462232
+478111
+474484
+423154
+467095
+477957
+476936
+453216
+471691
+438561
+471523
+427023
+478110
+439064
+415324
+436126
+452526
+465231
+463302
+414478
+451316
+455042
+473850
+413270
+434998
+472102
+472180
+473999
+450002
+446513
+463895
+459002
+414808
+446402
+421227
+420450
+462701
+416850
+462782
+443599
+473751
+414095
+413577
+471631
+452922
+415895
+465621
+465800
+473844
+468398
+450894
+446990
+470521
+452737
+444641
+414684
+453385
+440591
+414567
+453754
+415330
+434191
+434650
+466537
+474508
+454830
+400705
+465884
+438281
+465693
+477862
+426014
+470203
+470132
+456703
+446400
+471004
+478328
+411679
+474277
+450503
+477920
+465897
+473358
+450634
+463835
+414830
+467435
+470187
+448004
+473198
+470098
+404755
+471154
+458803
+443621
+472811
+465110
+473387
+469166
+415946
+429338
+443570
+476177
+438115
+473385
+448961
+424020
+470654
+476974
+445148
+451676
+471683
+466337
+467078
+453115
+423357
+476826
+417746
+458080
+416277
+442996
+444624
+462748
+470186
+429657
+432009
+413432
+463525
+437009
+427077
+415772
+478105
+463065
+473596
+460255
+458684
+463938
+474933
+471702
+422013
+401588
+475570
+474488
+471552
+471633
+433254
+463383
+417783
+472979
+412561
+411849
+433540
+437067
+449534
+411996
+413510
+449454
+471029
+478123
+462779
+472329
+474960
+470354
+412531
+414100
+477919
+464332
+471517
+421799
+472533
+462944
+461481
+466242
+412503
+463638
+452973
+471481
+401754
+453552
+464099
+424687
+472464
+448730
+466816
+471250
+420501
+470670
+412485
+471341
+454388
+474376
+444972
+421586
+414722
+474097
+476172
+472149
+471430
+464076
+476938
+466887
+443298
+477774
+400123
+446381
+468713
+444958
+418392
+451244
+403373
+473159
+463446
+445945
+471688
+470175
+414038
+414310
+413427
+472056
+413239
+446763
+464505
+473559
+474812
+427220
+473610
+461425
+454140
+454391
+477728
+415685
+448645
+419141
+463153
+478296
+443280
+453583
+420205
+453655
+460290
+411646
+435023
+470542
+418213
+471173
+467027
+467094
+418229
+414350
+453156
+474096
+466205
+443905
+477814
+422457
+433285
+449144
+478079
+461660
+420755
+423083
+435847
+467097
+477073
+405976
+445913
+476506
+461506
+452824
+464641
+415343
+410213
+453243
+467033
+475386
+424572
+421262
+423109
+478165
+464815
+478156
+478493
+440048
+428554
+414335
+478106
+467024
+470153
+474375
+444588
+478163
+444047
+420631
+478126
+414139
+472483
+400871
+419488
+412252
+464444
+414798
+466951
+414919
+425370
+420322
+453200
+477510
+413849
+410645
+415374
+438957
+449119
+478357
+441085
+453005
+471061
+417905
+471533
+477463
+421797
+454866
+478474
+415663
+465802
+470325
+476773
+413634
+419813
+400013
+445371
+469425
+478162
+471839
+400597
+452099
+463937
+447485
+422329
+402911
+415959
+399278
+470470
+434445
+416083
+436799
+449787
+471780
+422512
+400439
+472299
+447326
+466999
+478291
+467016
+453113
+465708
+444054
+477259
+414081
+442227
+411395
+419664
+456683
+467065
+477045
+476676
+431931
+472060
+399899
+471732
+445798
+414356
+464476
+478367
+477917
+467042
+411952
+418238
+433951
+441782
+477581
+452865
+403370
+411476
+474013
+463386
+415364
+400805
+477730
+439008
+422620
+466948
+402991
+441539
+470370
+411824
+445786
+470360
+467096
+471627
+418961
+415101
+478258
+411822
+453621
+441972
+451057
+445709
+475051
+473712
+430179
+453203
+418259
+466973
+441999
+467012
+472514
+413964
+422559
+454839
+416071
+466997
+464738
+445265
+471128
+432530
+470357
+442041
+471015
+462839
+420109
+413531
+478259
+471519
+464749
+408890
+439397
+438560
+433068
+399535
+443815
+453698
+443832
+416851
+471210
+402426
+434372
+420117
+463040
+464449
+473805
+441769
+467088
+478108
+478112
+472912
+463297
+467079
+438755
+477921
+447088
+415836
+467022
+469071
+477556
+466946
+399511
+470144
+478358
+412739
+442352
+466344
+477842
+476162
+412007
+420985
+418917
+474909
+465233
+478102
+465111
+411488
+467098
+475838
+466028
+430371
+410794
+440852
+477056
+471874
+414679
+477927
+451162
+415119
+423824
+434534
+420520
+433995
+414595
+478203
+478091
+463219
+441229
+425615
+467089
+416585
+476658
+477502
+478103
+478544
+478189
+472815
+478425
+401625
+472191
+455043
+467066
+473770
+476383
+478603
+470520
+434347
+449916
+471227
+455520
+447812
+474396
+476483
+477787
+478020
+478038
+478107
+478275
+478408
+467017
+448246
+413779
+466509
+432269
+440995
+467023
+443741
+467093
+472287
+477874
+478360
+448773
+464931
+467751
+466956
+472799
+473328
+476020
+478284
+478293
+478368
+478475
+452438
+420111
+466945
+467054
+467084
+473022
+477759
+477865
+478080
+478255
+478292
+478451
+478484
+478543
+406029
+414408
+414628
+416310
+419791
+422279
+432200
+433028
+437772
+445809
+445916
+446657
+447313
+450845
+453574
+464500
+465141
+465896
+466953
+466957
+466968
+466972
+467031
+467034
+467063
+467064
+467092
+467099
+467100
+467101
+467102
+470101
+471180
+471375
+471453
+471476
+471629
+471708
+471777
+471875
+472003
+472184
+472319
+472564
+472692
+472926
+472970
+473058
+473977
+474152
+474182
+474394
+474471
+475552
+475846
+475952
+476747
+476922
+476958
+477000
+477075
+477189
+477477
+477559
+477639
+477666
+477689
+477721
+477722
+478101
+478116
+478118
+478124
+478125
+478130
+478155
+478157
+478158
+478159
+478164
+478190
+478214
+478252
+478257
+478294
+478327
+478351
+478353
+478426
+478437
+478519
+478555
+478565
+478589
+478617
+478618
+478637
+478652
+478653
+478667
+478684
+478693
+478694
+478704
+478705
+478720
+478723
+478733
+478754
+478785
+478800
+478818
+478820
+478834
+478851
+478865
+478867
+478891
+478895
+478913
+478917
+478934
+478938
+478939
+478940
+478941
+478942
+478968
+479007
+479057
+479094
+479097
+479101
+479128
+479130
+479131
+479159
+479160
+479257
+479258
+479304
+);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: CNPJ */
+/* ORDEM EXECUÇÃO: 009 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Produção - Copy */
+/* ORDEM EXECUÇÃO: 010 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Produção - Copy */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-8ZqQsxXBubZp1aKQ/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table prodsazonal as select
+
+CanalProducaoSolar,
+NuAnoMes,
+NmAreaEstruturaComercialC,
+NuCnpjLoja,
+NuCnpjLojaFavorecido,
+CdParceiroComercial,
+count(nucontrato) as qtdcontratos,
+sum(VrProducao) as VrProducao,
+sum(VrMargemContribuicao) as VrMargemContribuicao,
+sum(QtSeguros) as QtSeguros,
+sum(VrSeguros) as VrSeguros
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND NuAnoMes >= 202201
+
+group by 1,2,3,4,5,6;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Produção - Copy */
+/* ORDEM EXECUÇÃO: 010 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (5) */
+/* ORDEM EXECUÇÃO: 011 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (5) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-YHWEkBy6ozZtMXry/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table prodMissao as select
+
+NuAnoMes,
+NmSubEstruturaComercialC,
+NmAreaEstruturaComercialC,
+DsLoginN3C,
+DsLoginN2C,
+DsLoginN1C,
+DsLoginN1CartPDV,
+CdColaboradorC,
+NmColaboradorC,
+NmGrupoProdutoMeta,
+DtContrato,
+sum(VrMargemContribuicao) as VrMargemContribuicao
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND NuAnoMes >= 202510
+
+group by 1,2,3,4,5,6,7,8,9,10,11;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (5) */
+/* ORDEM EXECUÇÃO: 011 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (3) (2) */
+/* ORDEM EXECUÇÃO: 012 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (3) (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-zZie3ThxAn7DrBHP/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table prodcanaldiaria_ as select
+
+DtContrato,
+
+NmAreaEstruturaComercialC,
+
+NuCnpjLojaFavorecido,
+
+count(nucontrato) as qtdcontratos,
+sum(VrProducao) as VrProducao,
+sum(VrMargemContribuicao) as VrMargemContribuicao,
+sum(QtSeguros) as QtSeguros,
+sum(VrSeguros) as VrSeguros,
+sum(FlBVMais) as QtBVMais,
+sum(VrBVMais) as VrBVMais,
+sum(FlCap) as QtCap,
+sum(VrCap) as VrCap,
+sum(FlPlacaSolar) as QtPlacaSolar,
+sum(VrPlacaSolar) as VrPlacaSolar
+
+
+
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND DtContrato >= '01Jul2025'd
+
+group by 1,2,3;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (3) (2) */
+/* ORDEM EXECUÇÃO: 012 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (3) (3) */
+/* ORDEM EXECUÇÃO: 013 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (3) (3) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-igrqBchJh2kQ2AaC/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table prodcanaldiaria_ as select
+
+DtContrato,
+
+NmAreaEstruturaComercialC,
+
+NuCnpjLojaFavorecido,
+
+count(nucontrato) as qtdcontratos,
+sum(VrProducao) as VrProducao,
+sum(VrMargemContribuicao) as VrMargemContribuicao,
+sum(QtSeguros) as QtSeguros,
+sum(VrSeguros) as VrSeguros,
+sum(FlBVMais) as QtBVMais,
+sum(VrBVMais) as VrBVMais,
+sum(FlCap) as QtCap,
+sum(VrCap) as VrCap,
+sum(FlPlacaSolar) as QtPlacaSolar,
+sum(VrPlacaSolar) as VrPlacaSolar
+
+
+
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND DtContrato >= '01Jul2025'd
+
+group by 1,2,3;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (3) (3) */
+/* ORDEM EXECUÇÃO: 013 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Apuração Campanhas */
+/* ORDEM EXECUÇÃO: 014 */
+/* FLUXO: PFD Flow 15 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Apuração Campanhas */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ag7jzGZsTXJVXRxD/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table apuracaocampanha_ as select
+
+DtContrato,
+CanalProducaoSolar,
+NmAreaEstruturaComercialC,
+NuCnpjLojaFavorecido,
+count(nucontrato) as qtdcontratos,
+sum(VrProducao) as VrProducao,
+sum(VrMargemContribuicao) as VrMargemContribuicao,
+sum(QtSeguros) as QtSeguros,
+sum(VrSeguros) as VrSeguros,
+sum(FlBVMais) as QtBVMais,
+sum(VrBVMais) as VrBVMais,
+sum(FlCap) as QtCap,
+sum(VrCap) as VrCap,
+sum(FlPlacaSolar) as QtPlacaSolar,
+sum(VrPlacaSolar) as VrPlacaSolar
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND DtContrato >= '01Jul2025'd
+
+group by 1,2,3,4;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Apuração Campanhas */
+/* ORDEM EXECUÇÃO: 014 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 015 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_PARCEIROSATIVOS);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_PARCEIROSATIVOS AS
+   SELECT t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.NuCnpjLoja,
+          t1.DsAtividadeFinanciamento,
+          t1.NmTipoParceiroComercial,
+          t1.NmCobanAtendimento,
+          t1.CdUf,
+          t1.NmCidade,
+          t1.CdCep,
+          t1.CdColaboradorC,
+          t1.NmColaboradorC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+          t1.DtCadastro,
+          t1.FlAtivo
+      FROM WORK.PARCEIROSATIVOS t1
+      WHERE t1.CdParceiroComercial = 418254;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 015 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 016 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_SIMULACAOCANAL_2);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_SIMULACAOCANAL_2 AS
+   SELECT t1.NuAnoMesSimu,
+          t1.CdParceiroComercial,
+          t1.NmAreaEstruturaComercialC,
+          t1.QtTotalDiaUtilMes,
+          t1.NuCpfCNPJSimu,
+          t1.Decisao,
+          t1.QtPropostaOriginada,
+          t1.QtPropostaAprovada,
+          t1.QtPropostaEfetivada,
+          t1.VrSimulacao,
+          t1.VrPropostaOriginada,
+          t1.VrPropostaAprovada,
+          t1.VrPropostaEfetivada
+      FROM WORK.SIMULACAOCANAL_2 t1
+      WHERE t1.Decisao = 'Aprovada';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 016 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 017 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_SIMULACAOCANAL_2);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_SIMULACAOCANAL_2 AS
+   SELECT t1.NuAnoMesSimu,
+          t1.CdParceiroComercial,
+          t1.NmAreaEstruturaComercialC,
+          t1.QtTotalDiaUtilMes,
+          t1.NuCpfCNPJSimu,
+          t1.Decisao,
+          t1.QtPropostaOriginada,
+          t1.QtPropostaAprovada,
+          t1.QtPropostaEfetivada,
+          t1.VrSimulacao,
+          t1.VrPropostaOriginada,
+          t1.VrPropostaAprovada,
+          t1.VrPropostaEfetivada
+      FROM WORK.SIMULACAOCANAL_2 t1
+      WHERE t1.Decisao = 'APROVADA';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 017 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 018 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.FILTER_FOR_PARCEIROSATIVOS);
+
+PROC SQL;
+   CREATE TABLE WORK.FILTER_FOR_PARCEIROSATIVOS AS
+   SELECT t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.NuCnpjLoja,
+          t1.DsAtividadeFinanciamento,
+          t1.NmTipoParceiroComercial,
+          t1.NmCobanAtendimento,
+          t1.CdUf,
+          t1.NmCidade,
+          t1.CdCep,
+          t1.CdColaboradorC,
+          t1.NmColaboradorC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+          t1.DtCadastro,
+          t1.FlAtivo
+      FROM WORK.PARCEIROSATIVOS t1
+      WHERE t1.FlAtivo = 'S';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 018 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 019 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+   CREATE TABLE WORK.PARCEIROS AS
+   SELECT t1.CdParceiroComercial,
+		  t1.NmParceiroComercial,
+		  t1.NuCnpjLoja,
+		  t1.DsAtividadeFinanciamento,
+          t1.NmTipoParceiroComercial,
+		  t1.NmParceiroComercial,
+          t1.CdUf,
+		  t1.NmCidade,
+		  t1.CdCep,
+          t1.CdColaboradorC,
+		  t1.NmColaboradorC,
+          t1.NmAreaEstruturaComercialC,
+          t1.NmCanalEstruturaComercialC,
+		  t1.DtUltimaAtualizacao,
+          t1.DtCadastro,
+          t1.FlAtivo
+      FROM BASES.TBPARCEIROCOMERCIAL t1
+      WHERE t1.CdParceiroComercial in (
+477832
+480899
+470951
+475151
+478328
+412713
+450839
+461215
+478109
+424974
+477916
+475967
+473712
+478290
+417359
+450579
+431974
+478865
+478296
+400967
+478258
+400655
+479495
+458676
+452486
+403024
+440432
+479094
+471679
+462608
+475307
+432565
+472528
+470359
+400014
+478544
+448825
+478941
+478116
+432719
+401445
+470869
+472104
+473380
+414452
+400558
+478351
+410645
+453543
+462944
+473923
+478100
+479845
+479931
+439070
+445823
+470305
+466468
+415893
+450977
+450894
+Favorecido
+446657
+478425
+468127
+480546
+480548
+453205
+472151
+399020
+477690
+430902
+451927
+462493
+459196
+473844
+455347
+441954
+423025
+471132
+449608
+476324
+442658
+478705
+478293
+399593
+400122
+466372
+473461
+474812
+477914
+414834
+464021
+479673
+478123
+414748
+478291
+447099
+450181
+412795
+459448
+470230
+479383
+479447
+477925
+414102
+478110
+473035
+448824
+446010
+477741
+449638
+473278
+453637
+439614
+458629
+478818
+472847
+402837
+477918
+477957
+466110
+434050
+413644
+413252
+445873
+414488
+439009
+473033
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+Favorecido
+433859
+479257
+446990
+461369
+429081
+415394
+470226
+412925
+433561
+415932
+419718
+463645
+479537
+446683
+469981
+414083
+432976
+463185
+414141
+466667
+
+);
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 019 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 020 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+create table apuracaocampanha_ as select
+
+DtContrato,
+CanalProducaoSolar,
+
+NmAreaEstruturaComercialC,
+
+NuCnpjLojaFavorecido,
+
+count(nucontrato) as qtdcontratos,
+sum(VrProducao) as VrProducao,
+sum(VrMargemContribuicao) as VrMargemContribuicao,
+sum(QtSeguros) as QtSeguros,
+sum(VrSeguros) as VrSeguros,
+sum(FlBVMais) as QtBVMais,
+sum(VrBVMais) as VrBVMais,
+sum(FlCap) as QtCap,
+sum(VrCap) as VrCap,
+sum(FlPlacaSolar) as QtPlacaSolar,
+sum(VrPlacaSolar) as VrPlacaSolar
+
+
+
+
+from bases.tbproducao
+WHERE NmGrupoProdutoMeta = 'Solar' AND DtContrato >= '01Jul2025'd
+
+group by 1,2,3,4;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 020 */
+/* =========================FIM TASK=========================== */

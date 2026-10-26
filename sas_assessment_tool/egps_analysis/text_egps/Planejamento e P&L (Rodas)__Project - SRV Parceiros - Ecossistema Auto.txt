@@ -1,0 +1,523 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Planejamento e P&L (Rodas)__Project - SRV Parceiros - Ecossistema Auto
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:38 UTC
+BUSINESS_AREA: Planejamento e P&L (Rodas)
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 464
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: DESDOBRO = /infogrc/desdobro_rodas/bases/
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBEXTPROPOSTA [SAS/Local], BASES.TBORIGINACAO [SAS/Local], BASES.TBPRODUCAO [SAS/Local], CONVSIMU.TBSIMULACOES [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBEXTPROPOSTA [PROC SQL - JOIN], BASES.TBORIGINACAO [PROC SQL - FROM], BASES.TBPRODUCAO [PROC SQL - FROM; PROC SQL - JOIN], CONVSIMU.TBSIMULACOES [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: TBPROPOSTAS, WORK.QUERY_FOR_TBPRODUCAO, WORK.QUERY_FOR_TBSIMULACOES
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Gerar SRV  */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Gerar SRV  */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-qgGvbHZHlfkDPOjO/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE TbPropostas AS
+SELECT
+	Originacao.NuAnoMes
+	,Originacao.DtEntradaProposta format ddmmyy10.
+	,Originacao.NuProposta
+	,Originacao.StProposta
+	,Producao.NuContrato
+	,Producao.DtContrato
+	,Producao.DtLiquidacaoEfetiva
+	,Producao.DtCancelamento
+	,Originacao.CdParceiroComercial
+	,Originacao.NuCnpjLoja
+	,Originacao.NmParceiroComercial
+	,Originacao.NmTipoParceiroComercial
+	,Producao.VrProducao format commax18.2
+	,Producao.VrOutroDesdobro format commax18.2
+	,(Producao.VrProducao - Producao.VrOutroDesdobro)AS VRCLIENTE format commax18.2
+	,case when Producao.VrOutroDesdobro < Producao.VrProducao then 'S' else 'N' END AS Desdobro
+    ,Originacao.NmPessoa
+	,Originacao.TpPessoa
+	,Originacao.CdUfPessoa
+	,Originacao.NmCidadePessoa
+    ,Originacao.NuCpfCnpj
+	,Originacao.NmGrupoProdutoMeta
+	,Originacao.DsTipoCanalProducao
+	,Originacao.NmCanalEstruturaComercial
+	,Originacao.NmAreaEstruturaComercial
+	,Originacao.NmSubEstruturaComercialA
+	,Originacao.QtAnosIdade
+	,Originacao.FxIdade
+	,Originacao.QtParcelas
+	,Originacao.CdMarca
+	,Originacao.CdModelo
+	,Originacao.AaModelo
+	,Originacao.AaFabricacao
+	,Originacao.VrPropostaOriginada format commax18.2
+	,Originacao.VrPropostaAprovada format commax18.2
+	,Originacao.VrLiberado format commax18.2
+	,Originacao.VrEntrada format commax18.2
+	,Originacao.VrFinanciamento format commax18.2
+	,Originacao.VrPrestacao format commax18.2
+	,Producao.VrComissaoTotal format commax18.2
+	,Originacao.QtCorridosDiaUtilMes
+	,Originacao.DtAtualizacao
+	,Originacao.TsProcessamento
+	,originacao.cdColaborador
+	,originacao.nmColaborador
+	,Originacao.NmTipoCobranca
+
+FROM BASES.TBORIGINACAO Originacao
+	left JOIN BASES.TBEXTPROPOSTA PRO
+	ON ORIGINACAO.NUPROPOSTA = PRO.NUPROPOSTA
+
+	LEFT JOIN BASES.TBPRODUCAO Producao
+		ON Originacao.NuProposta = Producao.NuProposta
+
+WHERE Originacao.DtEntradaProposta >= '1Jan2026'd
+and Originacao.NuCnpjLoja in (
+'14439116000136'
+)
+and Originacao.StProposta in ('A','AP','CA','PA','N');
+
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Gerar SRV  */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-OEmIFBoiGS4mqE5p/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME DESDOBRO '/infogrc/desdobro_rodas/bases/';
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBSIMULACOES);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBSIMULACOES AS
+   SELECT t1.DtAtualizacao,
+          t1.CdSimulacaoInicial,
+          t1.CdSimulacaoFinal,
+          t1.NuProposta,
+          t1.NuContrato,
+          t1.NuAnoMes,
+          t1.NuSemana,
+          t1.DtSimulacaoInicial,
+          t1.DtSimulacaoFinal,
+          t1.DtEntradaProposta,
+          t1.DtContrato,
+          t1.NuCpfCnpj,
+          t1.TpPessoa,
+          t1.SistemaInicial,
+          t1.SistemaFinal,
+          t1.FlSimulacao,
+          t1.FlCard,
+          t1.ProdutoGrupo,
+          t1.Produto,
+          t1.DsSubProduto,
+          t1.StatusSimulacao,
+          t1.StProposta,
+          t1.FlPropostaOriginada,
+          t1.FlPropostaAprovada,
+          t1.FlPropostaAPNP,
+          t1.FlPropostaNegada,
+          t1.FlPropostaEfetivada,
+          t1.FlPropostaPaga,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.FlPorteA,
+          t1.FlLocaliza,
+          t1.CdMolicar,
+          t1.Fl_ESG,
+          t1.AaModelo,
+          t1.AaFabricacao,
+          t1.IdadeBem,
+          t1.FxIdade,
+          t1.FlZeroKm,
+          t1.FlMultibanco,
+          t1.FlIsentoTarifaAberturaCrdo,
+          t1.CdTaxaRetorno,
+          t1.PcTaxaRetorno,
+          t1.ProbabilidadeAprovacao,
+          t1.RatingCliente,
+          t1.RatingSimulacao,
+          t1.Mensageria,
+          t1.Mensageria2,
+          t1.UltMensageria,
+          t1.MsgEntradaMinima,
+          t1.EntradaMinima,
+          t1.PcEntradaMinima,
+          t1.MotivoRecusa,
+          t1.FaixaScore,
+          t1.SubSistemaOrigem,
+          t1.CompraLeads,
+          t1.FlRastreador,
+          t1.TxOriginalFinanciamento,
+          t1.TxInicioFinanciamento,
+          t1.PcVariacaoTabelaFinanciamento,
+          t1.TxFinanciamentoSolicitada,
+          t1.TxTirContabil,
+          t1.TxTirDivulgada,
+          t1.VpSpreadContabil,
+          t1.VpSpreadDivulgada,
+          t1.DtNascimento,
+          t1.CdTabelaFinanciamento,
+          t1.Regional,
+          t1.Canal,
+          t1.Filial,
+          t1.NmColaborador,
+          t1.DsLoginN1,
+          t1.DsLoginN2,
+          t1.DsLoginN3,
+          t1.QtParcela,
+          t1.FxPrazo,
+          t1.VrProposta,
+          t1.VrPropostaOriginacao,
+          t1.VrPropostaOriginada,
+          t1.VrPropostaAprovada,
+          t1.VrPropostaEfetivada,
+          t1.VrProducao,
+          t1.PcEntradaSimu,
+          t1.VrEntrada,
+          t1.VrEntradaOri,
+          t1.PcEntradaAjustada,
+          t1.FxEntrada,
+          t1.VrVeiculoMolicar,
+          t1.VrVeiculoSimulacao,
+          t1.Prioridade,
+          t1.ID,
+          t1.NuVersaoMotor,
+          t1.FlPap,
+          t1.NotaGarantia,
+          t1.DsSituacaoCredito,
+          t1.FaixaScoreHSPN,
+          t1.FaixaMatriz,
+          t1.NuPlaca,
+          t1.FlSimuValidaBVO,
+          t1.DtInclusaoGravame,
+          t1.Banco,
+          t1.StPagoLoja,
+          t1.FlPagoLoja,
+          t1.FlConcorrente,
+          t1.FlConversao,
+          t1.FlSimuValida,
+          t1.FlSimuValidaDia,
+          t1.FlSimuValidaSemana,
+          t1.FlSimuValidaPDV,
+          t1.FlSimuValidaEfet,
+          t1.FlSimuValidaDiaEfet,
+          t1.FlSimuValidaSemanaEfet
+      FROM CONVSIMU.TBSIMULACOES t1
+      WHERE t1.NuCpfCnpj = '03300792550' AND t1.NuAnoMes BETWEEN 202511 AND 202512;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_TBPRODUCAO);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_TBPRODUCAO AS
+   SELECT t1.NuAnoMes,
+          t1.NuProposta,
+          t1.DtEntradaProposta,
+          t1.NuContrato,
+          t1.SqContratoFinanceiro,
+          t1.NuContratoLegado,
+          t1.DtContrato,
+          t1.DtLiquidacaoEfetiva,
+          t1.DtCancelamento,
+          t1.DtInicioVigencia,
+          t1.DtFimVigencia,
+          t1.DtPrimeiroVencimento,
+          t1.DtUltimoVencimento,
+          t1.CdColaboradorPromotor,
+          t1.FlProducaoHibrida,
+          t1.DsTipoCanalProducao,
+          t1.DsTipoSubCanalProducao,
+          t1.DsTipoCanalProducaoMeta,
+          t1.NmCanalEstruturaComercial,
+          t1.CdColaborador,
+          t1.NmColaborador,
+          t1.NmGrupoCargoColaborador,
+          t1.DsLoginN1,
+          t1.DsLoginN1CartPDV,
+          t1.CdColaboradorC,
+          t1.NmColaboradorC,
+          t1.DsLoginN1C,
+          t1.CdFilial,
+          t1.DsFilial,
+          t1.CdAreaEstruturaComercial,
+          t1.NmAreaEstruturaComercial,
+          t1.DsLoginN2A,
+          t1.DsLoginN2H,
+          t1.CdFilialC,
+          t1.NmFilialC,
+          t1.CdAreaEstruturaComercialC,
+          t1.NmAreaEstruturaComercialC,
+          t1.DsLoginN2C,
+          t1.NmSubEstruturaComercialA,
+          t1.NmSubEstruturaComercialH,
+          t1.DsLoginN3A,
+          t1.DsLoginN3H,
+          t1.NmSubEstruturaComercialC,
+          t1.DsLoginN3C,
+          t1.LstSubstituicao,
+          t1.LstSubstituicaoC,
+          t1.NmGrupoProdutoMeta,
+          t1.NuCnpjLojaFavorecido,
+          t1.NmParceiroComercialFavorecido,
+          t1.FlParceiroSinergia,
+          t1.FlPropostaSinergia,
+          t1.CanalProducaoSolar,
+          t1.DsLoginOriginador,
+          t1.NuCnpjLoja,
+          t1.CdParceiroComercial,
+          t1.NmParceiroComercial,
+          t1.NmTipoParceiroComercial,
+          t1.FlIntegracaoParceiroFeI,
+          t1.CdParceiroComercialCoban,
+          t1.NmParceiroComercialCoban,
+          t1.NmPromotora,
+          t1.DsTipoCanalPromotora,
+          t1.CdPessoa,
+          t1.NmPessoa,
+          t1.TpPessoa,
+          t1.NuCpfCnpj,
+          t1.CdUfPessoa,
+          t1.NmCidadePessoa,
+          t1.QtAnosIdadePessoa,
+          t1.CdTabelaFinanciamento,
+          t1.NmTipoTabelaFinanciamento,
+          t1.CdTipoCobranca,
+          t1.NmTipoCobranca,
+          t1.QtAnosIdade,
+          t1.FxIdade,
+          t1.QtParcelas,
+          t1.FxParcela,
+          t1.PcEntradaMolicar,
+          t1.FxEntrada,
+          t1.NuScoreFim,
+          t1.FxScoreFim,
+          t1.NuRating,
+          t1.FlTxAlterada,
+          t1.FlRefinConsignado,
+          t1.FlCompraDivida,
+          t1.FlContratoExcecao,
+          t1.CdDocumentoAlienacao,
+          t1.StDocumentoAlienacao,
+          t1.FlDNE,
+          t1.VrCliente,
+          t1.VrRefin,
+          t1.VrCompra,
+          t1.VrOutroDesdobro,
+          t1.VrProducaoLiquida,
+          t1.VrProducao,
+          t1.VrContrato,
+          t1.VrEntrada,
+          t1.VrMargemContribuicao,
+          t1.VrMargemContribuicaoFinal,
+          t1.VrMargem,
+          t1.VrObjGarantia,
+          t1.VrComissaoTotal,
+          t1.VrComissaoParcelada,
+          t1.VrAcordoComercial,
+          t1.VpDuration,
+          t1.VrFinanciamento,
+          t1.VrPerdaEstimada,
+          t1.VrTarifaCadastro,
+          t1.VrTarifaAvaliacaoBem,
+          t1.VpTxGerencial,
+          t1.VpTxGerencialRebate,
+          t1.VpTxJuros,
+          t1.PcROE,
+          t1.VpRoe,
+          t1.TxTirDivulgada,
+          t1.VpTirDivulgada,
+          t1.TxTirContabil,
+          t1.VpTirContabil,
+          t1.VpSpread,
+          t1.VpSpreadContabil,
+          t1.VpSpreadRebate,
+          t1.VpSpreadRebateContabil,
+          t1.VpSpreadTeorico,
+          t1.VpSpreadTeoricoAgrv,
+          t1.VpEntrada,
+          t1.VpScore,
+          t1.VpIdade,
+          t1.VpPrazo,
+          t1.CdTipoMeioVenda,
+          t1.FlPropostaUtilizacaoFgts,
+          t1.FlPropostaBipartida,
+          t1.StData,
+          t1.FlDiasUteisMaturacao,
+          t1.QtTotalDiaUtilMes,
+          t1.QtCorridosDiaUtilMes,
+          t1.QtTotalDiaUtilMesSab,
+          t1.QtCorridosDiaUtilMesSab,
+          t1.VrProducaoDiaUtil,
+          t1.VrProducaoProjetado,
+          t1.VrMargemDiaUtil,
+          t1.VrMargemProjetado,
+          t1.QtSeguros,
+          t1.FlBVMais,
+          t1.FlCap,
+          t1.FlPlacaSolar,
+          t1.FlDemais,
+          t1.FlDemaisSemCompleto,
+          t1.QtDemaisSemCompleto,
+          t1.FlCap03,
+          t1.FlCap05,
+          t1.FlCap07,
+          t1.FlCap10,
+          t1.FlCap12,
+          t1.FlCap15,
+          t1.FlCap19,
+          t1.FlCap25,
+          t1.FlCap35,
+          t1.FlCap40,
+          t1.FlCap50,
+          t1.FlCap96,
+          t1.FlCap145,
+          t1.FlPlacaSolar12,
+          t1.FlPlacaSolar24,
+          t1.FlPlacaSolar36,
+          t1.FlCompleto,
+          t1.FlGarantiaMecanica,
+          t1.FlRCF,
+          t1.FlCasco,
+          t1.FlGap,
+          t1.FlDFI,
+          t1.VrSeguros,
+          t1.VrBVMais,
+          t1.VrBVMaisDiaUtil,
+          t1.VrBVMaisProjetado,
+          t1.VrCap,
+          t1.VrCapDiaUtil,
+          t1.VrCapProjetado,
+          t1.VrPlacaSolar,
+          t1.VrPlacaSolarDiaUtil,
+          t1.VrPlacaSolarProjetado,
+          t1.VrDemais,
+          t1.VrDemaisDiaUtil,
+          t1.VrDemaisProjetado,
+          t1.VrDemaisSemCompletoMax,
+          t1.VrDemaisSemCompletoMaxDiaUtil,
+          t1.VrDemaisSemCompletoMaxProjetado,
+          t1.VrDemaisComCompletoMax,
+          t1.VrDemaisComCompletoMaxProjetado,
+          t1.VrCap03,
+          t1.VrCap05,
+          t1.VrCap07,
+          t1.VrCap10,
+          t1.VrCap12,
+          t1.VrCap15,
+          t1.VrCap19,
+          t1.VrCap25,
+          t1.VrCap35,
+          t1.VrCap40,
+          t1.VrCap50,
+          t1.VrCap96,
+          t1.VrCap145,
+          t1.VrCompleto,
+          t1.VrPlacaSolar12,
+          t1.VrPlacaSolar24,
+          t1.VrPlacaSolar36,
+          t1.VrCompletoProjetado,
+          t1.VrGarantiaMecanica,
+          t1.VrRCF,
+          t1.VrCasco,
+          t1.VrGap,
+          t1.VrDFI,
+          t1.FlBVMaisEleg,
+          t1.FlCapEleg,
+          t1.FlPlacaSolarEleg,
+          t1.FlDemaisEleg,
+          t1.FlCompletoEleg,
+          t1.FlRastreador,
+          t1.FlMultibanco,
+          t1.DtAtualizacao,
+          t1.TsProcessamento
+      FROM BASES.TBPRODUCAO t1
+      WHERE t1.NuAnoMes IN
+           (
+           202512,
+           202601,
+           202602
+           ) AND t1.NmColaborador = 'RAFAEL MATOS BUSSINE';
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

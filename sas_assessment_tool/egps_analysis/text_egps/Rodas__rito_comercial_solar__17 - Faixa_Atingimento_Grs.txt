@@ -1,0 +1,189 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 17 - Faixa_Atingimento_Grs.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 128
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m5, DtAtualizacao
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBMETAPRODUCAOFINAL [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBMETAPRODUCAOFINAL [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_GESTAO_SOLAR
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PESSOAS_CANAL_TOTAL, BASE_PESSOAS_FILIAL_TOTAL, BASE_PESSOAS_GRS_TOTAL, TBMETAPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/**/
+
+proc sql noprint;
+    select max(DtAtualizacao) into :DtAtualizacao
+    from tmp.TbProducao;
+quit;
+
+Proc Sql;
+Create Table TbMetaProducao as
+Select Distinct
+NuAnoMes
+,DsLoginN1 as DsLoginN1C
+,DsLoginN2A as DsLoginN2C
+,DsLoginN3A as DsLoginN3C
+,NmAreaEstruturaComercial
+,NmColaborador
+,AtingProdN1Proj
+,Case When Coalesce(AtingProdN1Proj,0) Between 0 and 0.600000000 Then 1 Else 0 End as Qt_Grs_Ate60
+,Case When Coalesce(AtingProdN1Proj,0) Between 0.600000001 and 0.800000000 Then 1 Else 0 End as Qt_Grs_Ate80
+,Case When Coalesce(AtingProdN1Proj,0) Between 0.800000001 and 1.000000000 Then 1 Else 0 End as Qt_Grs_Ate100
+,Case When Coalesce(AtingProdN1Proj,0) > 1.000000000 Then 1 Else 0 End as Qt_Grs_Acima100
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From Bases.TbMetaProducaoFinal
+Where NuAnomes >= &Base_m5. and NmGrupoProdutoMeta = 'Solar' and TpValor = 'VrProducao' and VrMetaNIN1 NE . and NmColaborador NE "";
+Run;
+
+Proc Sql;
+Create Table Base_Pessoas_Canal_Total as
+Select
+'Gestao' as Base
+,Prod.NuAnoMes
+,'Canal' as Visao
+,"" as DsLoginN1C
+,"" as DsLoginN2C
+,"" as DsLoginN3C
+,'Canal Solar' as Dimensao1
+,'Canal Solar' as Dimensao2
+,'Canal Solar' as Dimensao3
+,'Mês Fechado' as Semana
+,0 as QtCorridosDiaUtilMes
+,Count(distinct NmColaborador) as QtGrs
+,Sum(Qt_Grs_Ate60) as Qt_Grs_Ate60
+,Sum(Qt_Grs_Ate80) as Qt_Grs_Ate80
+,Sum(Qt_Grs_Ate100) as Qt_Grs_Ate100
+,Sum(Qt_Grs_Acima100) as Qt_Grs_Acima100
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From TbMetaProducao as Prod
+Where NuANomes >= &Base_m5. and
+		NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11
+;Quit;
+
+Proc Sql;
+Create Table Base_Pessoas_Filial_Total as
+Select
+'Gestao' as Base
+,Prod.NuAnoMes
+,'Filial' as Visao
+,"                         " as DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Prod.NmAreaEstruturaComercial as Dimensao2
+,Prod.NmAreaEstruturaComercial as Dimensao3
+,'Mês Fechado' as Semana
+,0 as QtCorridosDiaUtilMes
+,Count(distinct NmColaborador) as QtGrs
+,Sum(Qt_Grs_Ate60) as Qt_Grs_Ate60
+,Sum(Qt_Grs_Ate80) as Qt_Grs_Ate80
+,Sum(Qt_Grs_Ate100) as Qt_Grs_Ate100
+,Sum(Qt_Grs_Acima100) as Qt_Grs_Acima100
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From TbMetaProducao as Prod
+Where NuANomes >= &Base_m5. and
+		NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11
+;Quit;
+
+Proc Sql;
+Create Table Base_Pessoas_GRs_Total as
+Select
+'Gestao' as Base
+,Prod.NuAnoMes
+,'GRs' as Visao
+,Prod.DsLoginN1C
+,Prod.DsLoginN2C
+,Prod.DsLoginN3C
+,'Canal Solar' as Dimensao1
+,Prod.NmAreaEstruturaComercial as Dimensao2
+,Prod.NmColaborador as Dimensao3
+,'Mês Fechado' as Semana
+,0 as QtCorridosDiaUtilMes
+,Count(distinct NmColaborador) as QtGrs
+,Sum(Qt_Grs_Ate60) as Qt_Grs_Ate60
+,Sum(Qt_Grs_Ate80) as Qt_Grs_Ate80
+,Sum(Qt_Grs_Ate100) as Qt_Grs_Ate100
+,Sum(Qt_Grs_Acima100) as Qt_Grs_Acima100
+,Max(&DtAtualizacao.) as DataBase Format DDMMYY10.
+
+From TbMetaProducao as Prod
+Where NuANomes >= &Base_m5. and
+		NmAreaEstruturaComercial in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		)
+Group By 1,2,3,4,5,6,7,8,9,10,11
+;Quit;
+
+Data ritosol.Base_Gestao_Solar;
+Set
+	Base_Pessoas_Filial_Total
+	Base_Pessoas_GRs_Total
+	Base_Pessoas_Canal_Total
+;Run;

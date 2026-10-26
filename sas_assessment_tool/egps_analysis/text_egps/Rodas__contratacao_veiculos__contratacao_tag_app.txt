@@ -1,0 +1,338 @@
+START_METADATA
+PROJECT: Rodas__contratacao_veiculos
+FILE_SAS: contratacao_tag_app.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -24
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 246
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (7x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: APPBV = /infogrc/assinatura_app/bases; CONTRATO = /infogrc/contratacao_veiculos/bases
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: DtIni, MAXDIA
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DVRYBD, DVRYCRM, DVRYGA, DVRYVE
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DVRYBD.BDAPPSCREENBYUSER [SQLSVR], DVRYVE.TBBDAPPFINANCIAMENTO [SQLSVR]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: DVRYBD, DVRYVE
+EXPORTED_LIBNAMES: CONTRATO
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): CONTRATO.APP_TAG_ASSINATURA [PROC SQL - FROM], CONTRATO.APP_USER_ACESSOHOME [PROC SQL - FROM], DVRYBD.BDAPPSCREENBYUSER [PROC SQL - FROM], DVRYVE.TBBDAPPFINANCIAMENTO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): CONTRATO.APP_TAG_ASSINATURA, CONTRATO.APP_USER_ACESSOHOME
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): CONTRATO.APP_TAG_ASSINATURA, CONTRATO.APP_USER_ACESSOHOME
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CONTRATO.APP_TAG_ASSINATURA, CONTRATO.APP_USER_ACESSOHOME
+APPEND_ONLY_OUTPUTS: CONTRATO.APP_TAG_ASSINATURA, CONTRATO.APP_USER_ACESSOHOME
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): CONTRATO.APP_TAG_ASSINATURA, CONTRATO.APP_USER_ACESSOHOME
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: APP_TAG_1, APP_TAG_2, APP_TAG_3, APP_TAG_4, APP_TAG_4A, APP_TAG_5, APP_TAG_5A, APP_TAG_6, APP_USER_ACESSOHOME, DUP1A, DUPLICIDADE_21A, DUPLICIDADE_2A, DUPLICIDADE_3A, DUPLICIDADE_3B, DUP_11A
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+OPTIONS SYMBOLGEN MPRINT MLOGIC FULLSTIMER SOURCE SOURCE2 ERRORABEND VALIDVARNAME=ANY;
+OPTIONS COMPRESS=BINARY REUSE=YES;
+%INCLUDE '/infogrc/utils/all-includes.sas';
+
+LIBNAME CONTRATO '/infogrc/contratacao_veiculos/bases';
+LIBNAME APPBV '/infogrc/assinatura_app/bases';
+LIBNAME DVRYVE SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_veiculos USER= _SAS_VEICULOS	PASSWORD="{SAS002}6F63681B5258C9D15BB1A44A31C3DA5C524E367D11CE356E4478F47E";
+LIBNAME DVRYBD SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_banco_digital USER=_SAS_BANCODIGITAL PASSWORD="{SAS002}206C492D1E4DCDEF4B5E8F4C2BB0C0262A25A84047F1388D";
+LIBNAME DVRYGA SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_digital_analytics USER=_SAS_BANCODIGITAL PASSWORD="{SAS002}206C492D1E4DCDEF4B5E8F4C2BB0C0262A25A84047F1388D";
+LIBNAME DVRYCRM	SQLSVR Datasrc=SYNAPSE01 SCHEMA=dvry_crm USER=_SAS_CRM PASSWORD="{sas002}DF101A2C5B303A50386416621272918E204F119D4D5679B9";
+
+%LET 	dir_csv = /infogrc/contratacao_veiculos/csv;
+
+/*----------------------------------------------------
+PROJETO: CONTRATAÇÃO VEÍCULOS
+PROGRAMA: FLUXO ASSINATURA APP
+DESCRIÇÃO: EMPILHA BASE DE TAGUEAMENTO DA ASSINATURA
+VIA APPBV, APÓS APLICAR REGRAS DE CORREÇÃO DE EVENTOS.
+----------------------------------------------------*/
+
+PROC SQL; SELECT MAX(DIA) FORMAT DATE9. INTO: MAXDIA FROM CONTRATO.APP_TAG_ASSINATURA; QUIT;
+
+DATA _NULL_;
+	DtIni = intnx('day',"&MAXDIA."d,-10);
+	CALL symputx('DtIni', put(DtIni,date9.));
+RUN;
+
+/*%let DtSimuIni  = '01OCT2022'd; */
+/*%let DtSimuIni_ = '20221001';   */
+
+%PUT &DtIni;
+
+proc sql;
+create table app_tag_1 as
+select
+	NmUserPseudoId	as userPseudoId
+	,NmUserId as userId
+	,datepart(DtDia) format date9. as dia
+	,DtDiaHora as diaHora
+	,NuEventTimeStamp as eventTimeStamp
+	,NuSessionId as sessionId
+	,case
+		when NmScreen = 'bd|financiamentoVeiculo|bd|financiamentoVeiculo|contratacao|finalizandoDetalhesFinanciamento'
+			then 'bd|financiamentoVeiculo|contratacao|finalizandoDetalhesFinanciamento'
+		when NmScreen = 'bd|financiamentoVeiculo|bd|financiamentoVeiculo|contratacao|algoDeuErrado'
+			then'bd|financiamentoVeiculo|contratacao|algoDeuErrado'
+		when NmScreen = 'bd|financiamentoVeiculo|contratacao|validarCodigo' or NmScreen = 'bd|financiamentoVeiculo|onboarding|validarToken'
+			then 'bd|financiamentoVeiculo|onboarding|validarCodigo'
+		else NmScreen end as fullScreen
+	,scan(NmScreen,-1,'|') as screen
+	,NmEventType as eventType
+	,QtProdutosAtivos as produtosAtivos
+	,TpOrigemCodigo as origemCodigo
+	,TpTipoVeiculo as tipoVeiculo
+	,DsPesquisaSatisfacao as pesquisaSatisfacao
+	,DSTextComments as textComments
+	,NmStep as step
+	,NmMarca as marca
+	,NmDevice as device
+	,NmOs as os
+	,NmOsVersao as osVersao
+	,CdAppVersao as appVersao
+	,NmCidade as cidade
+	,NmRegiao as regiao
+	,CASE WHEN NuProposta = '0' THEN '' ELSE NuProposta END as proposta
+	,NmSeguro as nomeSeguro
+	,StButtonText as buttonText
+	,StModalName as modalName
+	,StModalRetention as modalRetention
+	,StModaType as modalType
+	,cats(NmUserPseudoId,NmUserId,NuSessionId,DtDiaHora,NmScreen,StButtonText) as chave
+from DVRYVE.TBBDAPPFINANCIAMENTO
+/*where datepart(DtDia) >= '01jan2022'd*/
+where DATEPART(DtDia) > "&DtIni."D
+;quit;
+
+/***** flAtivo ************************************************************\
+|  1: eventos que serão considerados no funil; e            			   |
+|  0: ajustes na base em função de tagueamento duplicado ou não esperado.  |
+\**************************************************************************/
+
+proc sort data=app_tag_1; by chave; run;
+
+data app_tag_2; set app_tag_1; by chave;
+/*identifica eventos duplicados e marca somente o primeiro como ativo*/
+if First.chave then flAtivo = 1; else flAtivo = 0;
+/*ajuste da flativo na tela validarcodigo pois origemCodigo deve estar preenchida*/
+if eventType = 'Screen' and screen = 'validarCodigo' and origemCodigo =  '' then flAtivo = 0;
+if eventType = 'Screen' and screen = 'validarCodigo' and origemCodigo ne '' then flAtivo = 1;
+run;
+
+/** Dup1 ********************************************************************************************\
+| cria base para identificar duplicidade da tela enviarCodigo quando dispara junto com validarCodigo |
+\****************************************************************************************************/
+
+data dup1a; set app_tag_2 (where=(screen in ('validarCodigo', 'enviarCodigo') and eventType = 'Screen')); keep chave screen; run;
+
+proc sort data=dup1a; by chave descending screen; run;
+
+data dup_11a; set dup1a; by chave descending screen;
+/*remove os eventos corretos e marca a duplicidade como 0*/
+if First.chave then delete; else flAtivo1 = 0;
+run;
+
+/*adiciona a coluna marcando os eventos que deverão ser removidos*/
+proc sql;
+create table app_tag_3 as
+	select	  t1.*
+			, t2.flAtivo1
+	from app_tag_2			  t1
+	left join dup_11a t2 on t1.chave = t2.chave
+;quit;
+
+/*até este ponto temos a base do tagueamento de assinatura com as marcações flAtivo indicando com 0 as duplicidades ou eventos não esperados;*/
+/*próximo passo, identificar duplicidade que ocorre ao fechar o app*/
+
+/** Dup2 ********************************************************************************************\
+| identifica sessoes nas quais usuarios chegaram nas telas de erro e houve disparo não esperado      |
+| nas telas de introdução ou enviarCodigo -  estes eventos afetam a visão de funil por visitantes    |
+\****************************************************************************************************/
+
+proc sql;
+create table duplicidade_2a as
+	select	  t1.sessionId
+			, sum(t1.fxIncorreto) 		as fxIncorreto
+			, sum(t1.fxIntroducao) 		as fxIntroducao
+			, sum(t1.fxenviarCodigo) 	as fxEnviarCodigo
+			, sum(t1.fxOutras) 			as fxOutras
+	from (
+			select	  sessionId
+					, case when screen = 'fluxoIncorreto' or
+								screen = 'algoDeuErrado' or
+								screen = 'finalizandoDetalhesFinanciamento'
+						   then 1 else 0 end as fxIncorreto
+					, case when screen = 'introducao'
+						   then 1 else 0 end as fxIntroducao
+					, case when screen = 'enviarCodigo'
+						   then 1 else 0 end as fxEnviarCodigo
+					, case when screen ne 'fluxoIncorreto' and
+								screen ne 'algoDeuErrado' and
+								screen ne 'finalizandoDetalhesFinanciamento' and
+								screen ne 'introducao' and
+								screen ne 'enviarCodigo'
+						   then 1 else 0 end as fxOutras
+			from app_tag_3
+/*			where eventType = 'Screen'*/
+	) t1
+	group by 1
+;quit;
+
+/*identificar as sessões cujos disparos das telas introducao e enviarCodigo ocorreram mas não eram esperadas*/
+data duplicidade_21a; set duplicidade_2a;
+	if 	 fxIncorreto  > 0 and							/*esteve no fluxo incorreto*/
+		(fxIntroducao > 0 or fxEnviarCodigo > 0) and	/*esteve na telaInicial, conforme flag cliente ativo*/
+		 fxOutras     = 0 								/*não esteve em outras telas além do fluxo incorreto e tela inicial*/
+		 				  then flAtivo2 = 0;			/*as condições indicam que a tela introdução e enviarCodigo não eram esperadas*/
+						  else delete;
+
+	drop fxEnviarCodigo fxIncorreto fxIntroducao fxOutras;
+run;
+
+proc sql;
+create table app_tag_4 as
+	select	  t1.*
+			, t2.flAtivo2
+	from app_tag_3			  t1
+	left join duplicidade_21a t2 on  t1.sessionId = t2.sessionId
+								 and t1.screen in ('introducao', 'enviarCodigo')
+/*								 and t1.eventType = 'Screen'*/
+order by 1,3
+;quit;
+
+/*atualiza a marcação da flAtivo e remove a flAtivo1*/
+data app_tag_4a; set app_tag_4;
+if flAtivo1 ne . or flAtivo2 ne . then flAtivo = 0;
+drop flAtivo1 flAtivo2;
+
+/*remarca a string null para vazio na proposta*/
+if proposta = 'null' then proposta = '';
+nuproposta = input(proposta, 10.);
+drop proposta;
+run;
+/*NOTE: The data set WORK.APP_TAG has 1.933.742 observations and 25 variables.*/
+
+/** Dup3 ********************************************************************************************\
+| identifica as telas de enviarCodigo 'não esperadas' que disparam antes da tela assinarContrato	 |
+\****************************************************************************************************/
+
+proc sql;
+create table duplicidade_3a as
+	select	  userId
+			, sessionId
+			, diaHora
+			, screen
+			, eventType
+			, nuproposta
+	from  app_tag_4a
+	where (screen like '%assinarContrato%' or
+		   screen like '%enviarCodigo%' )
+	and eventType = 'Screen'
+	and flativo = 1
+	order by 1,2,3,4
+;quit;
+
+proc sql;
+create table duplicidade_3b as
+	select *, 0 as flativo2
+	from duplicidade_3a
+	where sessionid in (
+		select distinct sessionid
+		from duplicidade_3a
+		where screen='assinarContrato')
+	and screen = 'enviarCodigo'
+	and nuproposta = .
+;quit;
+
+proc sql;
+create table app_tag_5 as
+	select a.*, b.flativo2
+	from app_tag_4a a
+	left join duplicidade_3b b
+	on a.sessionid = b.sessionid
+	and a.diaHora = b.diaHora
+	and a.screen = b.screen
+;quit;
+
+data app_tag_5a; set app_tag_5;
+if flAtivo2 ne . then flAtivo = 0;
+drop  flAtivo2;
+run;
+
+proc sql;
+create table app_tag_6 as
+select
+	 a.*
+	,coalesce(a.nuproposta,b.nuproposta,.) as nuproposta_ajustada
+from app_tag_5a a
+left join (
+	select
+		 userPseudoId
+		,sessionId
+		,min(nuproposta) as nuproposta
+	from app_tag_5a where flativo = 1 and nuproposta ne . group by 1,2
+	) b on a.userPseudoId = b.userPseudoId and a.sessionId = b.sessionId
+where a.flativo = 1
+;run;
+
+PROC SQL; DELETE FROM CONTRATO.APP_TAG_ASSINATURA WHERE dia >= "&DtIni."D; RUN;
+
+PROC SQL; INSERT INTO CONTRATO.APP_TAG_ASSINATURA	SELECT * FROM app_tag_6; RUN;
+
+/*---------------------------------------------------
+FINALIZA PROGRAMA FLUXO DE ASSINATURA APP
+----------------------------------------------------*/
+
+/*----------------------------------------------------
+PROJETO: CONTRATAÇÃO VEÍCULOS
+PROGRAMA: ACESSO APP WEB
+DESCRIÇÃO: EMPILHA BASE DE CLIENTES (CDUSER) QUE ACESSARAM
+O APPBV A FIM DE IDENTIFICAR PRIMEIRO E ÚLTIMO ACESSO.
+----------------------------------------------------*/
+
+PROC SQL; SELECT MAX(DTACESSO) format DATE9. INTO: MAXDTACESSO FROM CONTRATO.APP_USER_ACESSOHOME; QUIT;
+
+/*IDENTIFICAR TODOS OS USERS QUE ACESSARAM O APP BV DIARIAMENTE*/
+
+PROC SQL;
+CREATE TABLE APP_USER_ACESSOHOME AS
+SELECT DISTINCT
+	 CDUSER
+	,DATEPART(DTACESSO)FORMAT DATE9. AS DTACESSO
+	,'APPBV' AS ACESSOCANAL
+FROM DVRYBD.BDAPPSCREENBYUSER
+WHERE DATEPART(DTACESSO) >= "&DtIni"D
+AND CDUSER NE ''
+AND (DSSCREEN LIKE '%home%' OR DSSCREEN LIKE '%primeiroAcesso|tudoCerto%')
+;RUN;
+
+PROC SORT DATA=APP_USER_ACESSOHOME NODUPKEY; BY CDUSER DTACESSO ACESSOCANAL;RUN;
+
+PROC SQL; DELETE FROM CONTRATO.APP_USER_ACESSOHOME WHERE DTACESSO >= "&DtIni"D; RUN;
+
+PROC SQL; INSERT INTO CONTRATO.APP_USER_ACESSOHOME SELECT * FROM APP_USER_ACESSOHOME; RUN;
+
+/*---------------------------------------------------
+FINALIZA PROGRAMA FLUXO DE ASSINATURA APP
+----------------------------------------------------*/

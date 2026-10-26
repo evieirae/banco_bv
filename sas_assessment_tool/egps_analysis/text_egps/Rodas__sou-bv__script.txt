@@ -1,0 +1,147 @@
+START_METADATA
+PROJECT: Rodas__sou-bv
+FILE_SAS: script.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 90
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: DtAt, safraM0, safraM1
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], SOLITMP.TBVISIBILIDADEPOTENCIAL [SAS/Local], TMP.TBPOTENCIALRODAS [SAS/Local], TMP.TBPRODUCAO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): SOLITMP.TBVISIBILIDADEPOTENCIAL [PROC SQL - FROM], TMP.TBPOTENCIALRODAS [PROC SQL - FROM], TMP.TBPRODUCAO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: PARTICIPACAONOJOGO, TBINFOPARCEIROCOMERCIAL, TBPARCEIROCOMERCIAL, TBPRODUCAO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+
+PROC SQL;
+  SELECT MAX(DtAtualizacaoCetip) INTO :DtAt FROM TMP.TBPOTENCIALRODAS;
+RUN;
+
+PROC SQL;
+CREATE TABLE ParticipacaoNoJogo AS
+  SELECT
+    Safra,
+    /* SUBSTR(PUT("&M3."d,ddmmyy10.),4,7)||' a '||SUBSTR(PUT("&M1."d,ddmmyy10.),4,7) AS Safra, */
+    CdParceiroComercial,
+    Produto,
+    MIN(SUM(CASE WHEN Status <> 'NaoPassouBV' THEN QuantidadePgtoLoja END) / SUM(QuantidadePgtoLoja),1) AS ParticipacaoJogo
+  FROM
+    SOLITMP.TBVISIBILIDADEPOTENCIAL
+  WHERE
+    Safra = (CASE WHEN DAY(TODAY()) >= 10 THEN &safraM0. ELSE &safraM1. END)
+    /* Safra BETWEEN &safraM3. AND &safraM1. */
+    AND CdParceiroComercial <> .
+  GROUP BY
+    1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbProducao AS
+  SELECT
+    NuAnoMes AS Safra,
+    /* SUBSTR(PUT("&M3."d,ddmmyy10.),4,7)||' a '||SUBSTR(PUT("&M1."d,ddmmyy10.),4,7) AS Safra, */
+    CdParceiroComercial,
+    NmGrupoProdutoMeta AS Produto,
+    SUM(FlTxAlterada) / COUNT(DISTINCT NuContrato) AS PA,
+    SUM(VpSpread) / SUM(VrProducao) AS Spread,
+    SUM(FlCompleto) / SUM(FlCompletoEleg) AS Completo
+  FROM
+    TMP.TbProducao
+  WHERE
+    NuAnoMes = (CASE WHEN DAY(TODAY()) >= 10 THEN &safraM0. ELSE &safraM1. END)
+    /* NuAnoMes BETWEEN &safraM3. AND &safraM1. */
+    AND NmGrupoProdutoMeta IN ('Leves','Motos','Pesados')
+   AND DtContrato < &DtAt.
+  GROUP BY
+    1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbParceiroComercial AS
+  SELECT
+    NuAnoMes AS Safra,
+    /* SUBSTR(PUT("&M3."d,ddmmyy10.),4,7)||' a '||SUBSTR(PUT("&M1."d,ddmmyy10.),4,7) AS Safra, */
+    CdParceiroComercial,
+    NmGrupoProduto AS Produto,
+    SUM(QtContrato) / SUM(QtGravamesMercado) AS ShareBV,
+    SUM(QtBvMais) / SUM(QtBVMaisEleg) AS SPF,
+    SUM(QtCap) / SUM(QtCapEleg) AS CAP,
+    SUM(QtDemais) / SUM(QtDemaisEleg) AS Demais
+  FROM
+    TMP.TbPotencialRodas
+  WHERE
+    NuAnoMes = (CASE WHEN DAY(TODAY()) >= 10 THEN &safraM0. ELSE &safraM1. END)
+   /* NuAnoMes BETWEEN &safraM3. AND &safraM1. */
+    AND CdParceiroComercial <> .
+    AND FlAtualizacaoMercado = 1
+  GROUP BY
+    1,2,3;
+RUN;
+
+PROC SQL;
+CREATE TABLE TbInfoParceiroComercial AS
+  SELECT
+    /*PUT(&DtAt.,ddmmyy10.) AS DtAtualizacao,*/
+    A.Safra,
+    A.CdParceiroComercial,
+    A.Produto,
+    COALESCE(B.PA,0) AS PA ,
+    PUT(COALESCE(B.Spread,0), 10.8) AS Spread,
+    PUT(COALESCE(C.ParticipacaoJogo,0), 10.8) AS ParticipacaoJogo,
+    PUT(COALESCE(A.ShareBV,0), 10.8) AS ShareBV,
+    COALESCE(A.SPF,0) AS SPF ,
+    COALESCE(A.CAP,0) AS CAP ,
+    COALESCE(B.Completo,0) AS Completo ,
+    COALESCE(A.Demais,0) AS Demais
+  FROM
+    TbParceiroComercial A
+  LEFT JOIN
+    TbProducao B
+    ON A.CdParceiroComercial = B.CdParceiroComercial
+    AND A.Produto = B.Produto
+  LEFT JOIN
+    ParticipacaoNoJogo C
+    ON A.CdParceiroComercial = C.CdParceiroComercial
+    AND A.Produto = C.Produto;
+RUN;
+
+%ExportaCSV(TbInfoParcComercialSouBV,TbInfoParceiroComercial);
+%ExportaCSVDIR(TbInfoParcComercialSouBV,TbInfoParceiroComercial,/infogrc/sou-bv/output);

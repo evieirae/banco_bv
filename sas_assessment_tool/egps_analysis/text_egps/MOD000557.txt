@@ -1,0 +1,1209 @@
+START_METADATA
+PROJECT: SAS_UC4__MOD000557
+FILE_SAS: MOD000557.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:59 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -129
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (2x | +160)
+----------------------------------------
+LINES_OF_CODE: 1000
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, FREQ, SORT, SQL
+HAS_DATA_STEP: Yes (21x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: CARTOES = /projetos/DATA-COBR/sas-data-cobr-cartao-amigavel-mod000557/outbound
+DETECTED_MACROS_DEFINED: passIQ, userIQ
+DETECTED_MACROS_USED: DtAccd, DtFimBI, DtIniBI, anomes, dt, dt_ref, dt_refM1, dt_refM2, nome_arq, passIQ, seq, sysparm, userIQ
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): DWBI_DIME.TBDIMCONTACARTAO [SYBASEIQ], DWBI_DMOC.TBFATOAPURACAOBEHAVIOUR [SYBASEIQ], DWBI_DMOC.TBFATOTRANSACAOFATURA [SYBASEIQ]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: CARTOES
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): CARTOES.COLLECTION_SCORE_CARTOES_&ANOMES [DATA Step - SET; PROC SORT - DATA=], CARTOES.COLLECTION_SCORE_POP1_&ANOMES [DATA Step - SET], CARTOES.COLLECTION_SCORE_POP2_&ANOMES [DATA Step - SET], DWBI_DIME.TBDIMCONTACARTAO [Pass-Through Native (SYBASEIQ) - FROM], DWBI_DMOC.TBFATOAPURACAOBEHAVIOUR [Pass-Through Native (SYBASEIQ) - FROM], DWBI_DMOC.TBFATOTRANSACAOFATURA [Pass-Through Native (SYBASEIQ) - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): CARTOES.COLLECTION_SCORE_CARTOES_&ANOMES, CARTOES.COLLECTION_SCORE_POP1_&ANOMES, CARTOES.COLLECTION_SCORE_POP2_&ANOMES
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): CARTOES.COLLECTION_SCORE_CARTOES_&ANOMES, CARTOES.COLLECTION_SCORE_POP1_&ANOMES, CARTOES.COLLECTION_SCORE_POP2_&ANOMES
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &nome_arq.
+TEMP/DISCARDED OUTPUTS: ACORDO_&ANOMES, ACORDO_POP1_&ANOMES, ACORDO_POP2_&ANOMES, ARQUIVO, COLLECTION, COLLECTION_SCORE_CARTOES_&ANOMES, COLLECTION_SCORE_POP1_&ANOMES, COLLECTION_SCORE_POP2_&ANOMES, CRIACAO_CONTA, HEADER, MIN_SCORE_&ANOMES, POP1_&ANOMES, POP2_&ANOMES, POP_&ANOMES, SCORE2_POP2_&ANOMES, SCORE3_POP2_&ANOMES, SCORE4_POP2_&ANOMES, SCORE_FINAL_POP1_&ANOMES, SCORE_FINAL_POP2_&ANOMES, SCORE_POP1_&ANOMES, SCORE_POP2_&ANOMES, TRAILLER
+DYNAMIC REFS (Ambiguous): CARTOES.COLLECTION_SCORE_CARTOES_{ANOMES}, CARTOES.COLLECTION_SCORE_POP1_{ANOMES}, CARTOES.COLLECTION_SCORE_POP2_{ANOMES}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/********************************************************************************/
+/******************************** 0 - Parametros ********************************/
+/********************************************************************************/
+
+%LET userIQ = "_ENGD_PRD";
+%LET passIQ = "{SAS002}C4A120481D385E2B576EED8B4F2AE1C7";
+
+/**************************** PARAMETRIZAÇÃO AUTOMATICA - NÃO ALTERAR DADOS ***************/
+/* Parametrização das safras a serem executudas */
+DATA _NULL_;
+call symput("dt",scan("&sysparm.",1,','));
+call symput("seq",scan("&sysparm.",2,','));
+call symput("nome_arq",scan("&sysparm.",3,','));
+RUN;
+
+DATA _NULL_;
+dt_fim=intnx('month',"&dt."d,-1,'end');
+/*Controles dt_m1 e dt_m2 são fixos em relação ao dt_fim, não alterar*/
+dt_m1=intnx('month',dt_fim,-1);
+dt_m2=intnx('month',dt_fim,-2);
+
+anomes=year(dt_fim)*100 + month(dt_fim);
+dt_ref=year(dt_fim)*100 + month(dt_fim);
+dt_refM1=year(dt_m1)*100 + month(dt_m1);
+dt_refM2=year(dt_m2)*100 + month(dt_m2);
+DtIniBI = year(intnx('month',dt_fim,0,'B'))*10000+month(intnx('month',dt_fim,0,'B'))*100+day(intnx('month',dt_fim,0,'B'));
+DtFimBI = year(dt_fim)*10000+month(dt_fim)*100+day(dt_fim);
+DtAccd = year(intnx('month',dt_fim,-2,'B'))*10000+month(intnx('month',dt_fim,-2,'B'))*100+day(intnx('month',dt_fim,-2,'B'));
+
+call symput('anomes',put(anomes,6.));
+call symput('dt_ref',put(dt_ref,6.));
+call symput('dt_refM1',put(dt_refM1,6.));
+call symput('dt_refM2',put(dt_refM2,6.));
+call symput('DtIniBI',"'"||put(DtIniBI,8.)||"'");
+call symput('DtFimBI',"'"||put(DtFimBI,8.)||"'");
+call symput('DtAccd',"'"||put(DtAccd,8.)||"'");
+
+format dt_fim date.;
+format dt_m1 date.;
+format dt_m2 date.;
+
+RUN;
+
+/* DECLARACAO DAS LIBNAMES QUE SERÃO UTILIZADAS*/
+/*LIBNAME cartoes '/riscosbvf/gbinfra/CollectionCartoes';*/
+LIBNAME cartoes '/projetos/DATA-COBR/sas-data-cobr-cartao-amigavel-mod000557/outbound';
+/*LIBNAME cart 	'/riscosbvf/cobranca2/lfwhitaker/Collection Cartoes';*/
+
+%put ############ anomes=&anomes;
+%put ############ dt_ref=&dt_ref;
+%put ############ dt_refM1=&dt_refM1;
+%put ############ dt_refM2=&dt_refM2;
+%put ############ DtIniBI=&DtIniBI;
+%put ############ DtFimBI=&DtFimBI;
+%put ############ DtAccd=&DtAccd;
+
+/********************************************************************************/
+/****************************** 1 - Baixando Bases ******************************/
+/********************************************************************************/
+
+/*******************************************************************************************
+						BAIXANDO AS BASES DE ESCORAGEM
+
+##################*******####ATENÇÃO######################################
+ESTA EXTRAÇÃO DEVERÁ SER SUBSTITUIDA QUANDO O PROJETO DE AUTOMAÇÃO DO
+BEHAVIOR DE CARTÕES FOR FINALIZADO, EXTRAÇÃO DEVERÁ SER FEITA A PARTIR DESTA NOVA SOLUÇÃO
+********************************************************************************************/
+
+PROC SQL;
+	  CONNECT TO sybaseiq AS dbcon
+	  (HOST = 'iqprdbi' SERVER = iqprdbi USER = &userIQ. password= &passIQ.);
+	  CREATE TABLE Criacao_Conta AS SELECT * FROM CONNECTION TO dbcon
+	  (
+					SELECT
+						CdDimContaCartao,
+						CdTipoProdutoCartaoStmaOrgm,
+						DtAberturaContaCartao
+
+					FROM
+					  DWBI_DIME.TbDimContaCartao
+		);
+QUIT;
+RUN;
+
+proc sort data = Criacao_Conta noduprecs;
+by _all_;
+run;
+
+PROC SQL;
+	  CONNECT TO sybaseiq AS dbcon
+	  (HOST = 'iqprdbi' SERVER = iqprdbi USER = &userIQ. password= &passIQ.);
+	  CREATE TABLE pop_&anomes. AS SELECT * FROM CONNECTION TO dbcon
+	  (
+					SELECT
+						a.CdPessoaTitularConta,
+						a.CdDimContaCartao,
+
+						a.CdEstadoContaCartaoM,
+
+						a.DtCorteFaturaM,
+						a.DtCorteFaturaM1,
+						a.DtCorteFaturaM2,
+						a.DtCorteFaturaM3,
+						a.DtCorteFaturaM4,
+						a.DtCorteFaturaM5,
+						a.DtCorteFaturaM6,
+						a.DtCorteFaturaM7,
+
+						a.DtAtingimentoPgmnoMnmoM,
+						a.DtAtingimentoPgmnoMnmoM1,
+						a.DtAtingimentoPgmnoMnmoM2,
+						a.DtAtingimentoPgmnoMnmoM3,
+						a.DtAtingimentoPgmnoMnmoM4,
+						a.DtAtingimentoPgmnoMnmoM5,
+						a.DtAtingimentoPgmnoMnmoM6,
+
+						a.DtVencimentoFaturaM1,
+						a.DtVencimentoFaturaM2,
+						a.DtVencimentoFaturaM3,
+						a.DtVencimentoFaturaM4,
+						a.DtVencimentoFaturaM5,
+						a.DtVencimentoFaturaM6,
+						a.DtVencimentoFaturaM7,
+
+						a.QtDiaAtrasoFaturaM,
+						a.QtDiaAtrasoFaturaM1,
+						a.QtDiaAtrasoFaturaM2,
+						a.QtDiaAtrasoFaturaM3,
+						a.QtDiaAtrasoFaturaM4,
+						a.QtDiaAtrasoFaturaM5,
+						a.QtDiaAtrasoFaturaM6,
+						a.QtDiaAtrasoFaturaM7,
+
+						a.VrPagamentoMinimoFaturaM1,
+						a.VrPagamentoMinimoFaturaM2,
+						a.VrPagamentoMinimoFaturaM3,
+						a.VrPagamentoMinimoFaturaM4,
+						a.VrPagamentoMinimoFaturaM5,
+						a.VrPagamentoMinimoFaturaM6,
+						a.VrPagamentoMinimoFaturaM7,
+
+						a.VrSaldoFaturaM,
+						a.VrSaldoFaturaM1,
+						a.VrSaldoFaturaM2,
+						a.VrSaldoFaturaM3,
+						a.VrSaldoFaturaM4,
+						a.VrSaldoFaturaM5,
+						a.VrSaldoFaturaM6,
+						a.VrSaldoFaturaM7,
+
+						a.VrTrnsoPgmnoEntreCrteM,
+						a.VrTrnsoPgmnoEntreCrteM1,
+						a.VrTrnsoPgmnoEntreCrteM2,
+						a.VrTrnsoPgmnoEntreCrteM3,
+						a.VrTrnsoPgmnoEntreCrteM4,
+						a.VrTrnsoPgmnoEntreCrteM5,
+						a.VrTrnsoPgmnoEntreCrteM6,
+
+						a.VrLimiteCreditoContaCrteM,
+						a.VrLimiteCreditoCntaCrteM1,
+						a.VrLimiteCreditoCntaCrteM2,
+						a.VrLimiteCreditoCntaCrteM3,
+						a.VrLimiteCreditoCntaCrteM4,
+						a.VrLimiteCreditoCntaCrteM5,
+						a.VrLimiteCreditoCntaCrteM6,
+						a.VrLimiteCreditoCntaCrteM7,
+
+						a.VrLmteCrdtoCntaCrteDspnlM,
+						a.VrLmteCrdtoCntaCrteDspnlM1,
+						a.VrLmteCrdtoCntaCrteDspnlM2,
+						a.VrLmteCrdtoCntaCrteDspnlM3,
+						a.VrLmteCrdtoCntaCrteDspnlM4,
+						a.VrLmteCrdtoCntaCrteDspnlM5,
+						a.VrLmteCrdtoCntaCrteDspnlM6,
+						a.VrLmteCrdtoCntaCrteDspnlM7,
+
+						a.VrJuroMoraMultaM,
+						a.VrJuroMoraMultaM1,
+						a.VrJuroMoraMultaM2,
+						a.VrJuroMoraMultaM3,
+						a.VrJuroMoraMultaM4,
+						a.VrJuroMoraMultaM5
+
+					INTO #Collection
+					FROM
+					  DWBI_DMOC.TbFatoApuracaoBehaviour a
+					WHERE DtCorteFaturaM between &DtIniBI. and &DtFimBI.
+
+					GROUP BY
+						a.CdPessoaTitularConta,
+						a.CdDimContaCartao,
+						a.CdEstadoContaCartaoM,
+						a.DtCorteFaturaM,
+						a.DtCorteFaturaM1,
+						a.DtCorteFaturaM2,
+						a.DtCorteFaturaM3,
+						a.DtCorteFaturaM4,
+						a.DtCorteFaturaM5,
+						a.DtCorteFaturaM6,
+						a.DtCorteFaturaM7,
+						a.DtAtingimentoPgmnoMnmoM,
+						a.DtAtingimentoPgmnoMnmoM1,
+						a.DtAtingimentoPgmnoMnmoM2,
+						a.DtAtingimentoPgmnoMnmoM3,
+						a.DtAtingimentoPgmnoMnmoM4,
+						a.DtAtingimentoPgmnoMnmoM5,
+						a.DtAtingimentoPgmnoMnmoM6,
+						a.DtVencimentoFaturaM1,
+						a.DtVencimentoFaturaM2,
+						a.DtVencimentoFaturaM3,
+						a.DtVencimentoFaturaM4,
+						a.DtVencimentoFaturaM5,
+						a.DtVencimentoFaturaM6,
+						a.DtVencimentoFaturaM7,
+						a.QtDiaAtrasoFaturaM,
+						a.QtDiaAtrasoFaturaM1,
+						a.QtDiaAtrasoFaturaM2,
+						a.QtDiaAtrasoFaturaM3,
+						a.QtDiaAtrasoFaturaM4,
+						a.QtDiaAtrasoFaturaM5,
+						a.QtDiaAtrasoFaturaM6,
+						a.QtDiaAtrasoFaturaM7,
+						a.VrPagamentoMinimoFaturaM1,
+						a.VrPagamentoMinimoFaturaM2,
+						a.VrPagamentoMinimoFaturaM3,
+						a.VrPagamentoMinimoFaturaM4,
+						a.VrPagamentoMinimoFaturaM5,
+						a.VrPagamentoMinimoFaturaM6,
+						a.VrPagamentoMinimoFaturaM7,
+						a.VrSaldoFaturaM,
+						a.VrSaldoFaturaM1,
+						a.VrSaldoFaturaM2,
+						a.VrSaldoFaturaM3,
+						a.VrSaldoFaturaM4,
+						a.VrSaldoFaturaM5,
+						a.VrSaldoFaturaM6,
+						a.VrSaldoFaturaM7,
+						a.VrTrnsoPgmnoEntreCrteM,
+						a.VrTrnsoPgmnoEntreCrteM1,
+						a.VrTrnsoPgmnoEntreCrteM2,
+						a.VrTrnsoPgmnoEntreCrteM3,
+						a.VrTrnsoPgmnoEntreCrteM4,
+						a.VrTrnsoPgmnoEntreCrteM5,
+						a.VrTrnsoPgmnoEntreCrteM6,
+						a.VrLimiteCreditoContaCrteM,
+						a.VrLimiteCreditoCntaCrteM1,
+						a.VrLimiteCreditoCntaCrteM2,
+						a.VrLimiteCreditoCntaCrteM3,
+						a.VrLimiteCreditoCntaCrteM4,
+						a.VrLimiteCreditoCntaCrteM5,
+						a.VrLimiteCreditoCntaCrteM6,
+						a.VrLimiteCreditoCntaCrteM7,
+						a.VrLmteCrdtoCntaCrteDspnlM,
+						a.VrLmteCrdtoCntaCrteDspnlM1,
+						a.VrLmteCrdtoCntaCrteDspnlM2,
+						a.VrLmteCrdtoCntaCrteDspnlM3,
+						a.VrLmteCrdtoCntaCrteDspnlM4,
+						a.VrLmteCrdtoCntaCrteDspnlM5,
+						a.VrLmteCrdtoCntaCrteDspnlM6,
+						a.VrLmteCrdtoCntaCrteDspnlM7,
+						a.VrJuroMoraMultaM,
+						a.VrJuroMoraMultaM1,
+						a.VrJuroMoraMultaM2,
+						a.VrJuroMoraMultaM3,
+						a.VrJuroMoraMultaM4,
+						a.VrJuroMoraMultaM5
+
+					SELECT
+						CdPessoaTitularConta,
+						CdDimContaCartao,
+						CdEstadoContaCartaoM,
+						DtCorteFaturaM,
+						DtCorteFaturaM1,
+						DtCorteFaturaM2,
+						DtCorteFaturaM3,
+						DtCorteFaturaM4,
+						DtCorteFaturaM5,
+						DtCorteFaturaM6,
+						DtCorteFaturaM7,
+						DtAtingimentoPgmnoMnmoM,
+						DtAtingimentoPgmnoMnmoM1,
+						DtAtingimentoPgmnoMnmoM2,
+						DtAtingimentoPgmnoMnmoM3,
+						DtAtingimentoPgmnoMnmoM4,
+						DtAtingimentoPgmnoMnmoM5,
+						DtAtingimentoPgmnoMnmoM6,
+						DtVencimentoFaturaM1,
+						DtVencimentoFaturaM2,
+						DtVencimentoFaturaM3,
+						DtVencimentoFaturaM4,
+						DtVencimentoFaturaM5,
+						DtVencimentoFaturaM6,
+						DtVencimentoFaturaM7,
+						QtDiaAtrasoFaturaM,
+						QtDiaAtrasoFaturaM1,
+						QtDiaAtrasoFaturaM2,
+						QtDiaAtrasoFaturaM3,
+						QtDiaAtrasoFaturaM4,
+						QtDiaAtrasoFaturaM5,
+						QtDiaAtrasoFaturaM6,
+						QtDiaAtrasoFaturaM7,
+						VrPagamentoMinimoFaturaM1,
+						VrPagamentoMinimoFaturaM2,
+						VrPagamentoMinimoFaturaM3,
+						VrPagamentoMinimoFaturaM4,
+						VrPagamentoMinimoFaturaM5,
+						VrPagamentoMinimoFaturaM6,
+						VrPagamentoMinimoFaturaM7,
+						VrSaldoFaturaM,
+						VrSaldoFaturaM1,
+						VrSaldoFaturaM2,
+						VrSaldoFaturaM3,
+						VrSaldoFaturaM4,
+						VrSaldoFaturaM5,
+						VrSaldoFaturaM6,
+						VrSaldoFaturaM7,
+						VrTrnsoPgmnoEntreCrteM,
+						VrTrnsoPgmnoEntreCrteM1,
+						VrTrnsoPgmnoEntreCrteM2,
+						VrTrnsoPgmnoEntreCrteM3,
+						VrTrnsoPgmnoEntreCrteM4,
+						VrTrnsoPgmnoEntreCrteM5,
+						VrTrnsoPgmnoEntreCrteM6,
+						VrLimiteCreditoContaCrteM,
+						VrLimiteCreditoCntaCrteM1,
+						VrLimiteCreditoCntaCrteM2,
+						VrLimiteCreditoCntaCrteM3,
+						VrLimiteCreditoCntaCrteM4,
+						VrLimiteCreditoCntaCrteM5,
+						VrLimiteCreditoCntaCrteM6,
+						VrLimiteCreditoCntaCrteM7,
+						VrLmteCrdtoCntaCrteDspnlM,
+						VrLmteCrdtoCntaCrteDspnlM1,
+						VrLmteCrdtoCntaCrteDspnlM2,
+						VrLmteCrdtoCntaCrteDspnlM3,
+						VrLmteCrdtoCntaCrteDspnlM4,
+						VrLmteCrdtoCntaCrteDspnlM5,
+						VrLmteCrdtoCntaCrteDspnlM6,
+						VrLmteCrdtoCntaCrteDspnlM7,
+						VrJuroMoraMultaM,
+						VrJuroMoraMultaM1,
+						VrJuroMoraMultaM2,
+						VrJuroMoraMultaM3,
+						VrJuroMoraMultaM4,
+						VrJuroMoraMultaM5
+
+					FROM #Collection
+					Order By CdPessoaTitularConta, CdDimContaCartao, DtCorteFaturaM);
+QUIT;
+RUN;
+
+proc sql;
+create table pop_&anomes. as
+select a.*, b.DtAberturaContaCartao, b.CdTipoProdutoCartaoStmaOrgm
+
+from pop_&anomes. a
+left join Criacao_Conta b
+on a.CdDimContaCartao = b.CdDimContaCartao;
+quit;
+
+/*(coloque a DtCorteFaturaM, ou seja, a data de referência, exemplo: '2014-12-01' and '2014-12-31')*/
+
+/*ACORDO*/
+
+PROC SQL;
+	  CONNECT TO sybaseiq AS dbcon
+	  (HOST = 'iqprdbi' SERVER = iqprdbi USER = &userIQ. password= &passIQ.);
+	  CREATE TABLE acordo_&anomes. AS SELECT * FROM CONNECTION TO dbcon
+	  (
+					SELECT
+						*
+
+					FROM
+					  DWBI_DMOC.TbFatoTransacaoFatura
+					WHERE CdRubricaTransacaoCartao = 6053 and DtTransacao  between &DtAccd. and &DtFimBI.
+		);
+QUIT;
+RUN;
+
+/*'2 meses antes da referência, inclusive o mês de referência' (Ex:'20140201' and '20140431')*/
+
+/********************************************************************************/
+/****************************** 2 - Separando Pops ******************************/
+/********************************************************************************/
+
+/* SEPARAR BASE DE ESCORAGEM */
+
+DATA POP_&anomes.;
+SET  POP_&anomes.;
+	dt_ref=year(DtCorteFaturaM)*100 + month(DtCorteFaturaM);
+	IF VrTrnsoPgmnoEntreCrteM>=VrPagamentoMinimoFaturaM1 then pop=1; else pop=2;
+RUN;
+
+DATA pop1_&anomes.
+	 pop2_&anomes.;
+SET POP_&anomes.;
+	IF pop=1 THEN OUTPUT pop1_&anomes.;
+	IF pop=2 THEN OUTPUT pop2_&anomes.;
+RUN;
+
+/********************************************************************************/
+/**************************** 3 - Escoragem Modelo 1 ****************************/
+/********************************************************************************/
+
+/* H.C.*/
+
+/*********************************/
+/********* População 1 ***********/
+/*********************************/
+
+/*Criando Variáveis que entraram no modelo*/
+
+PROC SQL;
+CREATE TABLE score_pop1_&anomes. AS
+SELECT
+	*,
+	/* Quantas vezes atrasou mais do que 15 dias nas últimas 6 faturas*/
+	sum(
+	case when QtDiaAtrasoFaturaM1 >15 then 1 else 0 end,
+	case when QtDiaAtrasoFaturaM2 >15 then 1 else 0 end,
+	case when QtDiaAtrasoFaturaM3 >15 then 1 else 0 end,
+	case when QtDiaAtrasoFaturaM4 >15 then 1 else 0 end,
+	case when QtDiaAtrasoFaturaM5 >15 then 1 else 0 end,
+	case when QtDiaAtrasoFaturaM6 >15 then 1 else 0 end) as qtd_atrs_maior15d_6m,
+
+	/*Quantidade de vezes que pagou antes do corte seguinte nas últimas 6 faturas*/
+	sum(
+	case when DtAtingimentoPgmnoMnmoM1 ne . and DtAtingimentoPgmnoMnmoM1<DtCorteFaturaM1 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM2 ne . and DtAtingimentoPgmnoMnmoM2<DtCorteFaturaM2 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM3 ne . and DtAtingimentoPgmnoMnmoM3<DtCorteFaturaM3 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM4 ne . and DtAtingimentoPgmnoMnmoM4<DtCorteFaturaM4 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM5 ne . and DtAtingimentoPgmnoMnmoM5<DtCorteFaturaM5 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM6 ne . and DtAtingimentoPgmnoMnmoM6<DtCorteFaturaM6 then 1 else 0 end) as qtd_pg_ant_corte_6m,
+
+	/*Quantidade de vezes que pagou pelo menos o mínimo nas últimas 6 faturas*/
+	sum(
+	case when VrTrnsoPgmnoEntreCrteM1 between VrPagamentoMinimoFaturaM2 and VrSaldoFaturaM2 then 1 else 0 end,
+	case when VrTrnsoPgmnoEntreCrteM2 between VrPagamentoMinimoFaturaM3 and VrSaldoFaturaM3 then 1 else 0 end,
+	case when VrTrnsoPgmnoEntreCrteM3 between VrPagamentoMinimoFaturaM4 and VrSaldoFaturaM4 then 1 else 0 end,
+	case when VrTrnsoPgmnoEntreCrteM4 between VrPagamentoMinimoFaturaM5 and VrSaldoFaturaM5 then 1 else 0 end,
+	case when VrTrnsoPgmnoEntreCrteM5 between VrPagamentoMinimoFaturaM6 and VrSaldoFaturaM6 then 1 else 0 end,
+	case when VrTrnsoPgmnoEntreCrteM6 between VrPagamentoMinimoFaturaM7 and VrSaldoFaturaM7 then 1 else 0 end) as qtd_mais_min_6m,
+	/*filtro*/
+	sum(
+	case when VrJuroMoraMultaM>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM1>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM2>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM3>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM4>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM5>0 then 1 else 0 end) as qtd_juros_multa_6m
+
+FROM pop1_&anomes.
+GROUP BY CdPessoaTitularConta, CdDimContaCartao;
+	QUIT;
+
+DATA score_pop1_&anomes.;
+SET score_pop1_&anomes.;
+	/*Percentual Pago no mês anterior*/
+	Perc_pagoM1=VrTrnsoPgmnoEntreCrteM/VrSaldoFaturaM1;
+
+	/*Atrasou até 10 Dias a Fatura M1*/
+	IF QtDiaAtrasoFaturaM<=10 THEN atr_ate_10d=1; ELSE atr_ate_10d=0;
+
+	/*Idade_conta*/
+	idade_conta=yrdif(DtAberturaContaCartao,DtCorteFaturaM,'ACT/ACT');
+
+	/*Índice de Utilização */
+	IU_M0=(sum(VrLimiteCreditoContaCrteM,-VrLmteCrdtoCntaCrteDspnlM)/VrLimiteCreditoContaCrteM)*100;
+
+RUN;
+
+/*Acordo_M1*/
+
+PROC SQL;
+CREATE TABLE acordo_pop1_&anomes. AS
+SELECT
+	a.CdPessoaTitularConta,
+	a.CdDimContaCartao,
+	a.DtCorteFaturaM,
+	a.DtCorteFaturaM1,
+	a.DtCorteFaturaM2,
+	b.DtTransacao,
+	b.DtPostagemTransacao,
+	case when  b.DtTransacao > a.DtCorteFaturaM2 and b.DtTransacao<=a.DtCorteFaturaM1 then 1 else 0 end  as Acordo_M1
+FROM score_pop1_&anomes. AS a LEFT JOIN acordo_&anomes. AS b
+		ON a.CdDimContaCartao=b.CdDimContaCartao AND a.CdPessoaTitularConta=b.CdPessoaTitularConta;
+QUIT;
+
+PROC SQL;
+CREATE TABLE pop1_&anomes. AS
+SELECT DISTINCT
+	CdPessoaTitularConta,
+	CdDimContaCartao,
+	DtCorteFaturaM,
+	max(Acordo_M1) as Acordo_M1_
+FROM acordo_pop1_&anomes. (drop=DtTransacao) AS a
+GROUP BY CdPessoaTitularConta, CdDimContaCartao, DtCorteFaturaM;
+	QUIT;
+
+PROC SQL;
+CREATE TABLE Score_final_pop1_&anomes. AS
+SELECT
+	a.*,
+	b.Acordo_M1_ as Acordo_M1
+FROM score_pop1_&anomes. AS a LEFT JOIN pop1_&anomes. AS b
+						ON a.CdDimContaCartao=b.CdDimContaCartao
+						AND a.CdPessoaTitularConta=b.CdPessoaTitularConta
+						AND a.DtCorteFaturaM=b.DtCorteFaturaM;
+	QUIT;
+
+/* Categoriza Variáveis que entraram no modelo */
+
+DATA Score_final_pop1_&anomes.;
+SET Score_final_pop1_&anomes.;
+
+	if qtd_atrs_maior15d_6m <= 0 then c_qtd_atrs_maior15d_6m = 1; else
+	if qtd_atrs_maior15d_6m <= 1 then c_qtd_atrs_maior15d_6m = 2; else
+	if qtd_atrs_maior15d_6m >  1 then c_qtd_atrs_maior15d_6m = 3;
+
+	if qtd_pg_ant_corte_6m <= 4 then c_qtd_pg_ant_corte_6m = 1; else
+	if qtd_pg_ant_corte_6m <= 5 then c_qtd_pg_ant_corte_6m = 2; else
+	if qtd_pg_ant_corte_6m >  5 then c_qtd_pg_ant_corte_6m = 3;
+
+	if IU_M0 <= 37.736129032 then c_IU_M0 = 1; else
+	if IU_M0 <= 49.818823529 then c_IU_M0 = 2; else
+	if IU_M0 <= 81.284179104 then c_IU_M0 = 3; else
+	if IU_M0 <= 91.875		 then c_IU_M0 = 4; else
+	if IU_M0 > 91.875 		 then c_IU_M0 = 5;
+
+	if qtd_mais_min_6m <= 4 then c_qtd_mais_min_6m = 1; else
+	if qtd_mais_min_6m <= 5 then c_qtd_mais_min_6m = 2; else
+	if qtd_mais_min_6m >  5 then c_qtd_mais_min_6m = 3;
+
+	if Perc_pagoM1 <= 0.2485295336 then c_Perc_pagoM1 = 1; else
+	if Perc_pagoM1 <= 0.4767504688 then c_Perc_pagoM1 = 2; else
+	if Perc_pagoM1 <= 0.7434023045 then c_Perc_pagoM1 = 3; else
+	if Perc_pagoM1 >  0.7434023045 then c_Perc_pagoM1 = 4;
+
+	if Acordo_M1=0 then C_Acordo_M1=1; else C_Acordo_M1=2;
+
+	if atr_ate_10d=0 then C_atr_ate_10d=1; else C_atr_ate_10d=2;
+
+RUN;
+
+/* Score */
+
+DATA Score_final_pop1_&anomes.;
+SET  Score_final_pop1_&anomes.;
+
+	score = sum(0.6108809426, (idade_conta*0.1067177632));
+
+	IF c_IU_M0=1				 THEN score=sum(score, 0.3180584922);
+	IF c_IU_M0=2 				 THEN score=sum(score, 0.2556567497);
+	IF c_IU_M0=3 				 THEN score=sum(score, 0.1370063300);
+	IF c_IU_M0=5 				 THEN score=sum(score,-0.2038315250);
+
+	IF c_Perc_pagoM1=1 			 THEN score=sum(score,-0.4693847060);
+	IF c_Perc_pagoM1=2 			 THEN score=sum(score,-0.2388256540);
+	IF c_Perc_pagoM1=4			 THEN score=sum(score, 0.4482897443);
+
+	IF C_Acordo_M1=2			 THEN score=sum(score,-0.2996460930);
+
+	IF C_atr_ate_10d=1 			 THEN score=sum(score,-0.5678366590);
+
+	IF c_qtd_mais_min_6m=1 	  	 THEN score=sum(score,-0.1451096260);
+	IF c_qtd_mais_min_6m=3 	   	 THEN score=sum(score, 0.3297911035);
+
+	IF c_qtd_pg_ant_corte_6m=1   THEN score=sum(score,-0.2159759180);
+	IF c_qtd_pg_ant_corte_6m=3   THEN score=sum(score, 0.3379236932);
+
+	IF c_qtd_atrs_maior15d_6m=1  THEN score=sum(score, 0.3255998164);
+	IF c_qtd_atrs_maior15d_6m=3  THEN score=sum(score,-0.3032375490);
+
+	pred=1/(1+(exp(-score)));
+
+RUN;
+
+/* Olhar distribuição do Grupo Homogêneo */
+
+DATA Collection_Score_Pop1_&anomes. (COMPRESS=YES);
+SET Score_final_pop1_&anomes.;
+	if pred <=0.3024913 then GH=1 ; else
+	if pred <=0.4123656 then GH=2 ; else
+	if pred <=0.4796458 then GH=3 ; else
+	if pred <=0.5258662 then GH=4 ; else
+	if pred <=0.568507  then GH=5 ; else
+	if pred <=0.6100554 then GH=6 ; else
+	if pred <=0.6489051 then GH=7 ; else
+	if pred <=0.7109128 then GH=8 ; else
+	if pred <=0.765949  then GH=9 ; else
+	if pred <=0.7912149 then GH=10 ; else
+	if pred <=0.8370373 then GH=11 ; else
+	if pred <=0.8739366 then GH=12 ; else
+	if pred <=0.8924549 then GH=13 ; else
+	if pred <=0.9278566 then GH=14 ; else
+	if pred > 0.9278566 then GH=15;
+
+RUN;
+
+/* Corrigir layout base */
+
+DATA cartoes.Collection_Score_Pop1_&anomes.(drop = CdPessoaTitularConta CdDimContaCartao);
+set Collection_Score_Pop1_&anomes.;
+NuCpfcNpj = CdPessoaTitularConta - 100000000000000;
+if substr(put(CdDimContaCartao,$10.),2,1) = '0' then CdProduto = substr(put(CdDimContaCartao,$10.),1,1)*1;
+else CdProduto = substr(put(CdDimContaCartao,$11.),1,2)*1;
+NuConta = CdDimContaCartao - CdProduto * 1000000000;
+DtCorte	= year(DtCorteFaturaM)*100+month(DtCorteFaturaM);
+
+rename
+CdEstadoContaCartaoM = CdStatusContaM0
+CdTipoProdutoCartaoStmaOrgm = CdTipoCartao
+DtCorteFaturaM = DtCorteM0
+DtCorteFaturaM1 = DtCorteM1
+DtCorteFaturaM2 = DtCorteM2
+DtCorteFaturaM3 = DtCorteM3
+DtCorteFaturaM4 = DtCorteM4
+DtCorteFaturaM5 = DtCorteM5
+DtCorteFaturaM6 = DtCorteM6
+DtCorteFaturaM7 = DtCorteM7
+DtAberturaContaCartao = DtCriacaoConta
+DtAtingimentoPgmnoMnmoM = DtPagamentoM1
+DtAtingimentoPgmnoMnmoM1 = DtPagamentoM2
+DtAtingimentoPgmnoMnmoM2 = DtPagamentoM3
+DtAtingimentoPgmnoMnmoM3 = DtPagamentoM4
+DtAtingimentoPgmnoMnmoM4 = DtPagamentoM5
+DtAtingimentoPgmnoMnmoM5 = DtPagamentoM6
+DtAtingimentoPgmnoMnmoM6 = DtPagamentoM7
+DtVencimentoFaturaM1 = DtVencimentoCorteM1
+DtVencimentoFaturaM2 = DtVencimentoCorteM2
+DtVencimentoFaturaM3 = DtVencimentoCorteM3
+DtVencimentoFaturaM4 = DtVencimentoCorteM4
+DtVencimentoFaturaM5 = DtVencimentoCorteM5
+DtVencimentoFaturaM6 = DtVencimentoCorteM6
+DtVencimentoFaturaM7 = DtVencimentoCorteM7
+QtDiaAtrasoFaturaM = QtDiasAtrasoM0
+QtDiaAtrasoFaturaM1 = QtDiasAtrasoM1
+QtDiaAtrasoFaturaM2 = QtDiasAtrasoM2
+QtDiaAtrasoFaturaM3 = QtDiasAtrasoM3
+QtDiaAtrasoFaturaM4 = QtDiasAtrasoM4
+QtDiaAtrasoFaturaM5 = QtDiasAtrasoM5
+QtDiaAtrasoFaturaM6 = QtDiasAtrasoM6
+QtDiaAtrasoFaturaM7 = QtDiasAtrasoM7
+VrJuroMoraMultaM = VlJurosMultaM0
+VrJuroMoraMultaM1 = VlJurosMultaM1
+VrJuroMoraMultaM2 = VlJurosMultaM2
+VrJuroMoraMultaM3 = VlJurosMultaM3
+VrJuroMoraMultaM4 = VlJurosMultaM4
+VrJuroMoraMultaM5 = VlJurosMultaM5
+VrLimiteCreditoContaCrteM = VlLimiteCorteM0
+VrLimiteCreditoCntaCrteM1 = VlLimiteCorteM1
+VrLimiteCreditoCntaCrteM2 = VlLimiteCorteM2
+VrLimiteCreditoCntaCrteM3 = VlLimiteCorteM3
+VrLimiteCreditoCntaCrteM4 = VlLimiteCorteM4
+VrLimiteCreditoCntaCrteM5 = VlLimiteCorteM5
+VrLimiteCreditoCntaCrteM6 = VlLimiteCorteM6
+VrLimiteCreditoCntaCrteM7 = VlLimiteCorteM7
+VrTrnsoPgmnoEntreCrteM = VlPagamentoCorteM1
+VrTrnsoPgmnoEntreCrteM1 = VlPagamentoCorteM2
+VrTrnsoPgmnoEntreCrteM2 = VlPagamentoCorteM3
+VrTrnsoPgmnoEntreCrteM3 = VlPagamentoCorteM4
+VrTrnsoPgmnoEntreCrteM4 = VlPagamentoCorteM5
+VrTrnsoPgmnoEntreCrteM5 = VlPagamentoCorteM6
+VrTrnsoPgmnoEntreCrteM6 = VlPagamentoCorteM7
+VrPagamentoMinimoFaturaM1 = VlPagamentoMinimoM1
+VrPagamentoMinimoFaturaM2 = VlPagamentoMinimoM2
+VrPagamentoMinimoFaturaM3 = VlPagamentoMinimoM3
+VrPagamentoMinimoFaturaM4 = VlPagamentoMinimoM4
+VrPagamentoMinimoFaturaM5 = VlPagamentoMinimoM5
+VrPagamentoMinimoFaturaM6 = VlPagamentoMinimoM6
+VrPagamentoMinimoFaturaM7 = VlPagamentoMinimoM7
+VrLmteCrdtoCntaCrteDspnlM = VlSaldoDisponivelM0
+VrLmteCrdtoCntaCrteDspnlM1 = VlSaldoDisponivelM1
+VrLmteCrdtoCntaCrteDspnlM2 = VlSaldoDisponivelM2
+VrLmteCrdtoCntaCrteDspnlM3 = VlSaldoDisponivelM3
+VrLmteCrdtoCntaCrteDspnlM4 = VlSaldoDisponivelM4
+VrLmteCrdtoCntaCrteDspnlM5 = VlSaldoDisponivelM5
+VrLmteCrdtoCntaCrteDspnlM6 = VlSaldoDisponivelM6
+VrLmteCrdtoCntaCrteDspnlM7 = VlSaldoDisponivelM7
+VrSaldoFaturaM = VlSaldoFaturaM0
+VrSaldoFaturaM1 = VlSaldoFaturaM1
+VrSaldoFaturaM2 = VlSaldoFaturaM2
+VrSaldoFaturaM3 = VlSaldoFaturaM3
+VrSaldoFaturaM4 = VlSaldoFaturaM4
+VrSaldoFaturaM5 = VlSaldoFaturaM5
+VrSaldoFaturaM6 = VlSaldoFaturaM6
+VrSaldoFaturaM7 = VlSaldoFaturaM7;
+run;
+
+DATA cartoes.Collection_Score_Pop1_&anomes.;
+format NuCpfCnpj NuConta CdProduto DtCriacaoConta CdTipoCartao CdStatusContaM0 DtCorte DtCorteM0 DtCorteM1 DtCorteM2
+DtCorteM3 DtCorteM4 DtCorteM5 DtCorteM6 DtCorteM7 DtPagamentoM1 DtPagamentoM2 DtPagamentoM3 DtPagamentoM4
+DtPagamentoM5 DtPagamentoM6 DtPagamentoM7 DtVencimentoCorteM1 DtVencimentoCorteM2 DtVencimentoCorteM3
+DtVencimentoCorteM4 DtVencimentoCorteM5 DtVencimentoCorteM6 DtVencimentoCorteM7 QtDiasAtrasoM0 QtDiasAtrasoM1
+QtDiasAtrasoM2 QtDiasAtrasoM3 QtDiasAtrasoM4 QtDiasAtrasoM5 QtDiasAtrasoM6 QtDiasAtrasoM7 VlPagamentoMinimoM1
+VlPagamentoMinimoM2 VlPagamentoMinimoM3 VlPagamentoMinimoM4 VlPagamentoMinimoM5 VlPagamentoMinimoM6
+VlPagamentoMinimoM7 VlSaldoFaturaM0 VlSaldoFaturaM1 VlSaldoFaturaM2 VlSaldoFaturaM3 VlSaldoFaturaM4 VlSaldoFaturaM5
+VlSaldoFaturaM6 VlSaldoFaturaM7 VlPagamentoCorteM1 VlPagamentoCorteM2 VlPagamentoCorteM3 VlPagamentoCorteM4
+VlPagamentoCorteM5 VlPagamentoCorteM6 VlPagamentoCorteM7 VlLimiteCorteM0 VlLimiteCorteM1 VlLimiteCorteM2
+VlLimiteCorteM3 VlLimiteCorteM4 VlLimiteCorteM5 VlLimiteCorteM6 VlLimiteCorteM7 VlSaldoDisponivelM0
+VlSaldoDisponivelM1 VlSaldoDisponivelM2 VlSaldoDisponivelM3 VlSaldoDisponivelM4 VlSaldoDisponivelM5
+VlSaldoDisponivelM6 VlSaldoDisponivelM7 VlJurosMultaM0 VlJurosMultaM1 VlJurosMultaM2 VlJurosMultaM3 VlJurosMultaM4
+VlJurosMultaM5 dt_ref pop qtd_atrs_maior15d_6m qtd_pg_ant_corte_6m qtd_mais_min_6m qtd_juros_multa_6m Perc_pagoM1
+atr_ate_10d idade_conta IU_M0 Acordo_M1 c_qtd_atrs_maior15d_6m c_qtd_pg_ant_corte_6m c_IU_M0 c_qtd_mais_min_6m
+c_Perc_pagoM1 C_Acordo_M1 C_atr_ate_10d score pred GH;
+set cartoes.Collection_Score_Pop1_&anomes.;
+run;
+
+/********************************************************************************/
+/**************************** 4 - Escoragem Modelo 2 ****************************/
+/********************************************************************************/
+
+/*H.C.*/
+
+/*Criando Variáveis que entraram no modelo*/
+
+DATA score_pop2_&anomes.;
+SET pop2_&anomes.;
+
+/* não pagou as últimas duas faturas que antecedem a data de corte */
+	IF DtAtingimentoPgmnoMnmoM1 eq .  and DtAtingimentoPgmnoMnmoM2 eq . then rec_atrs_2=1;else rec_atrs_2=0;
+
+RUN;
+
+PROC SQL;
+CREATE TABLE score2_pop2_&anomes. AS
+SELECT
+	*,
+	/*Quantidade de vezes que pagou antes do corte seguinte nas últimas 6 faturas*/
+	sum(
+	case when DtAtingimentoPgmnoMnmoM1 ne . and DtAtingimentoPgmnoMnmoM1<DtCorteFaturaM1 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM2 ne . and DtAtingimentoPgmnoMnmoM2<DtCorteFaturaM2 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM3 ne . and DtAtingimentoPgmnoMnmoM3<DtCorteFaturaM3 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM4 ne . and DtAtingimentoPgmnoMnmoM4<DtCorteFaturaM4 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM5 ne . and DtAtingimentoPgmnoMnmoM5<DtCorteFaturaM5 then 1 else 0 end,
+	case when DtAtingimentoPgmnoMnmoM6 ne . and DtAtingimentoPgmnoMnmoM6<DtCorteFaturaM6 then 1 else 0 end) as qtd_pg_ant_corte_6m,
+	sum(
+	case when VrJuroMoraMultaM>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM1>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM2>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM3>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM4>0 then 1 else 0 end,
+	case when VrJuroMoraMultaM5>0 then 1 else 0 end) as qtd_juros_multa_6m
+FROM score_pop2_&anomes.
+GROUP BY CdPessoaTitularConta, CdDimContaCartao;
+	QUIT;
+
+DATA score3_pop2_&anomes.;
+SET score2_pop2_&anomes.;
+RUN;
+
+DATA score4_pop2_&anomes.;
+SET  score3_pop2_&anomes.;
+
+	/*Percentual Pago no mês anterior*/
+	Perc_pagoM2=VrTrnsoPgmnoEntreCrteM1/VrSaldoFaturaM2;
+	Perc_pagoM3=VrTrnsoPgmnoEntreCrteM2/VrSaldoFaturaM3;
+
+	/*Idade_conta*/
+	idade_conta=yrdif(DtAberturaContaCartao,DtCorteFaturaM,'ACT/ACT');
+
+	/*Índice de Utilização */
+	IU_M1=(sum(VrLimiteCreditoCntaCrteM1,-VrLmteCrdtoCntaCrteDspnlM1)/VrLimiteCreditoCntaCrteM1)*100;
+
+RUN;
+
+/*Acordo_M0*/
+
+PROC SQL;
+CREATE TABLE acordo_pop2_&anomes. AS
+SELECT
+	a.CdPessoaTitularConta,
+	a.CdDimContaCartao,
+	a.DtCorteFaturaM,
+	a.DtCorteFaturaM1,
+	b.DtTransacao,
+	b.DtPostagemTransacao,
+	case when  b.DtTransacao > a.DtCorteFaturaM1 and b.DtTransacao<=a.DtCorteFaturaM then 1 else 0 end  as Acordo_M0
+FROM score4_pop2_&anomes. AS a LEFT JOIN  acordo_&anomes. AS b
+			ON a.CdDimContaCartao=b.CdDimContaCartao
+			AND a.CdPessoaTitularConta=b.CdPessoaTitularConta;
+	QUIT;
+
+PROC SQL;
+CREATE TABLE pop2_&anomes. AS
+SELECT DISTINCT
+	CdPessoaTitularConta,
+	CdDimContaCartao,
+	DtCorteFaturaM,
+	max(Acordo_M0) as Acordo_M0_
+FROM acordo_pop2_&anomes. (drop=DtTransacao) AS a
+GROUP BY CdPessoaTitularConta, CdDimContaCartao, DtCorteFaturaM;
+	QUIT;
+
+PROC SQL;
+CREATE TABLE Score_final_pop2_&anomes. AS
+SELECT
+	a.*,
+	b.Acordo_M0_ as Acordo_M0
+FROM score4_pop2_&anomes. AS a LEFT JOIN pop2_&anomes. AS b
+			ON a.CdDimContaCartao=b.CdDimContaCartao
+			AND a.CdPessoaTitularConta=b.CdPessoaTitularConta
+			AND a.DtCorteFaturaM=b.DtCorteFaturaM;
+	QUIT;
+
+/* Categoriza Variáveis que entraram no modelo */
+
+DATA Score_final_pop2_&anomes.;
+SET Score_final_pop2_&anomes.;
+
+	IF rec_atrs_2 <= 0 then c_rec_atrs_2 = 1; else
+	IF rec_atrs_2 > 0 then c_rec_atrs_2 = 9;
+
+	IF qtd_pg_ant_corte_6m <= 3 then c_qtd_pg_ant_corte_6m = 3; else
+	IF qtd_pg_ant_corte_6m <= 4 then c_qtd_pg_ant_corte_6m = 4; else
+	IF qtd_pg_ant_corte_6m <= 5 then c_qtd_pg_ant_corte_6m = 6; else
+	IF qtd_pg_ant_corte_6m > 5 then c_qtd_pg_ant_corte_6m = 8;
+
+	IF Perc_pagoM3 <= . then c_Perc_pagoM3_2 = 5; else
+	IF Perc_pagoM3 <= 0.157766866290126 then c_Perc_pagoM3_2 = 3; else
+	IF Perc_pagoM3 <= 0.293785035814388 then c_Perc_pagoM3_2 = 4; else
+	IF Perc_pagoM3 <= 0.489883897516289 then c_Perc_pagoM3_2 = 5; else
+	IF Perc_pagoM3 > 0.489883897516289 then c_Perc_pagoM3_2 = 10;
+
+	IF Perc_pagoM2 <= . then c_Perc_pagoM2_2 = 5; else
+	IF Perc_pagoM2 <= 0.157766866290126 then c_Perc_pagoM2_2 = 3; else
+	IF Perc_pagoM2 <= 0.293785035814388 then c_Perc_pagoM2_2 = 4; else
+	IF Perc_pagoM2 <= 0.489883897516289 then c_Perc_pagoM2_2 = 5; else
+	IF Perc_pagoM2 > 0.489883897516289 then c_Perc_pagoM2_2 = 10;
+
+	c_2Perc_pagoM2 = trim(c_Perc_pagoM2_2);
+
+	c_2Perc_pagoM3 = trim(c_Perc_pagoM3_2);
+
+	Perc2_pago_M2_M3 = (c_2Perc_pagoM3||c_2Perc_pagoM2);
+
+	IF Perc2_pago_M2_M3 = '           3           3' then c_Perc2_pago_M2_M3 = 1; else
+	IF Perc2_pago_M2_M3 in ('           3           4', '           4           3',
+	'           5           3') then c_Perc2_pago_M2_M3 = 2; else
+	IF Perc2_pago_M2_M3 in ('           3           5','           4           4',
+	'           5           4') then c_Perc2_pago_M2_M3 = 3; else
+	IF Perc2_pago_M2_M3 in ('           3          10','           5           5', '          10           3',
+	'          10           4',  '           4           5') then c_Perc2_pago_M2_M3 = 4; else
+	IF Perc2_pago_M2_M3 in ('           4          10','           5          10',
+	'          10           5') then c_Perc2_pago_M2_M3 = 5; else
+	IF Perc2_pago_M2_M3 in ('          10          10') then c_Perc2_pago_M2_M3 = 6;
+
+	IF idade_conta <= 2.43561643835616 then c_idade_conta = 7; else
+	IF idade_conta <= 3.12054794520548 then c_idade_conta = 8; else
+	IF idade_conta > 3.12054794520548 then c_idade_conta = 10;
+
+	IF Acordo_M0 <= 0 then c_Acordo_M0 = 1; else
+	IF Acordo_M0 > 0 then c_Acordo_M0 = 8;
+
+	IF IU_M1 <= 34.1811111111111 then c_IU_M1 = 1; else
+	IF IU_M1 <= 69.66 			 then c_IU_M1 = 3; else
+	IF IU_M1 <= 93.8027272727273 then c_IU_M1 = 5; else
+	IF IU_M1 <= 121.930322580645 then c_IU_M1 = 8; else
+	IF IU_M1 <= 143.873454545455 then c_IU_M1 = 9; else
+	IF IU_M1 > 143.873454545455  then c_IU_M1 = 10;
+
+RUN;
+
+DATA Score_final_pop2_&anomes.;
+SET  Score_final_pop2_&anomes.;
+
+	score = 0.372281547;
+
+	IF c_Acordo_M0=8 then score=sum(score,-0.719139222);
+	IF c_rec_atrs_2=9 then score=sum(score,-0.088730529);
+	IF c_idade_conta=8 then score=sum(score,0.227455141);
+	IF c_idade_conta=10 then score=sum(score,0.337638304);
+	IF c_qtd_pg_ant_corte_6m=3 then score=sum(score,-0.153696794);
+	IF c_qtd_pg_ant_corte_6m=6 then score=sum(score,0.122873722);
+	IF c_qtd_pg_ant_corte_6m=8 then score=sum(score,0.16723359);
+	IF c_IU_M1=1 then score=sum(score,0.603203897);
+	IF c_IU_M1=3 then score=sum(score,0.301099783);
+	IF c_IU_M1=8 then score=sum(score,-0.269846821);
+	IF c_IU_M1=9 then score=sum(score,-0.365584483);
+	IF c_IU_M1=10 then score=sum(score,-0.562174581);
+	IF c_Perc2_pago_M2_M3=1 then score=sum(score,-0.601075867);
+	IF c_Perc2_pago_M2_M3=2 then score=sum(score,-0.287158668);
+	IF c_Perc2_pago_M2_M3=3 then score=sum(score,-0.229545226);
+	IF c_Perc2_pago_M2_M3=5 then score=sum(score,0.177876689);
+	IF c_Perc2_pago_M2_M3=6 then score=sum(score,0.511795039);
+
+	pred=1/(1+(exp(-score)));
+
+RUN;
+
+DATA Collection_Score_Pop2_&anomes. (COMPRESS=YES);
+SET  Score_final_pop2_&anomes.;
+
+	IF pred <=0.3024913 then GH=1 ; else
+	IF pred <=0.4123656 then GH=2 ; else
+	IF pred <=0.4796458 then GH=3 ; else
+	IF pred <=0.5258662 then GH=4 ; else
+	IF pred <=0.568507  then GH=5 ; else
+	IF pred <=0.6100554 then GH=6 ; else
+	IF pred <=0.6489051 then GH=7 ; else
+	IF pred <=0.7109128 then GH=8 ; else
+	IF pred <=0.765949  then GH=9 ; else
+	IF pred <=0.7912149 then GH=10 ; else
+	IF pred <=0.8370373 then GH=11 ; else
+	IF pred <=0.8739366 then GH=12 ; else
+	IF pred <=0.8924549 then GH=13 ; else
+	IF pred <=0.9278566 then GH=14 ; else
+	IF pred > 0.9278566 then GH=15;
+
+RUN;
+
+/* Corrigir layout base */
+
+DATA cartoes.Collection_Score_Pop2_&anomes.(drop = CdPessoaTitularConta CdDimContaCartao);
+set Collection_Score_Pop2_&anomes.;
+NuCpfcNpj = CdPessoaTitularConta - 100000000000000;
+if substr(put(CdDimContaCartao,$10.),2,1) = '0' then CdProduto = substr(put(CdDimContaCartao,$10.),1,1)*1;
+else CdProduto = substr(put(CdDimContaCartao,$11.),1,2)*1;
+NuConta = CdDimContaCartao - CdProduto * 1000000000;
+DtCorte	= year(DtCorteFaturaM)*100+month(DtCorteFaturaM);
+
+rename
+CdEstadoContaCartaoM = CdStatusContaM0
+CdTipoProdutoCartaoStmaOrgm = CdTipoCartao
+DtCorteFaturaM= DtCorteM0
+DtCorteFaturaM1 = DtCorteM1
+DtCorteFaturaM2 = DtCorteM2
+DtCorteFaturaM3 = DtCorteM3
+DtCorteFaturaM4 = DtCorteM4
+DtCorteFaturaM5 = DtCorteM5
+DtCorteFaturaM6 = DtCorteM6
+DtCorteFaturaM7 = DtCorteM7
+DtAberturaContaCartao = DtCriacaoConta
+DtAtingimentoPgmnoMnmoM = DtPagamentoM1
+DtAtingimentoPgmnoMnmoM1 = DtPagamentoM2
+DtAtingimentoPgmnoMnmoM2 = DtPagamentoM3
+DtAtingimentoPgmnoMnmoM3 = DtPagamentoM4
+DtAtingimentoPgmnoMnmoM4 = DtPagamentoM5
+DtAtingimentoPgmnoMnmoM5 = DtPagamentoM6
+DtAtingimentoPgmnoMnmoM6 = DtPagamentoM7
+DtVencimentoFaturaM1 = DtVencimentoCorteM1
+DtVencimentoFaturaM2 = DtVencimentoCorteM2
+DtVencimentoFaturaM3 = DtVencimentoCorteM3
+DtVencimentoFaturaM4 = DtVencimentoCorteM4
+DtVencimentoFaturaM5 = DtVencimentoCorteM5
+DtVencimentoFaturaM6 = DtVencimentoCorteM6
+DtVencimentoFaturaM7 = DtVencimentoCorteM7
+QtDiaAtrasoFaturaM = QtDiasAtrasoM0
+QtDiaAtrasoFaturaM1 = QtDiasAtrasoM1
+QtDiaAtrasoFaturaM2 = QtDiasAtrasoM2
+QtDiaAtrasoFaturaM3 = QtDiasAtrasoM3
+QtDiaAtrasoFaturaM4 = QtDiasAtrasoM4
+QtDiaAtrasoFaturaM5 = QtDiasAtrasoM5
+QtDiaAtrasoFaturaM6 = QtDiasAtrasoM6
+QtDiaAtrasoFaturaM7 = QtDiasAtrasoM7
+VrJuroMoraMultaM = VlJurosMultaM0
+VrJuroMoraMultaM1 = VlJurosMultaM1
+VrJuroMoraMultaM2 = VlJurosMultaM2
+VrJuroMoraMultaM3 = VlJurosMultaM3
+VrJuroMoraMultaM4 = VlJurosMultaM4
+VrJuroMoraMultaM5 = VlJurosMultaM5
+VrLimiteCreditoCntaCrteM1 = VlLimiteCorteM0
+VrLimiteCreditoCntaCrteM2 = VlLimiteCorteM1
+VrLimiteCreditoCntaCrteM3 = VlLimiteCorteM2
+VrLimiteCreditoCntaCrteM4 = VlLimiteCorteM3
+VrLimiteCreditoCntaCrteM5 = VlLimiteCorteM4
+VrLimiteCreditoCntaCrteM6 = VlLimiteCorteM5
+VrLimiteCreditoCntaCrteM7 = VlLimiteCorteM6
+VrLimiteCreditoContaCrteM = VlLimiteCorteM7
+VrTrnsoPgmnoEntreCrteM = VlPagamentoCorteM1
+VrTrnsoPgmnoEntreCrteM1 = VlPagamentoCorteM2
+VrTrnsoPgmnoEntreCrteM2 = VlPagamentoCorteM3
+VrTrnsoPgmnoEntreCrteM3 = VlPagamentoCorteM4
+VrTrnsoPgmnoEntreCrteM4 = VlPagamentoCorteM5
+VrTrnsoPgmnoEntreCrteM5 = VlPagamentoCorteM6
+VrTrnsoPgmnoEntreCrteM6 = VlPagamentoCorteM7
+VrPagamentoMinimoFaturaM1 = VlPagamentoMinimoM1
+VrPagamentoMinimoFaturaM2 = VlPagamentoMinimoM2
+VrPagamentoMinimoFaturaM3 = VlPagamentoMinimoM3
+VrPagamentoMinimoFaturaM4 = VlPagamentoMinimoM4
+VrPagamentoMinimoFaturaM5 = VlPagamentoMinimoM5
+VrPagamentoMinimoFaturaM6 = VlPagamentoMinimoM6
+VrPagamentoMinimoFaturaM7 = VlPagamentoMinimoM7
+VrLmteCrdtoCntaCrteDspnlM = VlSaldoDisponivelM0
+VrLmteCrdtoCntaCrteDspnlM1 = VlSaldoDisponivelM1
+VrLmteCrdtoCntaCrteDspnlM2 = VlSaldoDisponivelM2
+VrLmteCrdtoCntaCrteDspnlM3 = VlSaldoDisponivelM3
+VrLmteCrdtoCntaCrteDspnlM4 = VlSaldoDisponivelM4
+VrLmteCrdtoCntaCrteDspnlM5 = VlSaldoDisponivelM5
+VrLmteCrdtoCntaCrteDspnlM6 = VlSaldoDisponivelM6
+VrLmteCrdtoCntaCrteDspnlM7 = VlSaldoDisponivelM7
+VrSaldoFaturaM = VlSaldoFaturaM0
+VrSaldoFaturaM1 = VlSaldoFaturaM1
+VrSaldoFaturaM2 = VlSaldoFaturaM2
+VrSaldoFaturaM3 = VlSaldoFaturaM3
+VrSaldoFaturaM4 = VlSaldoFaturaM4
+VrSaldoFaturaM5 = VlSaldoFaturaM5
+VrSaldoFaturaM6 = VlSaldoFaturaM6
+VrSaldoFaturaM7 = VlSaldoFaturaM7;
+run;
+
+DATA cartoes.Collection_Score_Pop2_&anomes.;
+format NuCpfCnpj NuConta CdProduto DtCriacaoConta CdTipoCartao CdStatusContaM0 DtCorte DtCorteM0 DtCorteM1 DtCorteM2
+DtCorteM3 DtCorteM4 DtCorteM5 DtCorteM6 DtCorteM7 DtPagamentoM1 DtPagamentoM2 DtPagamentoM3 DtPagamentoM4
+DtPagamentoM5 DtPagamentoM6 DtPagamentoM7 DtVencimentoCorteM1 DtVencimentoCorteM2 DtVencimentoCorteM3
+DtVencimentoCorteM4 DtVencimentoCorteM5 DtVencimentoCorteM6 DtVencimentoCorteM7 QtDiasAtrasoM0 QtDiasAtrasoM1
+QtDiasAtrasoM2 QtDiasAtrasoM3 QtDiasAtrasoM4 QtDiasAtrasoM5 QtDiasAtrasoM6 QtDiasAtrasoM7 VlPagamentoMinimoM1
+VlPagamentoMinimoM2 VlPagamentoMinimoM3 VlPagamentoMinimoM4 VlPagamentoMinimoM5 VlPagamentoMinimoM6
+VlPagamentoMinimoM7 VlSaldoFaturaM0 VlSaldoFaturaM1 VlSaldoFaturaM2 VlSaldoFaturaM3 VlSaldoFaturaM4 VlSaldoFaturaM5
+VlSaldoFaturaM6 VlSaldoFaturaM7 VlPagamentoCorteM1 VlPagamentoCorteM2 VlPagamentoCorteM3 VlPagamentoCorteM4
+VlPagamentoCorteM5 VlPagamentoCorteM6 VlPagamentoCorteM7 VlLimiteCorteM0 VlLimiteCorteM1 VlLimiteCorteM2
+VlLimiteCorteM3 VlLimiteCorteM4 VlLimiteCorteM5 VlLimiteCorteM6 VlLimiteCorteM7 VlSaldoDisponivelM0
+VlSaldoDisponivelM1 VlSaldoDisponivelM2 VlSaldoDisponivelM3 VlSaldoDisponivelM4 VlSaldoDisponivelM5
+VlSaldoDisponivelM6 VlSaldoDisponivelM7 VlJurosMultaM0 VlJurosMultaM1 VlJurosMultaM2 VlJurosMultaM3 VlJurosMultaM4
+VlJurosMultaM5 dt_ref pop rec_atrs_2 qtd_pg_ant_corte_6m qtd_juros_multa_6m Perc_pagoM2 Perc_pagoM3 idade_conta
+IU_M1 Acordo_M0 c_rec_atrs_2 c_qtd_pg_ant_corte_6m c_Perc_pagoM3_2 c_Perc_pagoM2_2 c_2Perc_pagoM2 c_2Perc_pagoM3
+Perc2_pago_M2_M3 c_Perc2_pago_M2_M3 c_idade_conta c_Acordo_M0 c_IU_M1 score pred GH;
+set cartoes.Collection_Score_Pop2_&anomes.;
+run;
+
+/********************************************************************************/
+/**************************** 5 - Consolidando Bases ****************************/
+/********************************************************************************/
+
+DATA cartoes.Collection_Score_Cartoes_&anomes.;
+SET  cartoes.Collection_Score_Pop1_&anomes. cartoes.Collection_Score_Pop2_&anomes.;
+	KEEP NucpfCnpj CdProduto Nuconta pop pred GH dt_ref DtCorteM0;
+	RENAME pred=score;
+RUN;
+
+/*tiro cartão de quem cortou duas vezes no mês (deixo o corte (DtCorteM0) mais recente)*/
+PROC SORT DATA=cartoes.Collection_Score_Cartoes_&anomes. ;
+	BY NucpfCnpj CdProduto Nuconta descending DtCorteM0;
+RUN;
+
+PROC SORT DATA=cartoes.Collection_Score_Cartoes_&anomes.
+		  OUT=Collection_Score_Cartoes_&anomes. NODUPKEY
+		  DUPOUT=dup;
+	BY NucpfCnpj CdProduto Nuconta;
+RUN;
+
+/*Pego o menor score e o menor grupo homogêneo e arrasto para os demais cartões*/
+PROC SQL;
+CREATE TABLE min_score_&anomes. AS
+SELECT
+	*,
+	min(score) as P_score,
+	min(GH) as P_GH
+FROM Collection_Score_Cartoes_&anomes.
+GROUP BY NuCpfcNpj;
+	QUIT;
+
+DATA cartoes.Collection_Score_Cartoes_&anomes. (COMPRESS=YES);
+SET min_score_&anomes.;
+	DROP score GH;
+	RENAME P_score=score P_GH=GH;
+	rdg_cpf = input(substr(put(nucpfcnpj,z11.),6,1),2.); /*cpf campo numérico*/
+	cs = input((put(gh,z2.)||put(rdg_cpf,1.)),3.);
+	DROP rdg_cpf;
+RUN;
+
+/********************************************************************************/
+/****************************** 6 - Robo Arquivo IN *****************************/
+/********************************************************************************/
+
+/* ativar novamente após 3 meses (ou após alinhamento com Rafael Napoleone) a contar de 14/12/2018 */
+/*DATA collection;*/
+/*SET cartoes.Collection_Score_Cartoes_&anomes.; */
+/*	chpras = put(NucpfCnpj,z11.)||put(cdproduto,z2.); /*cpf campo numérico*/*/
+/*RUN;*/
+;
+
+/* Teste de nova política pelo período de 3 meses a contar de 14/12/2018 **************************************/
+
+	data collection;
+	set cartoes.COLLECTION_SCORE_CARTOES_&anomes.;
+	chpras = put(NucpfCnpj,z11.)||put(cdproduto,z2.); /*BAU*/
+	RDG = input(substr(put(NuCpfCnpj,z11.),6,1),1.); /*Cobrança*/
+	run;
+
+   *em teste em dez/18 - 50% Netpoints;
+	data collection;
+	set collection;
+	GH_COB = GH;
+	if CdProduto in (14,15) then do;
+		if RDG <= 4 then GH_COB = 1; end; /*50% dos Cartões NetPoints Régua Ruim*/
+
+	run;
+
+	data collection;
+	set collection;
+	GH_COB = GH;
+	if CdProduto in (14,15) then do;
+		if RDG <= 7 then GH_COB = 1; end; /*80% dos Cartões NetPoints Régua Ruim*/
+	run;
+	proc freq data=collection;
+	table CdProduto*GH_COB;
+	run;
+
+	data collection;
+	set collection;
+	cs_cob = input(put(GH_COB,z2.) || put(RDG,1.),3.);
+	run;
+
+/*************************************************************************************************************
+alterado put(cs,z3.) para put(cs_cob,z3.);*/
+
+DATA arquivo;
+SET collection;
+	registro = '1'||'000'||substr(chpras,1,11)||substr(put(nuconta,z9.),1,9)||substr(chpras,12,2)||put(cs_cob,z3.);
+	KEEP
+	registro;
+RUN;
+
+DATA header;
+	registro = '0COBSCOREENV'||substr(put(year("&dt."d),z4.),1,4)||substr(put(month("&dt."d),z2.),1,2)||substr(put(day("&dt."d),z2.),1,2)||'1001'||"&seq.";
+RUN;
+
+PROC SQL;
+CREATE TABLE trailler AS
+SELECT
+	count(*) AS qte
+FROM arquivo;
+	QUIT;
+
+DATA trailler(KEEP = registro);
+SET trailler;
+	registro = '9'||substr(put(qte,z8.),1,8);
+RUN;
+
+DATA arquivo;
+SET header arquivo trailler;
+RUN;
+
+PROC SORT DATA = arquivo;
+BY registro;
+RUN;
+
+PROC EXPORT DATA = arquivo
+        outfile = "&nome_arq."
+        dbms = tab REPLACE;
+        PUTNAMES=no;
+RUN;
+
+/*****************************************************************************************
+			ARQUIVO DEVE SER COLOCADO NO DIRETÓRIO DA HP PARA LEITURA DO ROBO:
+
+	\\pta-appsx\BVF-apps\CartaoApps\Saida\CollectScore
+
+Instruções:
+- Após processamento da HP (ocorre aos sábados), verificar arquivo de retorno (inconsistências):
+S:\CartaoApps\Entrada\CollectScore
+
+Observações:
+- Arquivo não deve ter cabeçalho
+- Excluir última linha em branco, caso apareça
+
+*****************************************************************************************/

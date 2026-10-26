@@ -1,0 +1,345 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__Project ipf_wo
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:36:57 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 260
+CODE_TASKS_COUNT: 8
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ATIVA = /riscosbv/cobranca/erocha/ATIVA/TABLEAU; IPF_ADM = /riscosbv/cobranca/elmartinz/novo_ipf; IPF_CONT = /riscosbv/cobranca/mlamera/IpfCont; IPF_WO = /riscosbv/cobranca/erocha/120_180_WO/GCP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): ATIVA.BASE_ATIVA_202601_BKP [SAS/Local], ATIVA.BASE_ATIVA_202602_BKP [SAS/Local], IPF_ADM.ANALITICO_20260227 [SAS/Local], IPF_CONT.IPFCONT_ANALITICO_20250930 [SAS/Local], IPF_WO.C_202601 [SAS/Local], IPF_WO.C_202602 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: ATIVA, IPF_ADM, IPF_CONT, IPF_WO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): ATIVA.BASE_ATIVA_202601_BKP [DATA Step - SET], ATIVA.BASE_ATIVA_202602_BKP [DATA Step - SET], IPF_ADM.ANALITICO_20260227 [DATA Step - SET], IPF_CONT.IPFCONT_ANALITICO_20250930 [DATA Step - SET], IPF_WO.C_202601 [DATA Step - SET], IPF_WO.C_202602 [DATA Step - SET]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CART_ADM, CART_ATIVA, CART_CONT, CART_WO, CONSULTA_CONTAS_ADM, CONSULTA_CONTAS_ATIVA, CONSULTA_CONTAS_ATIVA_V2, CONSULTA_CONTAS_CONT, CONSULTA_CONTAS_WO
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (2) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dEUnCAHzTdgq62k7/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname IPF_ADM '/riscosbv/cobranca/elmartinz/novo_ipf';
+
+DATA CART_ADM;
+SET
+	IPF_ADM.ANALITICO_20260227
+;RUN;
+
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_ADM AS
+SELECT
+A.RAZAO_NOME,
+A.ASSESSORIA,
+COUNT(A.NUCONTRATOGESTAO) AS QTD_CONTRATO
+FROM CART_ADM AS A
+WHERE A.CARTEIRA = 'ESTOQUE'
+GROUP BY
+ASSESSORIA, RAZAO_NOME
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (2) */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (3) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-gskHinfhWG8Jhlu5/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname IPF_CONT '/riscosbv/cobranca/mlamera/IpfCont';
+
+DATA CART_CONT;
+SET
+	IPF_CONT.IPFCONT_ANALITICO_20250930
+;RUN;
+
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_CONT AS
+SELECT
+A.DTBASE,
+A.ASSESSORIA,
+COUNT(A.NUCONTRATOGESTAO) AS QTD_CONTRATO
+FROM CART_CONT AS A
+WHERE A.TPCLASSE = 'E'
+GROUP BY
+DTBASE,
+ASSESSORIA
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (3) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (4) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (4) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-selFAdkI7OzD4f3z/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname IPF_WO '/riscosbv/cobranca/erocha/120_180_WO/GCP';
+
+DATA CART_WO;
+SET
+	IPF_WO.C_202601
+	IPF_WO.C_202602
+;RUN;
+
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_WO AS
+SELECT
+A.MESCOMPETENCIA,
+A.GPAGENTE,
+COUNT(A.NUCONTRATO) AS QTD_CONTRATO
+FROM CART_WO AS A
+WHERE A.TPCLASSE = 'E' AND
+FXMIS= 'WO'
+GROUP BY
+MESCOMPETENCIA,
+GPAGENTE
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (4) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program (5) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 9 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program (5) */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-b9XKkjKayWLtaoke/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname ATIVA BASE '/riscosbv/cobranca/erocha/ATIVA/TABLEAU';
+
+DATA CART_ATIVA;
+SET
+ATIVA.BASE_ATIVA_202601_BKP
+ATIVA.BASE_ATIVA_202602_BKP
+;RUN;
+
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_ATIVA AS
+SELECT
+A.DT_BASE,
+A.CD_ASSESSORIA,
+COUNT(A.NUCONTRATO) AS QTD_CONTRATO
+FROM CART_ATIVA AS A
+WHERE A.INCONSISTENCIA = 'N' AND
+A.TPCOB = 'E'
+GROUP BY
+DT_BASE,
+CD_ASSESSORIA
+;QUIT;
+
+PROC SQL;
+
+CREATE TABLE CONSULTA_CONTAS_ATIVA_V2 AS
+SELECT A.*,
+
+CASE
+
+	WHEN A.CD_ASSESSORIA = 1625 THEN "CRC"
+	WHEN A.CD_ASSESSORIA = 2005 THEN "PASCHOALOTTO"
+	WHEN A.CD_ASSESSORIA = 1652 THEN "CRC RENEG"
+	WHEN A.CD_ASSESSORIA = 1656 THEN "PASCHOALOTTO RENEG"
+	WHEN A.CD_ASSESSORIA = 2065 THEN "PASCHOALOTTO"
+	WHEN A.CD_ASSESSORIA = 2067 THEN "PASCHOALOTTO RENEG"
+	WHEN A.CD_ASSESSORIA = 2064 THEN "MENDES"
+	WHEN A.CD_ASSESSORIA = 2066 THEN "MENDES RENEG"
+	ELSE 'OUT' end as ASSESSORIA
+
+FROM CONSULTA_CONTAS_ATIVA AS A
+WHERE CD_ASSESSORIA IN (1625, 2005, 1652, 1656, 2065, 2067, 2064, 2066)
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program (5) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_ADM AS
+SELECT
+A.RAZAO_NOME,
+A.ASSESSORIA,
+COUNT(A.NUCONTRATOGESTAO) AS QTD_CONTRATO
+FROM CART_ADM AS A
+WHERE A.CARTEIRA = 'ESTOQUE'
+GROUP BY
+ASSESSORIA, RAZAO_NOME
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_CONT AS
+SELECT
+A.DTBASE,
+A.ASSESSORIA,
+COUNT(A.NUCONTRATOGESTAO) AS QTD_CONTRATO
+FROM CART_CONT AS A
+WHERE A.TPCLASSE = 'E'
+GROUP BY
+DTBASE,
+ASSESSORIA
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_WO AS
+SELECT
+A.MESCOMPETENCIA,
+A.GPAGENTE,
+COUNT(A.NUCONTRATO) AS QTD_CONTRATO
+FROM CART_WO AS A
+WHERE A.TPCLASSE = 'E' AND
+FXMIS= 'WO'
+GROUP BY
+MESCOMPETENCIA,
+GPAGENTE
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE  CONSULTA_CONTAS_ATIVA AS
+SELECT
+A.DT_BASE,
+A.CD_ASSESSORIA,
+COUNT(A.NUCONTRATO) AS QTD_CONTRATO
+FROM CART_ATIVA AS A
+WHERE A.INCONSISTENCIA = 'N' AND
+A.TPCOB = 'E'
+GROUP BY
+DT_BASE,
+CD_ASSESSORIA
+;QUIT;
+
+PROC SQL;
+
+CREATE TABLE CONSULTA_CONTAS_ATIVA_V2 AS
+SELECT A.*,
+
+CASE
+
+	WHEN A.CD_ASSESSORIA = 1625 THEN "CRC"
+	WHEN A.CD_ASSESSORIA = 2005 THEN "PASCHOALOTTO"
+	WHEN A.CD_ASSESSORIA = 1652 THEN "CRC RENEG"
+	WHEN A.CD_ASSESSORIA = 1656 THEN "PASCHOALOTTO RENEG"
+	WHEN A.CD_ASSESSORIA = 2065 THEN "PASCHOALOTTO"
+	WHEN A.CD_ASSESSORIA = 2067 THEN "PASCHOALOTTO RENEG"
+	WHEN A.CD_ASSESSORIA = 2064 THEN "MENDES"
+	WHEN A.CD_ASSESSORIA = 2066 THEN "MENDES RENEG"
+	ELSE 'OUT' end as ASSESSORIA
+
+FROM CONSULTA_CONTAS_ATIVA AS A
+WHERE CD_ASSESSORIA IN (1625, 2005, 1652, 1656, 2065, 2067, 2064, 2066)
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 008 */
+/* =========================FIM TASK=========================== */

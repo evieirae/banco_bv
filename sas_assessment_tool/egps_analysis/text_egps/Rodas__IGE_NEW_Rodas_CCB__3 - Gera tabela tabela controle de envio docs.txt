@@ -1,0 +1,175 @@
+START_METADATA
+PROJECT: Rodas__IGE_NEW_Rodas_CCB
+FILE_SAS: 3 - Gera tabela tabela controle de envio docs.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:25 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 108
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], BV-PDBD-PRD.TRUSTED_APROCONTROLEENVIOCONTRATO.TBCONTROLEENVIODOCUMENTO [BIGQUERY], BV-PDBD-PRD.TRUSTED_APROCONTROLEENVIOCONTRATO.TBSTATUSENVIODOCUMENTO [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CCBENVIODOCS1
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.CCBENVIODOCS1
+TABLE_READ_PROVENANCE (Flow): BV-PDBD-PRD.TRUSTED_APROCONTROLEENVIOCONTRATO.TBCONTROLEENVIODOCUMENTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], BV-PDBD-PRD.TRUSTED_APROCONTROLEENVIOCONTRATO.TBSTATUSENVIODOCUMENTO [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - JOIN], WORK.CCBENVIODOCS1 [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: CCBENVIODOCS, CCBENVIODOCS1, CCBENVIODOCS2, CCBENVIODOCSCPF, MXENVIODOCS, WORK.CCBENVIODOCS1_2
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	3 - Gera tabela tabela controle de envio docs.sas														| */
+/* | Descricao: Programa para gerar tabela de contratos com status de envio de cocumentos.					| */
+/* | Objetivo: 	Apuração do fluxo CCB Rodas					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ======================================================================================*/
+/* =====================Gera tabela controle de envio docs=========================*/
+/* ======================================================================================*/
+
+proc sql;
+	connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+		schema='bv-pdbd-prd' READ_MODE=storage ALLOW_LARGE_RESULTS=must MAX_CHAR_LEN=100);
+	Create table CCBENVIODOCS as
+
+	select distinct b.DtEntradaProposta,
+		b.DtContrato,
+		a.NuCpfCnpj_ori,
+		b.nucontrato as nucontrato2,
+		a.NuProposta,
+		a.NuContrato,
+		a.DsStatusEnvioDocumento,
+		a.DtInclusao,
+		a.DtAlteracao,
+		b.NmGrupoProdutoMeta
+
+from connection to perm
+/*cdenvioemail*/
+	(SELECT
+		tced.NuProposta,
+		tced.NuContrato,
+		tced.DsComentarioCliente AS descricao_cliente,
+		tced.CdDocumento,
+		tced.FlEnvioDocumento,
+		tced.DtInclusao,
+		tced.DtAlteracao,
+		tced.CdEnvioEmail,
+		tced.DsEmailCliente AS email_cliente,
+		tced.NuCpfCnpj as NuCpfCnpj_ori,
+		(substr(CAST(tced.NuCpfCnpj AS STRING),1,5)) AS NuCpfCnpj,
+		tsed.CdStatusEnvioDocumento,
+		tsed.DsStatusEnvioDocumento
+	FROM `bv-pdbd-prd.trusted_aprocontroleenviocontrato.tbcontroleenviodocumento` tced
+		INNER JOIN `bv-pdbd-prd.trusted_aprocontroleenviocontrato.tbstatusenviodocumento` tsed
+			ON tsed.CdStatusEnvioDocumento = tced.CdStatusEnvioDocumento
+			) a
+		right JOIN TMPPRD B
+			ON a.NUPROPOSTA = b.NUPROPOSTA
+
+			/*WHERE a.NUPROPOSTA IN (SELECT NUPROPOSTA FROM TMPPRD)*/
+	;
+	disconnect from perm;
+quit;
+
+PROC SORT DATA=CCBENVIODOCS
+	OUT=CCBENVIODOCS1;
+	BY DESCENDING NuCpfCnpj_ori DESCENDING NUPROPOSTA DESCENDING DtInclusao;
+RUN;
+
+data work.CCBENVIODOCS1_2;
+	set work.CCBENVIODOCS1;
+	BY DESCENDING NuCpfCnpj_ori DESCENDING NUPROPOSTA DESCENDING DtInclusao;
+
+	if first.NUPROPOSTA then
+		n=1;
+	else n+1;
+run;
+PROC SQL;
+	CREATE TABLE MXENVIODOCS AS
+		SELECT   a.DtEntradaProposta,
+          a.DtContrato,
+          a.NuCpfCnpj_ori,
+          a.NuProposta,
+          a.NuContrato,
+          a.DsStatusEnvioDocumento,
+          a.DtInclusao as DtPriInclusaoDoc,
+          a.DtAlteracao as DtPriAlteracaoDoc,
+          a.NmGrupoProdutoMeta,
+          a.n AS TtlInclusoes
+		FROM CCBENVIODOCS1_2 A
+			JOIN
+				(SELECT NUPROPOSTA, MAX(N) AS MXN FROM CCBENVIODOCS1_2 GROUP BY NUPROPOSTA) B
+					ON A.NUPROPOSTA = B.NUPROPOSTA AND A.N = B.MXN;
+QUIT;
+proc sql;
+
+create table CCBENVIODOCS2 AS
+SELECT a.DtEntradaProposta,
+          a.DtContrato,
+          a.NuCpfCnpj_ori,
+          a.NuProposta,
+          a.NuContrato,
+          a.DsStatusEnvioDocumento,
+		  b.DtPriInclusaoDoc,
+		  b.DtPriAlteracaoDoc,
+		  a.DtInclusao as DtUltInclusaoDoc,
+          a.DtAlteracao as DtUltAlteracaoDoc,
+          a.NmGrupoProdutoMeta,
+       	  b.TtlInclusoes as TtlInclusoesDocs
+
+from CCBENVIODOCS1_2 a
+
+join
+MXENVIODOCS b
+on a.Nuproposta = b.nuproposta
+where a.n = 1 ;quit;
+
+PROC SQL;
+	CREATE TABLE CCBENVIODOCSCPF AS
+		SELECT DISTINCT NuCpfCnpj_ori
+			FROM CCBENVIODOCS2 where NuCpfCnpj_ori is not null;
+QUIT;

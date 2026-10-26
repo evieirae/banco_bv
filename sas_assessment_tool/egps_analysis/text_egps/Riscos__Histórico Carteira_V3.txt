@@ -1,0 +1,406 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__Histórico Carteira_V3
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:39:37 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DATABRICKS (Score: 85)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 310
+CODE_TASKS_COUNT: 7
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: INSIGHT = /riscosbvf/insight; MISCRED = /riscosbv/credito/MISCREDITO
+DETECTED_MACROS_DEFINED: ANOMES2, Ref
+DETECTED_MACROS_USED: Ref, anomes
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: ANOMES
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): INSIGHT.TBBRUTA [SAS/Local], MISCRED.BASE_UNICA_ATACADO_&ANOMES [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202401 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202412 [SAS/Local], MISCRED.BASE_UNICA_ATACADO_202501 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: INSIGHT, MISCRED
+EXPORTED_LIBNAMES: INSIGHT
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_UNICA
+TABLE_READ_PROVENANCE (Flow): INSIGHT.TBBRUTA [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_&ANOMES [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202401 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202412 [DATA Step - SET], MISCRED.BASE_UNICA_ATACADO_202501 [DATA Step - SET], WORK.BASE_UNICA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): INSIGHT.TBBRUTA_20250731
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE1, PEAC, WORK, WORK.BASE_UNICA
+DYNAMIC REFS (Ambiguous): MISCRED.BASE_UNICA_ATACADO_{ANOMES}
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: BU Data */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: BU Data */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-GbXIftHDBkfPMOB3/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname miscred BASE "/riscosbv/credito/MISCREDITO";
+
+%LET Ref = '30apr2025'd; 
+%LET ANOMES2 = "Abr/25"; 
+
+DATA _NULL_;
+   AUX = &Ref.;
+   ANOMES = (YEAR(AUX))*100+MONTH(AUX);
+   CALL SYMPUTX('ANOMES',ANOMES);
+
+DATA WORK.BASE_UNICA;
+SET
+	MISCRED.BASE_UNICA_ATACADO_202401 - MISCRED.BASE_UNICA_ATACADO_202412
+	MISCRED.BASE_UNICA_ATACADO_202501 - MISCRED.BASE_UNICA_ATACADO_&anomes.
+
+;
+
+WHERE (DsTipoCarteira IN ('REGULAR', 'OPAC', 'COMISSAO_FIANÇA') OR (DSTIPOCARTEIRA = 'VOTORANTIM' AND DSPRODUTO ne 'EUROBONDS') OR (CdModalidadeProduto IN (208, 210) AND CdGrupo_Economico NOT IN (23444, 3)))
+
+;RUN;
+
+ %macro calcular_over (anomes);
+
+
+PROC SQL;
+CREATE TABLE base1 AS
+SELECT 	Anomes_Referencia AS REF
+		,NuObjetoNegociacao
+		,CASE WHEN (CDMODALIDADEPRODUTO = 211 AND DSGRUPOECONOMICORISCO NE 'FIDC TRADEMASTER') OR (CDMODALIDADEPRODUTO = 214 AND DSGRUPOECONOMICORISCO CONTAINS ('DEB')) THEN 'FIDC'
+			WHEN TIPO_CARTEIRA = 'SECURITIES' THEN 'OPAC'
+			WHEN TIPO_CARTEIRA = 'SMES' OR TIPO_CARTEIRA_GERENCIAL = 'SMES' THEN 'PM/UM'
+			WHEN Tipo_Carteira_Financas = 'CORPORATE' THEN 'CORPORATE'
+			WHEN Tipo_Carteira_Financas = 'LARGE' THEN 'LARGE'
+			WHEN Tipo_Carteira_Financas = 'FI' THEN 'FI'
+			WHEN Tipo_Carteira_Financas = 'ATIVOS ESPECIAIS' THEN 'ATIVOS ESPECIAIS'
+			ELSE 'PM/UM' END AS SEGMENTO_CARTEIRA
+		,CASE 	WHEN (CDMODALIDADEPRODUTO = 211 AND DSGRUPOECONOMICORISCO NE 'FIDC TRADEMASTER') OR (CDMODALIDADEPRODUTO = 214 AND DSGRUPOECONOMICORISCO CONTAINS ('DEB')) THEN 'FIDC'
+				WHEN DsGrupoProduto = 'Empréstimos' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Trade Finance' THEN 'Credito'
+				WHEN DsGrupoProduto = 'External Trade Finance' THEN 'Credito'
+				WHEN DsGrupoProduto = 'BNDES' THEN 'Credito'
+				WHEN DsGrupoProduto = 'External Loans' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Crédito Rural' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Leasing' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Créditos do Agronegócio' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Operações de Garantias' THEN 'Fianca'
+				WHEN DsGrupoProduto = 'TVM' THEN 'TVM'
+				ELSE 'Derivativos' END AS SEGMENTO_PRODUTO
+		,DsGrupoEconomicoRisco AS GRUPO
+		,sum(VrSaldo) as Saldo 		format commax26.2
+		,sum(VrProvisao) as Provisao 		format commax26.2
+		,Case WHEN calculated SEGMENTO_PRODUTO = 'Fianca' THEN 0
+			ELSE max(NumDiasVencidos) END AS Atraso
+
+FROM WORK.BASE_UNICA
+GROUP BY 1,2,3,4,5;
+
+quit;
+%mend;
+
+%calcular_over(&anomes.);
+
+/* =========================FIM TASK=========================== */
+/* TASK: BU Data */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Flags BU */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Flags BU */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ReEIHSrAld1AbtEb/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+CREATE TABLE '1.BASE_ANT'n AS
+	SELECT
+		Anomes_Referencia
+		,NuObjetoNegociacao
+		,CASE WHEN Anomes_Referencia = 202401 THEN 202312
+			WHEN Anomes_Referencia = 202501 THEN 202412
+			ELSE  Anomes_Referencia - 1 END AS REF_ANT
+			,CASE WHEN (CDMODALIDADEPRODUTO = 211 AND DSGRUPOECONOMICORISCO NE 'FIDC TRADEMASTER') OR (CDMODALIDADEPRODUTO = 214 AND DSGRUPOECONOMICORISCO CONTAINS ('DEB')) THEN 'FIDC'
+			WHEN TIPO_CARTEIRA = 'SECURITIES' THEN 'OPAC'
+			WHEN TIPO_CARTEIRA = 'SMES' OR TIPO_CARTEIRA_GERENCIAL = 'SMES' THEN 'PM/UM'
+			WHEN Tipo_Carteira_Financas = 'CORPORATE' THEN 'CORPORATE'
+			WHEN Tipo_Carteira_Financas = 'LARGE' THEN 'LARGE'
+			WHEN Tipo_Carteira_Financas = 'FI' THEN 'FI'
+			WHEN Tipo_Carteira_Financas = 'ATIVOS ESPECIAIS' THEN 'ATIVOS ESPECIAIS'
+			ELSE 'PM/UM' END AS SEGMENTO_CARTEIRA
+		,CASE 	WHEN (CDMODALIDADEPRODUTO = 211 AND DSGRUPOECONOMICORISCO NE 'FIDC TRADEMASTER') OR (CDMODALIDADEPRODUTO = 214 AND DSGRUPOECONOMICORISCO CONTAINS ('DEB')) THEN 'FIDC'
+				WHEN DsGrupoProduto = 'Empréstimos' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Trade Finance' THEN 'Credito'
+				WHEN DsGrupoProduto = 'External Trade Finance' THEN 'Credito'
+				WHEN DsGrupoProduto = 'BNDES' THEN 'Credito'
+				WHEN DsGrupoProduto = 'External Loans' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Crédito Rural' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Leasing' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Créditos do Agronegócio' THEN 'Credito'
+				WHEN DsGrupoProduto = 'Operações de Garantias' THEN 'Fianca'
+				WHEN DsGrupoProduto = 'TVM' THEN 'TVM'
+				ELSE 'Derivativos' END AS SEGMENTO_PRODUTO
+		,DsGrupoEconomicoRisco AS GRUPO
+		,sum(VrSaldo) as Saldo 		format commax26.2
+		,sum(VrProvisao) as Provisao 		format commax26.2
+		,Case WHEN calculated SEGMENTO_PRODUTO = 'Fianca' THEN 0
+			ELSE max(NumDiasVencidos) END AS Atraso
+
+FROM WORK.BASE_UNICA
+GROUP BY 1,2,3,4,5,6
+;RUN;
+
+PROC SQL;
+CREATE TABLE '2.ATRASO_ANT'n AS
+	SELECT
+	Anomes_Referencia
+	,NuObjetoNegociacao
+	,Max(NumDiasVencidos) AS Atraso
+
+	FROM WORK.BASE_UNICA
+	GROUP BY 1,2
+	;RUN;
+
+PROC SQL;
+	 CREATE TABLE '3.BASE_ANOMES_ANT'n AS
+	 SELECT T1.*, T2.Atraso AS ATRASO_ANT
+	 FROM '1.BASE_ANT'n AS T1
+	 LEFT JOIN '2.ATRASO_ANT'n AS T2
+	 ON (T1.NuObjetoNegociacao = T2.NuObjetoNegociacao and T1.REF_ANT = T2.Anomes_Referencia)
+	 ;RUN;
+
+PROC SQL;
+	 CREATE TABLE '4.MesAnterior_Final'n AS
+	 SELECT *,
+	 CASE 	WHEN Anomes_Referencia = 202401 then 0
+			WHEN (Atraso>90 and Atraso< 361) and Atraso_ANT<90 then 1
+	 			else 0 end as Flag_Entr,
+		CASE WHEN Atraso<90 and (Atraso_ANT>90 and Atraso_ANT<361) then 1
+				WHEN Atraso is null and Atraso_ANT>90 then 1
+				else 0 end as Flag_Saida
+	 FROM '3.BASE_ANOMES_ANT'n
+	 ;run;
+
+
+
+CREATE TABLE '5.Carteira_Total'n  as
+
+select
+		AnoMes_Referencia
+		,Segmento_Carteira
+		,Segmento_Produto
+		,sum(case when Atraso< 361 then Saldo end) as'Saldo Total'N    format commax26.2
+		,sum(case when Atraso> 330 AND Atraso<361 then Saldo end) as'331-360'N    format commax26.2
+		,sum(case when Atraso> 300 AND Atraso<331 then Saldo end) as'301-330'N    format commax26.2
+		,sum(case when Atraso> 270 AND Atraso<301 then Saldo end) as'271-300'N    format commax26.2
+		,sum(case when Atraso> 240 AND Atraso<271 then Saldo end) as'241-270'N    format commax26.2
+		,sum(case when Atraso> 210 AND Atraso<241 then Saldo end) as'211-240'N    format commax26.2
+		,sum(case when Atraso> 180 AND Atraso<211 then Saldo end) as'181-210'N    format commax26.2
+		,sum(case when Atraso> 150 AND Atraso<181 then Saldo end) as'151-180'N    format commax26.2
+		,sum(case when Atraso> 120 AND Atraso<151 then Saldo end) as'121-150'N    format commax26.2
+		,sum(case when Atraso> 090 AND Atraso<121 then Saldo end) as'091-120'N    format commax26.2
+		,sum(case when Atraso> 060 AND Atraso<91 then Saldo end) as'061-090'N    format commax26.2
+		,sum(case when Atraso> 030 AND Atraso<61 then Saldo end) as'031-060'N    format commax26.2
+		,sum(case when Atraso>0  AND Atraso<31 then Saldo end) as'001-030'N    format commax26.2
+		,sum(case when Atraso=0 then Saldo end) as 'Em dia'N   format commax26.2
+		,sum(case when Flag_Entr=1 then Saldo end) as 'Entrada_Over90'N    format commax26.2
+		,sum(case when Flag_Saida=1 then Saldo end) as 'Saida_Over90'N    format commax26.2
+
+from '4.MesAnterior_Final'n
+group by 1,2,3;
+
+
+
+CREATE TABLE '6.Provisao_Total'n  as
+
+select
+		AnoMes_Referencia
+		,Segmento_Carteira
+		,Segmento_Produto
+		,sum(case when Atraso< 361 then Provisao end) as'Provisao Total'N    format commax26.2
+		,sum(case when Atraso> 330 AND Atraso<361 then Provisao end) as' 331-360'N    format commax26.2
+		,sum(case when Atraso> 300 AND Atraso<331 then Provisao end) as' 301-330'N    format commax26.2
+		,sum(case when Atraso> 270 AND Atraso<301 then Provisao end) as' 271-300'N    format commax26.2
+		,sum(case when Atraso> 240 AND Atraso<271 then Provisao end) as' 241-270'N    format commax26.2
+		,sum(case when Atraso> 210 AND Atraso<241 then Provisao end) as' 211-240'N    format commax26.2
+		,sum(case when Atraso> 180 AND Atraso<211 then Provisao end) as' 181-210'N    format commax26.2
+		,sum(case when Atraso> 150 AND Atraso<181 then Provisao end) as' 151-180'N    format commax26.2
+		,sum(case when Atraso> 120 AND Atraso<151 then Provisao end) as' 121-150'N    format commax26.2
+		,sum(case when Atraso> 090 AND Atraso<121 then Provisao end) as' 091-120'N    format commax26.2
+		,sum(case when Atraso> 060 AND Atraso<91 then Provisao end) as' 061-090'N    format commax26.2
+		,sum(case when Atraso> 030 AND Atraso<61 then Provisao end) as' 031-060'N    format commax26.2
+		,sum(case when Atraso> 0 AND Atraso<31 then Provisao end) as' 001-030'N    format commax26.2
+		,sum(case when Atraso=0 then Provisao end) as 'Em dia'N   format commax26.2
+		,sum(case when Flag_Entr=1 then Provisao end) as 'Entrada_Over90'N    format commax26.2
+		,sum(case when Flag_Saida=1 then Provisao end) as 'Saida_Over90'N    format commax26.2
+
+from '4.MesAnterior_Final'n
+group by 1,2,3;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Flags BU */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: PEAC */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: PEAC */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-1OeEBwngZDC1eWWd/code.sas */
+/* =========================INÍCIO TASK========================= */
+Proc sql;
+
+CREATE TABLE PEAC AS
+SELECT
+	AnoMes_Referencia,
+	DsGrupoEconomicoRisco,
+	DsClienteRisco,
+	NuObjetoNegociacao,
+	DsProduto,
+	DtInicioOperacao,
+	DtVencimentoParcela,
+	NumDiasVencidos,
+	VrSaldoPrincipalAtual,
+	VrSaldo,
+	Tipo_Carteira_Financas,
+	Cluster_Risco
+
+FROM WORK.BASE_UNICA
+WHERE NuObjetoNegociacao IN('10344554','10331841','10348519','10338074','10334011','10327742','10359680','10323755','10363634','10349458','10331836','10382784','10385847','10350715','10376980','10335597','10357840','10380361','10356109','10343735','10380353','10388121','10383439',)
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: PEAC */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Watchlist */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Watchlist */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-iE1gtz5BwsKHIYa5/code.sas */
+/* =========================INÍCIO TASK========================= */
+Proc sql;
+
+CREATE TABLE PEAC AS
+SELECT
+		DsGrupoEconomicoRisco AS GRUPO
+		,'WATCHLIST' AS VISAO
+		,CASE WHEN TIPO_CARTEIRA = 'SMES' OR TIPO_CARTEIRA_GERENCIAL = 'SMES' THEN 'PM/UM'
+			ELSE 'CORE' END AS CARTEIRA
+		,DsSetorClienteRisco_novo AS SETOR
+		,Cluster_Risco AS CLUSTER
+		,Avaliação_Grupo AS VISAO_CLIENTE
+		,Avaliação_Setorial AS VISAO_SETORIAL
+		,DsGrupoProduto AS ESTRATEGIA
+		,DsProduto AS PRODUTO
+		,NuEstagioFinal AS ESTAGIO_ATUAL
+		,DsRatingCliente AS RATING
+		,DsStatus_Monitoramento AS CMR
+		,sum(VrSaldo) as Saldo 		format commax26.2
+		,sum(VrProvisao) as Provisao 		format commax26.2
+
+FROM WORK.BASE_UNICA
+WHERE CdGrupo_Economico IN (00023716,00216979,00126754,00038306,00023413,00023419,00004547,00038531,00020361,00023890,00006483,00012581,00023129,00022382,00010927,00040870,00005862,00007813,00000651,00001606,00012294,00038566,00013202,00030718,00023743)
+
+AND Anomes_referencia = 202504
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12
+
+;RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Watchlist */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: PFD Flow 10 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-4cWrxrSGbGP3MiHE/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME INSIGHT		'/riscosbvf/insight';
+DATA INSIGHT.TBBRUTA_20250731;
+SET INSIGHT.TBBRUTA;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK."%STR(QUERY_FOR_2.ATRASO_ANT)"n);
+
+PROC SQL;
+   CREATE TABLE WORK.'QUERY_FOR_2.ATRASO_ANT'n AS
+   SELECT t1.AnoMes_Referencia,
+          t1.NuObjetoNegociacao,
+          
+            (COUNT(t1.NuObjetoNegociacao)) AS COUNT_of_NuObjetoNegociacao
+      FROM WORK.'2.ATRASO_ANT'n t1
+      GROUP BY t1.AnoMes_Referencia,
+               t1.NuObjetoNegociacao
+      ORDER BY COUNT_of_NuObjetoNegociacao DESC;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+DATA INSIGHT.TBBRUTA_20250731;
+SET INSIGHT.TBBRUTA;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 007 */
+/* =========================FIM TASK=========================== */

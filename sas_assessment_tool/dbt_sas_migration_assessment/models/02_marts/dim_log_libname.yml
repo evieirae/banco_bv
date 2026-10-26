@@ -1,0 +1,38 @@
+version: 1
+
+models:
+  - name: dim_log_libname
+    description: >
+      A deduplicated dimension table containing all valid and permanent SAS library definitions 
+      (LIBNAMEs) extracted from project logs. This model filters out system libraries 
+      (e.g., WORK, SASUSER) and maintenance commands (CLEAR, LIST). It serves as the primary 
+      reference catalog for data source connections and physical paths, acting as the foundation 
+      for mapping dependencies in the PySpark/Databricks migration.
+    columns:
+      - name: project_name
+        description: "Corresponding SAS Enterprise Guide (.egp) project name."
+        tests:
+          - not_null
+      - name: task_name
+        description: "Name of the task (or program) within the SAS EGP project."
+        tests:
+          - not_null
+      - name: libname_alias
+        description: "The alias assigned to the SAS library (e.g., `DBEP`, `HIST`). The primary key used to join with table-level lineage."
+        tests:
+          - not_null
+      - name: libname_type
+        description: "Functional classification of the statement (`DATABASE` or `PATH`)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['DATABASE', 'PATH']
+      - name: libname_path
+        description: "The physical directory or file path on disk. Populated exclusively when `libname_type` is `PATH`."
+      - name: connection_engine
+        description: "The data access engine used by SAS (e.g., `BASE`, `ORACLE`, `META`, `XML`)."
+      - name: connection_options
+        description: "Cleaned parameters, credentials, and configurations for database connections. Populated only for `DATABASE`."
+      - name: path_options
+        description: "Cleaned advanced read/write options for physical files (e.g., `COMPRESS=YES`). Populated only for `PATH`."
+

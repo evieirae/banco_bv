@@ -1,0 +1,158 @@
+START_METADATA
+PROJECT: Rodas__qualidadedevendas_qdv-emprestimos
+FILE_SAS: 06-inad.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 97
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SORT, SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: BU_A0, BU_A1, safraXM
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): AUXL.TBROLLOUTMENSAGERIA [SAS/Local], BASEGRC.TBCLASSIFICACAORISCOSPDVS [SAS/Local], BASEGRC.TBLEVESNOVOSBVO [SAS/Local], BASES.TBINAD [SAS/Local], SHMESA.BASEUNICARODAS_&BU_A0 [SAS/Local], SHMESA.BASEUNICARODAS_&BU_A1 [SAS/Local], TMP.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): AUXL.TBROLLOUTMENSAGERIA [PROC SQL - JOIN], BASEGRC.TBCLASSIFICACAORISCOSPDVS [PROC SQL - JOIN], BASEGRC.TBLEVESNOVOSBVO [PROC SQL - JOIN], BASES.TBINAD [PROC SQL - JOIN], SHMESA.BASEUNICARODAS_&BU_A0 [DATA Step - SET], SHMESA.BASEUNICARODAS_&BU_A1 [DATA Step - SET], TMP.TBPARCEIROCOMERCIAL [PROC SQL - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): (none)
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASEUNICARODAS, INAD, INFOCLIENTE
+DYNAMIC REFS (Ambiguous): SHMESA.BASEUNICARODAS_{BU_A0}, SHMESA.BASEUNICARODAS_{BU_A1}
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 0 paths
+----------------------------------------
+[[ FILE INVENTORY ]]
+(none)
+
+END_METADATA
+================================================================================
+/*Tirei esse step por que esta impactando a criação da base quando não esta em d-1 */
+/*%VerificaAtualizacao(/infogrc/utils/bases/tbmolicar_suv.sas7bdat,12,300);*/
+
+%VerificaBURodas;
+DATA BaseUnicaRodas;
+SET SHMESA.BaseUnicaRodas_&BU_A1. - SHMESA.BaseUnicaRodas_&BU_A0.;
+  WHERE INPUT(TRANSTRN(Safra_Proposta,'.',TRIMN('')),6.) >= &safraXM.;
+RUN;
+
+PROC SQL;
+CREATE TABLE Inad AS
+  SELECT
+    'INAD' AS TpDados,
+    INPUT(TRANSTRN(BU.Safra_Proposta,'.',TRIMN('')),6.) AS SafraProposta,
+    COALESCE(ORI.nuanomes,INPUT(TRANSTRN(BU.Safra_Proposta,'.',TRIMN('')),6.)) as nuanomes,
+    CASE WHEN ORI.DtEntradaProposta >= TODAY()-90 THEN ORI.DtEntradaProposta
+	     ELSE intnx('month',ORI.DtEntradaProposta,0,'BEGINNING')
+         END AS DtReferencia format mmddyy10.,
+	coalesce(ORI.NmGrupoProdutoMeta,TRANSTRN(BU.produto,'CPG','CVG')) as NmGrupoProdutoMeta,
+    ORI.DsTipoCanalProducao as DsTipoCanalProducao,
+    ORI.NmAreaEstruturaComercial,
+    ORI.NmSubEstruturaComercialA AS NmSubEstruturaComercialA,
+    ORI.FxIdade as FxIdade,
+    ORI.FxParcela,
+    ORI.FxEntrada,
+    CASE WHEN ORI.NuRating <= 5.5 THEN 'SCORE 5 - 5.5'
+	     WHEN ORI.NuRating > 5.5 AND ORI.NuRating <= 6.5 THEN 'SCORE 6 - 6.5'
+	     WHEN ORI.NuRating > 6.5 AND ORI.NuRating <= 7.5 THEN 'SCORE 7 - 7.5'
+	     WHEN ORI.NuRating > 7.5 AND ORI.NuRating <= 8.5 THEN 'SCORE 8 - 8.5'
+	     WHEN ORI.NuRating > 8.5 THEN 'SCORE 9 - 10'
+    END AS Fx_Score,
+    ESG.Combustivel,
+	COALESCE(MSG.Mensageria,'9. Não houve mensageria') AS Mensageria,
+	BU.FlPAP,
+	case when BVOonda.CdParceiroComercial<>. then 'Grupo BVO'||'-'||put(BVOonda.nuanomes,6.) else 'Demais' end as FlGrupoBVO,
+	PCO.NmGrupoConcessionaria,
+
+	CASE WHEN ORI.DtEntradaProposta >= Y.DtInclusao_BVO AND ORI.NmGrupoProdutoMeta = 'Leves-BVO' THEN 1 ELSE 0 END AS FlBVOCredito,
+	ORI.TpPessoa,
+	case when ORI.PilotoRenave is null then "N" else ORI.PilotoRenave END AS PilotoRenave,
+
+	SUM(CASE WHEN Ori.StProposta = 'AP' THEN 1 ELSE 0 END) AS Denominador_Eleg,
+    SUM(BU.Inad_30_1pmt) AS Inad_30_1pmt,
+    SUM(BU.Val_prt_30_1pmt) AS Val_prt_30_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad30) AS Qtd_Cto_Elegiveis_Inad30,
+    SUM(BU.Inad_15_1pmt) AS Inad_15_1pmt,
+    SUM(BU.Val_prt_15_1pmt) AS Val_prt_15_1pmt,
+    SUM(BU.Qtd_Cto_Elegiveis_Inad15) AS Qtd_Cto_Elegiveis_Inad15,
+    SUM(BU.Inad_7_1pmt) AS Inad_7_1pmt,
+    SUM(BU.Val_prt_7_1pmt) AS Val_prt_7_1pmt,
+    SUM(BU.qtd_cto_elegiveis_inad7) AS Qtd_Cto_Elegiveis_Inad7,
+	SUM(PRD.VrMargem) AS VrMargemContribuicao FORMAT=num12.2,
+	SUM(PRD.VrProducao) AS VrLiberado FORMAT=num12.2
+  FROM
+    BaseUnicaRodas BU
+  LEFT JOIN
+    Originacao ORI
+    ON BU.NuProposta = ORI.NuProposta
+  LEFT JOIN
+    Producao PRD
+	ON BU.NuContrato = PRD.NuContrato
+  inner join bases.TbInad  as Inad
+	on Inad.NuContrato = BU.NuContrato
+  LEFT JOIN
+    TbModeloMolicar ESG
+    ON ESG.NuProposta = BU.NuProposta
+  LEFT JOIN
+    AUXL.TBROLLOUTMENSAGERIA MBV
+	ON MBV.CdParceiroComercial = ORI.CdParceiroComercial
+  LEFT JOIN
+    MsgProposta MSG
+	ON BU.NuProposta = MSG.NuProposta
+	  LEFT JOIN
+       BASEGRC.TbLevesNovosBVO BVO
+	ON BVO.CdParceiroComercial = PRD.CdParceiroComercial
+	   and bvo.nuanomes = prd.nuanomes
+	  Left Join TbOndaBVO BVOonda
+  		on BVOonda.cdparceirocomercial = Ori.cdparceirocomercial
+    LEFT JOIN
+    	tmp.tbparceirocomercial PCO
+		ON PCO.CdParceiroComercial = Ori.CdParceiroComercial
+
+	LEFT JOIN basegrc.TbClassificacaoRiscosPDVs Y
+		ON PRD.CdParceiroComercial = Y.CdLoja
+
+WHERE
+    calculated NmGrupoProdutoMeta IN ('Leves', 'Pesados', 'Motos','CVG Leves','CVG Pesados','Leves-BVO','Credito Auto-BV')
+  GROUP BY
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20;
+RUN;
+
+proc sql;create index NuAnoMes on Inad;quit;
+proc sql;create index NmGrupoProdutoMeta on Inad;quit;
+
+PROC SQL;
+CREATE TABLE InfoCliente AS
+  SELECT DISTINCT
+    NuProposta,
+    FlPAP
+  FROM BaseUnicaRodas;
+RUN;
+
+PROC SORT DATA=InfoCliente NODUPKEY;
+BY NuProposta;
+RUN;
+
+proc sql;create index NuProposta on InfoCliente;quit;

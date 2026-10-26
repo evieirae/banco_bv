@@ -1,0 +1,156 @@
+START_METADATA
+PROJECT: Rodas__Base_lojas
+FILE_SAS: 02 - TbControleCarteiraOperador_Hist.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:24 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 30)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -14
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (1x | +20), RETAIN (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 80
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (3x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BL = /infogrc/Base_Lojas
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DBCOR.TBCOLABORADOR [DBCON], DBCOR.TBCONTROLECARTEIRAOPERADOR [DBCON], DBCOR.TBPARCEIROCOMERCIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_001, WORK.MAX_REG_PC, WORK.TBCONTROLECARTEIRAOPERADOR_ATIVA, WORK.TBCONTROLECARTEIRAOPERADOR_HIST
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BL
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_001, WORK.MAX_REG_PC, WORK.TBCONTROLECARTEIRAOPERADOR_ATIVA, WORK.TBCONTROLECARTEIRAOPERADOR_HIST
+TABLE_READ_PROVENANCE (Flow): BL.TBCONTROLECARTEIRAOPERADOR_ATIVA [PROC SQL - FROM], BL.TBCONTROLECARTEIRAOPERADOR_HIST [DATA Step - SET], DBCOR.TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DBCOR.TBCONTROLECARTEIRAOPERADOR [Pass-Through Native (DBCON) - FROM], DBCOR.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN], WORK.BASE_001 [PROC SQL - FROM], WORK.MAX_REG_PC [PROC SQL - JOIN], WORK.TBCONTROLECARTEIRAOPERADOR_ATIVA [DATA Step - SET], WORK.TBCONTROLECARTEIRAOPERADOR_HIST [DATA Step - SET]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): BL.TBCONTROLECARTEIRAOPERADOR_ATIVA, BL.TBCONTROLECARTEIRAOPERADOR_HIST
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): BL.TBCONTROLECARTEIRAOPERADOR_ATIVA, BL.TBCONTROLECARTEIRAOPERADOR_HIST
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BL.TBCONTROLECARTEIRAOPERADOR_ATIVA, BL.TBCONTROLECARTEIRAOPERADOR_HIST
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_001, MAX_REG_PC, TBCONTROLECARTEIRAOPERADOR_ATIVA, TBCONTROLECARTEIRAOPERADOR_HIST, VALIDACAO_LOJAS_ATIVAS
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+%include '/infogrc/utils/all-includes.sas';
+LIBNAME BL '/infogrc/Base_Lojas';
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=CTR);
+create table TbControleCarteiraOperador_Hist as
+select * from connection to dbcon
+(
+
+SELECT
+
+a.CdColaborador AS CdColaboradorGF,
+D.CdOperador AS CdOperadorGF,
+D.CdRh AS CdRhGF,
+D.NmColaborador AS NmColaboradorGF,
+
+a.CdOperador AS CdColaboradorGR,
+b.CdOperador AS CdOperadorGR,
+B.CdRh AS CdRhGR,
+B.NmColaborador AS NmColaboradorGR,
+
+A.CdParceiroComercial,
+C.NMFANTASIA AS NMPARCEIROCOMERCIAL,
+
+a.DtInicioVigencia,
+a.DtFimVigenciaEfetiva,
+a.DtInclusao,
+a.DtFimVigenciaPrevisao,
+a.DtAlteracao,
+a.DsControleCarteiraOperador
+
+FROM DBCOR..TbControleCarteiraOperador A
+
+LEFT JOIN DBCOR..TBCOLABORADOR B ON B.CdColaborador = A.CdOperador
+LEFT JOIN DBCOR..TBPARCEIROCOMERCIAL C ON C.CdParceiroComercial = A.CdParceiroComercial
+LEFT JOIN DBCOR..TBCOLABORADOR D ON D.CdColaborador = A.CdColaborador
+
+ORDER BY a.CdParceiroComercial, A.DtInicioVigencia
+
+)
+;run;
+
+/***************************************************************/
+/*BASE HISTORICA COM TODAS AS ALTERAÇÕES NO ATENDIMENTO DA LOJA*/
+/***************************************************************/
+
+DATA BL.TbControleCarteiraOperador_Hist;
+SET WORK.TbControleCarteiraOperador_Hist;
+;RUN;
+
+/*********************************/
+/*BASE COM A CARTEIRA ATIVA ATUAL*/
+/*********************************/
+
+/*COMO TEMOS ALGUMAS LOJAS APARECENDO 2 VEZES OU + NA BASE POIS NÃO TEM DTFIMVIGENCIA*/
+/*TEMOS QUE PEGAR O MAIOR REGISTRO NO CONTADOR DE LINHAS*/
+
+DATA BASE_001;
+SET BL.TbControleCarteiraOperador_Hist;
+RETAIN QTD_PC;
+IF FIRST.CdParceiroComercial THEN QTD_PC = 1;
+ELSE QTD_PC = QTD_PC + 1;
+BY CdParceiroComercial;
+RUN;
+
+PROC SQL;
+CREATE TABLE MAX_REG_PC AS
+SELECT
+CdParceiroComercial,
+MAX(QTD_PC) AS MAX_REG_PC
+
+FROM WORK.BASE_001 A
+GROUP BY 1
+;RUN;
+
+PROC SQL;
+CREATE TABLE TbControleCarteiraOperador_Ativa AS
+SELECT
+
+A.*
+
+FROM WORK.BASE_001 A
+
+INNER JOIN WORK.MAX_REG_PC B ON
+B.CDPARCEIROCOMERCIAL = A.CDPARCEIROCOMERCIAL
+AND B.MAX_REG_PC = A.QTD_PC
+
+;RUN;
+
+DATA BL.TbControleCarteiraOperador_Ativa;
+SET WORK.TbControleCarteiraOperador_Ativa;
+WHERE DtFimVigenciaEfetiva IS null;
+;RUN;
+
+/*NÃO PODEMOS TEM QTD >= 2*/
+PROC SQL;
+CREATE TABLE VALIDACAO_LOJAS_ATIVAS AS
+SELECT
+CDPARCEIROCOMERCIAL,
+COUNT(CDPARCEIROCOMERCIAL) AS QTD
+FROM BL.TbControleCarteiraOperador_Ativa
+GROUP BY 1
+;RUN;

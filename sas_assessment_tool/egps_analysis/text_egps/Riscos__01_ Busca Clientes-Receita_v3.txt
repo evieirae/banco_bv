@@ -1,0 +1,304 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__01_ Busca Clientes-Receita_v3
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:04 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: PROC APPEND (1x | +15), %MACRO (1x | +5)
+----------------------------------------
+LINES_OF_CODE: 200
+CODE_TASKS_COUNT: 6
+DETECTED_PROCS: APPEND, DELETE, EXPORT, SQL
+HAS_DATA_STEP: Yes (4x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: OUV = /ouvidoria
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: i
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CLIENTES.DRE_GERAL_20250&I._NEW [SAS/Local], OUV.RECL_CONSOLIDADO_2025_NEW [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.OUVIDORIA
+IMPORTED_LIBNAMES: OUV
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.OUVIDORIA
+TABLE_READ_PROVENANCE (Flow): CLIENTES.DRE_GERAL_20250&I._NEW [PROC SQL - FROM], OUV.RECL_CONSOLIDADO_2025_NEW [DATA Step - SET], WORK.OUVIDORIA [DATA Step - SET; PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): C:\Users\lucas.moraes\OneDrive - Banco Votorantim S.A\2025\Dashboard MAT30\00. Bases\ouvidoria11.xlsx, C:\Users\lucas.moraes\OneDrive - Banco Votorantim S.A\2025\Dashboard MAT30\00. Bases\ouvidoria_analitico11.xlsx
+TEMP/DISCARDED OUTPUTS: CLIENTES_RECEITA, OUVIDORIA, RECEITA_OUVIDORIA, RECEITA_OUVIDORIA_1, T001, T002
+DYNAMIC REFS (Ambiguous): CLIENTES.DRE_GERAL_20250{I}
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Base de Receita */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Base de Receita */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-dPBIcbmLmdAth2vC/code.sas */
+/* =========================INÍCIO TASK========================= */
+%macro loop_receita;
+
+%do i = 1 %to 8;
+
+	PROC SQL;
+
+	CREATE TABLE T001 AS SELECT
+	CLIENTE,
+	DATA_REF,
+	COUNT(NEGOCIO) AS NEGOCIO FORMAT = COMMAX20.0,
+	SUM(RESULTADO_CARTEIRA) AS RESULTADO_CARTEIRA FORMAT = COMMAX20.2,
+	SUM(RESULTADO_PRODUCAO) AS RESULTADO_PRODUCAO FORMAT = COMMAX20.2,
+	(SUM(RESULTADO_CARTEIRA) + SUM(RESULTADO_PRODUCAO)) AS RECEITA FORMAT = COMMAX20.2
+
+	FROM CLIENTES.DRE_GERAL_20250&i._NEW
+
+	GROUP BY CLIENTE, DATA_REF;
+
+	QUIT;
+
+	PROC APPEND
+	BASE= CLIENTES_RECEITA
+	DATA= T001;
+	RUN;
+
+	PROC DELETE
+	DATA= T001;
+	RUN;
+
+%end;
+
+%mend loop_receita;
+
+DATA CLIENTES_RECEITA;
+INPUT CLIENTE DATA_REF NEGOCIO RESULTADO_CARTEIRA RESULTADO_PRODUCAO RECEITA;
+FORMAT DATA_REF DDMMYYD.;
+DATALINES
+;
+RUN;
+
+%loop_receita;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Base de Receita */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Base de Ouvidoria */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Base de Ouvidoria */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-o3ZKHksm9zZfimcY/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME OUV '/ouvidoria';
+
+DATA OUVIDORIA;
+SET OUV.RECL_CONSOLIDADO_2025_NEW;
+
+IF CPF_CNPJ NOT IN (., 0);
+
+DATA_REF = MDY(SUBSTR(DATA_ABERTURA, 5, 2), 1, SUBSTR(DATA_ABERTURA, 1, 4));
+
+IF PRODUTO IN ('Cartão de crédito', 'Cartões', 'Cartões de Crédito', 'cartão de crédito', 'méliuz') THEN NEW_PRODUTO = 'CARTAO';
+ELSE
+IF PRODUTO IN ('Banco Digital', 'Conta Digital', 'app banco bv', 'conta digital', 'produto lojas_conta digital') THEN NEW_PRODUTO = 'CONTA';
+ELSE
+IF PRODUTO IN ('CIG (Crédito com Imóvel em Garantia)',
+'CVC - Cessão de Direitos',
+'Consignado INSS',
+'Consignado privado',
+'Consignado público',
+'Crédito pessoal',
+'Crédito pessoal com garantia',
+'Energia Solar',
+'FGTS',
+'Financeira',
+'Financiamento Estudantil',
+'Financiamentos',
+'Material de construção',
+'consignado',
+'empréstimo fgts',
+'empréstimo pessoal',
+'energia solar') THEN NEW_PRODUTO = 'EMPRESTIMOS';
+ELSE
+IF PRODUTO IN ('CDC - Veículos', 'Leasing Veículos', 'Tag BV', 'empréstimo com veículo em garantia',
+'financiamento de veículo', 'produto lojas_financiamento de veículo') THEN NEW_PRODUTO = 'RODAS';
+ELSE
+IF PRODUTO IN ('SAUDE', 'Seguros', 'seguros') THEN NEW_PRODUTO = 'SEGUROS';
+
+IF NEW_PRODUTO IN ('CARTAO', 'CONTA');
+
+FORMAT DATA_REF DDMMYYD.;
+
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Base de Ouvidoria */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Base To Export */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Base To Export */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-18DKvYNoEHOWlwED/code.sas */
+/* =========================INÍCIO TASK========================= */
+PROC SQL;
+
+CREATE TABLE RECEITA_OUVIDORIA AS SELECT DISTINCT
+COALESCE(RECEITA.CLIENTE, OUVIDORIA.CPF_CNPJ) AS CLIENTE,
+COALESCE(RECEITA.DATA_REF, OUVIDORIA.DATA_REF) AS DATA_REF FORMAT DDMMYY10.,
+
+COALESCE(RECEITA.RESULTADO_CARTEIRA, 0) AS RESULTADO_CARTEIRA,
+COALESCE(RECEITA.RESULTADO_PRODUCAO, 0) AS RESULTADO_PRODUCAO,
+COALESCE(OUVIDORIA.ID_RECLAMACAO, 0) AS 'Quantidade de reclamações'n
+
+
+
+
+FROM CLIENTES_RECEITA AS RECEITA
+
+FULL JOIN (
+	SELECT
+	CPF_CNPJ,
+	DATA_REF,
+	NEW_PRODUTO,
+	COUNT(ID_RECLAMACAO) AS ID_RECLAMACAO
+	FROM OUVIDORIA
+	GROUP BY CPF_CNPJ, DATA_REF, NEW_PRODUTO) AS OUVIDORIA
+
+ON
+	RECEITA.CLIENTE = OUVIDORIA.CPF_CNPJ AND
+	RECEITA.DATA_REF = OUVIDORIA.DATA_REF;
+
+QUIT;
+
+DATA RECEITA_OUVIDORIA_1;
+SET RECEITA_OUVIDORIA;
+
+
+
+DATA_REF_1 = INTNX('MONTH', DATA_REF, 1) - 1;
+
+data_convertida = cat(put(day(DATA_REF_1), z2.),'-', put(month(DATA_REF_1), z2.), '-', put(year(DATA_REF_1), z4.));
+
+RECEITA =
+
+FORMAT DATA_REF_1 DDMMYY10.;
+
+DROP DATA_REF_1;
+
+RUN;
+
+PROC DELETE
+DATA= RECEITA_OUVIDORIA;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Base To Export */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-PyaRTVCeEBhw28Pr/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+  create table T001 as
+  select
+    
+    put(intnx('month', DATA_REF, 0, 'E'), ddmmyy10.) as DATA_REF length=10,
+    NEW_PRODUTO,
+    MOTIVO,
+    count(*) as QUANTIDADE format=comma20.
+  from WORK.OUVIDORIA
+  group by calculated DATA_REF, NEW_PRODUTO, MOTIVO
+  order by calculated QUANTIDADE desc
+  ;
+quit;
+
+data T002;
+set WORK.OUVIDORIA;
+
+DATA_REF = intnx('month', DATA_REF, 0, 'E');
+
+CPF_CNPJ_ = put(CPF_CNPJ, z11.);
+
+RENAME CPF_CNPJ_ = CPF_CNPJ;
+
+format DATA_REF DDMMYY10.;
+
+DROP CPF_CNPJ;
+
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 005 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.T002
+    OUTFILE='C:\Users\lucas.moraes\OneDrive - Banco Votorantim S.A\2025\Dashboard MAT30\00. Bases\ouvidoria_analitico11.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 005 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 006 */
+/* FLUXO: Export (Metadados) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Export Task */
+/* TIPO: SAS Task (Export Structured) */
+/* ARQUIVO FONTE: (ExportTask metadata) */
+/* =========================INÍCIO TASK========================= */
+PROC EXPORT DATA=WORK.T001
+    OUTFILE='C:\Users\lucas.moraes\OneDrive - Banco Votorantim S.A\2025\Dashboard MAT30\00. Bases\ouvidoria11.xlsx'
+    DBMS=xlsx REPLACE;
+RUN;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Export Task */
+/* ORDEM EXECUÇÃO: 006 */
+/* =========================FIM TASK=========================== */

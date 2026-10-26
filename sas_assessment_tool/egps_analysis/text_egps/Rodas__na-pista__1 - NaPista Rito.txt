@@ -1,0 +1,455 @@
+START_METADATA
+PROJECT: Rodas__na-pista
+FILE_SAS: 1 - NaPista Rito.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:27 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 70)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -5
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: MODIFY (1x | +30), %INCLUDE (1x | +20), PROC DATASETS (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 357
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: DATASETS, EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: TRIBO = /riscosbvf/coaching/tribo_veiculos/SAS
+DETECTED_MACROS_DEFINED: dir_csv
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], BASEGRC.NAPISTA_VALORPORTE [SAS/Local], BASEGRC.TBNAPISTAINDICADORPDV [SAS/Local], BASEGRC.TBNAPISTAPAGAMENTOSRESULTADO [SAS/Local], BASES.TBPARCEIROCOMERCIAL [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: TMP
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): BASEGRC.NAPISTA_VALORPORTE [PROC SQL - FROM], BASEGRC.TBNAPISTAINDICADORPDV [PROC SQL - FROM], BASEGRC.TBNAPISTAPAGAMENTOSRESULTADO [PROC SQL - FROM], BASES.TBPARCEIROCOMERCIAL [PROC SQL - JOIN], TMP.TBNAPISTARITOCOMERCIAL [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas, /riscosbvf/BA/processos/tmp/TbNaPistaRito.csv
+INTERNAL READS (Temp/Local): TMP.TBNAPISTARITOCOMERCIAL
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): TMP.TBNAPISTARITOCOMERCIAL
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/tmp/TbNaPistaRito.csv
+TEMP/DISCARDED OUTPUTS: MESANTERIORPGTO, MESATUALPGTO, PDVAUXCOMPLETA, TBNAPISTAINDICADORPDV, TBNAPISTAPAGAMENTOSAUX, TBNAPISTAPAGAMENTOSRESULTADO2, TBNAPISTAPDVAUX, TBNAPISTARITOCOMERCIAL, VALORPORTE
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 1, sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+[CODE REF] /riscosbvf/BA/processos/tmp/TbNaPistaRito.csv
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - NaPista Rito.sas														| */
+/* | Descricao: Programa gerar o output NaPista_Rito.					| */
+/* | Objetivo: 	Apuração do NaPista_Rito					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+%let dir_csv = /riscosbvf/BA/processos/output;
+LIBNAME TRIBO '/riscosbvf/coaching/tribo_veiculos/SAS';
+
+/* ================================================================= */
+/* ============ NaPista Rito Comercial Leves ======================= */
+/* ================================================================= */
+
+/*Base Pagamentos NaPista - OK*/
+proc sql;
+CREATE TABLE TbNaPistaPagamentosResultado2 AS
+SELECT
+                               NaPista.NuAnoMes
+                               ,NaPista.codigo_napista
+                               ,NaPista.cpf_cnpj
+                               ,NaPista.CdColaborador
+                               ,NaPista.DsLoginN1
+                               ,NaPista.NmColaborador
+                               ,COALESCE(NaPista.CdParceiroComercial, NaPista.codigo_parceiro_bv) AS CdParceiroComercial
+                               ,NaPista.FlPorteA
+                               ,Case When NaPista.data_fim_plano NE . and (NaPista.valor_pago = . or Coalesce(NaPista.valor_pago,0)) = 0 Then 1 Else 0 End as Lojas_Vencidas
+
+                               ,NaPista.data_inicio_plano as data_inicio_plano Format DDMMYY10.
+        ,NaPista.data_fim_plano as data_fim_plano Format DDMMYY10.
+                               ,NaPista.valor_pago as valor_pago
+                               ,NaPista.VrProducao as VrProducao
+                               ,Case
+                                               When Coalesce(NaPista.valor_pago,0) > 0 Then ((Coalesce(Porte.VrPlano,0) - Coalesce(NaPista.valor_pago,0)) / Coalesce(Porte.VrPlano,0)) * 100
+                                                               Else 0
+                               End as percentual_desconto
+
+                               ,Case
+                                               When calculated percentual_desconto = 0 Then 'Sem Desconsto'
+                                   When calculated percentual_desconto > 0 and calculated percentual_desconto <= 45 Then 'Alçada GR'
+                                   When calculated percentual_desconto > 45 and calculated percentual_desconto <= 60 Then 'Alçada GF'
+                                   When calculated percentual_desconto > 60 Then 'Fora da Alçada'
+                    Else 'ND'
+                               End as nome_cluster_desconto
+
+                               ,Count(Distinct NaPista.codigo_napista) as Qtd_Lojas_Pagando
+                               ,Sum(Case When NaPista.valor_pago > 0 Then 1 Else 0 End) as Qtd_PDVs_Pagando
+                               ,Sum(Case When NaPista.valor_pago > 0 and Calculated CdParceiroComercial NE 0 Then 1 Else 0 End) as Qtd_PDVs_BV_Pagando
+
+                               ,Sum(Porte.VrPlano) as VrPlano
+                               ,CASE WHEN NaPista.codigo_napista IS NULL THEN 1 ELSE 0 END AS FlSemCodigoNapista
+
+FROM basegrc.TbNaPistaPagamentosResultado as NaPista
+                Left Join
+                               (Select Distinct NuAnomes,
+                                               Case
+                                                               When PortePDV = 'NONE' Then 'Sem porte informado'
+                                                               Else PortePDV
+                                               End as PortePDV,
+                                               VrPlano
+                                From basegrc.NaPista_ValorPorte) as Porte On Napista.FlPorteA = Porte.PortePDV and Napista.NuAnomes = Porte.NuAnomes
+WHERE NaPista.NuAnoMes >= 202501
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+ORDER BY NaPista.NuAnoMes
+;run;
+
+/*Tratamentos base Indicador PDV */
+proc sql;
+CREATE TABLE TbNaPistaPagamentosAux AS
+SELECT
+     NuAnoMes
+    ,codigo_napista
+    ,MAX(data_fim_plano) AS data_fim_plano format DDMMYY10.
+    ,SUM(valor_pago) AS valor_pago
+FROM TbNaPistaPagamentosResultado2
+WHERE codigo_napista is not null
+GROUP BY NuAnoMes, codigo_napista
+ORDER BY NuAnoMes, codigo_napista
+;QUIT;
+
+proc sql;
+CREATE TABLE TbNaPistaPDVAux AS
+SELECT
+PDV.NuAnoMes
+,PDV.id_loja AS codigo_napista
+,PDV.valor_pago
+,PDV.lojas_pagas
+,PgtoAux.data_fim_plano
+FROM basegrc.TbNaPistaIndicadorPDV PDV
+LEFT JOIN TbNaPistaPagamentosAux PgtoAux
+ON PDV.NuAnoMes = PgtoAux.NuAnoMes
+AND PDV.id_loja = PgtoAux.codigo_napista
+;RUN;
+
+proc sql;
+CREATE TABLE MesAtualPgto AS
+SELECT DISTINCT
+                NuAnoMes
+                ,MDY(MOD(NuAnoMes, 100), 1, INT(NuAnoMes / 100)) AS DtNuAnoMesAtu FORMAT=DDMMYY10.
+                ,codigo_napista
+                ,valor_pago
+                ,data_fim_plano
+FROM TbNaPistaPDVAux
+WHERE codigo_napista is not null
+;QUIT;
+
+PROC SQL;
+CREATE TABLE MesAnteriorPgto AS
+SELECT DISTINCT
+     NuAnoMes
+    ,MDY(MOD(NuAnoMes, 100), 1, INT(NuAnoMes / 100)) AS DtNuAnoMes FORMAT=DDMMYY10.
+    ,codigo_napista
+    ,valor_pago
+    ,data_fim_plano
+    ,INTNX('month', MDY(MOD(NuAnoMes, 100), 1, INT(NuAnoMes / 100)), 1, 'beginning') AS MesProximo FORMAT=DDMMYY10.
+FROM TbNaPistaPDVAux
+;QUIT;
+
+proc sql;
+CREATE TABLE PDVAuxCompleta AS
+SELECT
+                 Atu.NuAnoMes
+                ,Atu.DtNuAnoMesAtu
+                ,Atu.codigo_napista
+                ,Atu.valor_pago
+                ,Atu.data_fim_plano  as data_fim_plano
+                ,Ant2.codigo_napista as codigo_napista2
+                ,Ant2.DtNuAnoMes     as DtNuAnoMesPgto
+                ,Ant2.valor_pago     as valor_pago2
+                ,Ant2.data_fim_plano as data_fim_plano2
+                ,Ant2.MesProximo
+                ,CASE
+                               WHEN Ant2.data_fim_plano = . Then .
+                               When Ant2.data_fim_plano < %SYSFUNC(TODAY()) AND (Coalesce(Atu.valor_pago,0) = 0) THEN 1
+                               ELSE 0
+                END AS FlVencido
+
+    ,CASE
+                               WHEN Coalesce(Ant2.valor_pago,0) <> 0 AND (Coalesce(Atu.valor_pago,0) = 0) and data_fim_plano2 < %SYSFUNC(TODAY()) THEN 1
+                               ELSE 0
+                END AS FlLojasSPgtoChurn
+
+                ,Case When Coalesce(Ant2.valor_pago,0) > 0 Then 1 Else 0 End as Lojas_Pagando_M1
+
+FROM MesAtualPgto Atu
+                LEFT JOIN MesAnteriorPgto Ant2
+                               ON Atu.codigo_napista = Ant2.codigo_napista
+                                               AND Atu.DtNuAnoMesAtu = Ant2.MesProximo
+;QUIT;
+
+/*O valor_porte do arquivo Indicadores da BVia está incorreto, foi necessário subir base auxiliar definida pela Flávia Eloy*/
+proc sql;
+CREATE TABLE ValorPorte AS
+SELECT
+NuAnoMes
+,PortePDV
+,VrPlano
+FROM basegrc.NaPista_ValorPorte
+;QUIT;
+
+/*Tratamentos base Indicador PDV */
+PROC SQL;
+CREATE TABLE TbNaPistaIndicadorPDV AS
+SELECT
+     Indicadores.NuAnoMes
+    ,Indicadores.id_loja as codigo_napista
+                ,Indicadores.cnpj as cpf_cnpj
+    ,Indicadores.id_bv as codigo_parceiro_bv
+
+                ,Case When Coalesce(Indicadores.valor_pago,0) > 0 Then 1 Else 0 End as Qtd_Lojas_Pagando
+                ,Case When Coalesce(Indicadores.id_bv,0) NE 0 and Coalesce(Indicadores.valor_pago,0) > 0 Then 1 Else 0 End as Qtd_PDVs_BV_Pagando
+                ,Case When Coalesce(Indicadores.id_bv,0) NE 0 Then 1 Else 0 End as Qtd_PDVs_BV
+
+    ,Coalesce(Indicadores.valor_pago,0) as valor_pago
+    ,Coalesce(Porte.VrPlano, Indicadores.valor_porte,0) as valor_porte
+
+    ,Case
+                               When Coalesce(Indicadores.valor_pago,0) = 0 Then 0
+                               When Coalesce(Indicadores.valor_pago,0) > 0 and Coalesce(Indicadores.valor_pago,0) < Coalesce(Porte.VrPlano, Indicadores.valor_porte,0) Then Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano, Indicadores.valor_porte,0)
+                               Else 0
+                End AS valor_desconto
+
+    ,CASE
+                                               When Coalesce(Indicadores.valor_pago,0) = 0 Then 0
+                                               WHEN Coalesce(Indicadores.valor_pago,0) >= Coalesce(Porte.VrPlano, Indicadores.valor_porte,0) Then 0
+                                               WHEN Coalesce(Indicadores.valor_pago,0) > 0 Then ((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano, Indicadores.valor_porte,0)) / Coalesce(Porte.VrPlano, Indicadores.valor_porte,0)) * 100
+                                               ELSE 0
+                END AS percentual_desconto
+
+    ,CASE
+		WHEN Indicadores.NuAnoMes <= 202512 THEN
+ CASE WHEN  Coalesce(Indicadores.valor_pago,0) > 0 AND Coalesce(Indicadores.valor_pago,0) > Coalesce(Porte.VrPlano, Indicadores.valor_porte,0) Then 'Pagou mais Plano Porte'
+        WHEN (Coalesce(Indicadores.valor_pago,0) > 0 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano, Indicadores.valor_porte,0))*-1) / Coalesce(Porte.VrPlano, Indicadores.valor_porte,0)) * 100 <= 45) THEN 'Alçada GR'
+        WHEN (Coalesce(Indicadores.valor_pago,0) > 0 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano, Indicadores.valor_porte,0))*-1) / Coalesce(Porte.VrPlano, Indicadores.valor_porte,0)) * 100 <= 60) THEN 'Alçada GF'
+        WHEN (Coalesce(Indicadores.valor_pago,0) > 0 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano, Indicadores.valor_porte,0))*-1) / Coalesce(Porte.VrPlano, Indicadores.valor_porte,0)) * 100 >  60) THEN 'Fora da Alçada'
+        ELSE 'ND'
+        END
+WHEN Indicadores.NuAnoMes >= 202601 THEN
+        CASE
+            /* Alçada GR por porte */
+            WHEN Coalesce(Indicadores.valor_pago,0) > 0 AND Indicadores.porte_loja IN ('None','P')
+                 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano,Indicadores.valor_porte,0))*-1)
+                      / Coalesce(Porte.VrPlano,Indicadores.valor_porte,0)) * 100 <= 40
+                 THEN 'Alçada GR'
+            WHEN Coalesce(Indicadores.valor_pago,0) > 0 AND Indicadores.porte_loja = 'M'
+                 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano,Indicadores.valor_porte,0))*-1)
+                      / Coalesce(Porte.VrPlano,Indicadores.valor_porte,0)) * 100 <= 35
+                 THEN 'Alçada GR'
+            WHEN Coalesce(Indicadores.valor_pago,0) > 0 AND Indicadores.porte_loja IN ('G','GG')
+                 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano,Indicadores.valor_porte,0))*-1)
+                      / Coalesce(Porte.VrPlano,Indicadores.valor_porte,0)) * 100 <= 30
+                 THEN 'Alçada GR'
+            WHEN Coalesce(Indicadores.valor_pago,0) > 0 AND Indicadores.porte_loja = 'Motos'
+                 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano,Indicadores.valor_porte,0))*-1)
+                      / Coalesce(Porte.VrPlano,Indicadores.valor_porte,0)) * 100 <= 45
+                 THEN 'Alçada GR'
+
+            /* Alçada GF (mesma regra para todos os portes) */
+            WHEN Coalesce(Indicadores.valor_pago,0) > 0
+                 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano,Indicadores.valor_porte,0))*-1)
+                      / Coalesce(Porte.VrPlano,Indicadores.valor_porte,0)) * 100 > 45
+                 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano,Indicadores.valor_porte,0))*-1)
+                      / Coalesce(Porte.VrPlano,Indicadores.valor_porte,0)) * 100 <= 55
+                 THEN 'Alçada GF'
+
+            /* Fora da Alçada */
+            WHEN Coalesce(Indicadores.valor_pago,0) > 0
+                 AND (((Coalesce(Indicadores.valor_pago,0) - Coalesce(Porte.VrPlano,Indicadores.valor_porte,0))*-1)
+                      / Coalesce(Porte.VrPlano,Indicadores.valor_porte,0)) * 100 > 55
+                 THEN 'Fora da Alçada'
+
+            ELSE 'ND'
+        END
+    ELSE 'ND'
+ END AS nome_cluster_desconto
+    ,Indicadores.estoque_zero
+    ,Indicadores.lojas_ativas
+                ,Case
+                               When Coalesce(Indicadores.estoque_zero,0) = 1 and Coalesce(Indicadores.qtd_classificados,0) >=2 Then 1
+                               Else 0
+                End as QtLojas_Estoque_0_Digital
+                ,Case
+                               When Coalesce(Indicadores.lojas_ativas,0) = 1 and Coalesce(Indicadores.qtd_classificados,0) >=2 Then 1
+                               Else 0
+                End as QtLojas_Ativas_Digital
+                ,Case
+                               When Coalesce(Indicadores.qtd_classificados,0) >=2 Then 1
+                               Else 0
+                End as QtLojas_Class_Digital
+                ,BaseAux.FlVencido
+                ,BaseAux.FlLojasSPgtoChurn
+                ,BaseAux.Lojas_Pagando_M1
+
+    ,Coalesce(Indicadores.plan_value,0) as plan_value
+    ,Indicadores.porte_loja
+    ,Indicadores.pgto_fora_porte
+    ,Coalesce(Indicadores.valor_plano_loja,0) as valor_plano_loja
+    ,Coalesce(Indicadores.diferenca_pago_porte,0 ) as diferenca_pago_porte
+    ,Indicadores.qtd_classificados
+
+FROM basegrc.TbNaPistaIndicadorPDV as Indicadores
+                Left join PDVAuxCompleta as BaseAux
+                               On Indicadores.NuAnomes = BaseAux.NuAnomes and Indicadores.id_loja = BaseAux.codigo_napista
+                               Left join ValorPorte as Porte On Indicadores.NuAnomes = Porte.NuAnomes And Indicadores.porte_loja = Porte.PortePDV
+;QUIT;
+
+PROC SQL;
+CREATE TABLE TbNaPistaRitoComercial AS
+SELECT
+     PDV1.NuAnoMes
+    ,PDV1.codigo_parceiro_bv
+    ,PDV1.cpf_cnpj
+    ,PDV1.codigo_napista
+
+    ,ParceiroComercial.DsLoginN1C
+    ,ParceiroComercial.NmColaboradorC
+    ,ParceiroComercial.DsLoginN2C
+    ,ParceiroComercial.DsLoginN3C
+    ,ParceiroComercial.LstSubstituicaoC
+
+    ,ParceiroComercial.NmCanalEstruturaComercialC
+    ,ParceiroComercial.NmSubEstruturaComercialC
+    ,ParceiroComercial.NmAreaEstruturaComercialC
+
+    ,ParceiroComercial.NmParceiroComercial
+    ,ParceiroComercial.NuCnpjLoja
+    ,ParceiroComercial.NmTipoParceiroComercial
+    ,ParceiroComercial.FlAtivo
+    ,ParceiroComercial.PredominanciaProduto
+
+                ,PDV1.Qtd_Lojas_Pagando
+                ,PDV1.Qtd_PDVs_BV_Pagando
+                ,PDV1.Qtd_PDVs_BV
+    ,PDV1.valor_pago
+    ,PDV1.valor_porte
+    ,PDV1.valor_desconto
+    ,PDV1.percentual_desconto
+    ,PDV1.nome_cluster_desconto
+    ,PDV1.estoque_zero
+    ,PDV1.lojas_ativas
+                ,PDV1.QtLojas_Estoque_0_Digital
+                ,PDV1.QtLojas_Ativas_Digital
+                ,PDV1.QtLojas_Class_Digital
+                ,PDV1.FlVencido
+                ,PDV1.FlLojasSPgtoChurn
+                ,PDV1.Lojas_Pagando_M1
+    ,PDV1.plan_value
+    ,PDV1.porte_loja
+    ,PDV1.pgto_fora_porte
+    ,PDV1.valor_plano_loja
+    ,PDV1.diferenca_pago_porte
+    ,PDV1.qtd_classificados
+
+FROM TbNaPistaIndicadorPDV PDV1
+                LEFT JOIN bases.TbParceiroComercial ParceiroComercial
+                    ON PDV1.codigo_parceiro_bv = ParceiroComercial.CdParceiroComercial
+
+WHERE PDV1.NuAnoMes >= 202501 and PDV1.codigo_napista IS NOT NULL and ParceiroComercial.FlAtivo = 'S'
+ORDER BY PDV1.NuAnoMes;
+QUIT;
+
+PROC SQL;
+CREATE TABLE tmp.TbNaPistaRitoComercial AS
+SELECT
+     PDV1.NuAnoMes
+    ,PDV1.codigo_parceiro_bv as codigo_parceiro_bv
+    ,PDV1.cpf_cnpj as cpf_cnpj
+    ,PDV1.codigo_napista
+
+    ,ParceiroComercial.DsLoginN1C
+    ,ParceiroComercial.NmColaboradorC
+    ,ParceiroComercial.DsLoginN2C
+    ,ParceiroComercial.DsLoginN3C
+    ,ParceiroComercial.LstSubstituicaoC
+
+    ,ParceiroComercial.NmCanalEstruturaComercialC
+    ,ParceiroComercial.NmSubEstruturaComercialC
+    ,ParceiroComercial.NmAreaEstruturaComercialC
+
+    ,ParceiroComercial.NmParceiroComercial
+    ,ParceiroComercial.NuCnpjLoja
+    ,ParceiroComercial.NmTipoParceiroComercial
+    ,ParceiroComercial.FlAtivo
+    ,ParceiroComercial.PredominanciaProduto
+
+                ,PDV1.Qtd_Lojas_Pagando
+                ,PDV1.Qtd_PDVs_BV_Pagando
+                ,PDV1.Qtd_PDVs_BV
+    ,PDV1.valor_pago
+    ,PDV1.valor_porte
+    ,PDV1.valor_desconto
+    ,PDV1.percentual_desconto
+    ,PDV1.nome_cluster_desconto
+    ,PDV1.estoque_zero
+    ,PDV1.lojas_ativas
+                ,PDV1.QtLojas_Estoque_0_Digital
+                ,PDV1.QtLojas_Ativas_Digital
+                ,PDV1.QtLojas_Class_Digital
+                ,PDV1.FlVencido
+                ,PDV1.FlLojasSPgtoChurn
+                ,PDV1.Lojas_Pagando_M1
+    ,PDV1.plan_value
+    ,PDV1.porte_loja
+    ,PDV1.pgto_fora_porte
+    ,PDV1.valor_plano_loja
+    ,PDV1.diferenca_pago_porte
+    ,PDV1.qtd_classificados
+	,today() as DtAtualizacao format=date9.
+
+FROM TbNaPistaIndicadorPDV PDV1
+                LEFT JOIN bases.TbParceiroComercial ParceiroComercial
+                    ON PDV1.codigo_parceiro_bv = ParceiroComercial.CdParceiroComercial
+
+WHERE PDV1.NuAnoMes >= 202501
+                               Order by PDV1.NuAnomes
+;QUIT;
+
+PROC DATASETS LIB=work NOLIST;
+  MODIFY tmp.TbNaPistaRitoComercial;
+  FORMAT
+    valor_pago           COMMAX18.2
+    valor_porte          COMMAX18.2
+    valor_plano_loja     COMMAX18.2
+    valor_desconto       COMMAX18.2
+    percentual_desconto  COMMAX18.2
+    plan_value           COMMAX18.2
+    pgto_fora_porte      COMMAX18.2
+    diferenca_pago_porte COMMAX18.2;
+QUIT;
+
+proc export
+data=tmp.TbNaPistaRitoComercial
+file='/riscosbvf/BA/processos/tmp/TbNaPistaRito.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /riscosbvf/BA/processos/tmp/TbNaPistaRito.csv  /riscosbvf/BA/processos/output/ ";

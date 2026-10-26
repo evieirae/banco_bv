@@ -1,0 +1,161 @@
+START_METADATA
+PROJECT: Rodas__rito_comercial_solar
+FILE_SAS: 103 - Abandono_Aprova.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:26 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -5
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 102
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: RITOSOL = /infogrc/rito_comercial_solar
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: Base_m0, dt_ref
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: PERM
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): BASES.TBFUNILSIMULACAO_SOLAR [SAS/Local], BASES.TBTEMPODATA [SAS/Local], BV-PDBD-PRD.DVRY_NEGC_RODAS.TBCADASTROVENDEDORES [BIGQUERY]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: RITOSOL
+IMPORTED FILES (Requires Ingestion): (none)
+TABLE_READ_PROVENANCE (Flow): BASES.TBFUNILSIMULACAO_SOLAR [PROC SQL - FROM], BASES.TBTEMPODATA [PROC SQL - JOIN], BV-PDBD-PRD.DVRY_NEGC_RODAS.TBCADASTROVENDEDORES [Pass-Through Native (BIGQUERY) - BQ fully-qualified identifier; Pass-Through Native (BIGQUERY) - FROM], RITOSOL.BASE_FUNIL_MSGPOS_TOTAL [PROC EXPORT - DATA=]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /riscosbvf/BA/processos/output/cartapdv_msg_positiva_solar.csv
+INTERNAL READS (Temp/Local): RITOSOL.BASE_FUNIL_MSGPOS_TOTAL
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): RITOSOL.BASE_FUNIL_MSGPOS_TOTAL
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): RITOSOL.BASE_FUNIL_MSGPOS_TOTAL
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): /riscosbvf/BA/processos/output/cartapdv_msg_positiva_solar.csv
+TEMP/DISCARDED OUTPUTS: BASE_LOGINS_SIMU, TBCADASTROVENDEDORES
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (csv: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /riscosbvf/BA/processos/output/cartapdv_msg_positiva_solar.csv
+
+END_METADATA
+================================================================================
+Libname ritosol '/infogrc/rito_comercial_solar';
+
+PROC SQL;
+connect to bigquery as perm (project='bv-saem-dtm' credfile='/projetos/acessos/bq/em/saem-dtm.json'
+      schema='bv-pdbd-prd' READ_MODE=storage);
+Create table tbcadastrovendedores as
+select Distinct dsloginusuariogpar, nmusuario from connection to perm(
+select *
+from bv-pdbd-prd.dvry_negc_rodas.tbcadastrovendedores;
+);
+disconnect from perm;
+QUIT;
+
+Proc Sql;
+Create Table Base_Logins_Simu as
+Select Distinct
+Funil.NuCpfCNPJSimu as NuCpfCliente
+,Funil.CdParceiroComercial
+,Funil.DtSimulacaoProposta
+,Funil.Ds_Login
+,Trim(Funil.Ds_Login) || ' - ' || Trim(GPAR.nmusuario) as Vendedor
+,Funil.NmPessoa
+From Bases.TbFunilSimulacao_Solar as Funil
+Left Join tbcadastrovendedores as GPAR
+	On Funil.Ds_Login = GPAR.dsloginusuariogpar
+Where (Funil.DtSimulacaoAux >= (&dt_ref. - 45) and Funil.FlMSGPositiva = 1) and Funil.Ds_Login NE ''
+;Quit;
+
+/**Resumo dos PDVs**/
+Proc Sql;
+Create Table ritosol.Base_Funil_MSGPOS_Total as
+Select Distinct
+'MSGPOS' as Base
+,Funil.NuAnoMesAux as NuAnomes
+,"Cobans" as Visao
+,Funil.DsLoginN1C
+,Funil.DsLoginN2C
+,Funil.DsLoginN3C
+,Funil.NmAreaEstruturaComercialC as Dimensao1
+,Funil.NmColaboradorC as Dimensao2
+,Funil.CdParceiroComercial
+,put(Funil.CdParceiroComercial, 8.) || '-' || Funil.NmParceiroComercial as Dimensao3
+,"Mês Fechado" as Semana
+,Porte.Porte
+,Porte.TipoParceiro
+,Funil.NuCpfCNPJSimu as NuCpfCliente
+,Funil.Decisao_Simulacao
+,Coalesce(Login.NmPessoa, Funil.NmPessoa) as NmPessoa
+,Login.Vendedor as Ds_Login
+,Funil.NuDDDCelular
+,Funil.NuTelefoneCelular
+,Funil.DsEmail
+,Funil.NuDDD2
+,Funil.NuTelefone2
+
+,Case
+	when Max(TempoData.QtDiasUteisMaturacao) > 10 then 'Acima de 10 Dias'
+	when Max(TempoData.QtDiasUteisMaturacao) >  5 then '6 a 10 Dias'
+	when Max(TempoData.QtDiasUteisMaturacao) > -1 then '0 a 5 Dias'
+End as FxMatruracao
+,Count (Distinct Funil.NuCpfCNPJSimu) as QtdSimulação Format COMMAX10.0
+,Count (Distinct Funil.NuCpfCNPJSimu) as FlMSGPositiva Format COMMAX10.0
+,Sum(EFETIV.FlPropostaAprovada) as FlPropostaAprovada Format COMMAX10.0
+,Sum(EFETIV.FlPropostaEfetivada) as FlPropostaEfetivada Format COMMAX10.0
+,Max(Funil.VrSimulacao) as VrSimulacao Format COMMAX10.2
+,Max(Funil.GhEntrada) as Score
+
+From Bases.TbFunilSimulacao_Solar (Where = (DtSimulacaoAux >= (&dt_ref. - 45) and FlMSGPositiva = 1)) as Funil
+	Left join BASE_PORTE_COBANS as Porte On Funil.CdParceiroComercial = Porte.CdParceiroComercial and Porte.NuANomes = &Base_m0.
+	left join bases.TbTempoData TempoData
+		on  Funil.DtSimulacaoAux = TempoData.DtTempo
+	Left join Base_Logins_Simu as Login
+		on Funil.NuCpfCNPJSimu = Login.NuCpfCliente and Funil.CdParceiroComercial = Login.CdParceiroComercial and Funil.DtSimulacaoProposta = Login.DtSimulacaoProposta
+	Left Join
+			(Select Distinct DtSimulacaoAux, NuCpfCNPJSimu, FlPropostaEfetivada, FlPropostaAprovada, FlPropostaEfetivada
+				From Bases.TbFunilSimulacao_Solar
+				Where DtSimulacaoAux >= (&dt_ref. - 45) and FlPropostaEfetivada = 1 And
+	  NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and NmCanalEstruturaComercialC = 'Canal Solar') as EFETIV
+		  On Funil.NuCpfCNPJSimu = EFETIV.NuCpfCNPJSimu and Funil.DtSimulacaoAux Between EFETIV.DtSimulacaoAux and EFETIV.DtSimulacaoAux + 45
+
+Where EFETIV.FlPropostaEfetivada NE 1 and Funil.Decisao_Simulacao = 'Abandono Aprova' and Funil.VrSimulacao > 0 and
+		Funil.NmAreaEstruturaComercialC in
+		(
+			'Canal Solar CO e NO',
+			'Canal Solar MG, BA, AL e SE',
+			'Canal Solar NE',
+			'Canal Solar SP Interior',
+			'Canal Solar SP, RJ e ES',
+			'Canal Solar Sul'
+		) and Funil.NmCanalEstruturaComercialC = 'Canal Solar'
+		  and Funil.GhEntrada >= 6
+Group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
+;Quit;
+
+proc export
+data= ritosol.Base_Funil_MSGPOS_Total
+file= '/riscosbvf/BA/processos/output/cartapdv_msg_positiva_solar.csv' replace
+dbms=dlm;
+delimiter=';';
+run;
+
+X "mv  /riscosbvf/BA/processos/output/cartapdv_msg_positiva_solar.csv  /riscosbvf/BA/processos/output/ ";

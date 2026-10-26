@@ -1,0 +1,189 @@
+START_METADATA
+PROJECT: Rodas__MFS
+FILE_SAS: 1 - Gera base MFS.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:22 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DBT_BQ (Score: 20)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -540
+ODS_OUTPUTS_DETECTED: csv
+TRIGGERS: %INCLUDE (1x | +20)
+----------------------------------------
+LINES_OF_CODE: 113
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: TIMESTAMP, TIMESTAMPDATA, TIMESTAMPHORA, dir_csv
+DETECTED_MACROS_USED: TIMESTAMPDATA, dir_csv
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/all-includes.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/ALL-INCLUDES.SAS [SAS/Local], DBCOR.DBO.TBPARCEIROSUBPRODUTO [DBCON], DBCOR.DBO.TBSUBPRODUTO [DBCON], DBCOR.TBATIVIDADEFINANCIAMENTO [DBCON], DBCOR.TBATIVIDFINANCPARCCOMERCIAL [DBCON], DBCOR.TBCOLABORADOR [DBCON], DBCOR.TBFAVORECIDOAUTORIZADO [DBCON], DBCOR.TBFAVORECIDOCONTACORRENTE [DBCON], DBCOR.TBFILIAL [DBCON], DBCOR.TBPARCEIROCOMERCIAL [DBCON], DBCOR.TBPESSOA [DBCON], DBCOR.TBREGIAO [DBCON], DBCOR.TBREPRESENTANTELEGAL [DBCON], DBCOR.TBSOCIO [DBCON], DBCOR.TBTIPOPARCEIROCOMERCIAL [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/all-includes.sas
+TABLE_READ_PROVENANCE (Flow): DBCOR.DBO.TBPARCEIROSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCOR.DBO.TBSUBPRODUTO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBATIVIDADEFINANCIAMENTO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBATIVIDFINANCPARCCOMERCIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBCOLABORADOR [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFAVORECIDOAUTORIZADO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFAVORECIDOCONTACORRENTE [Pass-Through Native (DBCON) - JOIN], DBCOR.TBFILIAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - FROM], DBCOR.TBPESSOA [Pass-Through Native (DBCON) - JOIN], DBCOR.TBREGIAO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBREPRESENTANTELEGAL [Pass-Through Native (DBCON) - JOIN], DBCOR.TBSOCIO [Pass-Through Native (DBCON) - JOIN], DBCOR.TBTIPOPARCEIROCOMERCIAL [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/all-includes.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): &dir_csv./Base_MFS_&TIMESTAMPDATA..csv
+TEMP/DISCARDED OUTPUTS: TBMFS
+DYNAMIC REFS (Ambiguous): {TIMESTAMPDATA}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 1 paths (sas: 1)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/all-includes.sas
+
+END_METADATA
+================================================================================
+/* ====================================================================================== */
+/* | Programa: 	1 - Gera base leads MFS														| */
+/* | Descricao: Programa para gerar base de leads.					| */
+/* | Objetivo: 	Compartilhamento de leadas com o parceiro BV					| */
+/* | Author: Flávio Pereira | MIS-IGE							| */
+/* ====================================================================================== */
+
+/* ======================================================================================*/
+/* =====================LibName e parametros=============================================*/
+/* ======================================================================================*/
+
+%include '/infogrc/utils/all-includes.sas';
+
+OPTIONS COMPRESS=BINARY;
+%LET TIMESTAMP = %SYSFUNC(DATE(),ddmmyy10.);
+%LET TIMESTAMPDATA = %SYSFUNC(date(),YYMMDDN8.);
+%LET TIMESTAMPHORA = %sysfunc(TIME(),hour4.);
+
+/* ======================================================================================*/
+/* =====================Gera tabela de leads MFS =========================*/
+/* ======================================================================================*/
+
+PROC SQL;
+%CONECTADB(server=CTR);
+
+  CREATE TABLE TbMFS AS
+	SELECT *
+	FROM CONNECTION TO DBCON
+				(
+SELECT
+			pc.dtcadastro AS 'Data cadastro COBAN',
+			pc.NmFantasia AS 'Razão Social do Parceiro',
+			p.NuCpfCnpj AS 'CNPJ do Parceiro',
+			pc.CdParceiroComercial AS 'Login',
+			pc.FlAtivo AS 'Status Login',
+			tpc.NmTipoParceiroComercial AS 'Tipo Parceiro',
+			taf.DsAtividadeFinanciamento AS 'Nome da Atividade' ,
+			psc.CdSubProduto AS 'Cod.Produto',
+			sc.DsSubProduto AS 'Nome Produto',
+			fa.dtcadastro AS 'Data Cadastro Favorecido',
+			fa.NmTitular AS 'Razão Social Favorecido',
+			fa.NuCpfCnpj AS 'CNPJ Favorecido',
+			fcc.NuBanco AS 'Nro Banco Favorecido',
+			fcc.CdAgencia AS 'Nro Agência Favorecido',
+			fcc.NuContaCorrente AS 'Nro Conta Favorecido',
+			fa.FlAtivo AS 'Status Favorecido',
+			fcc.FlPrincipal AS 'Principal',
+			fcc.FlContaServico AS 'Serviço',
+			fcc.FlComissao AS 'Comissão',
+			fcc.FlContrato AS 'Contrato',
+			fcc.FlAtivoComissao AS 'Ativo Comissão',
+			fcc.FlAtivoContrato 'Ativo Contrato',
+			cgc.NmColaborador AS 'Gerente Comercial',
+			cgr.NmColaborador AS 'Gerente Regional',
+			rl.NmRepresentanteLegal AS 'Nome Sócio',
+			rl.NuCpf AS 'CPF Sócio'
+
+			/* table parceiro comercial*/
+		FROM dbcor..TbParceiroComercial pc
+
+			/*table regiao*/
+		LEFT  JOIN DBCOR..TbRegiao r
+			ON r.CdRegiao = pc.CdRegiao
+
+			/*table filial*/
+		LEFT  JOIN DBCOR..TbFilial f
+			ON r.CdFilial = f.CdFilial
+
+			/* Gerente Comercial*/
+		LEFT  JOIN DBCOR..TbColaborador cgc
+			ON cgc.CdColaborador = f.CdGerenteComercial
+
+			/* Gerente Regional*/
+		LEFT  JOIN DBCOR..TbColaborador cgr
+			ON cgr.CdColaborador = f.CdGerenteRegional
+
+			/* Representante legal*/
+		LEFT  JOIN DBCOR..TbRepresentanteLegal rl
+			ON rl.CdParceiroComercial = pc.CdParceiroComercial
+
+			/* Sócios*/
+		LEFT  JOIN DBCOR..TbSocio s
+			ON s.CdParceiroComercial = pc.CdParceiroComercial
+			AND s.SqRepresentanteLegal = rl.SqRepresentanteLegal
+
+			/*table pessoa*/
+		LEFT  JOIN DBCOR..TbPessoa p
+			ON pc.CdPessoa = p.CdPessoa
+
+			/*table tipo parceiro comercial */
+		LEFT  JOIN DBCOR..TbTipoParceiroComercial tpc
+			ON tpc.CdTipoParceiroComercial = pc.CdTipoParceiroComercial
+
+			/*table atividade financeira parc comercial*/
+		LEFT JOIN DBCOR..TbAtividFinancParcComercial af
+			ON af.CdParceiroComercial = pc.CdParceiroComercial
+
+			/*table atividade financiamento*/
+		LEFT JOIN DBCOR..TbAtividadeFinanciamento taf
+			ON af.CdAtividadeFinanciamento = taf.CdAtividadeFinanciamento
+
+			/*table favorecido */
+		LEFT JOIN DBCOR..TbFavorecidoAutorizado fa
+			ON fa.CdParceiroComercial = pc.CdParceiroComercial
+
+			/*table favorecido conta corrente */
+		LEFT JOIN DBCOR..TbFavorecidoContaCorrente fcc
+			ON fcc.CdParceiroComercial = fa.CdParceiroComercial
+
+			/*table Produtos*/
+		LEFT JOIN DBCOR.dbo.TbParceiroSubProduto psc
+			ON psc.CdParceiroComercial = pc.CdParceiroComercial
+
+			/*table De/Para Produtos*/
+		LEFT JOIN DBCOR.dbo.TbSubProduto sc
+			ON sc.CdSubProduto = psc.CdSubProduto
+
+		WHERE (1=1)
+			AND pc.FlAtivo = 'S' /*flag parceiro ativo/inativo*/
+			AND pc.flconsignadoconvenio = 'N' /*flag exclusao consignado*/
+			AND pc.CdTipoParceiroComercial in (5) /*tipo de parceiro*/
+			AND pc.FlParceiroVirtual = 'N' /*flag exclusão parceiro virtual*/
+			AND taf.cdatividadefinanciamento in (7) /*tipo atividade financiamento*/
+			AND fcc.SqFavorecido = fa.SqFavorecido
+			AND psc.FlAtivo = 's'
+			AND pc.NmFantasia = 'MEU FINANCIAMENTO SOLAR LTDA'
+
+		ORDER BY pc.dtcadastro);
+RUN;
+
+%let dir_csv = /riscosbvf/BA/processos/output;
+
+proc export
+  data=TBMFS
+  dbms=csv
+  OUTFILE= "&dir_csv./Base_MFS_&TIMESTAMPDATA..csv"
+  replace;
+run;

@@ -1,0 +1,122 @@
+START_METADATA
+PROJECT: SAS_UC4__tbmargemhibrida
+FILE_SAS: tbmargemhibrida.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:58 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 50)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40), PROC TRANSPOSE (1x | +10)
+----------------------------------------
+LINES_OF_CODE: 64
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL, TRANSPOSE
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], TMP.TBPRODUCAOHIBRIDA [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): TMP.TBPRODUCAOHIBRIDA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBMARGEMHIBRIDA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: TBPRODUCAOHIBRIDA, TBPRODUCAOHIBRIDAUNPIVOT
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ================= Meta Colaborador  ==================== */
+/* ======================================================== */
+
+proc sql;
+create table TbProducaoHibrida as
+select
+	 NuAnoMes
+	,CdColaborador
+	,NmColaboradorPromotor as NmColaborador
+	,NmGrupoCargoColaboradorPromotor as NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,case when FxIdade = 'ZeroKM' then 'Novos' else 'Usados' end as StVeiculo
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,sum(VrMargem) as VrMargem format 18.2
+	,sum(VrProducao) as VrProducao format 18.2
+
+from tmp.TbProducaoHibrida
+group by 1,2,3,4,5,6,7,8,9,10
+order by 1,2,3,4,5,6,7,8,9,10
+;quit;
+
+proc transpose data=TbProducaoHibrida out=TbProducaoHibridaUnpivot
+(drop=_LABEL_ rename=_NAME_=TpValor rename=COL1=VrMedida where=(coalesce(VrMedida,0)<>0));
+by
+	 NuAnoMes
+	 CdColaborador
+	 NmColaborador
+	 NmGrupoCargoColaborador
+	 DsLoginN1
+	 NmGrupoProdutoMeta
+	 StVeiculo
+	 DsTipoCanalProducao
+	 CdFilial
+	 DtAtualizacao
+;run;
+
+proc sql;
+create table bases.TbMargemHibrida as
+select
+	 NuAnoMes
+	,CdColaborador
+	,NmColaborador
+	,NmGrupoCargoColaborador
+	,DsLoginN1
+	,NmGrupoProdutoMeta
+	,case when NmGrupoProdutoMeta = 'Leves' and nuanomes >= 202301 then StVeiculo end as StVeiculo
+	,DsTipoCanalProducao
+	,CdFilial
+	,DtAtualizacao
+	,case
+		when TpValor in ('VrMargem') then 'VrMargemContribuicao'
+		when TpValor in ('VrProducao') then 'VrProducao'
+	 end as TpValor
+	,sum(case when TpValor in ('VrMargem') then VrMedida else 0 end) as VrMargemHibrida
+	,sum(case when TpValor in ('VrProducao') then VrMedida else 0 end) as VrProducaoHibrida
+from TbProducaoHibridaUnpivot
+group by 1,2,3,4,5,6,7,8,9,10,11
+;run;

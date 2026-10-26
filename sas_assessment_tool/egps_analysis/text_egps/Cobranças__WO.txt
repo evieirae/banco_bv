@@ -1,0 +1,187 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Cobranças__WO
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:35:05 UTC
+BUSINESS_AREA: Cobranças
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 123
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ATIVA = /riscosbv/cobranca/erocha/ATIVA/TABLEAU; DANIEL = /riscosbv/cobranca/dvitor/; IPF_CONT = /riscosbv/cobranca/mlamera/IpfCont; IPF_WO = /riscosbv/cobranca/erocha/120_180_WO/GCP
+DETECTED_MACROS_DEFINED: 
+DETECTED_MACROS_USED: 
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): IPF_WO.C_202411 [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.CARTEIRA_WO_SCHULZE
+IMPORTED_LIBNAMES: IPF_WO
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): (none)
+TEMP/DISCARDED_TABLE_INPUT: WORK.CARTEIRA_WO_SCHULZE
+TABLE_READ_PROVENANCE (Flow): IPF_WO.C_202411 [PROC SQL - FROM], WORK.CARTEIRA_WO_SCHULZE [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: CARTEIRA_WO, CARTEIRA_WO_SCHULZE, WORK.QUERY_FOR_CARTEIRA_WO_SCHULZE, WORK.QUERY_FOR_CARTEIRA_WO_SCHULZE1
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 7 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Program */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-2JKyfbj37T2YB6LZ/code.sas */
+/* =========================INÍCIO TASK========================= */
+LIBNAME ATIVA BASE '/riscosbv/cobranca/erocha/ATIVA/TABLEAU';
+LIBNAME DANIEL BASE '/riscosbv/cobranca/dvitor/';
+libname IPF_CONT BASE '/riscosbv/cobranca/mlamera/IpfCont';
+libname IPF_WO '/riscosbv/cobranca/erocha/120_180_WO/GCP';
+
+PROC SQL;
+CREATE TABLE CARTEIRA_WO AS
+SELECT
+NuContrato,
+NuCpfCnpj,
+CAT(SUBSTR(PUT(NuContrato, Z14.),13,1),SUBSTR(NuCpfCnpj,5,1)) AS RDG,
+AtrasoVisao,
+FxAtraso,
+TpClasse,
+CdAssessoria,
+NmAgente,
+VrRisco,
+DtUltimoRecebimento
+
+FROM IPF_WO.C_202411;
+
+QUIT;
+
+PROC SQL;
+CREATE TABLE CARTEIRA_WO_SCHULZE AS
+SELECT
+NuContrato,
+NuCpfCnpj,
+CAT(SUBSTR(PUT(NuContrato, Z14.),13,1),SUBSTR(NuCpfCnpj,5,1)) AS RDG,
+AtrasoVisao,
+FxAtraso,
+TpClasse,
+CdAssessoria,
+NmAgente,
+VrRisco,
+DtUltimoRecebimento
+
+FROM CARTEIRA_WO
+WHERE NmAgente LIKE '%SCHULZE%'
+
+;QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Program */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+libname IPF_WO '/riscosbv/cobranca/erocha/120_180_WO/GCP';
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTEIRA_WO_SCHULZE);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTEIRA_WO_SCHULZE AS
+   SELECT DISTINCT 
+                     (COUNT(t1.NuContrato)) AS COUNT_of_NuContrato,
+          t1.RDG,
+          
+            (SUM(t1.VrRisco)) AS SUM_of_VrRisco,
+          t1.AtrasoVisao,
+          t1.FxAtraso
+      FROM WORK.CARTEIRA_WO_SCHULZE t1
+      GROUP BY t1.RDG,
+               t1.AtrasoVisao,
+               t1.FxAtraso;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+%_eg_conditional_dropds(WORK.QUERY_FOR_CARTEIRA_WO_SCHULZE1);
+
+PROC SQL;
+   CREATE TABLE WORK.QUERY_FOR_CARTEIRA_WO_SCHULZE1 AS
+   SELECT DISTINCT t1.NuContrato,
+          t1.RDG,
+          t1.AtrasoVisao,
+          t1.FxAtraso,
+          t1.TpClasse,
+          
+            (SUM(t1.VrRisco)) AS SUM_of_VrRisco,
+          t1.DtUltimoRecebimento
+      FROM WORK.CARTEIRA_WO_SCHULZE t1
+      GROUP BY t1.NuContrato,
+               t1.RDG,
+               t1.AtrasoVisao,
+               t1.FxAtraso,
+               t1.TpClasse,
+               t1.DtUltimoRecebimento;
+QUIT;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

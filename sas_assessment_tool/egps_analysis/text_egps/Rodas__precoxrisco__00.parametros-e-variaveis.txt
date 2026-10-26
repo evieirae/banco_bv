@@ -1,0 +1,112 @@
+START_METADATA
+PROJECT: Rodas__precoxrisco
+FILE_SAS: 00.parametros-e-variaveis.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (3x | +60)
+----------------------------------------
+LINES_OF_CODE: 53
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: none
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: BA_DADOS = /riscosbvf/BA/bases_gerenciais; BA_HOML = /projetos/MISV/data/bases; CRM_ADD = /riscosbvf/CRM/SAS/AddIn; CRM_MIS = /riscosbvf/CRM/SAS/DM_MIS; INFGER = /infogrc/precoxrisco; TMP = /projetos/MISV/data/bases/tmp
+DETECTED_MACROS_DEFINED: final, inicio
+DETECTED_MACROS_USED: final, inicio
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/UTILS/IQ.SAS [SAS/Local], /INFOGRC/UTILS/LIBNAME.SAS [SAS/Local], /INFOGRC/UTILS/PWD.SAS [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/utils/IQ.sas, /infogrc/utils/libname.sas, /infogrc/utils/pwd.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 3 paths (sas: 3)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/utils/IQ.sas
+[CODE REF] /infogrc/utils/libname.sas
+[CODE REF] /infogrc/utils/pwd.sas
+
+END_METADATA
+================================================================================
+/*
+   PREÇO POR RISCO
+   Desenvolvido por: Ana Lazarini
+   Criado em: November 19th, 2020
+   Atualizado em: February 02nd, 2021
+   Ponto focal de negócio: Marina Pereira
+*/
+
+/* STEP 00.01 - Declarar variáveis globais */
+%include '/infogrc/utils/pwd.sas';
+%include '/infogrc/utils/IQ.sas';
+%CRIAVARDB;
+/* Períodos consultados */
+%let inicio = 20250101;
+%let final  = 20301231;
+
+/* STEP 00.02 - Declarar libnames que serão usadas durante o processo */
+%include '/infogrc/utils/libname.sas';
+LIBNAME BA_HOML '/projetos/MISV/data/bases';
+LIBNAME TMP '/projetos/MISV/data/bases/tmp';
+LIBNAME BA_DADOS '/riscosbvf/BA/bases_gerenciais';
+LIBNAME CRM_MIS '/riscosbvf/CRM/SAS/DM_MIS';
+LIBNAME CRM_ADD '/riscosbvf/CRM/SAS/AddIn';
+LIBNAME INFGER '/infogrc/precoxrisco';
+
+/* STEP 00.03 - Formatar variáveis */
+data _null_;
+    anoAtual   = year(today());
+
+    /* Seus formatos existentes */
+    inicioIq   = "'" || put(&inicio., 8.) || "'";
+    finalIq    = "'" || put(&final., 8.)  || "'";
+    inicioCtr  = "'" || substr(put(&inicio., 8.), 1, 4) || "-" ||
+                        substr(put(&inicio., 8.), 5, 2) || "-" ||
+                        substr(put(&inicio., 8.), 7, 2) || "'";
+    finalCtr   = "'" || substr(put(&final., 8.), 1, 4)  || "-" ||
+                        substr(put(&final., 8.), 5, 2)  || "-" ||
+                        substr(put(&final., 8.), 7, 2)  || "'";
+
+    safraInicio = input(substr(put(&inicio., 8.), 1, 6), 6.);
+    inicioDate  = input(put(&inicio., 8.), yymmdd8.);
+
+    /* NOVA macro para uso no SPI (SQL pass-through):
+       - Versão com aspas simples e formato AAAA-MM-DD
+       - Versão sem aspas
+    */
+    InicioGCp_q  = quote( put( input("&inicio.", yymmdd8.), yymmdd10.) ); /* -> '2020-01-01' */
+    InicioGCp_nq =       put( input("&inicio.", yymmdd8.), yymmdd10.  );  /* ->  2020-01-01  */
+
+    /* Gravar macros */
+    call symputx('anoAtual',        put(anoAtual, 4.));
+    call symputx('inicioIq',        inicioIq);
+    call symputx('finalIq',         finalIq);
+    call symputx('inicioCtr',       inicioCtr);
+    call symputx('finalCtr',        finalCtr);
+    call symputx('safraInicio',     safraInicio);
+    call symputx('inicioDate',      inicioDate);
+    call symputx('InicioGCp',       InicioGCp_q);   /* principal: com aspas, pronta para SPI */
+    call symputx('InicioGCp_nq',    InicioGCp_nq);  /* opcional: sem aspas */
+run;

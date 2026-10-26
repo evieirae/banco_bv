@@ -1,0 +1,328 @@
+START_METADATA
+PROJECT: SAS_UC4__MOD000559
+FILE_SAS: MOD000559.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:33:52 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 34)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -7
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: FILENAME  (2x | +24), %MACRO (2x | +10)
+----------------------------------------
+LINES_OF_CODE: 223
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: EXPORT, SQL
+HAS_DATA_STEP: Yes (8x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: ATRASO = /riscosbvf/analytics/narciso; SEGMENT = /projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound; _BHV = /projetos/ctrcredito/modelos/historico/bhrodas; _CARTEIR = /projetos/ctrcredito/modelos/historico/carteira
+DETECTED_MACROS_DEFINED: ANOMES, ANOMES_AUX, mon
+DETECTED_MACROS_USED: ANOMES, ANOMES_AUX, REF, first, func, last, mon, sysparm
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: FIRST, FUNC, LAST, REF
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/DATA-COBR/SAS-DATA-COBR-COLLECTION-5-30D-MOD000559/OUTBOUND/BASE_CARTEIRA_5_A_30D_V2_&ANOMES..CSV [SAS/Local], /PROJETOS/DATA-COBR/SAS-DATA-COBR-COLLECTION-5-30D-MOD000559/OUTBOUND/BASE_SQUAD_CRM_CARTEIRA_5_A_30D_V2_&ANOMES..CSV [SAS/Local], _BHV.BHS_CONTRATOS_PDDBEHAVIOR_&REF [SAS/Local], _CARTEIR.CARTEIRA_SD2_&ANOMES_AUX [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): WORK.BASE_ATRASO_12A, WORK.BASE_ATRASO_12B
+IMPORTED_LIBNAMES: _BHV, _CARTEIR
+EXPORTED_LIBNAMES: SEGMENT
+IMPORTED FILES (Requires Ingestion): /projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_CARTEIRA_5_A_30D_v2_&amp;ANOMES..CSV, /projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_SQUAD_CRM_CARTEIRA_5_A_30D_v2_&amp;ANOMES..CSV
+TEMP/DISCARDED_TABLE_INPUT: WORK.BASE_ATRASO_12A, WORK.BASE_ATRASO_12B, WORK.WRK_BASE_CARTEIRA_5_A_30D_&ANOMES
+TABLE_READ_PROVENANCE (Flow): WORK.BASE_ATRASO_12A [PROC SQL - FROM], WORK.BASE_ATRASO_12B [PROC SQL - FROM], WORK.WRK_BASE_CARTEIRA_5_A_30D_&ANOMES [PROC EXPORT - DATA=], _BHV.BHS_CONTRATOS_PDDBEHAVIOR_&REF [DATA Step - SET], _CARTEIR.CARTEIRA_SD2_&ANOMES_AUX [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_CARTEIRA_5_A_30D_v2_&amp;ANOMES..CSV, /projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_SQUAD_CRM_CARTEIRA_5_A_30D_v2_&amp;ANOMES..CSV
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+COMMENT-ONLY QUALIFIED WRITES (DATA in SAS comments only, not executable scan): CRMCOMP.BASE_CARTEIRA_5_A_30D_&ANOMES, DEV.BASE_CARTEIRA_5_A_30D_&ANOMES, DEV.BASE_CARTEIRA_5_A_30D_201812
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): SEGMENT.BASE_CARTEIRA_5_A_30D_V2_&ANOMES
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: BASE_ATRASO, BASE_ATRASO_10, BASE_ATRASO_12A, BASE_ATRASO_12B, BASE_ATRASO_4, BASE_ATRASO_41, BASE_ATRASO_42, BASE_CARTEIRA_5_A_30D_&ANOMES, BHV, BHV_AUX, CLUSTERS, DBMS, DLM, WORK.WRK_BASE_CARTEIRA_5_A_30D_&ANOMES
+DYNAMIC REFS (Ambiguous): _BHV.BHS_CONTRATOS_PDDBEHAVIOR_{REF}, _CARTEIR.CARTEIRA_SD2_{ANOMES_AUX}, {ANOMES}.CSV
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (csv: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_CARTEIRA_5_A_30D_v2_&amp;ANOMES..CSV
+[CODE REF] /projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_SQUAD_CRM_CARTEIRA_5_A_30D_v2_&amp;ANOMES..CSV
+
+END_METADATA
+================================================================================
+/* 1. Base */
+
+libname _CARTEIR '/projetos/ctrcredito/modelos/historico/carteira';
+libname _BHV '/projetos/ctrcredito/modelos/historico/bhrodas';
+
+/* alterar os meses conforme abaixo */
+%LET ANOMES = &sysparm.;
+%LET ANOMES_AUX = %substr(&ANOMES., 1, 4)_%substr(&ANOMES., 5, 2);
+
+%put ####### Parameters Set ######;
+%put #                           #;
+%put # :&ANOMES. #;
+%put # :&ANOMES_AUX. #;
+%put #############################;
+%put .;
+
+libname _CARTEIR '/projetos/ctrcredito/modelos/historico/carteira';
+
+PROC SQL;
+   CREATE TABLE BASE_ATRASO AS
+   SELECT &ANOMES. as DTBASE,
+   		  input(NuCpfCnpj,14.) as NuCpfCnpj,
+		  t1.NuContrato,
+          t1.SqContratoFinanceiroAtivo,
+          t1.Atraso
+      FROM _CARTEIR.CARTEIRA_SD2_&ANOMES_AUX. t1;
+QUIT;
+
+%MACRO APPEND(REF);
+
+	DATA BHV_AUX;
+		SET _BHV.BHS_CONTRATOS_PDDBEHAVIOR_&REF. (KEEP=NuContrato
+														NuCpfCnpj
+														RU
+														Produto);
+		IF Produto IN ('Leves','Motos','Pesados');
+		DTBASE = &REF.;
+	RUN;
+
+	DATA BHV;
+		SET BHV BHV_AUX;
+		IF NOT MISSING(NuContrato);
+	RUN;
+
+	PROC SQL;
+		DROP TABLE BHV_AUX;
+	QUIT;
+
+%MEND;
+
+%macro monthly(func,first,last);
+%do mon=&first %to &last;
+    %if %substr(&mon,5)=13 %then %let mon=%eval(%substr(&mon,1,4)+1)01;
+    %&func(&mon);
+%end;
+%mend monthly;
+
+DATA BHV;
+RUN;
+
+%monthly(APPEND,&ANOMES.,&ANOMES.);
+
+PROC SQL;
+   CREATE TABLE BASE_ATRASO_4 AS
+   SELECT A.*,B.RU AS BEHAVIOR,B.Produto
+
+      FROM BASE_ATRASO A
+      LEFT JOIN BHV B
+	  ON (A.NuContrato = B.NuContrato) AND (A.DTBASE = B.DTBASE)
+;
+QUIT;
+
+/* 2. Score */
+
+/**************************************************************/
+/******** Ajuste devido a mudança do modelo de BS Leves *******/
+/**************************************************************/
+data BASE_ATRASO_41 (drop=BEHAVIOR);
+set BASE_ATRASO_4;
+format RU_ajust $char8.;
+if Produto = 'Leves' then do;
+	IF BEHAVIOR = 'BS5.5' THEN RU_ajust = 'BS5';
+	else IF BEHAVIOR = 'BS6.5' THEN RU_ajust = 'BS6';
+	else IF BEHAVIOR = 'BS7' THEN RU_ajust = 'BS7.5';
+	else IF BEHAVIOR = 'BS8.5' THEN RU_ajust = 'BS8';
+	else IF BEHAVIOR = 'BS10' THEN RU_ajust = 'BS9';
+    else RU_ajust = BEHAVIOR;
+end;
+else do;
+RU_ajust = BEHAVIOR;
+end;
+BS_ant = BEHAVIOR;
+run;
+
+data BASE_ATRASO_42;
+set BASE_ATRASO_41;
+BEHAVIOR = RU_ajust;
+run;
+
+/* DEFINIÇÃO DOS CLUSTERS */
+
+DATA BASE_ATRASO_10;
+
+	SET BASE_ATRASO_42;
+
+	IF Produto = 'Leves' THEN DO;
+
+		IF BEHAVIOR = 'BS1' THEN Cluster = '1';
+		IF BEHAVIOR = 'BS1.5' THEN Cluster = '1';
+		IF BEHAVIOR = 'BS2' THEN Cluster = '2';
+		IF BEHAVIOR = 'BS3' THEN Cluster = '3';
+		IF BEHAVIOR = 'BS3.5' THEN Cluster = '4';
+		IF BEHAVIOR = 'BS4.5' THEN Cluster = '6';
+		IF BEHAVIOR = 'BS5' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS6' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS7.5' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS8' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS9' THEN Cluster = '7';
+		IF BEHAVIOR = 'Def' THEN Cluster = '1';
+		IF BEHAVIOR = 'SemRelac' THEN Cluster = '5';
+
+	END;
+
+	ELSE IF PRODUTO = 'Motos' THEN DO;
+
+		IF BEHAVIOR = 'BS1' THEN Cluster = '1';
+		IF BEHAVIOR = 'BS1.5' THEN Cluster = '1';
+		IF BEHAVIOR = 'BS2' THEN Cluster = '2';
+		IF BEHAVIOR = 'BS3' THEN Cluster = '3';
+		IF BEHAVIOR = 'BS3.5' THEN Cluster = '6';
+		IF BEHAVIOR = 'BS4' THEN Cluster = '6';
+		IF BEHAVIOR = 'BS4.5' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS5' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS6' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS7.5' THEN Cluster = '7';
+		IF BEHAVIOR = 'Def' THEN Cluster = '1';
+		IF BEHAVIOR = 'SemRelac' THEN Cluster = '5';
+
+	END;
+
+	ELSE DO;
+
+		IF BEHAVIOR = 'BS1' THEN Cluster = '1';
+		IF BEHAVIOR = 'BS2' THEN Cluster = '1';
+		IF BEHAVIOR = 'BS3' THEN Cluster = '4';
+		IF BEHAVIOR = 'BS4.5' THEN Cluster = '6';
+		IF BEHAVIOR = 'BS6' THEN Cluster = '6';
+		IF BEHAVIOR = 'BS6.5' THEN Cluster = '5';
+		IF BEHAVIOR = 'BS7' THEN Cluster = '7';
+		IF BEHAVIOR = 'BS8' THEN Cluster = '7';
+		IF BEHAVIOR = 'Def' THEN Cluster = '1';
+		IF BEHAVIOR = 'SemRelac' THEN Cluster = '5';
+
+	END;
+
+	IF MISSING(Cluster) THEN Cluster = '1';
+
+RUN;
+
+DATA BASE_ATRASO_12A;
+
+	SET BASE_ATRASO_10;
+
+	IF CLUSTER IN ('3','4') THEN CLUSTER = '3';
+	IF CLUSTER IN ('5','6') THEN CLUSTER = '6';
+
+RUN;
+
+/* corrige clusters */
+PROC SQL;
+   CREATE TABLE clusters AS
+   SELECT DISTINCT t1.Cluster
+      FROM WORK.BASE_ATRASO_12A t1;
+QUIT;
+
+data clusters;
+	set clusters;
+	Score = _N_;
+run;
+
+PROC SQL;
+	CREATE TABLE BASE_ATRASO_12B AS
+	SELECT A.*,B.Score
+	FROM BASE_ATRASO_12A AS A
+	LEFT JOIN clusters AS B
+	ON A.CLUSTER = B.CLUSTER
+	;
+QUIT;
+
+/* 3. Disponibilizar base */
+
+/* DEV: libname segment '/sustentacaomodelos';*/
+
+libname atraso '/riscosbvf/analytics/narciso';
+libname segment '/projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound';
+
+PROC SQL;
+   CREATE TABLE BASE_CARTEIRA_5_A_30D_&ANOMES. AS
+   SELECT t1.DTBASE,
+          t1.NuCpfCnpj,
+          t1.NuContrato,
+          t1.SqContratoFinanceiroAtivo,
+          t1.Atraso,
+          t1.Produto,
+          t1.Score
+      FROM WORK.BASE_ATRASO_12B t1;
+QUIT;
+
+/*DATA dev.BASE_CARTEIRA_5_A_30D_&ANOMES. (COMPRESS=YES REUSE=YES);*/
+/*	SET BASE_CARTEIRA_5_A_30D_&ANOMES.;*/
+/*RUN;*/
+
+DATA segment.BASE_CARTEIRA_5_A_30D_v2_&ANOMES. (COMPRESS=YES REUSE=YES);
+	SET BASE_CARTEIRA_5_A_30D_&ANOMES.;
+RUN;
+
+/*Extração de arquivo final para PDEC e Squad de CRM*/
+DATA WORK.WRK_BASE_CARTEIRA_5_A_30D_&ANOMES.;
+  SET  BASE_CARTEIRA_5_A_30D_&ANOMES.;
+FORMAT NuCpfCnpj 14.;
+       NuCpfCnpj = put(NuCpfCnpj, 14.);
+
+RUN;
+
+FILENAME ARQCOL "/projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_CARTEIRA_5_A_30D_v2_&ANOMES..CSV" ENCODING='UTF-8';
+PROC EXPORT DATA = WORK.WRK_BASE_CARTEIRA_5_A_30D_&ANOMES. (keep= NuContrato  Score ENCODING=UTF8)
+    OUTFILE=ARQCOL
+    DBMS = dlm REPLACE;
+    DELIMITER = ";";
+RUN;
+
+FILENAME ARQCOL "/projetos/DATA-COBR/sas-data-cobr-collection-5-30d-mod000559/outbound/BASE_SQUAD_CRM_CARTEIRA_5_A_30D_v2_&ANOMES..CSV" ENCODING='UTF-8';
+PROC EXPORT DATA = WORK.WRK_BASE_CARTEIRA_5_A_30D_&ANOMES. (ENCODING=UTF8)
+    OUTFILE=ARQCOL
+    DBMS = dlm REPLACE;
+    DELIMITER = ";";
+RUN;
+
+/*Disponibilizar para CRM*/
+/*Libname CrmComp '/riscosbvf/CRM/comp_total'; */
+/*DATA CrmComp.BASE_CARTEIRA_5_A_30D_&ANOMES. (COMPRESS=YES REUSE=YES);*/
+/*	SET BASE_CARTEIRA_5_A_30D_&ANOMES.;*/
+/*RUN;*/
+
+/* HOMOLOGAÇÕES */
+/**/
+/*PROC COMPARE BASE=dev.BASE_CARTEIRA_5_A_30D_201812 COMPARE=comp_tot.BASE_CARTEIRA_5_A_30D_201901;*/
+/*RUN;*/
+/**/
+/**/
+/*%macro freq(data);*/
+/**/
+/*	PROC SORT*/
+/*		DATA=dev.BASE_CARTEIRA_5_A_30D_&data.(KEEP=Score Produto)*/
+/*		OUT=WORK.SORT*/
+/*		;*/
+/*		BY Produto;*/
+/*	RUN;*/
+/**/
+/*	title "Frequencia para a data &data.";*/
+/**/
+/*	PROC FREQ DATA=WORK.SORT*/
+/*		ORDER=INTERNAL*/
+/*	;*/
+/*		TABLES Score / MISSPRINT MISSING  SCORES=TABLE;*/
+/*/*		BY Produto;*/*/
+/*	RUN;*/
+/**/
+/*	title;*/
+/**/
+/*%mend;*/
+/**/
+/*%freq(201901);*/
+/*%freq(201812);*/

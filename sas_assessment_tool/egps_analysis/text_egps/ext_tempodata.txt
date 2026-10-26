@@ -1,0 +1,253 @@
+START_METADATA
+PROJECT: SAS_UC4__ext_tempodata
+FILE_SAS: ext_tempodata.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:34:05 UTC
+BUSINESS_AREA: SAS_UC4
+TARGET_ARCH: DBT_BQ (Score: 40)
+PURPOSE_CLASSIFICATION: DATA_TRANSFORMATION
+CONSULTIVE_SCORE: -10
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: %INCLUDE (2x | +40)
+----------------------------------------
+LINES_OF_CODE: 170
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: No (0x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_ini
+DETECTED_MACROS_USED: W_ini
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/CONECTADB.SAS [SAS/Local], /PROJETOS/MISV/SAS-MISV-BASE-LIB/SCRIPTS/LIBNAME.SAS [SAS/Local], TBCORRIDOSDIAUTILDIA [DBCON], TBDIAUTEISMATURACAO [DBCON], TBDIMTEMPODATA [DBCON], TBNUANOMES [DBCON], TBSTDATA [DBCON], TBSTMES [DBCON], TBTOTALDUMESSAB [DBCON]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: BASES
+IMPORTED FILES (Requires Ingestion): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+TABLE_READ_PROVENANCE (Flow): TBCORRIDOSDIAUTILDIA [Pass-Through Native (DBCON) - JOIN], TBDIAUTEISMATURACAO [Pass-Through Native (DBCON) - JOIN], TBDIMTEMPODATA [Pass-Through Native (DBCON) - FROM], TBNUANOMES [Pass-Through Native (DBCON) - JOIN], TBSTDATA [Pass-Through Native (DBCON) - JOIN], TBSTMES [Pass-Through Native (DBCON) - JOIN], TBTOTALDUMESSAB [Pass-Through Native (DBCON) - JOIN]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas, /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): BASES.TBTEMPODATA
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: 
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 2 paths (sas: 2)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas
+[CODE REF] /projetos/MISV/sas-misv-base-lib/scripts/libname.sas
+
+END_METADATA
+================================================================================
+%PUT #!# INICIO ext_tempodata.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%LET W_ini = %SYSFUNC(datetime());
+
+/* ====================================================================================== */
+/* |	Programa: 	ext_tempodata.sas													| */
+/* |	Descricao: 	Programa para extrair informacoes Datas.							| */
+/* |	Objetivo: 	Input de informacoes para os relatorios Tableua utilizados pela		| */
+/* |				area comercial.														| */
+/* ====================================================================================== */
+/* |	Criacao:	Programa desenvolvido pela area de BA								| */
+/* |	Criador: 	Carlos Makoto - BA													| */
+/* |	Data:		01/04/2020															| */
+/* ====================================================================================== */
+/* |	Atualizacao:	08/04/2020														| */
+/* |	Responsavel: 	Paulo Oliveira - Squad MIS Comercial							| */
+/* |	Alt. Realizada:	- Inclusao de cabecalho											| */
+/* |					- Testes iniciais												| */
+/* ====================================================================================== */
+/* |	Atualizacao:	24/04/2020														| */
+/* |	Responsavel: 	Nome - Squad MIS Comercial										| */
+/* |	Alt. Realizada:	- Utilizacao do usuario sistemico								| */
+/* |					- 																| */
+/* ====================================================================================== */
+
+/* ======================================================== */
+/* ================ Libname e Parametros ================== */
+/* ======================================================== */
+
+option compress = binary;
+%include '/projetos/MISV/sas-misv-base-lib/scripts/ConectaDB.sas';
+%include '/projetos/MISV/sas-misv-base-lib/scripts/libname.sas';
+
+/* ======================================================== */
+/* ================= Extracao IQPRDBI  ==================== */
+/* ======================================================== */
+
+%CRIAVARDB;
+proc sql;
+%CONECTADB(server=BI);
+create table bases.TbTempoData as
+select * from connection to dbcon
+(
+
+WITH
+
+	 TbDimTempoData AS
+	(
+		SELECT
+			 DtTempo
+			,NuAnoMes
+			,NuAnoMesDia
+			,CASE WHEN TempoData.DtTempo = '20201231' THEN 'N'
+			      WHEN TempoData.DtTempo IN ('20211224','20211231','20241231') THEN 'N'
+				  WHEN TempoData.DtTempo IN ('20251120') THEN 'N' /*FERIADO NACIONAL - CONSCIENCIA NEGRA - GFM - 05/11/2025*/
+			      ELSE TempoData.FlDiaUtil END AS FlDiaUtil
+			,CASE
+				  WHEN TempoData.NuAnoMes IN (202012,202112) THEN 21
+				  WHEN TempoData.NuAnoMes IN (202412) THEN 20
+				  WHEN TempoData.NuAnoMes IN (202511) THEN 19 /*FERIADO NACIONAL - CONSCIENCIA NEGRA - GFM - 05/11/2025*/
+				  ELSE TempoData.QtTotalDiaUtilMes END AS QtTotalDiaUtilMes
+			,NmDiaSemana
+			,SgDiaSemana
+			,CASE WHEN FlDiaUtil = 'S' THEN 1
+                  WHEN NuDiaSemana = 7 AND FlFeriadoNacional = 'N' THEN 0.4
+                  ELSE 0 END AS FlDiaUtilSab
+		FROM DWBI_DIME.TbDimTempoData TempoData
+
+	)
+
+	,TbTotalDUMesSab AS
+    (
+        SELECT
+             NuAnoMes,
+             SUM(FlDiaUtilSab) AS QtTotalDiaUtilMes
+        FROM TbDimTempoData
+        GROUP BY NuAnoMes
+    )
+
+	,TbStData AS
+	(
+		SELECT
+			 1 StData
+			,max(CASE WHEN TempoData.FlDiaUtil = 'S' THEN TempoData.DtTempo END) AS DtTempo
+
+		FROM TbDimTempoData TempoData
+		WHERE 1 = 1
+		  AND TempoData.DtTempo >= '20150101'
+		  AND TempoData.DtTempo < today()
+		GROUP BY
+			1
+	)
+	,TbStMes AS
+	(
+		SELECT
+			 NuAnoMes
+			,1 StMes
+			,max(CASE WHEN TempoData.FlDiaUtil = 'S' THEN TempoData.DtTempo END) AS DtTempo
+
+		FROM TbDimTempoData TempoData
+		WHERE 1 = 1
+		  AND TempoData.DtTempo >= '20150101'
+		  AND TempoData.DtTempo < today()
+		GROUP BY
+			1,
+			NuAnoMes
+	)
+	,TbDiaUteisMaturacao AS
+	(
+		SELECT
+			 DtTempo
+			,sum(CASE WHEN TempoData.FlDiaUtil = 'S' THEN 1 END) over (ORDER BY CAST(DtTempo AS  INTEGER) desc) AS QtDiasUteisMaturacao
+
+		FROM TbDimTempoData TempoData
+		WHERE 1 = 1
+		  AND TempoData.DtTempo >= '20150101'
+		  AND TempoData.DtTempo < today()
+	)
+
+	,TbNuAnoMes AS
+
+	(
+
+		SELECT
+
+			 TempoData.NuAnoMes
+			,max(TempoData.QtTotalDiaUtilMes) AS QtTotalDiaUtilMes
+			,sum(CASE WHEN TempoData.FlDiaUtil = 'S' THEN 1 ELSE 0 END) AS QtCorridosDiaUtilMes
+		    ,sum(FlDiaUtilSab) AS QtCorridosDiaUtilMesSab
+		FROM TbDimTempoData TempoData
+		WHERE 1 = 1
+		  AND TempoData.DtTempo >= '20150101'
+		  AND TempoData.DtTempo < today()
+		GROUP BY
+			 TempoData.NuAnoMes
+
+	),TbCorridosDiaUtilDia AS
+	(
+		SELECT
+			 DtTempo
+			,sum(CASE WHEN FlDiaUtil = 'S' THEN 1 ELSE 0 END) over (partition BY NuAnoMes ORDER BY cast(DtTempo as integer)) AS QtCorridosDiaUtilDia
+		FROM TbDimTempoData
+		WHERE 1 = 1
+		AND DtTempo >= '20150101'
+		AND DtTempo < today()
+	)
+
+		SELECT
+
+			 TempoData.NuAnoMes
+			,TempoData.NuAnoMesDia
+			,TempoData.DtTempo
+			,TempoData.FlDiaUtil
+			,TempoData.NmDiaSemana
+			,TempoData.SgDiaSemana
+			,coalesce(StData.StData,0) AS StData
+			,coalesce(StMes.StMes,0) AS StMes
+
+			,CASE WHEN coalesce(DiaUteisMaturacao.QtDiasUteisMaturacao,0) >= 8 THEN 1 ELSE 0 END AS FlDiasUteisMaturacao
+			,DiaUteisMaturacao.QtDiasUteisMaturacao
+			,NuANoMes.QtTotalDiaUtilMes
+			,NuAnoMesSab.QtTotalDiaUtilMes AS QtTotalDiaUtilMesSab
+			,DAY(TempoData.DtTempo) AS QtCorridosDiaMes
+			,NuAnoMes.QtCorridosDiaUtilMes
+			,NuAnoMes.QtCorridosDiaUtilMesSab
+			,CorridosDiaUtilDia.QtCorridosDiaUtilDia
+			,NuANoMes.QtTotalDiaUtilMes-CorridosDiaUtilDia.QtCorridosDiaUtilDia QtDiasUtilFinalMes
+			,NuAnoMesSab.QtTotalDiaUtilMes - NuAnoMes.QtCorridosDiaUtilMesSab as QtDiasUtilFinalMesSab
+		FROM TbDimTempoData TempoData
+
+			LEFT JOIN TbStData StData
+				ON  TempoData.DtTempo = StData.DtTempo
+
+			LEFT JOIN TbStMes StMes
+				ON  TempoData.DtTempo = StMes.DtTempo
+
+			LEFT JOIN TbNuAnoMes NuAnoMes
+				ON  TempoData.NuAnoMes = NuANoMes.NuAnoMes
+
+			LEFT JOIN TbDiaUteisMaturacao DiaUteisMaturacao
+				ON  TempoData.DtTempo = DiaUteisMaturacao.DtTempo
+
+			LEFT JOIN TbCorridosDiaUtilDia CorridosDiaUtilDia
+				ON  TempoData.DtTempo = CorridosDiaUtilDia.DtTempo
+
+			LEFT JOIN TbTotalDUMesSab NuAnoMesSab
+			    ON  TempoData.NuAnoMes = NuAnoMesSab.NuAnoMes
+
+		WHERE 1 = 1
+		  AND TempoData.DtTempo >= '20150101'
+		  AND TempoData.DtTempo < today()
+
+)
+;run;
+
+proc sql;create index DtTempo on bases.TbTempoData;run;
+
+/* ====================================================================================== */
+/* ====================================================================================== */
+/* ====================================================================================== */
+%PUT #!# FIM ext_tempodata.sas: %SYSFUNC(date(),ddmmyy10.) - %SYSFUNC(time(),tod8.);
+%PUT #!# TEMPO PROCESSAMENTO:   %SYSFUNC(intck(SECOND, &W_ini, %SYSFUNC(datetime())), tod8.);

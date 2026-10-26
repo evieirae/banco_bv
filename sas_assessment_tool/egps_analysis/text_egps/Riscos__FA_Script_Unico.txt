@@ -1,0 +1,383 @@
+START_METADATA
+EXTRACTOR: egps_extractor_v1 (tasks por fluxo project.xml + comentários de início/fim; interior sem comentários)
+PROJECT: Riscos__FA_Script_Unico
+PROJECT_EXTENSION: .egp
+CREATED_AT: 2026-08-21 17:40:04 UTC
+BUSINESS_AREA: Riscos
+TARGET_ARCH: DBT_BQ (Score: 0)
+PURPOSE_CLASSIFICATION: CONSULTIVE
+CONSULTIVE_SCORE: 15
+ODS_OUTPUTS_DETECTED: (none)
+TRIGGERS: Standard Logic (SQL Compatible)
+----------------------------------------
+LINES_OF_CODE: 290
+CODE_TASKS_COUNT: 4
+DETECTED_PROCS: SQL
+HAS_DATA_STEP: Yes (1x)
+HAS_PASSTHROUGH: Yes
+----------------------------------------
+DETECTED_LIBNAMES: CARTOES = /digital/cartoes; EMER = /riscosbvf/fraude/PESSOAL/EMERSON
+DETECTED_MACROS_DEFINED: ano, ano_mes, mes
+DETECTED_MACROS_USED: ano, ano_mes, base_work, mes, prop
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: DBCON
+INCLUDED SCRIPTS (Dependencies): (none)
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): CARTOES.TBPROPOSTASCONTA [SAS/Local], DBCARTAOCREDITOCONTA.TBMEIOVENDA [SYBASEIQ], DBCARTAOCREDITOCONTA.TBTIPOCARTAO [SYBASEIQ], DBCARTAOCREDITOPROPOSTA.TBPESSOAPROPOSTACARTAO [SYBASEIQ], DBCARTAOCREDITOPROPOSTA.TBPROPOSTACARTAO [SYBASEIQ], DBCARTAOCREDITOPROPOSTA.TBPROPOSTATIPOCARTAO [SYBASEIQ], DICTIONARY.TABLES [SAS/Local], DWBI_DIME.TBDIMCONTACARTAO [SYBASEIQ], DWBI_DIME.TBDIMPESSOA [SYBASEIQ], DWBI_DIME.TBDIMPLASTICO [SYBASEIQ], DWBI_DIME.TBDIMPROPOSTACARTAOCREDITO [SYBASEIQ], DWBI_DMOC.TBFATOCONTACARTAO [SYBASEIQ], DWBI_DTWH.TBPLASTICO [SYBASEIQ], EMER.CT_PROP_ANALITICO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: CARTOES, EMER
+EXPORTED_LIBNAMES: (none)
+IMPORTED FILES (Requires Ingestion): N:\DTEC\Desenvolvimento\Tableau\PrevencaoFraudes\Cartoes\TRANSACIONAL\AUTORIZACOES\tbl_analiticoperdas.csv
+TEMP/DISCARDED_FILE_INPUT: WORK.fa_tbl_analiticoperdas <- N:\DTEC\Desenvolvimento\Tableau\PrevencaoFraudes\Cartoes\TRANSACIONAL\AUTORIZACOES\tbl_analiticoperdas.csv
+TEMP/DISCARDED_TABLE_INPUT: WORK.&BASE_WORK, WORK.MISSING_CONTACARTAO, WORK.MISSING_PROPOSTA
+TABLE_READ_PROVENANCE (Flow): CARTOES.TBPROPOSTASCONTA [PROC SQL - FROM], DBCARTAOCREDITOCONTA.TBMEIOVENDA [Pass-Through Native (SYBASEIQ) - JOIN], DBCARTAOCREDITOCONTA.TBTIPOCARTAO [Pass-Through Native (SYBASEIQ) - JOIN], DBCARTAOCREDITOPROPOSTA.TBPESSOAPROPOSTACARTAO [Pass-Through Native (SYBASEIQ) - JOIN], DBCARTAOCREDITOPROPOSTA.TBPROPOSTACARTAO [Pass-Through Native (SYBASEIQ) - FROM], DBCARTAOCREDITOPROPOSTA.TBPROPOSTATIPOCARTAO [Pass-Through Native (SYBASEIQ) - JOIN], DICTIONARY.TABLES [PROC SQL - FROM], DWBI_DIME.TBDIMCONTACARTAO [Pass-Through Native (SYBASEIQ) - JOIN], DWBI_DIME.TBDIMPESSOA [Pass-Through Native (SYBASEIQ) - JOIN], DWBI_DIME.TBDIMPLASTICO [Pass-Through Native (SYBASEIQ) - JOIN], DWBI_DIME.TBDIMPROPOSTACARTAOCREDITO [Pass-Through Native (SYBASEIQ) - JOIN], DWBI_DMOC.TBFATOCONTACARTAO [Pass-Through Native (SYBASEIQ) - FROM], DWBI_DTWH.TBPLASTICO [Pass-Through Native (SYBASEIQ) - JOIN], EMER.CT_PROP_ANALITICO [PROC SQL - FROM], WORK.&BASE_WORK [PROC SQL - FROM], WORK.MISSING_CONTACARTAO [PROC SQL - FROM; PROC SQL - JOIN], WORK.MISSING_PROPOSTA [PROC SQL - FROM]
+EXTERNAL FILE PATHS (fluxo EG): (none)
+INTERNAL READS (Temp/Local): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): (none)
+APPEND_ONLY_OUTPUTS: (none)
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): (none)
+EXPORTED FILES (Artifacts): (none)
+EXPORT TASKS (EG metadata, nao contam como output): (none)
+TEMP/DISCARDED OUTPUTS: BASE_PERDAS_&ANO_MES, MISSING_FULL, TESTE, VERIF_BASEWORK, WORK.MISSING_CONTACARTAO, WORK.MISSING_PROPOSTA
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+[[ FILE_REFS_MACRO ]]
+IN|N:\DTEC\Desenvolvimento\Tableau\PrevencaoFraudes\Cartoes\TRANSACIONAL\AUTORIZACOES\tbl_analiticoperdas.csv|N:/DTEC/DESENVOLVIMENTO/TABLEAU/PREVENCAOFRAUDES/CARTOES/TRANSACIONAL/AUTORIZACOES|TBL_ANALITICOPERDAS.CSV||ok
+
+END_METADATA
+================================================================================
+/* =========================INÍCIO TASK========================= */
+/* TASK: Gera Base Perdas Novo */
+/* ORDEM EXECUÇÃO: 001 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Gera Base Perdas Novo */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-A5GXd1xpomP1Sf3c/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname emer '/riscosbvf/fraude/PESSOAL/EMERSON';
+
+%let ano_mes = %sysfunc(putn(%sysfunc(intnx(month, %sysfunc(today()), -1, s)),yymmn6.));
+%put >>>>>>>> &ano_mes;
+
+
+%let mes = ('FEVEREIRO','MARÇO','JUNHO');
+%put >>>>>> &mes.;
+
+%let ano = %sysfunc(substr(&ano_mes., 1, 4));
+%put >>>>>> &ano.;
+
+
+proc sql noprint;
+  select max(strip(memname))
+  into :base_work
+  from dictionary.tables
+  where libname = 'WORK' and upcase(memname) like '%FA%'
+  ;
+quit;
+%put >>>>>>>> &base_work.;
+
+proc sql;
+	create table verif_basework as
+	select * from work.&base_work.
+	where upcase(MesBaixa) in &mes. and AnoBaixa = &ano.
+	and upcase(Reclassificacao) in ('FRAUD APPLICATION','FRAUD APLICATION', 'FRAUD APLICATION (BASE REPESCAGEM)', 'FRAUDE APLICATION')
+	;
+quit;
+
+
+proc sql;
+	create table base_perdas_&ano_mes. as
+	select
+		'01jan1900'd format date9. as DtContabil
+		,case
+			when upcase(a.mesBaixa) = 'FEVEREIRO' then 202502
+			when upcase(a.mesBaixa) = 'MARÇO' then 202503
+			when upcase(a.mesBaixa) = 'JUNHO' then 202506
+		end as safra_contabil
+
+		,a.conta as conta
+		,a.cartao
+		,a.ValorFinal as valor_final
+		,b.DT_ENTRADA_PROPOSTA
+		,b.mes_ano as Safra_Proposta
+		,b.PROPOSTA
+		,b.CPF_CNPJ
+		,b.NOME
+		,b.MEIO_VENDA
+		,b.CANAL_VENDA
+		,b.PUBLICO
+		,b.PERFIL
+		,b.TIPO_CARTAO
+		,b.STS_RETORNO_CLEARSALE
+		,b.score_clear as score_fraude
+		,c.cddimcontacartao as cdcontacartao
+		,c.nu_conta_cartao as nucontacartao
+		,c.Dt_Abertura_Conta
+		,c.Dt_Primeira_Compra
+		,c.Desc_Portador
+		,c.DtEmissaoPlastico as data_emissao_cartao
+		,year(c.DtEmissaoPlastico)*100+month(c.DtEmissaoPlastico) as safra_emis_cartao
+		,c.Status_ContaCartao_Atual
+		,c.Status_PlastCartao
+		,year(c.dt_abertura_conta)*100 + month(c.dt_abertura_conta) as safra_abert_cta
+	from (
+		select * from work.&base_work.
+		where upcase(MesBaixa) in &mes. and AnoBaixa = &ano.
+		and upcase(Reclassificacao) in ('FRAUD APPLICATION','FRAUD APLICATION', 'FRAUD APLICATION (BASE REPESCAGEM)', 'FRAUDE APLICATION')
+		) as a 
+	left join emer.conta_cartao as c 
+		on trim(a.Cartao) = trim(c.nu_plast_cartao)
+		and a.Conta = c.nu_conta_cartao
+	left join (
+		select
+			DT_ENTRADA_PROPOSTA
+			,mes_ano
+			,PROPOSTA
+			,CPF_CNPJ
+			,NOME
+			,MEIO_VENDA
+			,CANAL_VENDA
+			,PUBLICO
+			,PERFIL
+			,TIPO_CARTAO
+			,STS_RETORNO_CLEARSALE
+			,score_clear
+		from emer.ct_prop_analitico 
+		where status_proposta in ('A','AE')
+		) as b
+		on strip(put(b.proposta, 15.)) = c.Num_Proposta
+
+
+
+
+
+
+
+
+		
+
+
+	;
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Gera Base Perdas Novo */
+/* ORDEM EXECUÇÃO: 001 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Pegando casos missing */
+/* ORDEM EXECUÇÃO: 002 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Pegando casos missing */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-ozjmmMNyhmQfINj3/code.sas */
+/* =========================INÍCIO TASK========================= */
+libname cartoes '/digital/cartoes';
+
+
+
+PROC SQL;
+
+	CONNECT TO sasiosiq AS dbcon
+	(HOST="iqprdbi"
+	SERVER=iqprdbi
+	USER='lgettRiscoPrevencaoFraude'
+	PASSWORD='1o4ANrTKKe4isVam');
+
+	CREATE TABLE work.missing_contacartao AS
+	SELECT *
+	FROM CONNECTION TO DBCON (
+		SELECT
+			A.*
+			,mod(F.CdContaCartao, 1000000000) AS Nu_Conta_Cartao
+			,C.DtAberturaContaCartao AS Dt_Abertura_Conta
+			,C.DtPrimeiroDesbloqueio AS Dt_Desbloqueio
+			,C.NmEstadoContaCartao as Status_ContaCartao_Atual
+			,C.NmEstadoContaCartaoAnterior as Status_ContaCartao_Anter
+			,C.DtAlteracaoEstadoContaCartao as Dt_Alter_Estado_ContaCartao
+			,C.DtPrimeiraCompra as Dt_Primeira_Compra
+			,E.CdPropostaCartaoCrdtoStmaOrgm AS Num_Proposta
+			,D.NuCPFCNPJ
+			,convert(CHAR(6),F.NuBINPlastico)+ '******' + RIGHT(trim(convert(CHAR(17),F.CdPlastico)),4) AS nu_plast_cartao
+			,G.NuPlastico
+  		    ,G.NuBINPlastico
+		    ,F.NuOrdemTitularidadePlastico as Ordem_Titular
+			,CASE WHEN F.NuOrdemTitularidadePlastico = 0 THEN 'TITULAR'
+       		ELSE F.NuOrdemTitularidadePlastico || ' ADICIONAL' end as Desc_Portador
+			,G.NmTipoCartao
+		    ,G.DtEmissaoPlastico
+			,G.DtDesbloqueioPlastico
+			,G.NmEstadoPlastico as Status_PlastCartao
+			,G.DtAlteracaoEstadoPlastico as Dt_Alter_Status_PlastCartao
+			,G.FlVersaoVigente
+			,G.DtValidadePlastico
+		FROM (
+			SELECT *
+			FROM (
+				SELECT
+					RANK() OVER(partition BY AAA.CdDimContaCartao ORDER BY AAA.CdDimContaCartao, AAA.DtReferencia desc) AS RANK
+					,AAA.CdDimContaCartao
+					,AAA.CdDimContaCartaoVersao
+					,AAA.cdpropostacartaocredito
+					,AAA.DtReferencia
+					,AAA.VrLimiteContaCartaoGeral
+					,AAA.VrSaldoAtual
+					,AAA.CdPessoaTitularConta
+          		FROM DWBI_DMOC.TbFatoContaCartao AS AAA
+				 WHERE AAA.CdDimContaCartao = 2000801360) AS AA 
+          	WHERE AA.rank = 1) AS A
+			LEFT JOIN DWBI_DIME.TbDimContaCartao AS C
+				ON A.CdDimContaCartaoVersao = C.CdDimContaCartaoVersao
+			LEFT JOIN DWBI_DIME.TbDimPropostaCartaoCredito AS E
+				ON A.cdpropostacartaocredito = E.cdpropostacartaocredito
+			LEFT JOIN DWBI_DIME.TbDimPessoa AS D
+				ON A.CdPessoaTitularConta = D.CdPessoa
+			LEFT JOIN DWBI_DTWH.TbPlastico AS F
+				on A.CdDimContaCartao = F.CdContaCartao
+			LEFT JOIN DWBI_DIME.TbDimPlastico AS G
+				ON F.cdplastico = G.cddimplastico
+			WHERE G.FlVersaoVigente = 'S' AND nu_plast_cartao = '518471******3051' 
+	);
+disconnect from DBCON;
+QUIT;
+
+proc sql;
+	select distinct
+		Num_Proposta
+	into: prop separated ","
+	from work.missing_contacartao
+	;
+quit;
+%put >>>>>>>> &prop.;
+
+PROC SQL;
+    CONNECT TO SYBASEIQ AS DBCON
+    (HOST='PTA-IQPRD01'
+	 SERVER=PTAIQPRD
+	 DB=PTAIQCONT
+	 USER='lgettRiscoPrevencaoFraude'
+	 PASSWORD='1o4ANrTKKe4isVam');
+
+    CREATE TABLE WORK.missing_proposta AS
+        SELECT * FROM CONNECTION TO DBCON
+        (
+        
+        SELECT
+            YEAR (T1.DtEntradaProposta) || RIGHT ('0'|| MONTH (T1.DtEntradaProposta), 2) AS MES_ANO
+            , CAST (T1.DtEntradaProposta AS DATE) AS DT_ENTRADA_PROPOSTA
+            , T1.nuproposta AS PROPOSTA
+            , TRIM(T5.dsmeiovenda) AS MEIO_VENDA
+            , T2.NuCpfCnpj AS CPF_CNPJ
+            , UPPER(T2.NmPessoa) AS NOME
+            , T6.DsTipoCartao AS TIPO_CARTAO
+			,T4.VrLimite AS LIMITE_CONCEDIDO
+        FROM DBCARTAOCREDITOPROPOSTA.TbPropostaCartao AS T1
+        INNER JOIN DBCARTAOCREDITOPROPOSTA.TbPessoaPropostaCartao AS T2 ON T1.NuProposta = T2.NuProposta
+		LEFT JOIN DBCARTAOCREDITOCONTA.TBMEIOVENDA AS T5 ON T1.cdmeiovenda = T5.cdmeiovenda
+		LEFT JOIN DBCARTAOCREDITOPROPOSTA.TbPropostaTipoCartao AS T4 ON T1.NuProposta = T4.NuProposta
+		LEFT JOIN DBCARTAOCREDITOCONTA.TbTipoCartao AS T6 ON T4.CdTipoCartao = T6.CdTipoCartao
+		WHERE T1.nuproposta IN (&prop.) );
+	disconnect from DBCON;
+quit;
+
+
+proc sql;
+create table missing_full as
+	select
+		b.DT_ENTRADA_PROPOSTA
+		,b.mes_ano as Safra_Proposta
+		,b.PROPOSTA
+		,b.CPF_CNPJ
+		,b.NOME
+		,b.MEIO_VENDA
+		,upcase(d.Canal_Venda) as CANAL_VENDA
+		,upcase(d.Publico) as PUBLICO
+		,upcase(d.Perfil) as PERFIL
+		,b.TIPO_CARTAO
+		,'' as STS_RETORNO_CLEARSALE
+		,'' as score_fraude
+		,c.cddimcontacartao as cdcontacartao
+		,c.nu_conta_cartao as nucontacartao
+		,c.Dt_Abertura_Conta
+		,c.Dt_Primeira_Compra
+		,c.Desc_Portador
+		,c.DtEmissaoPlastico as data_emissao_cartao
+		,year(c.DtEmissaoPlastico)*100+month(c.DtEmissaoPlastico) as safra_emis_cartao
+		,c.Status_ContaCartao_Atual
+		,c.Status_PlastCartao
+		,year(c.dt_abertura_conta)*100 + month(c.dt_abertura_conta) as safra_abert_cta
+	from work.missing_proposta as b
+	LEFT JOIN (
+		SELECT DISTINCT
+			NUM_PROPOSTA
+			,CANAL_VENDA
+			,PUBLICO
+			,EPS
+			,PERFIL
+			,PRODUTO
+		FROM CARTOES.TBPROPOSTASCONTA) AS d
+		ON b.PROPOSTA = d.NUM_PROPOSTA
+	LEFT JOIN WORK.MISSING_CONTACARTAO AS c ON b.PROPOSTA = INPUT(c.Num_Proposta, 9.);
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Pegando casos missing */
+/* ORDEM EXECUÇÃO: 002 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Validacao Qde e Vlr */
+/* ORDEM EXECUÇÃO: 003 */
+/* FLUXO: PFD Flow 8 */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Validacao Qde e Vlr */
+/* TIPO: SAS Program */
+/* ARQUIVO FONTE: CodeTask-k7gXkLyubeoFrsvi/code.sas */
+/* =========================INÍCIO TASK========================= */
+proc sql;
+
+	create table teste as
+	select *
+	from work.&base_work.
+	where upcase(MesBaixa) = 'JUNHO' and AnoBaixa = 2024
+	and upcase(Reclassificacao) in ('FRAUD APLICATION', 'FRAUD APLICATION (BASE REPESCAGEM)');
+
+	select
+	count(CartaoConta) format commax10. as Qtde
+	,sum(ValorFinal) format commax20.2 as Valor
+	from work.&base_work.
+	where upcase(MesBaixa) = 'JUNHO' and AnoBaixa = 2024
+	and upcase(Reclassificacao) in ('FRAUD APLICATION', 'FRAUD APLICATION (BASE REPESCAGEM)');
+
+quit;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Validacao Qde e Vlr */
+/* ORDEM EXECUÇÃO: 003 */
+/* =========================FIM TASK=========================== */
+
+/* =========================INÍCIO TASK========================= */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* FLUXO: (embedded — project.xml) */
+/* ORDEM: Sequencial (Topological Sort) */
+/* NOME DO NÓ: Embedded Task (XML) */
+/* TIPO: Embedded Code (Wizard/Task/Program) */
+/* ARQUIVO FONTE: project.xml */
+/* ORIGEM: Código persistido em project.xml (embedded / wizard / task) */
+/* =========================INÍCIO TASK========================= */
+data emer.base_perdas;
+set emer.base_perdas
+	work.base_perdas_&ano_mes.;
+run;
+
+/* =========================FIM TASK=========================== */
+/* TASK: Embedded Task (XML) */
+/* ORDEM EXECUÇÃO: 004 */
+/* =========================FIM TASK=========================== */

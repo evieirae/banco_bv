@@ -1,0 +1,141 @@
+START_METADATA
+PROJECT: Rodas__precoxrisco
+FILE_SAS: run-ppr.sas
+PROJECT_EXTENSION: .sas
+CREATED_AT: 2026-08-21 17:40:23 UTC
+BUSINESS_AREA: Rodas
+TARGET_ARCH: DATABRICKS (Score: 100)
+PURPOSE_CLASSIFICATION: HYBRID
+CONSULTIVE_SCORE: 1
+ODS_OUTPUTS_DETECTED: html
+TRIGGERS: DATA _NULL_ (1x | +80), %INCLUDE (7x | +140), FILENAME  (2x | +24), PROC APPEND (1x | +15)
+----------------------------------------
+LINES_OF_CODE: 68
+CODE_TASKS_COUNT: 1 (Single Script)
+DETECTED_PROCS: APPEND, ODSTEXT, REPORT, SQL
+HAS_DATA_STEP: Yes (2x)
+HAS_PASSTHROUGH: No
+----------------------------------------
+DETECTED_LIBNAMES: 
+DETECTED_MACROS_DEFINED: W_durp, W_fimp, W_inip
+DETECTED_MACROS_USED: W_durp, W_fimp, W_inip
+MACRO_SCOPE_GLOBALS: (none)
+MACRO_SCOPE_PARAMS: (none)
+CONNECTION_LIBS: (none)
+INCLUDED SCRIPTS (Dependencies): /infogrc/precoxrisco/codigos/00.parametros-e-variaveis.sas, /infogrc/precoxrisco/codigos/01.input-bases-iqprdbi.sas, /infogrc/precoxrisco/codigos/02.input-bases-ptasybctr.sas, /infogrc/precoxrisco/codigos/03.input-bases-ptaiqcont.sas, /infogrc/precoxrisco/codigos/04.input-bases-sas.sas, /infogrc/precoxrisco/codigos/05.etl-base-preco-por-risco.sas, /infogrc/precoxrisco/codigos/06.tabela-taxas-propostas.sas
+----------------------------------------
+[[ I/O INVENTORY ]]
+EXTERNAL INPUTS (Requires Ingestion): /INFOGRC/PRECOXRISCO/CODIGOS/00.PARAMETROS-E-VARIAVEIS.SAS [BIGQUERY/GCP], /INFOGRC/PRECOXRISCO/CODIGOS/01.INPUT-BASES-IQPRDBI.SAS [BIGQUERY/GCP], /INFOGRC/PRECOXRISCO/CODIGOS/02.INPUT-BASES-PTASYBCTR.SAS [BIGQUERY/GCP], /INFOGRC/PRECOXRISCO/CODIGOS/03.INPUT-BASES-PTAIQCONT.SAS [BIGQUERY/GCP], /INFOGRC/PRECOXRISCO/CODIGOS/04.INPUT-BASES-SAS.SAS [BIGQUERY/GCP], /INFOGRC/PRECOXRISCO/CODIGOS/05.ETL-BASE-PRECO-POR-RISCO.SAS [BIGQUERY/GCP], /INFOGRC/PRECOXRISCO/CODIGOS/06.TABELA-TAXAS-PROPOSTAS.SAS [BIGQUERY/GCP], INFGER.PPR_ANALITICO [SAS/Local]
+SAME-SCRIPT RE-READS (output→read in same script; not external ingestion): (none)
+IMPORTED_LIBNAMES: (none)
+EXPORTED_LIBNAMES: IGELOG
+IMPORTED FILES (Requires Ingestion): /infogrc/precoxrisco/codigos/00.parametros-e-variaveis.sas, /infogrc/precoxrisco/codigos/01.input-bases-iqprdbi.sas, /infogrc/precoxrisco/codigos/02.input-bases-ptasybctr.sas, /infogrc/precoxrisco/codigos/03.input-bases-ptaiqcont.sas, /infogrc/precoxrisco/codigos/04.input-bases-sas.sas, /infogrc/precoxrisco/codigos/05.etl-base-preco-por-risco.sas, /infogrc/precoxrisco/codigos/06.tabela-taxas-propostas.sas
+TABLE_READ_PROVENANCE (Flow): INFGER.PPR_ANALITICO [PROC SQL - FROM]
+EXTERNAL FILE PATHS (SAS scan — INFILE/INFILE=/FILENAME/%INC/LIBNAME EXCEL|ACCESS|PROC IMPORT + heurística ext.; sem raízes LIBNAME pasta): /infogrc/precoxrisco/codigos/00.parametros-e-variaveis.sas, /infogrc/precoxrisco/codigos/01.input-bases-iqprdbi.sas, /infogrc/precoxrisco/codigos/02.input-bases-ptasybctr.sas, /infogrc/precoxrisco/codigos/03.input-bases-ptaiqcont.sas, /infogrc/precoxrisco/codigos/04.input-bases-sas.sas, /infogrc/precoxrisco/codigos/05.etl-base-preco-por-risco.sas, /infogrc/precoxrisco/codigos/06.tabela-taxas-propostas.sas
+INTERNAL READS (Temp/Local): (none)
+SAS QUALIFIED READS (Full project .txt, incl. outside EG flow): (none)
+----------------------------------------
+PERMANENT OUTPUTS (Target Marts): IGELOG.LOGEXECUCAOPROCESSOS
+APPEND_ONLY_OUTPUTS: IGELOG.LOGEXECUCAOPROCESSOS
+NON_CREATOR_OUTPUTS (apensa/atualiza, nunca cria): IGELOG.LOGEXECUCAOPROCESSOS
+EXPORTED FILES (Artifacts): (none)
+TEMP/DISCARDED OUTPUTS: LOGEXE, STATUSPPR
+DYNAMIC REFS (Ambiguous): 
+----------------------------------------
+FILE_REFERENCES_SUMMARY: 7 paths (sas: 7)
+----------------------------------------
+[[ FILE INVENTORY ]]
+[CODE REF] /infogrc/precoxrisco/codigos/00.parametros-e-variaveis.sas
+[CODE REF] /infogrc/precoxrisco/codigos/01.input-bases-iqprdbi.sas
+[CODE REF] /infogrc/precoxrisco/codigos/02.input-bases-ptasybctr.sas
+[CODE REF] /infogrc/precoxrisco/codigos/03.input-bases-ptaiqcont.sas
+[CODE REF] /infogrc/precoxrisco/codigos/04.input-bases-sas.sas
+[CODE REF] /infogrc/precoxrisco/codigos/05.etl-base-preco-por-risco.sas
+[CODE REF] /infogrc/precoxrisco/codigos/06.tabela-taxas-propostas.sas
+
+END_METADATA
+================================================================================
+options validvarname=any;
+options nofmterr;
+
+/* Marcar horário de início da atualização */
+%LET W_inip = %SYSFUNC(datetime());
+
+/* Enviar e-mail de início da atualização */
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_INI EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+        BCC=("fernanda.varani@bv.com.br" "andressa.souza@bv.com.br" "hellen.dantas@bv.com.br" "felipe.ikezaki@bv.com.br" "rafaeli.trigone@bv.com.br")
+SUBJECT="Preço por risco | Início da atualização";
+
+DATA _NULL_;
+	FILE MAIL_INI;
+		PUT "Processamento da base de Preço por Risco iniciado.";
+RUN;
+
+/* Executar código de geração da base */
+%include '/infogrc/precoxrisco/codigos/00.parametros-e-variaveis.sas';
+%include '/infogrc/precoxrisco/codigos/01.input-bases-iqprdbi.sas';
+%include '/infogrc/precoxrisco/codigos/02.input-bases-ptasybctr.sas';
+%include '/infogrc/precoxrisco/codigos/03.input-bases-ptaiqcont.sas';
+%include '/infogrc/precoxrisco/codigos/04.input-bases-sas.sas';
+%include '/infogrc/precoxrisco/codigos/05.etl-base-preco-por-risco.sas';
+%include '/infogrc/precoxrisco/codigos/06.tabela-taxas-propostas.sas';
+
+/* Calcular tempo de processamento total */
+%LET W_fimp = %SYSFUNC(datetime());
+%LET W_durp = %SYSFUNC(intck(SECOND, &W_inip, &W_fimp), tod8.);
+
+/* Enviar e-mail de finalização da atualização */
+PROC SQL;
+CREATE TABLE STATUSPPR AS
+SELECT
+MAX(DtContrato) format=ddmmyy10. AS MaxDtContrato,
+MAX(DtEntradaProposta) format=ddmmyy10. AS MaxDtProposta
+FROM INFGER.PPR_ANALITICO;
+RUN;
+
+OPTIONS EMAILHOST=smtprelay.bvnet.bv EMAILPORT=25 EMAILAUTHPROTOCOL=NONE;
+
+FILENAME MAIL_FIM EMAIL
+	FROM=("inf-gerenciais@bv.com.br")
+	TO=("inf-gerenciais@bv.com.br")
+	BCC=("mariana.cardoso@bv.com.br" "larissa.borghi@bv.com.br" "fernanda.varani@bv.com.br" "andressa.souza@bv.com.br" "hellen.dantas@bv.com.br" "felipe.ikezaki@bv.com.br" "rafaeli.trigone@bv.com.br")
+    TYPE="text/html"
+    SUBJECT="Preço por risco | Fim da atualização";
+
+ODS html body=MAIL_FIM style=noline rs=none;
+
+PROC REPORT DATA=STATUSPPR nowd HEADLINE HEADSKIP
+style (report) = {background = none font_face = "Calibri" font_size = 9pt just=left OUTLINECOLOR = none}
+style (column) = {background = none CELLHEIGHT = 2.5% font_face = "Calibri" font_size = 9pt just=center OUTLINECOLOR = none}
+style (header) = {foreground = white font_face="Calibri" font_size = 9pt just=center background = #69c3cf OUTLINECOLOR = none} ;
+
+COLUMNS MaxDtContrato MaxDtProposta;
+RUN;
+
+PROC ODSTEXT;
+   p "Prezados,";
+   p "";
+   p "A base de preço por risco foi atualizada.";
+   p "A geração da base demorou &W_durp. para ser concluída.";
+   P "";
+   p "Atenciosamente,";
+   p "Informações Gerenciais Estratégicas";
+RUN;
+
+ods _all_ close;
+
+DATA LOGEXE;
+  IdProcesso = 'BPRCRSCO';
+  LENGTH Processo $40.;
+  Processo = 'Preço por risco';
+  FORMAT Inicio Final DATETIME18.;
+  Inicio = &W_inip.;
+  Final = &W_fimp.;
+  Duracao = "&W_durp.";
+RUN;
+
+PROC APPEND DATA=LOGEXE BASE=IGELOG.LogExecucaoProcessos; RUN;
